@@ -1,6 +1,7 @@
 /**
  * @file MoodPicker.tsx
  * @updated 2026-05-05: Hide sticker labels in the picker and tighten the 4x4 grid so 16 stickers fit without an inner scrollbar.
+ * @updated 2026-09-25: Added an opt-in merged-group sticker picker with a scrollable masonry layout while preserving the legacy picker.
  * @description 心情选择器组件 - 用于每日回顾（全屏模态框样式）
  * 支持 emoji 和自定义贴纸组
  */
@@ -11,6 +12,7 @@ import { IconRenderer } from './IconRenderer';
 import { stickerService } from '../services/stickerService';
 import { useSettings } from '../contexts/SettingsContext';
 import { RedemptionService } from '../services/redemptionService';
+import { resolveStickerSelectorGroups } from '../services/stickerSelectorLayoutService';
 
 // 默认心情 emoji 列表（只存储 emoji，不需要 label）
 const DEFAULT_MOOD_EMOJIS = [
@@ -78,7 +80,7 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     onOpenDailyReview,
     onClose
 }) => {
-    const { defaultSelectorPage } = useSettings();
+    const { defaultSelectorPage, stickerSelectorConfig } = useSettings();
     const [isCustomMode, setIsCustomMode] = React.useState(false);
     const [customEmoji, setCustomEmoji] = React.useState('');
     const [moodEmojis, setMoodEmojis] = useState(getMoodEmojis());
@@ -94,6 +96,10 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
     
     // 获取 sticker sets
     const [stickerSets, setStickerSets] = useState(stickerService.getAllStickerSets());
+    const resolvedStickerGroups = React.useMemo(
+        () => resolveStickerSelectorGroups(stickerSelectorConfig, stickerSets),
+        [stickerSelectorConfig, stickerSets]
+    );
     
     // 滑动相关状态
     const [touchStart, setTouchStart] = useState<number | null>(null);
@@ -111,17 +117,21 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
         if (!isRedeemed) {
             return 0;
         }
-        // 查找对应的 sticker set 索引
-        const stickerIndex = stickerSets.findIndex(set => set.id === defaultSelectorPage);
+        // 查找对应的 sticker set 或新版大分组索引
+        const stickerIndex = stickerSelectorConfig.enabled
+            ? resolvedStickerGroups.findIndex((group) => (
+                group.id === defaultSelectorPage || group.sourceSetIds.includes(defaultSelectorPage)
+            ))
+            : stickerSets.findIndex(set => set.id === defaultSelectorPage);
         // 如果找到，返回索引 + 1（因为 0 是 emoji 页）；否则返回 0
         return stickerIndex >= 0 ? stickerIndex + 1 : 0;
-    }, [defaultSelectorPage, isRedeemed, stickerSets]);
+    }, [defaultSelectorPage, isRedeemed, resolvedStickerGroups, stickerSelectorConfig.enabled, stickerSets]);
     
     // 页面切换状态
     const [currentPageIndex, setCurrentPageIndex] = useState(0);
     
     // 总页数 = 1 (Emoji) + N (Sticker sets)
-    const totalPages = 1 + stickerSets.length;
+    const totalPages = 1 + (stickerSelectorConfig.enabled ? resolvedStickerGroups.length : stickerSets.length);
 
     // 检查验证状态
     useEffect(() => {
@@ -181,7 +191,9 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
             return 'Emoji';
         }
         const stickerSetIndex = currentPageIndex - 1;
-        return stickerSets[stickerSetIndex]?.name || 'Stickers';
+        return stickerSelectorConfig.enabled
+            ? resolvedStickerGroups[stickerSetIndex]?.name || 'Stickers'
+            : stickerSets[stickerSetIndex]?.name || 'Stickers';
     };
     
     // 获取当前页面描述
@@ -190,6 +202,12 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
             return null;
         }
         const stickerSetIndex = currentPageIndex - 1;
+        if (stickerSelectorConfig.enabled) {
+            return resolvedStickerGroups[stickerSetIndex]?.sourceSets
+                .map((set) => set.description)
+                .filter(Boolean)
+                .join(' · ');
+        }
         return stickerSets[stickerSetIndex]?.description;
     };
     
@@ -410,12 +428,40 @@ export const MoodPickerModal: React.FC<MoodPickerModalProps> = ({
                             <>
                                 {(() => {
                                     const stickerSetIndex = currentPageIndex - 1;
-                                    const currentStickerSet = stickerSets[stickerSetIndex];
+                                    const currentStickerSet = stickerSelectorConfig.enabled
+                                        ? resolvedStickerGroups[stickerSetIndex]
+                                        : stickerSets[stickerSetIndex];
                                     
                                     if (!currentStickerSet) {
                                         return (
                                             <div className="text-center py-12 text-stone-400">
                                                 <p className="text-sm">贴纸集不存在</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    if (stickerSelectorConfig.enabled) {
+                                        return (
+                                            <div className="columns-2 sm:columns-3 gap-2 mb-4 max-h-[52vh] overflow-y-auto pr-1">
+                                                {currentStickerSet.stickers.map((sticker) => {
+                                                    const stickerIcon = `image:${sticker.path}`;
+
+                                                    return (
+                                                        <button
+                                                            key={sticker.path}
+                                                            onClick={() => {
+                                                                onSelect(stickerIcon);
+                                                                onClose();
+                                                            }}
+                                                            aria-label={sticker.label || '选择贴纸'}
+                                                            className="mb-2 inline-flex w-full break-inside-avoid items-center justify-center rounded-2xl p-2 transition-all hover:bg-stone-50 relative"
+                                                        >
+                                                            <div className="relative flex items-center justify-center w-full aspect-square max-w-[112px]">
+                                                                <IconRenderer icon={stickerIcon} size="100%" />
+                                                            </div>
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     }

@@ -4,6 +4,7 @@
  * @output Versioned preference backup payloads and restore/change events
  * @pos Service (Backup and Sync)
  * @description Keeps user-facing preference state separate from appearance data while allowing cloud restore to rehydrate mounted contexts.
+ * @updated 2026-09-25: Included the new sticker selector layout preference in backup/restore snapshots.
  */
 
 export const PREFERENCES_RESTORED_EVENT = 'lumostime:preferences-restored';
@@ -30,6 +31,7 @@ const PREFERENCE_STORAGE_KEYS = [
   'lumostime_collapse_threshold',
   'lumostime_scene_card_timer_mode',
   'lumostime_default_selector_page',
+  'lumostime_sticker_selector_config',
   'lumostime_timeline_layout',
   'lumostime_timeline_todo_sidebar_collapsed',
   'lumostime_timeline_todo_sidebar_ratio',
