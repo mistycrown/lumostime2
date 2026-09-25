@@ -116,28 +116,24 @@ const RadialHistogram: React.FC<{ summary: HourBucketSummary; range: RhythmRange
   const maximum = Math.max(...summary.buckets.map((bucket) => bucket.minutes), 0);
   const startAtTop = -Math.PI / 2;
   const step = (Math.PI * 2) / 24;
-  const hasData = summary.totalMinutes > 0;
   return <div className="mx-auto w-full max-w-[360px]">
     <svg viewBox="0 0 320 320" className="w-full" role="img" aria-label={`时序图，直方样式，${rangeLabel(range)}，总时长 ${formatRhythmDuration(summary.totalMinutes)}`}>
       <circle cx={center} cy={center} r={maxRadius} fill={palette.background} opacity="0.3" />
       {summary.buckets.map((bucket) => {
         const angle = startAtTop + bucket.hour * step;
-        const gap = 0.035;
+        const gap = 0.008;
         const ratio = maximum > 0 ? bucket.minutes / maximum : 0;
         const outerRadius = innerRadius + ratio * (maxRadius - innerRadius);
         const basePath = annularSectorPath(center, innerRadius, maxRadius, angle + gap, angle + step - gap);
         const valuePath = annularSectorPath(center, innerRadius, Math.max(innerRadius + 1, outerRadius), angle + gap, angle + step - gap);
         const labelPoint = polarPoint(center, maxRadius + 20, angle + step / 2);
         return <g key={bucket.hour}>
-          <path d={basePath} fill={palette.grid} fillOpacity="0.42" stroke={palette.background} strokeWidth="1" />
-          {bucket.minutes > 0 && <path d={valuePath} fill={palette.accent} fillOpacity={0.25 + ratio * 0.68} stroke={palette.background} strokeWidth="1"><title>{`${String(bucket.hour).padStart(2, '0')}:00–${String((bucket.hour + 1) % 24).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>}
+          <path d={basePath} fill={palette.grid} fillOpacity="0.42" />
+          {bucket.minutes > 0 && <path d={valuePath} fill={palette.accent} fillOpacity={0.25 + ratio * 0.68}><title>{`${String(bucket.hour).padStart(2, '0')}:00–${String((bucket.hour + 1) % 24).padStart(2, '0')}:00 · ${formatRhythmDuration(bucket.minutes)}`}</title></path>}
           <text x={labelPoint.x} y={labelPoint.y + 3} textAnchor="middle" fill="#8f8174" fontSize="8" fontFamily="var(--font-family)" fontVariant="tabular-nums">{bucket.hour}</text>
         </g>;
       })}
       <circle cx={center} cy={center} r="38" fill={palette.background} stroke={palette.grid} strokeWidth="1" />
-      <text x={center} y={center - 12} textAnchor="middle" fill="#5d5147" fontSize="9" fontFamily="var(--font-family)">累计时长</text>
-      <text x={center} y={center + 8} textAnchor="middle" fill="#4b3d32" fontSize="16" fontFamily="var(--font-family)">{hasData ? formatRhythmDuration(summary.totalMinutes) : '暂无记录'}</text>
-      {hasData && <text x={center} y={center + 24} textAnchor="middle" fill="#9a8b7e" fontSize="8.5" fontFamily="var(--font-family)">{summary.activeDays} 天</text>}
     </svg>
   </div>;
 };
