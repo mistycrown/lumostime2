@@ -187,6 +187,8 @@ export interface AssistantAgentConfig {
   nextLetterAt?: string;
   lastLetterSentAt?: string;
   lastLetterScheduledAt?: string;
+  letterDispatchAttemptCount?: number;
+  lastLetterDispatchAttemptAt?: string;
 }
 
 export interface AssistantLetterDraft {

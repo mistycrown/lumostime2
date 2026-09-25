@@ -27,6 +27,9 @@ export interface AssistantLetterSchedulePatch {
   lastLetterScheduledAt?: string;
 }
 
+export const ASSISTANT_LETTER_MAX_DISPATCH_ATTEMPTS = 3;
+export const ASSISTANT_LETTER_RETRY_DELAY_MS = 60_000;
+
 const MINUTES_PER_DAY = 24 * 60;
 
 const parseWindowMinutes = (value?: string | null): number | null => {
@@ -167,6 +170,46 @@ export const assistantLetterScheduler = {
     return Number.isFinite(nextLetterMs) && nextLetterMs <= now.getTime();
   },
 
+  isDispatchAllowed(
+    config: Pick<AssistantAgentConfig, 'letterDispatchAttemptCount' | 'lastLetterDispatchAttemptAt'>,
+    now = new Date()
+  ): boolean {
+    if ((config.letterDispatchAttemptCount || 0) >= ASSISTANT_LETTER_MAX_DISPATCH_ATTEMPTS) {
+      return false;
+    }
+    const lastAttemptMs = parseAssistantDateTime(config.lastLetterDispatchAttemptAt);
+    return !Number.isFinite(lastAttemptMs)
+      || now.getTime() - lastAttemptMs >= ASSISTANT_LETTER_RETRY_DELAY_MS;
+  },
+
+  buildFailurePatch(
+    config: Pick<AssistantAgentConfig, 'letterFrequencyDays' | 'letterWindowStart' | 'letterWindowEnd' | 'lastLetterSentAt' | 'letterDispatchAttemptCount'>,
+    options?: { now?: Date; attemptedAt?: string }
+  ): Partial<AssistantAgentConfig> {
+    const now = options?.now || new Date();
+    const attemptedAt = normalizeAssistantDateTime(options?.attemptedAt || now.toISOString()) || now.toISOString();
+    const attemptCount = Math.min(
+      ASSISTANT_LETTER_MAX_DISPATCH_ATTEMPTS,
+      Math.max(0, config.letterDispatchAttemptCount || 0) + 1
+    );
+    if (attemptCount < ASSISTANT_LETTER_MAX_DISPATCH_ATTEMPTS) {
+      return {
+        letterDispatchAttemptCount: attemptCount,
+        lastLetterDispatchAttemptAt: attemptedAt
+      };
+    }
+
+    const nextSchedule = assistantLetterScheduler.buildNextSchedulePatch(config, {
+      now,
+      anchorAt: attemptedAt
+    });
+    return {
+      ...(nextSchedule || { nextLetterAt: undefined }),
+      letterDispatchAttemptCount: 0,
+      lastLetterDispatchAttemptAt: undefined
+    };
+  },
+
   buildSuccessPatch(
     config: Pick<AssistantAgentConfig, 'letterFrequencyDays' | 'letterWindowStart' | 'letterWindowEnd'>,
     options?: {
@@ -193,6 +236,8 @@ export const assistantLetterScheduler = {
 
     return {
       lastLetterSentAt: normalizedSentAt,
+      letterDispatchAttemptCount: 0,
+      lastLetterDispatchAttemptAt: undefined,
       ...nextPatch
     };
   },

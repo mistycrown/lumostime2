@@ -35,6 +35,8 @@ const DEFAULT_ASSISTANT_AGENT_CONFIG: AssistantAgentConfig = {
   letterFrequencyDays: 2
 };
 
+const MAX_LETTER_DISPATCH_ATTEMPTS = 3;
+
 const normalizeStringArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -114,6 +116,12 @@ const normalizeConfig = (value: unknown): AssistantAgentConfig => {
       : {}),
     ...(normalizeAssistantDateTime(candidate.lastLetterScheduledAt)
       ? { lastLetterScheduledAt: normalizeAssistantDateTime(candidate.lastLetterScheduledAt)! }
+      : {}),
+    ...(Number.isFinite(candidate.letterDispatchAttemptCount)
+      ? { letterDispatchAttemptCount: Math.max(0, Math.min(MAX_LETTER_DISPATCH_ATTEMPTS, Math.round(Number(candidate.letterDispatchAttemptCount)))) }
+      : {}),
+    ...(normalizeAssistantDateTime(candidate.lastLetterDispatchAttemptAt)
+      ? { lastLetterDispatchAttemptAt: normalizeAssistantDateTime(candidate.lastLetterDispatchAttemptAt)! }
       : {})
   };
 };

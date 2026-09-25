@@ -151,6 +151,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
         || !isAssistantBackgroundContextReady
         || isProcessingAssistantLetterRef.current
         || !assistantLetterScheduler.isLetterDue(assistantAgentConfig, new Date())
+        || !assistantLetterScheduler.isDispatchAllowed(assistantAgentConfig, new Date())
       ) {
         return;
       }
