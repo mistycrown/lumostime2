@@ -290,6 +290,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     }}
                     previewEventName={NAVIGATION_BACKGROUND_PREVIEW_EVENT}
                     title="导航背景调整"
+                    resetSettings={{ offsetY: 13, offsetX: 0, scale: 115, opacity: 100 }}
                 />
             )}
         </>
