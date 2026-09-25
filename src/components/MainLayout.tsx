@@ -7,6 +7,7 @@
  * @updated 2026-04-25: Let floating switch-button fallback icons inherit the button theme color so default UI icons stay visible on accent-theme white buttons.
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @updated 2026-09-25: Applies the persisted transparent-navigation setting to supported top title bars while excluding Todo schedule mode.
+ * @updated 2026-09-25: Marks transparent-title-bar layouts so page background masks can cover the full viewport without changing normal layout flow.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -67,7 +68,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
     const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
-    const { backgroundUrl, hasBackground } = useBackgroundDisplay();
+    const { backgroundUrl, backgroundOpacity, hasBackground } = useBackgroundDisplay();
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
@@ -162,7 +163,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     const shouldUseTransparentTitleBar = isTransparentNavigation && supportsTransparentTitleBar;
 
     return (
-        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)]`}>
+        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)] ${shouldUseTransparentTitleBar ? 'transparent-title-bar-active' : ''}`}>
 
             {shouldUseTransparentTitleBar && hasBackground && (
                 <div
@@ -171,7 +172,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         backgroundImage: `url(${backgroundUrl})`,
                         backgroundSize: 'cover',
                         backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat'
+                        backgroundRepeat: 'no-repeat',
+                        opacity: backgroundOpacity
                     }}
                 />
             )}

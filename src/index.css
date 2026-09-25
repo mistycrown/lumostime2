@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Transparent title-bar mode uses one viewport-wide mask so the header, page, and bottom navigation share the same tone. */
+.transparent-title-bar-active .page-background-overlay {
+  position: fixed;
+  inset: 0;
+}
+
+.transparent-title-bar-active .transparent-index-overlay {
+  background-color: rgb(250 249 246 / 64%);
+}
+
+.transparent-title-bar-active #tags-content > *:not(.bg-layer):not(.transparent-index-overlay),
+.transparent-title-bar-active #scopes-content > *:not(.bg-layer):not(.transparent-index-overlay) {
+  position: relative;
+  z-index: 1;
+}
+
 @layer components {
   .association-option-grid-wrap {
     container-type: inline-size;
