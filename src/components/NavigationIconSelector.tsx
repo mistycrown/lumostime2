@@ -7,6 +7,7 @@
  * @updated 2026-09-25: Reworked the page view into a compact multi-scheme selector.
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import {
@@ -42,6 +43,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
     const [customIcons, setCustomIcons] = useState<NavigationIconOption[]>(() => navigationIconService.getCustomIcons());
     const [schemes, setSchemes] = useState<NavigationIconScheme[]>(() => navigationIconService.getCustomSchemes());
     const [editingScheme, setEditingScheme] = useState<NavigationIconScheme | null>(null);
+    const [openSlot, setOpenSlot] = useState<NavigationIconSlot | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,6 +83,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
 
     const closeEditor = () => {
         setEditingScheme(null);
+        setOpenSlot(null);
         reload();
     };
 
@@ -127,14 +130,6 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
         }
     };
 
-    const handleDeleteIcon = async (icon: NavigationIconOption) => {
-        if (await navigationIconService.deleteCustomIcon(icon.id)) {
-            reload();
-            if (editingScheme) setEditingScheme(navigationIconService.getCustomSchemes().find((scheme) => scheme.id === editingScheme.id) || null);
-            onToast('success', '导航图标已删除');
-        }
-    };
-
     const handleDeleteScheme = () => {
         if (!editingScheme) return;
         navigationIconService.deleteCustomScheme(editingScheme.id);
@@ -156,6 +151,77 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
             />
         ) : <span className="font-serif text-lg text-stone-500">Aa</span>
     );
+
+    const editor = editingScheme ? (
+        <div
+            className="fixed inset-0 z-[220] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="编辑导航图标方案"
+            onClick={closeEditor}
+        >
+            <div
+                className="flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-[24px] bg-[#fdfbf7] shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="flex items-start justify-between border-b border-stone-100 px-5 py-5">
+                    <h3 className="text-lg font-medium text-stone-800">编辑导航图标方案</h3>
+                    <button type="button" onClick={closeEditor} aria-label="关闭" className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"><X size={19} /></button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                    <label className="block text-xs text-stone-500">
+                        方案名称
+                        <input
+                            value={editingScheme.name}
+                            onChange={(event) => updateSchemeName(event.target.value)}
+                            maxLength={20}
+                            className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-200"
+                        />
+                    </label>
+                    <div className="mt-4 divide-y divide-stone-100 border-t border-stone-100">
+                        {navigationIconService.getSlots().map((slot) => {
+                            const selectedIcon = customIcons.find((icon) => icon.id === editingScheme.mapping[slot]);
+                            const isOpen = openSlot === slot;
+                            return (
+                                <div key={slot} className="relative flex min-h-[108px] items-start justify-between gap-4 py-4">
+                                    <span className="pt-1 text-sm text-stone-600">{SLOT_LABELS[slot]}</span>
+                                    <div className="relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => setOpenSlot(isOpen ? null : slot)}
+                                            className={`flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border bg-white p-1.5 transition-colors ${selectedIcon ? 'border-stone-300' : 'border-stone-700'}`}
+                                            aria-label={`选择${SLOT_LABELS[slot]}图标`}
+                                        >
+                                            {selectedIcon ? renderIcon(selectedIcon, selectedIcon.name, 'h-full w-full object-contain') : <span className="text-[11px] text-stone-400">文字</span>}
+                                        </button>
+                                        {isOpen && (
+                                            <div className="absolute right-0 top-[72px] z-10 grid w-[232px] grid-cols-5 gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-lg">
+                                                <button type="button" onClick={() => { selectSchemeIcon(slot, null); setOpenSlot(null); }} className={`flex h-10 w-10 items-center justify-center rounded-lg border text-[10px] text-stone-400 ${!selectedIcon ? 'border-stone-700' : 'border-stone-200'}`}>文字</button>
+                                                {customIcons.map((icon) => (
+                                                    <button key={icon.id} type="button" onClick={() => { selectSchemeIcon(slot, icon.id); setOpenSlot(null); }} className={`flex h-10 w-10 items-center justify-center rounded-lg border bg-stone-50 p-1 ${selectedIcon?.id === icon.id ? 'border-stone-700' : 'border-stone-200'}`}>
+                                                        {renderIcon(icon, icon.name, 'h-full w-full object-contain')}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+                <div className="flex shrink-0 items-center justify-between gap-3 border-t border-stone-100 bg-white px-5 py-4">
+                    <button type="button" onClick={handleDeleteScheme} className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700"><Trash2 size={14} /> 删除方案</button>
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-xl border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-500 hover:border-stone-500">
+                            <Plus size={14} /> {isUploading ? '上传中' : '添加图标'}
+                        </button>
+                        <button type="button" onClick={closeEditor} className="rounded-xl bg-stone-800 px-4 py-2 text-xs text-white hover:bg-stone-700">完成</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    ) : null;
 
     return (
         <>
@@ -201,44 +267,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                 </div>
             </div>
 
-            {editingScheme && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4" role="dialog" aria-modal="true" aria-label="编辑导航图标方案">
-                    <div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-base font-bold text-stone-800">编辑导航图标方案</h3>
-                            <button type="button" onClick={closeEditor} aria-label="关闭" className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100"><X size={17} /></button>
-                        </div>
-                        <label className="mb-4 block text-xs text-stone-500">
-                            方案名称
-                            <input value={editingScheme.name} onChange={(event) => updateSchemeName(event.target.value)} className="mt-1 w-full rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-800 outline-none focus:border-stone-500" />
-                        </label>
-                        <div className="space-y-3">
-                            {navigationIconService.getSlots().map((slot) => (
-                                <div key={slot} className="border-t border-stone-100 pt-3">
-                                    <div className="mb-2 text-xs font-semibold text-stone-600">{SLOT_LABELS[slot]}</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <button type="button" onClick={() => selectSchemeIcon(slot, null)} className={`flex h-14 w-14 items-center justify-center rounded-lg border text-[11px] text-stone-400 ${!editingScheme.mapping[slot] ? 'border-stone-700 bg-stone-50' : 'border-stone-200'}`}>文字</button>
-                                        {customIcons.map((icon) => (
-                                            <button key={icon.id} type="button" onClick={() => selectSchemeIcon(slot, icon.id)} className={`relative flex h-14 w-14 items-center justify-center rounded-lg border bg-stone-50 p-1 ${editingScheme.mapping[slot] === icon.id ? 'border-stone-700' : 'border-stone-200'}`}>
-                                                {renderIcon(icon, icon.name, 'h-full w-full object-contain')}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
-                            <button type="button" onClick={handleDeleteScheme} className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700"><Trash2 size={14} /> 删除方案</button>
-                            <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-stone-300 px-3 py-2 text-xs text-stone-500 hover:border-stone-500">
-                                    <Plus size={14} /> {isUploading ? '上传中' : '添加图标'}
-                                </button>
-                                <button type="button" onClick={closeEditor} className="rounded-lg bg-stone-800 px-4 py-2 text-xs text-white hover:bg-stone-700">完成</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {editor && (typeof document === 'undefined' ? editor : createPortal(editor, document.body))}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
         </>
     );
