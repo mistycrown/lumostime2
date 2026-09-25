@@ -25,6 +25,7 @@
  * @updated 2026-09-21: Enlarges cross-month choice heatmaps to two monthly columns and removes redundant chart subtitles.
  * @updated 2026-09-21: Restores statistic-card type subtitles while keeping the redundant inner chart description removed.
  * @updated 2026-09-23: Adds shared weekly/monthly/yearly petal rhythm charts for duration sources.
+ * @updated 2026-09-25: Keeps rolling stacked choice charts bounded to the selected dates instead of expanding to full calendar months.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -811,9 +812,12 @@ const ChoiceStackedPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   const optionIds = [...totals.entries()].sort((left, right) => right[1] - left[1]).map(([id]) => id);
   if (optionIds.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
   const labels = new Map((attribute.options || []).map((option) => [option.id, option.label]));
+  // Stacked bars represent one bar per selected day. Unlike calendar heatmaps,
+  // rolling ranges must not expand to the surrounding complete months, otherwise
+  // a 30-day chart can render up to 61 positions with most of them empty.
   const days = range === 'all'
     ? [...new Set(logs.map((log) => getLocalDateKey(log.startTime)))].sort()
-    : range === '7d' ? getDateKeysForRange(range) : getCalendarDaysForRange(range);
+    : getDateKeysForRange(range);
   const maximum = Math.max(...days.map((day) => [...(daily.get(day)?.values() || [])].reduce((sum, value) => sum + value, 0)), 1);
   const chartWidth = 640;
   const chartHeight = 270;
