@@ -16,6 +16,7 @@
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
  * @updated 2026-06-13: 解构并传递 handleQuickActionUpdateTitle 给 TodoQuickActionsModal 从而支持快捷编辑栏中的标题内联编辑和自动保存。
  * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
+ * @updated 2026-09-26: Added configurable backgrounds to loose-mode todo cards.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -24,6 +25,7 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { useCardBackground } from '../hooks/useCardBackground';
 import { FloatingButton } from '../components/FloatingButton';
 import { UIIcon } from '../components/UIIcon';
 import {
@@ -113,6 +115,7 @@ const SwipeableTodoItem: React.FC<{
   isFirst?: boolean;
   isLast?: boolean;
   compactDisplaySettings: TodoCompactDisplaySettings;
+  backgroundIndex?: number;
 }> = ({
   todo,
   categories,
@@ -133,8 +136,10 @@ const SwipeableTodoItem: React.FC<{
   onToggleChildren,
   isFirst = false,
   isLast = false,
-  compactDisplaySettings
+  compactDisplaySettings,
+  backgroundIndex = 0
 }) => {
+  const cardBackground = useCardBackground(backgroundIndex, viewMode === 'loose');
   const [translateX, setTranslateX] = useState(0);
   const isQuickReminder = isQuickTodo(todo);
   const canQuickToggle = true;
@@ -433,7 +438,7 @@ const SwipeableTodoItem: React.FC<{
             : (viewMode === 'compact' ? 'bg-white' : 'bg-white/80 backdrop-blur-md border-stone-100 shadow-sm')
           }
         `}
-        style={{ transform: `translateX(${translateX}px)` }}
+        style={{ transform: `translateX(${translateX}px)`, ...(viewMode === 'loose' && cardBackground.active ? cardBackground.style : {}) }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -2915,6 +2920,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                         isFirst={index === 0}
                         isLast={index === section.entries.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
                         compactDisplaySettings={compactDisplaySettings}
+                        backgroundIndex={index}
                       />
 
                       {isExpanded && group && group.childEntries.length > 0 && (
@@ -2938,6 +2944,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                               isFirst={childIndex === 0}
                               isLast={childIndex === group.childEntries.length - 1}
                               compactDisplaySettings={compactDisplaySettings}
+                              backgroundIndex={index + childIndex + 1}
                             />
                           ))}
                         </div>
@@ -2983,6 +2990,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       isFirst={index === 0}
                       isLast={index === selectedTodoEntriesForRender.length - 1 && !(isExpanded && group && group.childEntries.length > 0)}
                       compactDisplaySettings={compactDisplaySettings}
+                      backgroundIndex={index}
                     />
 
                     {isExpanded && group && group.childEntries.length > 0 && (
@@ -3006,6 +3014,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             isFirst={childIndex === 0}
                             isLast={childIndex === group.childEntries.length - 1}
                             compactDisplaySettings={compactDisplaySettings}
+                            backgroundIndex={index + childIndex + 1}
                           />
                         ))}
                       </div>
@@ -3031,6 +3040,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                     isFirst={index === 0}
                     isLast={index === selectedTodoEntriesForRender.length - 1}
                     compactDisplaySettings={compactDisplaySettings}
+                    backgroundIndex={index}
                   />
                 ))
               : selectedCategoryTreeGroups.map((group, groupIndex) => {
@@ -3064,6 +3074,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                       isFirst={groupIndex === 0}
                       isLast={groupIndex === selectedCategoryTreeGroups.length - 1 && !(isExpanded && group.childEntries.length > 0)}
                       compactDisplaySettings={compactDisplaySettings}
+                      backgroundIndex={groupIndex}
                     />
 
                     {isExpanded && group.childEntries.length > 0 && (
@@ -3086,6 +3097,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             isFirst={childIndex === 0}
                             isLast={childIndex === group.childEntries.length - 1}
                             compactDisplaySettings={compactDisplaySettings}
+                            backgroundIndex={groupIndex + childIndex + 1}
                           />
                         ))}
                       </div>

@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-26: `CardBackgroundSelector.tsx` adds multi-image card-background groups, alignment, deletion, and opacity controls to the sponsorship style tab; `useCardBackground.ts` resolves stable carousel backgrounds for supported card views.
+
 - Update 2026-09-26: `BottomNavigation.tsx` no longer follows the title-bar transparency setting; legacy navigation retains its surface while new-mode background images continue to render independently.
 
 - Update 2026-09-26: `NavigationBackgroundSelector.tsx` keeps both navigation setting switches visible in dark mode with an outlined track, distinct enabled state, and light thumb.

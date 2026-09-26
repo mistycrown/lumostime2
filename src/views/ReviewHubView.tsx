@@ -8,6 +8,7 @@
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-09-14: Localized Chronicle page labels and empty-state copy to Chinese without changing date formatting.
  * @updated 2026-09-25: Connects the Chronicle title bar transparency to the navigation setting.
+ * @updated 2026-09-26: Added configurable image backgrounds to daily, weekly, and monthly review cards.
  *
  * 鈿狅笍 Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -18,6 +19,22 @@ import { DailyReview, WeeklyReview, MonthlyReview, Log } from '../types';
 import { parseNarrative } from '../utils/narrativeUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
+import { useCardBackground } from '../hooks/useCardBackground';
+
+interface CardBackgroundSurfaceProps {
+  index: number;
+  as?: 'article' | 'div';
+  className: string;
+  style: React.CSSProperties;
+  onClick?: () => void;
+  children: React.ReactNode;
+}
+
+const CardBackgroundSurface: React.FC<CardBackgroundSurfaceProps> = ({ index, as = 'div', className, style, onClick, children }) => {
+  const background = useCardBackground(index);
+  const Surface = as;
+  return <Surface onClick={onClick} className={className} style={{ ...style, ...(background.active ? background.style : {}) }}>{children}</Surface>;
+};
 
 interface ReviewHubViewProps {
   dailyReviews: DailyReview[];
@@ -300,7 +317,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             </div>
           ) : (
             <div className="flex overflow-x-auto gap-4 pb-5 pt-2 -mr-5 pr-5 snap-x snap-mandatory scrollbar-hide">
-              {sortedMonthlyReviews.map((review) => {
+              {sortedMonthlyReviews.map((review, index) => {
                 const reviewDate = new Date(review.monthStartDate);
                 const monthName = reviewDate.toLocaleDateString('en-US', { month: 'long' }).toUpperCase();
                 const isCurrentMonth = new Date().getMonth() === reviewDate.getMonth()
@@ -322,8 +339,10 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                 }
 
                 return (
-                  <article
+                  <CardBackgroundSurface
                     key={review.id}
+                    as="article"
+                    index={index}
                     onClick={() => onOpenMonthlyReview(new Date(review.monthStartDate), new Date(review.monthEndDate))}
                     className="flex-none w-[90%] snap-center border border-stone-100 rounded-lg p-6 relative active:scale-[0.98] transition-transform"
                     style={cardSurfaceStyle}
@@ -350,7 +369,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                       <span>{reviewDate.getFullYear()}/{(reviewDate.getMonth() + 1).toString().padStart(2, '0')}</span>
                       <span>点击查看完整报告 -&gt;</span>
                     </div>
-                  </article>
+                  </CardBackgroundSurface>
                 );
               })}
             </div>
@@ -364,7 +383,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             </div>
           ) : (
             <div className="flex overflow-x-auto gap-3 -mr-5 pr-5 pb-5 pt-2 snap-x snap-mandatory scrollbar-hide">
-              {sortedWeeklyReviews.map((review) => {
+              {sortedWeeklyReviews.map((review, index) => {
                 const startDate = new Date(review.weekStartDate);
                 const endDate = new Date(review.weekEndDate);
                 const midWeekDate = new Date(startDate.getTime() + 3 * 24 * 60 * 60 * 1000);
@@ -388,8 +407,9 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                 const isCurrentWeek = nowDateOnly >= startDateOnly && nowDateOnly <= endDateOnly;
 
                 return (
-                  <div
+                  <CardBackgroundSurface
                     key={review.id}
+                    index={index}
                     onClick={() => onOpenWeeklyReview(new Date(review.weekStartDate), new Date(review.weekEndDate))}
                     className="snap-start flex-none w-[calc(50%-6px)] rounded-2xl p-4 h-[140px] flex flex-col justify-between relative overflow-hidden border border-stone-100 text-stone-900 transition-all active:scale-95"
                     style={cardSurfaceStyle}
@@ -408,7 +428,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                     <div className="flex gap-2 text-[9px] opacity-80 font-mono">
                       <span>{dateRangeStr}</span>
                     </div>
-                  </div>
+                  </CardBackgroundSurface>
                 );
               })}
             </div>
@@ -422,7 +442,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {visibleDailyReviews.map((review) => {
+              {visibleDailyReviews.map((review, index) => {
                 const dateObj = new Date(review.date);
                 const dayStr = dateObj.getDate().toString();
                 const monthStr = dateObj.toLocaleDateString('en-US', { month: 'short' });
@@ -454,7 +474,8 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                       <span className="text-[10px] font-semibold uppercase text-stone-500 mt-1">{monthStr}</span>
                     </div>
 
-                    <div
+                    <CardBackgroundSurface
+                      index={index}
                       className="flex-1 min-w-0 rounded-lg p-4 border border-stone-100"
                       style={cardSurfaceStyle}
                     >
@@ -469,7 +490,7 @@ export const ReviewHubView: React.FC<ReviewHubViewProps> = ({
                       <div className="text-[13px] text-stone-500 line-clamp-2 leading-relaxed">
                         {displayContent}
                       </div>
-                    </div>
+                    </CardBackgroundSurface>
                   </div>
                 );
               })}

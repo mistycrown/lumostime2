@@ -11,6 +11,7 @@
  * @updated 2026-09-26: Included imported theme package metadata while keeping local-only font binaries out of sync.
  * @updated 2026-09-26: Syncs custom achievement-bottle image mappings without uploading their binary data directly.
  * @updated 2026-09-26: Includes independent Memoir calendar background modes in appearance backup and restore.
+ * @updated 2026-09-26: Includes custom card background groups, selection, opacity, and image references.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -21,6 +22,11 @@ import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 import { ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY } from './achievementBottleIconPackService';
+import {
+  CARD_BACKGROUND_CURRENT_KEY,
+  CARD_BACKGROUND_GROUPS_KEY,
+  CARD_BACKGROUND_OPACITY_KEY
+} from './cardBackgroundService';
 
 export const APPEARANCE_RESTORED_EVENT = 'lumostime:appearance-restored';
 
@@ -68,7 +74,10 @@ const APPEARANCE_STORAGE_KEYS = [
   TIMEPAL_KEYS.FILTER_ENABLED,
   TIMEPAL_KEYS.FILTER_ACTIVITIES,
   TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED,
-  TIMEPAL_KEYS.CUSTOM_QUOTES
+  TIMEPAL_KEYS.CUSTOM_QUOTES,
+  CARD_BACKGROUND_GROUPS_KEY,
+  CARD_BACKGROUND_CURRENT_KEY,
+  CARD_BACKGROUND_OPACITY_KEY
 ] as const;
 
 type AppearanceStorage = Record<string, string | null>;
@@ -116,6 +125,14 @@ const addImageReference = (set: Set<string>, value: unknown, includeThumbnail = 
 
 const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string[] => {
   const referenced = new Set<string>();
+  const cardBackgroundGroups = parseJsonValue(snapshot, CARD_BACKGROUND_GROUPS_KEY);
+  if (Array.isArray(cardBackgroundGroups)) {
+    cardBackgroundGroups.forEach((group) => {
+      if (Array.isArray(group?.imageFilenames)) {
+        group.imageFilenames.forEach((filename: unknown) => addImageReference(referenced, filename));
+      }
+    });
+  }
   const customTimePalItems = parseJsonValue(snapshot, TIMEPAL_KEYS.CUSTOM_ITEMS);
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {

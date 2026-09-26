@@ -1151,7 +1151,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
               </div>
             </div>
           ) : (
-            currentCards.map((card) => {
+            currentCards.map((card, index) => {
               let cardWithStatus = card;
               
               if (card.type === 'checklist' && card.action.checkItemId) {
@@ -1208,6 +1208,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
                   onAction={handleCardAction}
                   sceneCardTimerMode={sceneCardTimerMode}
                   forceBackSide={doesSceneCardMatchCurrentSlotTimeline(card, logs, currentSlotWindow)}
+                  backgroundIndex={index}
                 />
               );
             })

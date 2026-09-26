@@ -13,6 +13,7 @@
  * @updated 2026-09-26: Protects single-image Memoir Fill backgrounds from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects image assets retained by immutable saved theme snapshots.
  * @updated 2026-09-26: Reads achievement icon-pack filenames without treating display names as assets.
+ * @updated 2026-09-26: Protects custom card-background group images from cleanup and sync manifest rebuilds.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -29,6 +30,7 @@ const CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY = 'mood_calendar_fill_background_
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
 const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
 const CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
+const CARD_BACKGROUND_GROUPS_KEY = 'lumostime_card_background_groups_v1';
 
 interface StoredCustomTimePalItem {
   stageFilenames?: unknown;
@@ -61,6 +63,10 @@ interface StoredCustomPreset {
   snapshot?: {
     storage?: Record<string, string | null>;
   };
+}
+
+interface StoredCardBackgroundGroup {
+  imageFilenames?: unknown;
 }
 
 const isValidFilename = (value: unknown): value is string => (
@@ -97,6 +103,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
   );
   const customUiIconAssets = readRawJson<Record<string, Record<string, unknown>>>(CUSTOM_UI_ICON_ASSETS_KEY, {});
   const customAchievementIconPacks = readRawJson<Record<string, unknown>>(CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY, {});
+  const cardBackgroundGroups = readRawJson<StoredCardBackgroundGroup[]>(CARD_BACKGROUND_GROUPS_KEY, []);
   const savedPresets = storage.getJSON<StoredCustomPreset[]>(THEME_KEYS.CUSTOM_PRESETS, []);
 
   if (Array.isArray(customTimePalItems)) {
@@ -108,6 +115,18 @@ export const getSettingsReferencedImages = (): Set<string> => {
       item.stageFilenames.forEach((filename) => {
         if (isValidFilename(filename)) {
           referencedImages.add(filename);
+        }
+      });
+    });
+  }
+
+  if (Array.isArray(cardBackgroundGroups)) {
+    cardBackgroundGroups.forEach((group) => {
+      if (!Array.isArray(group?.imageFilenames)) return;
+      group.imageFilenames.forEach((filename) => {
+        if (isValidFilename(filename)) {
+          referencedImages.add(filename);
+          referencedImages.add(`thumb_${filename}`);
         }
       });
     });
