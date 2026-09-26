@@ -7,6 +7,7 @@
  * @updated 2026-09-26: Added parser coverage for version-one theme packages.
  * @updated 2026-09-26: Added validation coverage for custom achievement-bottle frames.
  * @updated 2026-09-26: Ensures empty template directory markers are ignored.
+ * @updated 2026-09-26: Covers single-image fill-mode backgrounds and mode/image mismatches.
  */
 
 import JSZip from 'jszip';
@@ -80,6 +81,53 @@ describe('parseThemePackage', () => {
     await expect(parseThemePackage(await createZip(manifest, {
       'assets/preview.webp': 'preview',
       'assets/memoir-calendar/five-week.webp': 'five'
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'config.memoirCalendar.background'
+    });
+  });
+
+  it('accepts a single image for Memoir fill mode', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: {
+        memoirCalendar: {
+          background: {
+            mode: 'fill',
+            image: 'assets/memoir-calendar/fill.webp'
+          }
+        }
+      }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview',
+      'assets/memoir-calendar/fill.webp': 'fill'
+    }));
+
+    expect(result.manifest.config.memoirCalendar).toMatchObject({
+      background: { mode: 'fill', image: 'assets/memoir-calendar/fill.webp' }
+    });
+  });
+
+  it('requires the image shape to match the Memoir background mode', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: {
+        memoirCalendar: {
+          background: {
+            mode: 'fill',
+            fiveWeek: 'assets/memoir-calendar/five.webp',
+            sixWeek: 'assets/memoir-calendar/six.webp'
+          }
+        }
+      }
+    };
+
+    await expect(parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview',
+      'assets/memoir-calendar/five.webp': 'five',
+      'assets/memoir-calendar/six.webp': 'six'
     }))).rejects.toMatchObject({
       code: 'INVALID_CONFIGURATION',
       path: 'config.memoirCalendar.background'
