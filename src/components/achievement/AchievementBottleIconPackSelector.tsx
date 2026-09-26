@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Upload } from 'lucide-react';
+import { Plus, Upload, X } from 'lucide-react';
 import { useSettings } from '../../contexts/SettingsContext';
 import { useToast } from '../../contexts/ToastContext';
 import { CompactPreviewCardSelector } from '../CompactPreviewCardSelector';
@@ -49,7 +49,7 @@ export const AchievementBottleIconPackSelector: React.FC = () => {
   const { achievementBottleIconPack, setAchievementBottleIconPack } = useSettings();
   const { addToast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [revision, setRevision] = useState(0);
+  const [, setRevision] = useState(0);
   const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
@@ -58,9 +58,7 @@ export const AchievementBottleIconPackSelector: React.FC = () => {
     return () => window.removeEventListener(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT, refresh);
   }, []);
 
-  const customOptions = ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS.filter((option) => (
-    !['star1', 'flower1', 'sea', 'coin', 'candy', 'leaf', 'paper', 'planet', 'stone'].includes(option.value)
-  ));
+  const builtInPackIds = ['star1', 'flower1', 'sea', 'coin', 'candy', 'leaf', 'paper', 'planet', 'stone'];
 
   const handleZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -104,6 +102,17 @@ export const AchievementBottleIconPackSelector: React.FC = () => {
         onSelect={setAchievementBottleIconPack}
         renderPreview={(option) => renderIconPackPreview(option as AchievementBottleIconPackOption)}
         showLabels={false}
+        renderOverlayAction={(option) => builtInPackIds.includes(option.value) ? null : (
+          <button
+            type="button"
+            title={`删除${option.label}方案`}
+            aria-label={`删除${option.label}方案`}
+            onClick={() => handleDelete(option as AchievementBottleIconPackOption)}
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-white shadow-sm transition-colors hover:bg-rose-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-600"
+          >
+            <X size={13} strokeWidth={2.5} />
+          </button>
+        )}
         actionSlot={(
           <>
             <input
@@ -126,24 +135,6 @@ export const AchievementBottleIconPackSelector: React.FC = () => {
           </>
         )}
       />
-      {customOptions.length > 0 && (
-        <div key={revision} className="flex flex-wrap gap-x-4 gap-y-2 px-4 pt-2">
-          {customOptions.map((option) => (
-            <div key={option.value} className="flex min-w-0 items-center gap-1 text-xs text-stone-600">
-              <span className="max-w-40 truncate">{option.label}</span>
-              <button
-                type="button"
-                title={`删除${option.label}方案`}
-                aria-label={`删除${option.label}方案`}
-                onClick={() => handleDelete(option)}
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-stone-400 hover:bg-rose-50 hover:text-rose-600"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
     </>
   );
 };
