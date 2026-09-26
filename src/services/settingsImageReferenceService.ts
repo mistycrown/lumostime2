@@ -7,6 +7,8 @@
  * @updated 2026-09-25: Included active custom sticker assets and custom navigation icon assets so legacy flat manifests can be migrated into the theme group.
  * @updated 2026-09-26: Protects custom Memoir mood-calendar background images from cleanup.
  * @updated 2026-09-26: Protects imported theme package image assets from cleanup and sync manifest rebuilds.
+ * @updated 2026-09-26: Protects image-backed custom UIIcon assets from cleanup and sync manifest rebuilds.
+ * @updated 2026-09-26: Protects custom achievement-bottle icon frames from cleanup and sync manifest rebuilds.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -20,6 +22,8 @@ const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
 const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
 const CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY = 'mood_calendar_background_custom_list';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
+const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
+const CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
 
 interface StoredCustomTimePalItem {
   stageFilenames?: unknown;
@@ -79,6 +83,8 @@ export const getSettingsReferencedImages = (): Set<string> => {
     'lumostime_theme_packages_v1',
     []
   );
+  const customUiIconAssets = readRawJson<Record<string, Record<string, unknown>>>(CUSTOM_UI_ICON_ASSETS_KEY, {});
+  const customAchievementIconPacks = readRawJson<Record<string, unknown>>(CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY, {});
 
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {
@@ -147,6 +153,26 @@ export const getSettingsReferencedImages = (): Set<string> => {
       }
       referencedImages.add(filename);
       referencedImages.add(`thumb_${filename}`);
+    });
+  });
+
+  Object.values(customUiIconAssets).forEach((mapping) => {
+    if (!mapping || typeof mapping !== 'object') return;
+    Object.values(mapping).forEach((filename) => {
+      if (isValidFilename(filename)) {
+        referencedImages.add(filename);
+        referencedImages.add(`thumb_${filename}`);
+      }
+    });
+  });
+
+  Object.values(customAchievementIconPacks).forEach((filenames) => {
+    if (!Array.isArray(filenames)) return;
+    filenames.forEach((filename) => {
+      if (isValidFilename(filename)) {
+        referencedImages.add(filename);
+        referencedImages.add(`thumb_${filename}`);
+      }
     });
   });
 

@@ -5,6 +5,7 @@
  * @updated 2026-08-11: Moves bottle skin layers to semantic CSS variables so dark-mode fallbacks preserve every light-mode bottle shape and palette.
  * @updated 2026-07-07: Displays split current/history bottle balances beside the total star count.
  * @updated 2026-04-07: Clamp live-mode spawn points so low-count bottle items always start inside the visible chamber.
+ * @updated 2026-09-26: Refreshes custom achievement-bottle frames after package import or sync hydration.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -16,6 +17,7 @@ import {
 } from '../../services/achievementBottleStyleService';
 import {
   DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
+  ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT,
   getAchievementBottleIconPackFramePaths,
   type AchievementBottleIconPack
 } from '../../services/achievementBottleIconPackService';
@@ -603,6 +605,16 @@ export const AchievementBottle: React.FC<AchievementBottleProps> = ({
   const frameRef = useRef<number | null>(null);
   const collisionSoundRef = useRef<CollisionSoundController | null>(null);
   const [dimensions, setDimensions] = useState(EMPTY_DIMENSIONS);
+  const [, setIconPackRefresh] = useState(0);
+
+  useEffect(() => {
+    const refreshCustomIconPack = () => {
+      delete STAR_IMAGE_PATHS_BY_PACK[iconPack];
+      setIconPackRefresh((value) => value + 1);
+    };
+    window.addEventListener(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT, refreshCustomIconPack);
+    return () => window.removeEventListener(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT, refreshCustomIconPack);
+  }, [iconPack]);
 
   const palette = getPalette(styleVariant);
   const normalizedStarCount = normalizeAchievementStarValue(starCount);

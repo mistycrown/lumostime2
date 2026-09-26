@@ -5,6 +5,7 @@
  * @pos Test (Theme Package Import)
  * @description Verifies manifest validation, optional sections, required paired assets, and archive path safety.
  * @updated 2026-09-26: Added parser coverage for version-one theme packages.
+ * @updated 2026-09-26: Added validation coverage for custom achievement-bottle frames.
  */
 
 import JSZip from 'jszip';
@@ -81,6 +82,24 @@ describe('parseThemePackage', () => {
     }))).rejects.toMatchObject({
       code: 'INVALID_CONFIGURATION',
       path: 'config.memoirCalendar.background'
+    });
+  });
+
+  it('requires at least one frame for a custom achievement bottle icon pack', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: {
+        achievementBottle: {
+          iconPack: { source: 'asset', id: 'moon-stars', frames: [] }
+        }
+      }
+    };
+
+    await expect(parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview'
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'config.achievementBottle.iconPack.frames'
     });
   });
 

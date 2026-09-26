@@ -15,6 +15,9 @@ export const SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION = 1;
 const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const SAFE_ASSET_PATH_PATTERN = /^assets\/[A-Za-z0-9._/-]+$/;
+const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;
+const MAX_ASSET_BYTES = 30 * 1024 * 1024;
+const MAX_TOTAL_ASSET_BYTES = 200 * 1024 * 1024;
 const ALLOWED_ASSET_EXTENSIONS = new Set([
   'bmp',
   'gif',
@@ -217,9 +220,28 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
       }
     }
   }
+
+  const achievementBottle = manifest.config.achievementBottle;
+  if (achievementBottle && typeof achievementBottle === 'object' && !Array.isArray(achievementBottle)) {
+    const iconPack = (achievementBottle as { iconPack?: unknown }).iconPack;
+    if (iconPack && typeof iconPack === 'object' && !Array.isArray(iconPack)) {
+      const iconPackRecord = iconPack as Record<string, unknown>;
+      if (iconPackRecord.source === 'asset' && (!Array.isArray(iconPackRecord.frames) || iconPackRecord.frames.length === 0)) {
+        throw new ThemePackageValidationError(
+          'INVALID_CONFIGURATION',
+          '自定义成就瓶图标包必须至少包含一张图片',
+          'config.achievementBottle.iconPack.frames'
+        );
+      }
+    }
+  }
 };
 
 export const parseThemePackage = async (source: Blob | File): Promise<ParsedThemePackage> => {
+  if (source.size > MAX_PACKAGE_BYTES) {
+    throw new ThemePackageValidationError('INVALID_ZIP', '主题压缩包不能超过 100 MB');
+  }
+
   let zip: JSZip;
   try {
     zip = await JSZip.loadAsync(await source.arrayBuffer());
@@ -247,15 +269,17 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
   validateConfigurationInvariants(manifest);
 
   const assets = new Map<string, Blob>();
+  let totalAssetBytes = 0;
   for (const entry of Object.values(zip.files)) {
+    const originalPath = (entry as typeof entry & { unsafeOriginalName?: string }).unsafeOriginalName || entry.name;
     const archivePath = entry.name.replace(/\\/g, '/');
 
     if (entry.dir) {
       continue;
     }
 
-    if (!isSafeArchivePath(archivePath)) {
-      throw new ThemePackageValidationError('UNSAFE_ARCHIVE_PATH', `主题包包含不安全路径：${entry.name}`, entry.name);
+    if (originalPath.includes('\\') || !isSafeArchivePath(originalPath) || !isSafeArchivePath(archivePath)) {
+      throw new ThemePackageValidationError('UNSAFE_ARCHIVE_PATH', `主题包包含不安全路径：${originalPath}`, originalPath);
     }
 
     if (archivePath === 'theme.json' || archivePath.startsWith('__MACOSX/')) {
@@ -271,6 +295,10 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
     }
 
     const extractedBlob = await entry.async('blob');
+    totalAssetBytes += extractedBlob.size;
+    if (extractedBlob.size > MAX_ASSET_BYTES || totalAssetBytes > MAX_TOTAL_ASSET_BYTES) {
+      throw new ThemePackageValidationError('INVALID_CONFIGURATION', '主题资源体积超出限制', archivePath);
+    }
     const mimeType = ASSET_MIME_TYPES[getExtension(archivePath)] || 'application/octet-stream';
     const blob = extractedBlob.type
       ? extractedBlob

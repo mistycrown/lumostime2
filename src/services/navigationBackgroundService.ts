@@ -95,7 +95,7 @@ class NavigationBackgroundService {
         localStorage.setItem(CUSTOM_KEY, JSON.stringify(backgrounds));
     }
 
-    private async hydrateCustomBackgrounds(): Promise<void> {
+    async hydrateCustomBackgrounds(): Promise<void> {
         const backgrounds = this.loadCustomBackgrounds();
         let changed = false;
         const hydrated = await Promise.all(backgrounds.map(async (background) => {

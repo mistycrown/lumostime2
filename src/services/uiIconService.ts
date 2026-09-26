@@ -13,6 +13,7 @@
  * - 每个主题包含完整的96个图标
  * - 图标文件格式: `/uiicon/{theme}/{编号}.webp` (带PNG降级)
  * @updated 2026-04-25: Added helpers to map packaged UI icon asset paths back to icon ids so widget editors can round-trip native icon selections.
+ * @updated 2026-09-26: Added image-backed UIIcon themes imported from theme packages.
  * - 编号格式: 01-96 (两位数字，前导零)
  * 
  * ### 使用方式
@@ -33,6 +34,7 @@
 
 import React from 'react';
 import { resolveAssetPath } from '../utils/assetPath';
+import { imageService } from './imageService';
 
 // UI 图标类型定义
 export type UIIconType =
@@ -253,7 +255,8 @@ const ICON_TYPE_BY_NUMBER = Object.entries(ICON_NUMBER_MAP).reduce<Record<string
 
 // 可用的主题列表
 export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'old', 'paper', 'pencil'] as const;
-export type UIIconTheme = typeof UI_ICON_THEMES[number];
+export type UIIconTheme = typeof UI_ICON_THEMES[number] | string;
+export const UI_ICON_CUSTOM_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
 
 // 图标分组定义
 export const ICON_GROUPS = {
@@ -412,9 +415,58 @@ export const DEFAULT_EMOJI_TO_ICON_MAP: Record<string, UIIconType> = {
 class UIIconService {
     private currentTheme: UIIconTheme = 'default';
     private readonly STORAGE_KEY = 'lumostime_ui_icon_theme';
+    private customThemeAssets: Record<string, Record<string, string>> = {};
 
     constructor() {
+        this.loadCustomThemeAssets();
         this.loadTheme();
+        void this.hydrateCustomThemeAssets();
+    }
+
+    private loadCustomThemeAssets(): void {
+        try {
+            const raw = localStorage.getItem(UI_ICON_CUSTOM_ASSETS_KEY);
+            const parsed = raw ? JSON.parse(raw) : {};
+            this.customThemeAssets = parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            this.customThemeAssets = {};
+        }
+    }
+
+    private async hydrateCustomThemeAssets(): Promise<void> {
+        const hydrated: Record<string, Record<string, string>> = {};
+        for (const [theme, mapping] of Object.entries(this.customThemeAssets)) {
+            const nextMapping: Record<string, string> = {};
+            for (const [iconType, filename] of Object.entries(mapping)) {
+                const url = await imageService.getImageUrl(filename).catch(() => '');
+                if (url) {
+                    nextMapping[iconType] = url;
+                }
+            }
+            hydrated[theme] = nextMapping;
+        }
+        this.customThemeAssets = hydrated;
+        if (this.currentTheme !== 'default' && typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ui-icon-theme-changed', { detail: { theme: this.currentTheme } }));
+        }
+    }
+
+    async registerCustomThemeAssets(theme: string, mapping: Record<string, string>): Promise<void> {
+        const stored = this.readStoredCustomThemeAssets();
+        stored[theme] = { ...mapping };
+        localStorage.setItem(UI_ICON_CUSTOM_ASSETS_KEY, JSON.stringify(stored));
+        this.customThemeAssets = stored;
+        await this.hydrateCustomThemeAssets();
+    }
+
+    private readStoredCustomThemeAssets(): Record<string, Record<string, string>> {
+        try {
+            const raw = localStorage.getItem(UI_ICON_CUSTOM_ASSETS_KEY);
+            const parsed = raw ? JSON.parse(raw) : {};
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            return {};
+        }
     }
 
     /**
@@ -422,8 +474,8 @@ class UIIconService {
      */
     private loadTheme() {
         const saved = localStorage.getItem(this.STORAGE_KEY);
-        if (saved && UI_ICON_THEMES.includes(saved as UIIconTheme)) {
-            this.currentTheme = saved as UIIconTheme;
+        if (saved && saved.trim()) {
+            this.currentTheme = saved;
         }
     }
 
@@ -456,6 +508,11 @@ class UIIconService {
             return '';
         }
 
+        const customPath = this.customThemeAssets[this.currentTheme]?.[iconType];
+        if (customPath) {
+            return customPath;
+        }
+
         const iconNumber = ICON_NUMBER_MAP[iconType];
         return resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.${format}`);
     }
@@ -469,6 +526,11 @@ class UIIconService {
     getIconPathWithFallback(iconType: UIIconType): { primary: string; fallback: string } {
         if (this.currentTheme === 'default') {
             return { primary: '', fallback: '' };
+        }
+
+        const customPath = this.customThemeAssets[this.currentTheme]?.[iconType];
+        if (customPath) {
+            return { primary: customPath, fallback: customPath };
         }
 
         const iconNumber = ICON_NUMBER_MAP[iconType];

@@ -9,21 +9,24 @@
  * @updated 2026-09-25: Included navigation icon selections and custom image hydration in appearance backups.
  * @updated 2026-09-26: Included Memoir mood-calendar backgrounds in appearance backups and image references.
  * @updated 2026-09-26: Included imported theme package metadata while keeping local-only font binaries out of sync.
+ * @updated 2026-09-26: Syncs custom achievement-bottle image mappings without uploading their binary data directly.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
-import { uiIconService } from './uiIconService';
+import { UI_ICON_CUSTOM_ASSETS_KEY, uiIconService } from './uiIconService';
 import { colorSchemeService } from './colorSchemeService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
+import { ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY } from './achievementBottleIconPackService';
 
 export const APPEARANCE_RESTORED_EVENT = 'lumostime:appearance-restored';
 
 const APPEARANCE_STORAGE_KEYS = [
   THEME_KEYS.CURRENT_PRESET,
   THEME_KEYS.UI_ICON_THEME,
+  UI_ICON_CUSTOM_ASSETS_KEY,
   THEME_KEYS.COLOR_SCHEME,
   THEME_KEYS.CUSTOM_COLOR_GROUP,
   THEME_KEYS.CURRENT_BACKGROUND,
@@ -48,6 +51,7 @@ const APPEARANCE_STORAGE_KEYS = [
   THEME_KEYS.TIMELINE_LAYOUT,
   THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE,
   THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK,
+  ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY,
   'lumostime_emoji_style',
   'lumostime_theme_mode',
   'lumos_selected_icon',
