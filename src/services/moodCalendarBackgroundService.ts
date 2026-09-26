@@ -4,23 +4,16 @@
  * @output Current background, persisted tuning settings, and preview events
  * @pos Service (UI Customization)
  * @description Keeps Memoir mood-calendar background assets independent from navigation decoration settings.
- * @updated 2026-09-26: Separated horizontal size from five-week/six-week vertical mapping.
+ * @updated 2026-09-26: Switched to paired five-week/six-week background images and removed week scaling.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
-
-export type MoodCalendarWeekScale = {
-    fiveWeek?: number;
-    sixWeek?: number;
-};
 
 export type MoodCalendarBackgroundSettings = {
     offsetY?: string;
     offsetX?: string;
     scale?: number;
-    heightScale?: number;
     opacity?: number;
-    weekScale?: MoodCalendarWeekScale;
 };
 
 export interface MoodCalendarBackgroundOption extends MoodCalendarBackgroundSettings {
@@ -29,7 +22,10 @@ export interface MoodCalendarBackgroundOption extends MoodCalendarBackgroundSett
     type: 'preset' | 'custom';
     url: string;
     thumbnail?: string;
+    sixWeekUrl?: string;
+    sixWeekThumbnail?: string;
     imageFilename?: string;
+    sixWeekImageFilename?: string;
 }
 
 const CURRENT_KEY = 'mood_calendar_background';
@@ -39,41 +35,21 @@ const CUSTOM_KEY = 'mood_calendar_background_custom_list';
 export const MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT = 'moodCalendarBackgroundChange';
 export const MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT = 'moodCalendarBackgroundPreview';
 
-const DEFAULT_SETTINGS: Required<Omit<MoodCalendarBackgroundSettings, 'weekScale'>> & { weekScale: Required<MoodCalendarWeekScale> } = {
+const DEFAULT_SETTINGS: Required<MoodCalendarBackgroundSettings> = {
     offsetY: '0px',
     offsetX: '0px',
     scale: 1.35,
-    heightScale: 1,
-    opacity: 1,
-    weekScale: {
-        fiveWeek: 1,
-        sixWeek: 1
-    }
+    opacity: 1
 };
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
-
-const normalizeWeekScale = (value: MoodCalendarWeekScale | undefined): Required<MoodCalendarWeekScale> => ({
-    fiveWeek: clamp(Number(value?.fiveWeek ?? DEFAULT_SETTINGS.weekScale.fiveWeek) || DEFAULT_SETTINGS.weekScale.fiveWeek, 0.5, 1.5),
-    sixWeek: clamp(Number(value?.sixWeek ?? DEFAULT_SETTINGS.weekScale.sixWeek) || DEFAULT_SETTINGS.weekScale.sixWeek, 0.5, 1.5)
-});
 
 const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined): MoodCalendarBackgroundSettings => ({
     offsetY: settings?.offsetY || DEFAULT_SETTINGS.offsetY,
     offsetX: settings?.offsetX || DEFAULT_SETTINGS.offsetX,
     scale: clamp(Number(settings?.scale ?? DEFAULT_SETTINGS.scale) || DEFAULT_SETTINGS.scale, 0.1, 3),
-    heightScale: clamp(Number(settings?.heightScale ?? DEFAULT_SETTINGS.heightScale) || DEFAULT_SETTINGS.heightScale, 0.1, 3),
-    opacity: clamp(Number(settings?.opacity ?? DEFAULT_SETTINGS.opacity) || 0, 0, 1),
-    weekScale: normalizeWeekScale(settings?.weekScale)
+    opacity: clamp(Number(settings?.opacity ?? DEFAULT_SETTINGS.opacity) || 0, 0, 1)
 });
-
-export const getMoodCalendarMappedHeightScale = (
-    settings: MoodCalendarBackgroundSettings,
-    weekCount: number
-): number => {
-    const weekScale = normalizeWeekScale(settings.weekScale);
-    return (settings.heightScale || DEFAULT_SETTINGS.heightScale) * (weekCount >= 6 ? weekScale.sixWeek : weekScale.fiveWeek);
-};
 
 class MoodCalendarBackgroundService {
     private readonly builtIn: MoodCalendarBackgroundOption[] = [
@@ -82,18 +58,19 @@ class MoodCalendarBackgroundService {
             name: '无背景',
             type: 'preset',
             url: '',
+            sixWeekUrl: '',
             ...DEFAULT_SETTINGS
         },
         {
             id: 'calendar-1',
             name: '兔子云朵',
             type: 'preset',
-            url: '/calendar/1.webp',
+            url: '/calendar/tuzi/5.png',
+            sixWeekUrl: '/calendar/tuzi/6.png',
             offsetY: '0px',
             offsetX: '0px',
             scale: 1.35,
-            opacity: 1,
-            weekScale: { ...DEFAULT_SETTINGS.weekScale }
+            opacity: 1
         }
     ];
 
@@ -136,11 +113,14 @@ class MoodCalendarBackgroundService {
         const backgrounds = this.loadCustomBackgrounds();
         let changed = false;
         const hydrated = await Promise.all(backgrounds.map(async (background) => {
-            if (!background.imageFilename) return background;
-            const url = await imageService.getImageUrl(background.imageFilename);
-            if (!url || url === background.url) return background;
+            if (!background.imageFilename && !background.sixWeekImageFilename) return background;
+            const [url, sixWeekUrl] = await Promise.all([
+                background.imageFilename ? imageService.getImageUrl(background.imageFilename) : Promise.resolve(background.url),
+                background.sixWeekImageFilename ? imageService.getImageUrl(background.sixWeekImageFilename) : Promise.resolve(background.sixWeekUrl || background.url)
+            ]);
+            if ((!url || url === background.url) && (!sixWeekUrl || sixWeekUrl === background.sixWeekUrl)) return background;
             changed = true;
-            return { ...background, url, thumbnail: url };
+            return { ...background, url: url || background.url, thumbnail: url || background.thumbnail, sixWeekUrl: sixWeekUrl || background.sixWeekUrl, sixWeekThumbnail: sixWeekUrl || background.sixWeekThumbnail };
         }));
 
         if (changed) {
@@ -156,7 +136,9 @@ class MoodCalendarBackgroundService {
             ...this.builtIn.map((background) => ({
                 ...background,
                 url: background.url ? resolveAssetPath(background.url) : '',
-                thumbnail: background.thumbnail ? resolveAssetPath(background.thumbnail) : background.thumbnail
+                thumbnail: background.thumbnail ? resolveAssetPath(background.thumbnail) : background.thumbnail,
+                sixWeekUrl: background.sixWeekUrl ? resolveAssetPath(background.sixWeekUrl) : background.sixWeekUrl,
+                sixWeekThumbnail: background.sixWeekThumbnail ? resolveAssetPath(background.sixWeekThumbnail) : background.sixWeekThumbnail
             })),
             ...this.loadCustomBackgrounds().map((background) => ({
                 ...background,
@@ -194,16 +176,25 @@ class MoodCalendarBackgroundService {
         window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId } }));
     }
 
-    async addCustomBackground(file: File): Promise<MoodCalendarBackgroundOption> {
-        const imageFilename = await imageService.saveImage(file, 'theme');
-        const url = await imageService.getImageUrl(imageFilename);
+    async addCustomBackground(fiveWeekFile: File, sixWeekFile: File, name?: string): Promise<MoodCalendarBackgroundOption> {
+        const [imageFilename, sixWeekImageFilename] = await Promise.all([
+            imageService.saveImage(fiveWeekFile, 'theme'),
+            imageService.saveImage(sixWeekFile, 'theme')
+        ]);
+        const [url, sixWeekUrl] = await Promise.all([
+            imageService.getImageUrl(imageFilename),
+            imageService.getImageUrl(sixWeekImageFilename)
+        ]);
         const background: MoodCalendarBackgroundOption = {
             id: `mood_calendar_custom_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-            name: file.name.replace(/\.[^/.]+$/, ''),
+            name: name?.trim() || fiveWeekFile.name.replace(/\.[^/.]+$/, ''),
             type: 'custom',
             url,
             thumbnail: url,
+            sixWeekUrl,
+            sixWeekThumbnail: sixWeekUrl,
             imageFilename,
+            sixWeekImageFilename,
             ...DEFAULT_SETTINGS
         };
         this.saveCustomBackgrounds([...this.loadCustomBackgrounds(), background]);
@@ -219,6 +210,9 @@ class MoodCalendarBackgroundService {
         this.saveCustomBackgrounds(backgrounds.filter((background) => background.id !== backgroundId));
         if (target.imageFilename) {
             await imageService.deleteImage(target.imageFilename).catch(() => undefined);
+        }
+        if (target.sixWeekImageFilename) {
+            await imageService.deleteImage(target.sixWeekImageFilename).catch(() => undefined);
         }
         if (wasCurrent) {
             this.setCurrentBackground('none');

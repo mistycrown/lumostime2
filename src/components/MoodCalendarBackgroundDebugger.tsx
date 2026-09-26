@@ -1,10 +1,10 @@
 /**
  * @file MoodCalendarBackgroundDebugger.tsx
  * @input Current Memoir mood-calendar background and tuning callbacks
- * @output Live preview and persisted position, independent size, opacity, and week mapping
+ * @output Live preview and persisted position, width, and opacity for paired background images
  * @pos Component (Memoir Background Tuning)
  * @description Provides navigation-adjuster-style button controls for the Memoir mood calendar.
- * @updated 2026-09-26: Replaced sliders with mobile-friendly step buttons and separated width/height mapping.
+ * @updated 2026-09-26: Replaced sliders with mobile-friendly step buttons for paired background images.
  * @updated 2026-09-26: Constrained the mobile panel above bottom navigation and enabled compact scrolling.
  */
 import React, { useEffect, useState } from 'react';
@@ -28,9 +28,6 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
     const [widthScale, setWidthScale] = useState(135);
-    const [heightScale, setHeightScale] = useState(100);
-    const [fiveWeekScale, setFiveWeekScale] = useState(100);
-    const [sixWeekScale, setSixWeekScale] = useState(100);
     const [opacity, setOpacity] = useState(100);
     const [previewWeeks, setPreviewWeeks] = useState<5 | 6>(5);
     const [isSaved, setIsSaved] = useState(false);
@@ -43,9 +40,6 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
         setOffsetX(parseOffset(background.offsetX));
         setOffsetY(parseOffset(background.offsetY));
         setWidthScale(Math.round((background.scale || 1) * 100));
-        setHeightScale(Math.round((background.heightScale || 1) * 100));
-        setFiveWeekScale(Math.round((background.weekScale?.fiveWeek ?? 1) * 100));
-        setSixWeekScale(Math.round((background.weekScale?.sixWeek ?? 1) * 100));
         setOpacity(Math.round((background.opacity ?? 1) * 100));
     }, [activeId]);
 
@@ -53,16 +47,14 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
         offsetX: `${offsetX}px`,
         offsetY: `${offsetY}px`,
         scale: widthScale / 100,
-        heightScale: heightScale / 100,
         opacity: opacity / 100,
-        weekScale: { fiveWeek: fiveWeekScale / 100, sixWeek: sixWeekScale / 100 }
     };
 
     useEffect(() => {
         window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT, {
             detail: { id: activeId, settings, previewWeeks }
         }));
-    }, [activeId, offsetX, offsetY, widthScale, heightScale, fiveWeekScale, sixWeekScale, opacity, previewWeeks]);
+    }, [activeId, offsetX, offsetY, widthScale, opacity, previewWeeks]);
 
     const save = () => {
         moodCalendarBackgroundService.saveCustomSettings(activeId, settings);
@@ -76,17 +68,13 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
             offsetX: parseOffset(defaults?.offsetX),
             offsetY: parseOffset(defaults?.offsetY),
             widthScale: Math.round((defaults?.scale || 1) * 100),
-            heightScale: Math.round((defaults?.heightScale || 1) * 100),
-            fiveWeek: Math.round((defaults?.weekScale?.fiveWeek ?? 1) * 100),
-            sixWeek: Math.round((defaults?.weekScale?.sixWeek ?? 1) * 100),
             opacity: Math.round((defaults?.opacity ?? 1) * 100)
         };
         setOffsetX(next.offsetX); setOffsetY(next.offsetY); setWidthScale(next.widthScale);
-        setHeightScale(next.heightScale); setFiveWeekScale(next.fiveWeek); setSixWeekScale(next.sixWeek); setOpacity(next.opacity);
+        setOpacity(next.opacity);
         moodCalendarBackgroundService.saveCustomSettings(activeId, {
             offsetX: `${next.offsetX}px`, offsetY: `${next.offsetY}px`, scale: next.widthScale / 100,
-            heightScale: next.heightScale / 100, opacity: next.opacity / 100,
-            weekScale: { fiveWeek: next.fiveWeek / 100, sixWeek: next.sixWeek / 100 }
+            opacity: next.opacity / 100
         });
     };
 
@@ -124,9 +112,6 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
                 {stepControl(<><Move size={11} /> 水平位置</>, offsetX, -240, 240, setOffsetX, 'px')}
                 {stepControl(<><Move size={11} className="rotate-90" /> 垂直位置</>, offsetY, -240, 240, setOffsetY, 'px')}
                 {stepControl(<><ZoomIn size={11} /> 图片宽度</>, widthScale, 30, 300, setWidthScale, '%')}
-                {stepControl(<><ZoomIn size={11} /> 基础高度</>, heightScale, 30, 300, setHeightScale, '%')}
-                {stepControl('五周高度映射', fiveWeekScale, 50, 150, setFiveWeekScale, '%')}
-                {stepControl('六周高度映射', sixWeekScale, 50, 150, setSixWeekScale, '%')}
                 {stepControl(<><Sun size={11} /> 透明度</>, opacity, 0, 100, setOpacity, '%')}
             </div>
             <button type="button" onClick={save} disabled={isSaved} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-bold shadow-sm transition-all ${isSaved ? 'border border-green-200 bg-green-100 text-green-700' : 'bg-stone-800 text-white hover:bg-stone-900'}`}><Save size={14} /> <span>{isSaved ? '已保存设置' : '保存当前状态'}</span></button>

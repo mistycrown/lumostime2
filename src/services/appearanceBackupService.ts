@@ -132,7 +132,10 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
 
   const customMoodCalendarBackgrounds = parseJsonValue(snapshot, 'mood_calendar_background_custom_list');
   if (Array.isArray(customMoodCalendarBackgrounds)) {
-    customMoodCalendarBackgrounds.forEach((item) => addImageReference(referenced, item?.imageFilename));
+    customMoodCalendarBackgrounds.forEach((item) => {
+      addImageReference(referenced, item?.imageFilename);
+      addImageReference(referenced, item?.sixWeekImageFilename);
+    });
   }
 
   return [...referenced];
