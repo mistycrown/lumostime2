@@ -4,6 +4,7 @@
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
  * @updated 2026-09-26: Added independent background width and week-mapped height rendering.
  * @updated 2026-09-26: Added a clipped single-image Fill mode while preserving paired Overflow rendering.
+ * @updated 2026-09-26: Added Fill image opacity and rounded clipping without dimming calendar content.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -193,7 +194,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
             <div className={`memoir-mood-calendar relative overflow-visible ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
                 {hasCalendarBackground && (
                     backgroundMode === 'fill'
-                        ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-right-bottom" /></div>
+                        ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-lg"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-right-bottom" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
                         : <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible"><img src={selectedBackgroundUrl} alt="" className="absolute left-1/2 top-1/2 max-w-none" style={{ width: `${Math.max(10, backgroundWidthScale * 100)}%`, height: 'auto', opacity: backgroundSettings.opacity ?? 1, transformOrigin: 'center center', transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px)) scaleY(${backgroundHeightScale})` }} /></div>
                 )}
                 {/* Weekday Headers */}

@@ -7,6 +7,7 @@
  * @updated 2026-09-26: Requires separate five-week and six-week images for each uploaded background.
  * @updated 2026-09-26: Constrained mood calendar background cards to a 96px left-aligned grid.
  * @updated 2026-09-26: Added isolated one-image Fill and paired-image Overflow background modes.
+ * @updated 2026-09-26: Added per-image Fill opacity control.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -31,6 +32,7 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
     const [files, setFiles] = useState<{ fiveWeek?: File; sixWeek?: File; fill?: File }>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadSlotRef = useRef<UploadSlot | null>(null);
+    const selectedOpacity = moodCalendarBackgroundService.getBackgroundById(currentId)?.opacity ?? 1;
 
     const reload = () => {
         setBackgrounds(moodCalendarBackgroundService.getAllBackgrounds());
@@ -145,6 +147,7 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
         <>
             <section className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-sm font-medium text-stone-700">心情日历背景</h3><p className="mt-1 text-xs text-stone-500">用于 Memoir 顶部月历</p></div><div className="flex items-center gap-2"><div role="group" aria-label="背景模式" className="inline-flex border-b border-stone-200">{([{ id: 'overflow', label: '溢出' }, { id: 'fill', label: '填充' }] as const).map((item) => <button key={item.id} type="button" aria-pressed={mode === item.id} onClick={() => switchMode(item.id)} className={`px-3 py-1.5 text-xs ${mode === item.id ? 'border-b-2 border-stone-800 font-medium text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}>{item.label}</button>)}</div>{mode === 'overflow' && <button type="button" onClick={() => onOpenDebugger?.()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-stone-600 shadow-sm hover:bg-stone-100"><Settings size={14} /> 调整</button>}</div></div>
+                {mode === 'fill' && currentId !== 'none' && <label className="flex items-center gap-3 text-xs text-stone-600"><span className="shrink-0">图片透明度</span><input type="range" min="0" max="100" step="1" value={Math.round(selectedOpacity * 100)} onChange={(event) => moodCalendarBackgroundService.saveCustomSettings(currentId, { opacity: Number(event.target.value) / 100 })} className="h-1.5 min-w-0 flex-1 accent-stone-700" /><span className="w-9 text-right font-mono text-stone-500">{Math.round(selectedOpacity * 100)}%</span></label>}
                 <div className="grid justify-start gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, 96px)' }}>
                     {backgrounds.map((background) => <div key={background.id} role="button" tabIndex={0} aria-label={`选择心情日历背景：${background.name}`} aria-pressed={currentId === background.id} onClick={() => moodCalendarBackgroundService.setCurrentBackground(background.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); moodCalendarBackgroundService.setCurrentBackground(background.id); } }} className={`relative w-full max-w-24 justify-self-start aspect-[3/2] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
                         {background.url ? <img src={background.thumbnail || background.url} alt={background.name} className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-xs text-stone-400">无背景</span>}
