@@ -1,7 +1,7 @@
 /**
  * @file moodCalendarBackgroundService.test.ts
- * @input Persisted mood-calendar background tuning settings
- * @output Regression coverage for paired five-week/six-week background persistence
+ * @input Persisted mood-calendar background modes and tuning settings
+ * @output Regression coverage for isolated Fill and paired Overflow backgrounds
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
@@ -30,6 +30,25 @@ describe('mood calendar background persistence', () => {
     expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
     moodCalendarBackgroundService.setCurrentBackground('missing');
     expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
+  });
+
+  it('keeps Overflow and Fill selections independent when switching modes', () => {
+    localStorage.setItem('mood_calendar_background_custom_list', JSON.stringify([
+      { id: 'overflow-custom', name: 'Overflow', type: 'custom', url: 'blob:overflow' }
+    ]));
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
+      { id: 'fill-custom', name: 'Fill', type: 'custom', url: 'blob:fill', imageFilename: 'fill.png' }
+    ]));
+
+    moodCalendarBackgroundService.setCurrentBackground('overflow-custom');
+    moodCalendarBackgroundService.setMode('fill');
+    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
+    moodCalendarBackgroundService.setCurrentBackground('fill-custom');
+    moodCalendarBackgroundService.setMode('overflow');
+
+    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('overflow-custom');
+    moodCalendarBackgroundService.setMode('fill');
+    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('fill-custom');
   });
 
   it('persists per-background tuning values', () => {

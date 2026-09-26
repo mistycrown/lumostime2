@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Protects imported theme package image assets from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects image-backed custom UIIcon assets from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects custom achievement-bottle icon frames from cleanup and sync manifest rebuilds.
+ * @updated 2026-09-26: Protects single-image Memoir Fill backgrounds from cleanup and sync manifest rebuilds.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -21,6 +22,7 @@ const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
 const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
 const CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY = 'mood_calendar_background_custom_list';
+const CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY = 'mood_calendar_fill_background_custom_list';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
 const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
 const CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
@@ -78,6 +80,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
   const customNavigationDecorations = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_KEY, []);
   const customNavigationIcons = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_ICON_KEY, []);
   const customMoodCalendarBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY, []);
+  const customMoodCalendarFillBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY, []);
   const customStickers = readRawJson<StoredCustomSticker[]>(CUSTOM_STICKERS_KEY, []);
   const importedThemePackages = readRawJson<StoredThemePackage[]>(
     'lumostime_theme_packages_v1',
@@ -112,7 +115,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
     referencedImages.add(aiChatUserProfile.avatarImage);
   }
 
-  [...customBackgrounds, ...customNavigationDecorations, ...customMoodCalendarBackgrounds].forEach((asset) => {
+  [...customBackgrounds, ...customNavigationDecorations, ...customMoodCalendarBackgrounds, ...customMoodCalendarFillBackgrounds].forEach((asset) => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
       referencedImages.add(`thumb_${asset.imageFilename}`);
