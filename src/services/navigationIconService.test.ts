@@ -64,4 +64,19 @@ describe('navigationIconService custom schemes', () => {
       mapping: { index: 'custom-icon-5' }
     });
   });
+
+  it('persists the optional label setting without changing the selected scheme', () => {
+    const scheme = navigationIconService.createCustomScheme('带文字');
+
+    navigationIconService.setShowLabelWithIcon(true);
+
+    expect(navigationIconService.getSelection()).toMatchObject({
+      mode: 'custom',
+      schemeId: scheme.id,
+      showLabelWithIcon: true
+    });
+    expect(JSON.parse(localStorage.getItem('navigation_icon_selection_v1') || '{}')).toMatchObject({
+      showLabelWithIcon: true
+    });
+  });
 });

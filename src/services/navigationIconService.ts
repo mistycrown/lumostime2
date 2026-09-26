@@ -5,6 +5,7 @@
  * @pos Service (UI Customization)
  * @description Manages text, built-in, and user-created image schemes for the five navigation slots.
  * @updated 2026-09-25: Added multiple editable custom schemes with legacy selection migration.
+ * @updated 2026-09-26: Added persisted opt-in labels below image navigation icons.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -31,6 +32,7 @@ export interface NavigationIconSelection {
     mode: NavigationIconMode;
     schemeId?: string;
     customMapping: Partial<Record<NavigationIconSlot, string>>;
+    showLabelWithIcon: boolean;
 }
 
 export const NAVIGATION_ICON_CHANGE_EVENT = 'navigationIconChange';
@@ -131,21 +133,26 @@ class NavigationIconService {
         return {
             mode,
             schemeId,
-            customMapping: activeScheme?.mapping || (stored.customMapping && typeof stored.customMapping === 'object' ? stored.customMapping : {})
+            customMapping: activeScheme?.mapping || (stored.customMapping && typeof stored.customMapping === 'object' ? stored.customMapping : {}),
+            showLabelWithIcon: stored.showLabelWithIcon === true
         };
     }
 
     setMode(mode: NavigationIconMode): void { this.saveSelection({ ...this.getSelection(), mode }); }
 
+    setShowLabelWithIcon(enabled: boolean): void {
+        this.saveSelection({ ...this.getSelection(), showLabelWithIcon: enabled });
+    }
+
     setActiveScheme(schemeId: string): void {
         const scheme = this.getCustomSchemes().find((item) => item.id === schemeId);
-        if (scheme) this.saveSelection({ mode: 'custom', schemeId, customMapping: scheme.mapping });
+        if (scheme) this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId, customMapping: scheme.mapping });
     }
 
     createCustomScheme(name = '新方案'): NavigationIconScheme {
         const scheme: NavigationIconScheme = { id: `custom-scheme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: name.trim() || '新方案', type: 'custom', mapping: {} };
         this.saveSchemes([...this.getCustomSchemes(), scheme]);
-        this.saveSelection({ mode: 'custom', schemeId: scheme.id, customMapping: {} });
+        this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId: scheme.id, customMapping: {} });
         return scheme;
     }
 
@@ -165,8 +172,8 @@ class NavigationIconService {
         const selection = this.getSelection();
         if (selection.schemeId === schemeId) {
             const next = remaining[0];
-            if (next) this.saveSelection({ mode: 'custom', schemeId: next.id, customMapping: next.mapping });
-            else this.saveSelection({ mode: 'text', customMapping: {} });
+            if (next) this.saveSelection({ ...selection, mode: 'custom', schemeId: next.id, customMapping: next.mapping });
+            else this.saveSelection({ ...selection, mode: 'text', customMapping: {} });
         } else this.emitChange();
         return true;
     }

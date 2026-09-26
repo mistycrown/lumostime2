@@ -5,6 +5,7 @@
  * @pos Component (Sponsorship Navigation Settings)
  * @description Compact TimePal-style scheme selector with a separate editor modal.
  * @updated 2026-09-25: Reworked the page view into a compact multi-scheme selector.
+ * @updated 2026-09-26: Added an opt-in switch for displaying small labels below image icons.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -70,6 +71,11 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
 
     const selectScheme = (schemeId: string) => {
         navigationIconService.setActiveScheme(schemeId);
+        reload();
+    };
+
+    const toggleLabelWithIcon = () => {
+        navigationIconService.setShowLabelWithIcon(!selection.showLabelWithIcon);
         reload();
     };
 
@@ -246,6 +252,20 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                         );
                     })}
                 </div>
+                {selection.mode !== 'text' && (
+                    <div className="flex items-center justify-between gap-4 border-t border-stone-100 pt-3">
+                        <span className="text-xs text-stone-600">图标下显示导航文字</span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={selection.showLabelWithIcon}
+                            onClick={toggleLabelWithIcon}
+                            className={`navigation-setting-switch relative h-6 w-11 shrink-0 rounded-full transition-colors ${selection.showLabelWithIcon ? 'bg-stone-800' : 'bg-stone-300'}`}
+                        >
+                            <span className={`navigation-setting-switch-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${selection.showLabelWithIcon ? 'translate-x-5' : 'translate-x-0'}`} />
+                        </button>
+                    </div>
+                )}
             </div>
 
             {editor && (typeof document === 'undefined' ? editor : createPortal(editor, document.body))}
