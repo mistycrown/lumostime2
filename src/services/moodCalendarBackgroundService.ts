@@ -4,7 +4,7 @@
  * @output Current background, persisted tuning settings, and preview events
  * @pos Service (UI Customization)
  * @description Keeps Memoir mood-calendar background assets independent from navigation decoration settings.
- * @updated 2026-09-25: Added persisted five-week/six-week scale mapping for the Memoir mood calendar.
+ * @updated 2026-09-26: Separated horizontal size from five-week/six-week vertical mapping.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -18,6 +18,7 @@ export type MoodCalendarBackgroundSettings = {
     offsetY?: string;
     offsetX?: string;
     scale?: number;
+    heightScale?: number;
     opacity?: number;
     weekScale?: MoodCalendarWeekScale;
 };
@@ -42,10 +43,11 @@ const DEFAULT_SETTINGS: Required<Omit<MoodCalendarBackgroundSettings, 'weekScale
     offsetY: '0px',
     offsetX: '0px',
     scale: 1.35,
+    heightScale: 1,
     opacity: 1,
     weekScale: {
         fiveWeek: 1,
-        sixWeek: 0.86
+        sixWeek: 1
     }
 };
 
@@ -60,16 +62,17 @@ const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined)
     offsetY: settings?.offsetY || DEFAULT_SETTINGS.offsetY,
     offsetX: settings?.offsetX || DEFAULT_SETTINGS.offsetX,
     scale: clamp(Number(settings?.scale ?? DEFAULT_SETTINGS.scale) || DEFAULT_SETTINGS.scale, 0.1, 3),
+    heightScale: clamp(Number(settings?.heightScale ?? DEFAULT_SETTINGS.heightScale) || DEFAULT_SETTINGS.heightScale, 0.1, 3),
     opacity: clamp(Number(settings?.opacity ?? DEFAULT_SETTINGS.opacity) || 0, 0, 1),
     weekScale: normalizeWeekScale(settings?.weekScale)
 });
 
-export const getMoodCalendarMappedScale = (
+export const getMoodCalendarMappedHeightScale = (
     settings: MoodCalendarBackgroundSettings,
     weekCount: number
 ): number => {
     const weekScale = normalizeWeekScale(settings.weekScale);
-    return (settings.scale || DEFAULT_SETTINGS.scale) * (weekCount >= 6 ? weekScale.sixWeek : weekScale.fiveWeek);
+    return (settings.heightScale || DEFAULT_SETTINGS.heightScale) * (weekCount >= 6 ? weekScale.sixWeek : weekScale.fiveWeek);
 };
 
 class MoodCalendarBackgroundService {
@@ -90,7 +93,7 @@ class MoodCalendarBackgroundService {
             offsetX: '0px',
             scale: 1.35,
             opacity: 1,
-            weekScale: { ...DEFAULT_SETTINGS.weekScale, sixWeek: 0.86 }
+            weekScale: { ...DEFAULT_SETTINGS.weekScale }
         }
     ];
 
