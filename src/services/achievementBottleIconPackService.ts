@@ -4,6 +4,7 @@
  *
  * @updated 2026-04-06: Replaced invalid public asset imports with generated public URL paths shared by settings and bottle rendering.
  * @updated 2026-09-26: Added imported image-backed achievement-bottle icon packs.
+ * @updated 2026-09-26: Persists user names, supports pack removal, and rehydrates custom packs after appearance restore.
  */
 
 import { resolveAssetPath } from '../utils/assetPath';
@@ -47,10 +48,28 @@ export const ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY = CUSTOM_ICON_PACKS_KEY;
 export const ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT = 'achievement-bottle-icon-packs-changed';
 const customFramePaths: Record<string, string[]> = {};
 
-const readCustomIconPacks = (): Record<string, string[]> => {
+interface StoredCustomIconPack {
+  name: string;
+  filenames: string[];
+}
+
+const readCustomIconPacks = (): Record<string, StoredCustomIconPack> => {
   try {
     const parsed = JSON.parse(localStorage.getItem(CUSTOM_ICON_PACKS_KEY) || '{}');
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).flatMap(([id, value]) => {
+      if (Array.isArray(value)) {
+        return [[id, { name: toTitleCase(id), filenames: value.filter((item): item is string => typeof item === 'string') }]];
+      }
+      if (value && typeof value === 'object' && Array.isArray((value as StoredCustomIconPack).filenames)) {
+        const pack = value as StoredCustomIconPack;
+        return [[id, {
+          name: typeof pack.name === 'string' && pack.name.trim() ? pack.name.trim() : toTitleCase(id),
+          filenames: pack.filenames.filter((item): item is string => typeof item === 'string')
+        }]];
+      }
+      return [];
+    }));
   } catch {
     return {};
   }
@@ -58,29 +77,44 @@ const readCustomIconPacks = (): Record<string, string[]> => {
 
 const hydrateCustomIconPacks = async (): Promise<void> => {
   const stored = readCustomIconPacks();
-  for (const [packId, filenames] of Object.entries(stored)) {
-    const paths = await Promise.all(filenames.map((filename) => imageService.getImageUrl(filename).catch(() => '')));
+  for (const [packId, pack] of Object.entries(stored)) {
+    const paths = await Promise.all(pack.filenames.map((filename) => imageService.getImageUrl(filename).catch(() => '')));
     customFramePaths[packId] = paths.filter(Boolean);
   }
+  refreshAchievementBottleIconPackOptions();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT));
   }
 };
 
-void hydrateCustomIconPacks();
-
 export const registerCustomAchievementBottleIconPack = async (
   packId: string,
-  filenames: string[]
+  filenames: string[],
+  name = toTitleCase(packId)
 ): Promise<void> => {
+  if (filenames.length === 0) throw new Error('图标包至少需要一张图片');
   const stored = readCustomIconPacks();
-  stored[packId] = filenames;
+  stored[packId] = { name: name.trim() || toTitleCase(packId), filenames };
   localStorage.setItem(CUSTOM_ICON_PACKS_KEY, JSON.stringify(stored));
   const paths = await Promise.all(filenames.map((filename) => imageService.getImageUrl(filename).catch(() => '')));
   customFramePaths[packId] = paths.filter(Boolean);
+  refreshAchievementBottleIconPackOptions();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT));
   }
+};
+
+export const removeCustomAchievementBottleIconPack = (packId: string): boolean => {
+  const stored = readCustomIconPacks();
+  if (!Object.prototype.hasOwnProperty.call(stored, packId)) return false;
+  delete stored[packId];
+  localStorage.setItem(CUSTOM_ICON_PACKS_KEY, JSON.stringify(stored));
+  delete customFramePaths[packId];
+  refreshAchievementBottleIconPackOptions();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT));
+  }
+  return true;
 };
 
 const getAchievementBottleIconPackFrameFileName = (frameNumber: number): string => {
@@ -173,18 +207,35 @@ export const getAchievementBottleIconPackFramePaths = (
   });
 };
 
-export const ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS: AchievementBottleIconPackOption[] = availableIconPacks.map((packName) => {
-  const meta = ICON_PACK_META[packName];
-  const previewImageSrc = getAchievementBottleIconPackFramePaths(packName)[0]
-    || getAchievementBottleIconPackFramePath(packName, 1);
+const buildAchievementBottleIconPackOptions = (): AchievementBottleIconPackOption[] => {
+  const customPacks = readCustomIconPacks();
+  const packNames = [...availableIconPacks, ...Object.keys(customPacks).filter((id) => !availableIconPacks.includes(id))];
+  return packNames.map((packName) => {
+    const meta = ICON_PACK_META[packName];
+    const customPack = customPacks[packName];
+    const previewImageSrc = getAchievementBottleIconPackFramePaths(packName)[0]
+      || getAchievementBottleIconPackFramePath(packName, 1);
 
-  return {
-    value: packName,
-    label: meta?.label || toTitleCase(packName),
-    description: meta?.description || `${packName} sprite pack.`,
-    previewImageSrc
-  };
-});
+    return {
+      value: packName,
+      label: customPack?.name || meta?.label || toTitleCase(packName),
+      description: meta?.description || (customPack ? 'Custom achievement bottle icon pack.' : `${packName} sprite pack.`),
+      previewImageSrc
+    };
+  });
+};
+
+export const ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS: AchievementBottleIconPackOption[] = buildAchievementBottleIconPackOptions();
+
+const refreshAchievementBottleIconPackOptions = (): void => {
+  ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS.splice(0, ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS.length, ...buildAchievementBottleIconPackOptions());
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('lumostime:appearance-restored', () => void hydrateCustomIconPacks());
+}
+
+void hydrateCustomIconPacks();
 
 export const isAchievementBottleIconPack = (
   value: string | null | undefined

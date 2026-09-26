@@ -1403,7 +1403,9 @@ export const useSyncManager = () => {
             'timepal-type-changed',
             'timepal-click-switch-changed',
             'timepal-stage-thresholds-changed',
-            'timepal-custom-changed'
+            'timepal-custom-changed',
+            'achievement-bottle-icon-packs-changed',
+            'achievement-bottle-icon-pack-selection-changed'
         ];
 
         const handleAppearanceDataChanged = () => {
