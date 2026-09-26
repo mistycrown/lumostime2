@@ -14,6 +14,21 @@
   z-index: 1;
 }
 
+html[data-theme-mode='dark'] .navigation-setting-switch {
+  border: 1px solid #78716c;
+  background-color: #57534e !important;
+}
+
+html[data-theme-mode='dark'] .navigation-setting-switch[aria-checked='true'] {
+  border-color: #4ade80;
+  background-color: #15803d !important;
+}
+
+html[data-theme-mode='dark'] button.navigation-setting-switch .navigation-setting-switch-thumb {
+  background-color: #fafaf9 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.48) !important;
+}
+
 @layer components {
   .association-option-grid-wrap {
     container-type: inline-size;

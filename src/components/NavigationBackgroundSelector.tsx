@@ -6,6 +6,7 @@
  * @description Provides the new navigation background workflow without changing the legacy foreground decoration page.
  * @updated 2026-09-25: Added the navigation icon mode selector for the new navigation bar.
  * @updated 2026-09-25: Added the opt-in transparent navigation toggle above the new navigation mode setting.
+ * @updated 2026-09-26: Adds dedicated dark-mode styling hooks to keep navigation setting switches visible.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
@@ -120,9 +121,9 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         role="switch"
                         aria-checked={transparentNavigation}
                         onClick={handleTransparentNavigationToggle}
-                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${transparentNavigation ? 'bg-stone-800' : 'bg-stone-300'}`}
+                        className={`navigation-setting-switch relative h-6 w-11 shrink-0 rounded-full transition-colors ${transparentNavigation ? 'bg-stone-800' : 'bg-stone-300'}`}
                     >
-                        <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${transparentNavigation ? 'translate-x-5' : 'translate-x-0'}`} />
+                        <span className={`navigation-setting-switch-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${transparentNavigation ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                 </div>
             </div>
@@ -138,9 +139,9 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         role="switch"
                         aria-checked={enabled}
                         onClick={handleToggle}
-                        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? 'bg-stone-800' : 'bg-stone-300'}`}
+                        className={`navigation-setting-switch relative h-6 w-11 shrink-0 rounded-full transition-colors ${enabled ? 'bg-stone-800' : 'bg-stone-300'}`}
                     >
-                        <span className={`absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                        <span className={`navigation-setting-switch-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                 </div>
             </div>
