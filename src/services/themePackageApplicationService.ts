@@ -7,6 +7,7 @@
  * @updated 2026-09-26: Added package configuration application for appearance, stickers, TimePal, navigation, timeline, and Memoir.
  * @updated 2026-09-26: Applies imported achievement-bottle image packs and fixes TimePal package replacement IDs.
  * @updated 2026-09-26: Applies navigation changes through service events and supports Memoir overflow/fill package modes.
+ * @updated 2026-09-26: Applies achievement-bottle and other appearance settings from their manifest sections.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -481,7 +482,8 @@ const applySettings = async (record: ImportedThemePackageRecord, warnings: strin
           .filter((filename): filename is string => Boolean(filename));
         if (filenames.length > 0) {
           const packId = getNamespacedId(record, `achievement-bottle-${String(iconPackConfig.id || 'custom')}`);
-          await registerCustomAchievementBottleIconPack(packId, filenames);
+          const packName = typeof iconPackConfig.name === 'string' ? iconPackConfig.name : record.name;
+          await registerCustomAchievementBottleIconPack(packId, filenames, packName);
           localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, packId);
         } else {
           warnings.push('成就瓶图标包没有可用图片');
@@ -533,8 +535,13 @@ export const applyImportedThemePackage = async (
     ['settings', async () => applySettings(record, warnings)]
   ];
 
+  const hasSettingsConfiguration = ['color', 'font', 'achievementBottle', 'timeline']
+    .some((key) => record.manifest.config[key] !== undefined);
   for (const [section, task] of sectionTasks) {
-    if (record.manifest.config[section] === undefined) continue;
+    const shouldApply = section === 'settings'
+      ? hasSettingsConfiguration
+      : record.manifest.config[section] !== undefined;
+    if (!shouldApply) continue;
     await task();
     appliedSections.push(section);
   }

@@ -5,6 +5,7 @@
  * @pos Service (Theme Management)
  * @description Captures and restores the full set of theme-managed settings while leaving user data and theme catalog metadata untouched.
  * @updated 2026-09-26: Added immutable full appearance snapshots for saved themes.
+ * @updated 2026-09-26: Restores named custom achievement-bottle icon-pack records.
  */
 
 import { THEME_KEYS } from '../constants/storageKeys';
@@ -107,16 +108,27 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
   addImageList('lumostime_timepal_custom_items');
   addImageList('lumostime_custom_stickers_v2');
 
-  [UI_ICON_CUSTOM_ASSETS_KEY, 'lumostime_achievement_bottle_custom_icon_packs_v1'].forEach((key) => {
-    const mapping = parse(key);
-    if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) return;
+  const customUiThemes = parse(UI_ICON_CUSTOM_ASSETS_KEY);
+  if (customUiThemes && typeof customUiThemes === 'object' && !Array.isArray(customUiThemes)) {
     const addValues = (value: unknown) => {
       if (typeof value === 'string') add(value);
       else if (Array.isArray(value)) value.forEach(addValues);
       else if (value && typeof value === 'object') Object.values(value).forEach(addValues);
     };
-    addValues(mapping);
-  });
+    addValues(customUiThemes);
+  }
+
+  const customIconPacks = parse('lumostime_achievement_bottle_custom_icon_packs_v1');
+  if (customIconPacks && typeof customIconPacks === 'object' && !Array.isArray(customIconPacks)) {
+    Object.values(customIconPacks).forEach((pack) => {
+      const filenames = Array.isArray(pack)
+        ? pack
+        : pack && typeof pack === 'object' && Array.isArray(pack.filenames)
+          ? pack.filenames
+          : [];
+      filenames.forEach(add);
+    });
+  }
 
   return [...references];
 };
@@ -144,9 +156,14 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
   }
 
   const activeIconPack = snapshot.storage[THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK];
-  const customIconPacks = getStoredObject<Record<string, string[]>>('lumostime_achievement_bottle_custom_icon_packs_v1');
-  if (activeIconPack && customIconPacks[activeIconPack]) {
-    await registerCustomAchievementBottleIconPack(activeIconPack, customIconPacks[activeIconPack]);
+  const customIconPacks = getStoredObject<Record<string, string[] | { name?: string; filenames?: string[] }>>('lumostime_achievement_bottle_custom_icon_packs_v1');
+  const customIconPack = activeIconPack ? customIconPacks[activeIconPack] : undefined;
+  if (activeIconPack && customIconPack) {
+    const filenames = Array.isArray(customIconPack) ? customIconPack : customIconPack.filenames || [];
+    const name = Array.isArray(customIconPack) ? activeIconPack : customIconPack.name || activeIconPack;
+    if (filenames.length > 0) {
+      await registerCustomAchievementBottleIconPack(activeIconPack, filenames, name);
+    }
   }
 
   const navigationBackgroundId = snapshot.storage['navigation_new_background'];
