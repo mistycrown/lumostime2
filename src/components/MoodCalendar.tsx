@@ -182,7 +182,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className={`memoir-mood-calendar relative isolate ${hasCalendarBackground ? 'has-custom-background bg-transparent' : 'bg-stone-50'} shadow-sm p-6 rounded-2xl mb-6`}>
+            <div className={`memoir-mood-calendar relative ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
                 {hasCalendarBackground && (
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
                         <img
