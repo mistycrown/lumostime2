@@ -7,6 +7,7 @@
  * @updated 2026-08-10: Added the first unified appearance backup block with built-in-font fallback and theme-image reference extraction.
  * @updated 2026-09-15: Included the global font-scale preference in appearance backups.
  * @updated 2026-09-25: Included navigation icon selections and custom image hydration in appearance backups.
+ * @updated 2026-09-26: Included Memoir mood-calendar backgrounds in appearance backups and image references.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -15,6 +16,7 @@ import { colorSchemeService } from './colorSchemeService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
+import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 
 export const APPEARANCE_RESTORED_EVENT = 'lumostime:appearance-restored';
 
@@ -31,6 +33,9 @@ const APPEARANCE_STORAGE_KEYS = [
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
+  'mood_calendar_background',
+  'mood_calendar_background_settings',
+  'mood_calendar_background_custom_list',
   'lumos_custom_backgrounds',
   THEME_KEYS.CUSTOM_PRESETS,
   THEME_KEYS.SCHEDULE_STYLE,
@@ -125,6 +130,11 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
     customNavigationIcons.forEach((item) => addImageReference(referenced, item?.imageFilename));
   }
 
+  const customMoodCalendarBackgrounds = parseJsonValue(snapshot, 'mood_calendar_background_custom_list');
+  if (Array.isArray(customMoodCalendarBackgrounds)) {
+    customMoodCalendarBackgrounds.forEach((item) => addImageReference(referenced, item?.imageFilename));
+  }
+
   return [...referenced];
 };
 
@@ -160,6 +170,7 @@ export const appearanceBackupService = {
     void backgroundService.hydrateImageBackedCustomBackgrounds();
     void navigationDecorationService.hydrateImageBackedCustomDecorations();
     void navigationIconService.hydrateCustomIcons();
+    void moodCalendarBackgroundService.hydrateCustomBackgrounds();
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));

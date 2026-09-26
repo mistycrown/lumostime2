@@ -3030,6 +3030,10 @@ html[data-theme-mode=dark] .memoir-mood-calendar {
   box-shadow: none !important;
 }
 
+html[data-theme-mode=dark] .memoir-mood-calendar.has-custom-background {
+  background-color: transparent !important;
+}
+
 html[data-theme-mode=dark] .memoir-calendar-weekday,
 html[data-theme-mode=dark] .memoir-calendar-day,
 html[data-theme-mode=dark] .memoir-timeline-month {
