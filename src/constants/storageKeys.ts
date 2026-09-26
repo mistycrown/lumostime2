@@ -6,6 +6,7 @@
  * @updated 2026-07-30: Added persistent quick-color sidebar ratio while keeping the legacy width key for migration.
  * @updated 2026-08-06: Added the association selector column-count preference key.
  * @updated 2026-08-11: Added the last-seen cloud upload timestamp for dual-path sync decisions.
+ * @updated 2026-09-26: Added imported theme package metadata storage for appearance sync.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -69,6 +70,8 @@ export const THEME_KEYS = {
     NAVIGATION_ICON_SCHEMES: 'navigation_icon_schemes_v1',
     /** 自定义主题预设列表 */
     CUSTOM_PRESETS: 'lumostime_custom_presets',
+    /** 已导入主题包元数据与图片资源映射 */
+    IMPORTED_THEME_PACKAGES: 'lumostime_theme_packages_v1',
 } as const;
 
 /**

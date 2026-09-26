@@ -90,4 +90,22 @@ describe('getSettingsReferencedImages', () => {
       'thumb_custom-navigation.png'
     ]);
   });
+
+  it('keeps imported theme package images and thumbnails protected', () => {
+    localStorage.setItem('lumostime_theme_packages_v1', JSON.stringify([
+      {
+        imageAssets: {
+          'assets/background/main.webp': 'theme-background.webp',
+          'assets/stickers/moon/001.webp': 'theme-sticker.webp'
+        }
+      }
+    ]));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'theme-background.webp',
+      'theme-sticker.webp',
+      'thumb_theme-background.webp',
+      'thumb_theme-sticker.webp'
+    ]);
+  });
 });

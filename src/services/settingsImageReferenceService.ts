@@ -6,6 +6,7 @@
  * @description Collects persisted settings-level image filenames so cleanup and sync manifest rebuild can keep user-owned assets.
  * @updated 2026-09-25: Included active custom sticker assets and custom navigation icon assets so legacy flat manifests can be migrated into the theme group.
  * @updated 2026-09-26: Protects custom Memoir mood-calendar background images from cleanup.
+ * @updated 2026-09-26: Protects imported theme package image assets from cleanup and sync manifest rebuilds.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -43,6 +44,10 @@ interface StoredCustomSticker {
   status?: unknown;
 }
 
+interface StoredThemePackage {
+  imageAssets?: unknown;
+}
+
 const isValidFilename = (value: unknown): value is string => (
   typeof value === 'string' && value.trim().length > 0
 );
@@ -70,6 +75,10 @@ export const getSettingsReferencedImages = (): Set<string> => {
   const customNavigationIcons = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_ICON_KEY, []);
   const customMoodCalendarBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY, []);
   const customStickers = readRawJson<StoredCustomSticker[]>(CUSTOM_STICKERS_KEY, []);
+  const importedThemePackages = readRawJson<StoredThemePackage[]>(
+    'lumostime_theme_packages_v1',
+    []
+  );
 
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {
@@ -125,6 +134,20 @@ export const getSettingsReferencedImages = (): Set<string> => {
         ? sticker.thumbnailFilename
         : `thumb_${sticker.imageFilename}`
     );
+  });
+
+  importedThemePackages.forEach((themePackage) => {
+    if (!themePackage || typeof themePackage.imageAssets !== 'object' || !themePackage.imageAssets) {
+      return;
+    }
+
+    Object.values(themePackage.imageAssets as Record<string, unknown>).forEach((filename) => {
+      if (!isValidFilename(filename)) {
+        return;
+      }
+      referencedImages.add(filename);
+      referencedImages.add(`thumb_${filename}`);
+    });
   });
 
   return referencedImages;

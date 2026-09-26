@@ -47,6 +47,7 @@ describe('parseThemePackage', () => {
 
     expect(result.manifest.package.id).toBe('moonlit-garden');
     expect(result.assets.has('assets/background/main.webp')).toBe(true);
+    expect(result.assets.get('assets/background/main.webp')?.type).toBe('image/webp');
   });
 
   it('allows optional configuration sections to be omitted', async () => {
@@ -91,4 +92,3 @@ describe('parseThemePackage', () => {
     await expect(parseThemePackage(await zip.generateAsync({ type: 'blob' }))).rejects.toBeInstanceOf(ThemePackageValidationError);
   });
 });
-
