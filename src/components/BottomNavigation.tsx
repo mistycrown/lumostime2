@@ -22,6 +22,7 @@
  * @updated 2026-09-26: Added optional small labels below image navigation icons.
  * @updated 2026-09-26: Restores the default navigation surface when the new navigation has no background selected.
  * @updated 2026-09-26: Restores the original text navigation layout for the no-background selection.
+ * @updated 2026-09-26: Keeps the no-background navigation surface solid white regardless of transparency settings.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -214,14 +215,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         || (currentView === AppView.TODO && !isTodoScheduleMode)
         || currentView === AppView.REVIEW
         || isIndexView(currentView);
-    const shouldUseTransparentNavigation = isTransparentNavigation && supportsTransparentNavigation;
+    const isNoBackgroundNavigation = isNewNavigation && currentBackground === 'new-none';
+    const shouldUseTransparentNavigation = !isNoBackgroundNavigation
+        && isTransparentNavigation
+        && supportsTransparentNavigation;
     const useNewNavigationStyle = isNewNavigation && currentBackground !== 'new-none';
     const hasNavigationBackground = useNewNavigationStyle && Boolean(backgroundUrl);
-    const bgColor = hasNavigationBackground || shouldUseTransparentNavigation
-        ? 'bg-transparent'
-        : (currentView === AppView.TIMELINE || isIndexView(currentView))
-            ? 'bg-[#faf9f6]/80 backdrop-blur-md'
-            : 'bg-white/80 backdrop-blur-md';
+    const bgColor = isNoBackgroundNavigation
+        ? 'bg-white'
+        : hasNavigationBackground || shouldUseTransparentNavigation
+            ? 'bg-transparent'
+            : (currentView === AppView.TIMELINE || isIndexView(currentView))
+                ? 'bg-[#faf9f6]/80 backdrop-blur-md'
+                : 'bg-white/80 backdrop-blur-md';
 
     // Calculate dynamic styles
     const navStyle: React.CSSProperties = {};
