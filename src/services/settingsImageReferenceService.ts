@@ -9,12 +9,14 @@
  * @updated 2026-09-26: Protects imported theme package image assets from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects image-backed custom UIIcon assets from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects custom achievement-bottle icon frames from cleanup and sync manifest rebuilds.
+ * @updated 2026-09-26: Reads named custom icon-pack configuration while retaining legacy filename-array support.
  * @updated 2026-09-26: Protects single-image Memoir Fill backgrounds from cleanup and sync manifest rebuilds.
+ * @updated 2026-09-26: Protects image assets retained by immutable saved theme snapshots.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
 
-import { TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 
 const AI_CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
@@ -54,6 +56,12 @@ interface StoredThemePackage {
   imageAssets?: unknown;
 }
 
+interface StoredCustomPreset {
+  snapshot?: {
+    storage?: Record<string, string | null>;
+  };
+}
+
 const isValidFilename = (value: unknown): value is string => (
   typeof value === 'string' && value.trim().length > 0
 );
@@ -88,6 +96,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
   );
   const customUiIconAssets = readRawJson<Record<string, Record<string, unknown>>>(CUSTOM_UI_ICON_ASSETS_KEY, {});
   const customAchievementIconPacks = readRawJson<Record<string, unknown>>(CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY, {});
+  const savedPresets = storage.getJSON<StoredCustomPreset[]>(THEME_KEYS.CUSTOM_PRESETS, []);
 
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {
@@ -183,6 +192,69 @@ export const getSettingsReferencedImages = (): Set<string> => {
       }
     });
   });
+
+  if (Array.isArray(savedPresets)) {
+    const snapshotKeys = [
+      TIMEPAL_KEYS.CUSTOM_ITEMS,
+      CUSTOM_BACKGROUND_KEY,
+      CUSTOM_NAVIGATION_KEY,
+      'navigation_new_background_custom_list',
+      CUSTOM_NAVIGATION_ICON_KEY,
+      CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY,
+      CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY,
+      CUSTOM_STICKERS_KEY
+    ];
+    savedPresets.forEach((preset) => {
+      const snapshot = preset?.snapshot?.storage;
+      if (!snapshot) return;
+      snapshotKeys.forEach((key) => {
+        let value: unknown;
+        try {
+          value = JSON.parse(snapshot[key] || 'null');
+        } catch {
+          return;
+        }
+        if (!Array.isArray(value)) return;
+        value.forEach((item) => {
+          if (isValidFilename(item?.imageFilename)) {
+            referencedImages.add(item.imageFilename);
+            referencedImages.add(`thumb_${item.imageFilename}`);
+          }
+          if (isValidFilename(item?.sixWeekImageFilename)) {
+            referencedImages.add(item.sixWeekImageFilename);
+            referencedImages.add(`thumb_${item.sixWeekImageFilename}`);
+          }
+          if (isValidFilename(item?.thumbnailFilename)) referencedImages.add(item.thumbnailFilename);
+          if (isValidFilename(item?.sixWeekThumbnail)) referencedImages.add(item.sixWeekThumbnail);
+          if (Array.isArray(item?.stageFilenames)) {
+            item.stageFilenames.forEach((filename: unknown) => {
+              if (isValidFilename(filename)) referencedImages.add(filename);
+            });
+          }
+        });
+      });
+
+      [CUSTOM_UI_ICON_ASSETS_KEY, CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY].forEach((key) => {
+        let value: unknown;
+        try {
+          value = JSON.parse(snapshot[key] || 'null');
+        } catch {
+          return;
+        }
+        const collect = (candidate: unknown) => {
+          if (typeof candidate === 'string' && isValidFilename(candidate)) {
+            referencedImages.add(candidate);
+            referencedImages.add(`thumb_${candidate}`);
+          } else if (Array.isArray(candidate)) {
+            candidate.forEach(collect);
+          } else if (candidate && typeof candidate === 'object') {
+            Object.values(candidate).forEach(collect);
+          }
+        };
+        collect(value);
+      });
+    });
+  }
 
   return referencedImages;
 };

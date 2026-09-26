@@ -1,9 +1,10 @@
 /**
  * @file useCustomPresets.ts
  * @input SettingsContext (uiIconTheme, colorScheme), LocalStorage (custom presets data)
- * @output Custom Presets Management (customPresets, addCustomPreset, updateCustomPreset, deleteCustomPreset, getCustomPresetById, isPresetNameValid, validatePresetName), Loading State (isLoading)
+ * @output Immutable saved theme snapshots with create, delete, and name validation
  * @pos Hook (Data Manager)
- * @description 自定义主题方案 Hook - 管理用户自定义的主题方案，支持增删改查和名称验证
+ * @description 自定义主题方案 Hook - 管理完整外观快照，支持新增、删除和名称验证
+ * @updated 2026-09-26: Saves full appearance snapshots and removes editing operations.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,6 +13,13 @@ import { useSettings } from '../contexts/SettingsContext';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import type { AchievementBottleStyle } from '../services/achievementBottleStyleService';
 import type { AchievementBottleIconPack } from '../services/achievementBottleIconPackService';
+import {
+    captureThemeSettingsSnapshot,
+    deleteUnusedSnapshotImages,
+    type ThemeSettingsSnapshot
+} from '../services/themeSnapshotService';
+
+/** @updated 2026-09-26: Stores full immutable appearance snapshots for newly saved themes. */
 
 // Theme preset interface
 export interface ThemePreset {
@@ -24,9 +32,11 @@ export interface ThemePreset {
     colorScheme: string;
     background: string;
     navigation: string;
+    navigationMode?: 'legacy' | 'modern';
     timePal: string;
     achievementBottleStyle?: AchievementBottleStyle;
     achievementBottleIconPack?: AchievementBottleIconPack;
+    snapshot?: ThemeSettingsSnapshot;
     isCustom?: boolean;
     createdAt?: number;
     updatedAt?: number;
@@ -167,6 +177,8 @@ export const useCustomPresets = () => {
             timePal: storage.get(TIMEPAL_KEYS.TYPE) || 'none',
             achievementBottleStyle,
             achievementBottleIconPack,
+            navigationMode: localStorage.getItem('navigation_new_mode_enabled') === 'true' ? 'modern' : 'legacy',
+            snapshot: captureThemeSettingsSnapshot(),
             isCustom: true,
             createdAt: timestamp,
             updatedAt: timestamp
@@ -198,38 +210,6 @@ export const useCustomPresets = () => {
     }, [customPresets, createCustomPreset]);
 
     /**
-     * Update an existing custom preset
-     */
-    const updateCustomPreset = useCallback((updatedPreset: ThemePreset): { success: boolean; error?: ValidationError } => {
-        // Validate name
-        const validationError = validatePresetName(updatedPreset.name, customPresets, updatedPreset.id);
-        if (validationError) {
-            return { success: false, error: validationError };
-        }
-
-        // Validate data
-        if (!validatePresetData(updatedPreset)) {
-            return { success: false, error: 'INVALID_DATA' };
-        }
-
-        try {
-            const updatedPresets = customPresets.map(preset =>
-                preset.id === updatedPreset.id
-                    ? { ...updatedPreset, updatedAt: Date.now() }
-                    : preset
-            );
-            
-            saveCustomPresets(updatedPresets);
-            setCustomPresets(updatedPresets);
-            
-            return { success: true };
-        } catch (error) {
-            console.error('[useCustomPresets] Failed to update preset:', error);
-            return { success: false, error: 'INVALID_DATA' };
-        }
-    }, [customPresets]);
-
-    /**
      * Delete a custom preset
      */
     const deleteCustomPreset = useCallback((presetId: string): boolean => {
@@ -238,6 +218,9 @@ export const useCustomPresets = () => {
             
             saveCustomPresets(updatedPresets);
             setCustomPresets(updatedPresets);
+
+            const deleted = customPresets.find((preset) => preset.id === presetId);
+            if (deleted?.snapshot) void deleteUnusedSnapshotImages(deleted.snapshot);
             
             // If deleted preset was current, clear current preset ID
             const currentPresetId = storage.get(THEME_KEYS.CURRENT_PRESET);
@@ -253,13 +236,6 @@ export const useCustomPresets = () => {
     }, [customPresets]);
 
     /**
-     * Get a custom preset by ID
-     */
-    const getCustomPresetById = useCallback((presetId: string): ThemePreset | undefined => {
-        return customPresets.find(preset => preset.id === presetId);
-    }, [customPresets]);
-
-    /**
      * Check if a preset name is valid
      */
     const isPresetNameValid = useCallback((name: string, excludeId?: string): boolean => {
@@ -270,9 +246,7 @@ export const useCustomPresets = () => {
         customPresets,
         isLoading,
         addCustomPreset,
-        updateCustomPreset,
         deleteCustomPreset,
-        getCustomPresetById,
         isPresetNameValid,
         validatePresetName: (name: string, excludeId?: string) => 
             validatePresetName(name, customPresets, excludeId)

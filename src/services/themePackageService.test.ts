@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Added validation coverage for custom achievement-bottle frames.
  * @updated 2026-09-26: Ensures empty template directory markers are ignored.
  * @updated 2026-09-26: Covers single-image fill-mode backgrounds and mode/image mismatches.
+ * @updated 2026-09-26: Covers explicit legacy-navigation theme package configuration.
  */
 
 import JSZip from 'jszip';
@@ -132,6 +133,19 @@ describe('parseThemePackage', () => {
       code: 'INVALID_CONFIGURATION',
       path: 'config.memoirCalendar.background'
     });
+  });
+
+  it('accepts explicit legacy navigation decorations', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: { navigation: { mode: 'legacy', decorationId: 'pencil' } }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview'
+    }));
+
+    expect(result.manifest.config.navigation).toEqual({ mode: 'legacy', decorationId: 'pencil' });
   });
 
   it('requires at least one frame for a custom achievement bottle icon pack', async () => {

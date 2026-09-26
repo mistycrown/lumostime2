@@ -302,7 +302,6 @@ Components for theme and appearance customization.
 - `NavigationDecorationSelector.tsx`: 导航装饰选择器
 - `NavigationIconSelector.tsx`: 新版导航栏图标方案选择器，支持粉色内置方案、多套自定义方案、弹窗编辑及图标下导航文字开关
 - `UIIconSelector.tsx`: UI 图标主题选择器
-- `PresetEditModal.tsx`: 主题预设编辑弹窗
 
  - `achievement/AchievementBottleIconPackSelector.tsx`: 投喂页中切换成就瓶图标资源包的下拉选择器，与瓶身样式独立保存。
 

@@ -7,6 +7,7 @@
  * @updated 2026-09-26: Added version-one theme package manifest parsing and archive safety validation.
  * @updated 2026-09-26: Ignores .gitkeep directory markers used by the editable package template.
  * @updated 2026-09-26: Validates Memoir overflow/fill background mode and matching image shape.
+ * @updated 2026-09-26: Validates explicit legacy/modern navigation modes for compatible theme packages.
  */
 
 import JSZip from 'jszip';
@@ -175,6 +176,27 @@ const assertManifestShape = (value: unknown): ThemePackageManifest => {
 };
 
 const validateConfigurationInvariants = (manifest: ThemePackageManifest): void => {
+  const navigation = manifest.config.navigation;
+  if (navigation && typeof navigation === 'object' && !Array.isArray(navigation)) {
+    const navigationRecord = navigation as Record<string, unknown>;
+    if (navigationRecord.mode !== undefined && navigationRecord.mode !== 'legacy' && navigationRecord.mode !== 'modern') {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'navigation.mode 只支持 legacy 或 modern',
+        'config.navigation.mode'
+      );
+    }
+    if (navigationRecord.mode === 'legacy'
+      && typeof navigationRecord.decorationId !== 'string'
+      && (!navigationRecord.decoration || typeof navigationRecord.decoration !== 'object' || Array.isArray(navigationRecord.decoration))) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'legacy 导航必须提供 decorationId 或 decoration 配置',
+        'config.navigation'
+      );
+    }
+  }
+
   const timePal = manifest.config.timePal;
   if (timePal && typeof timePal === 'object' && !Array.isArray(timePal)) {
     const items = (timePal as { items?: unknown }).items;
