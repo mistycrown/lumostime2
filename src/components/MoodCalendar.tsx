@@ -142,6 +142,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         : selectedBackground?.url;
     const hasCalendarBackground = Boolean(selectedBackgroundUrl);
     const backgroundWidthScale = backgroundSettings.scale || 1;
+    const backgroundHeightScale = backgroundSettings.heightScale || 1;
     const backgroundOffsetX = Number(backgroundSettings.offsetX?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
     const backgroundOffsetY = Number(backgroundSettings.offsetY?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
 
@@ -195,7 +196,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                 width: `${Math.max(10, backgroundWidthScale * 100)}%`,
                                 height: 'auto',
                                 opacity: backgroundSettings.opacity ?? 1,
-                                transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px))`
+                                transformOrigin: 'center center',
+                                transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px)) scaleY(${backgroundHeightScale})`
                             }}
                         />
                     </div>
