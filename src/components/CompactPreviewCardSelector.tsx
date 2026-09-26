@@ -24,6 +24,7 @@ interface CompactPreviewCardSelectorProps<T extends string = string> {
   selectedValue: T;
   onSelect: (value: T) => void;
   renderPreview: (option: CompactPreviewCardOption<T>, selected: boolean) => React.ReactNode;
+  renderOverlayAction?: (option: CompactPreviewCardOption<T>) => React.ReactNode;
   actionSlot?: React.ReactNode;
   minCardWidth?: number;
   maxCardWidth?: number;
@@ -38,6 +39,7 @@ export const CompactPreviewCardSelector = <T extends string,>({
   selectedValue,
   onSelect,
   renderPreview,
+  renderOverlayAction,
   actionSlot,
   minCardWidth = 68,
   maxCardWidth = 96,
@@ -63,42 +65,49 @@ export const CompactPreviewCardSelector = <T extends string,>({
         >
           {options.map((option) => {
             const isSelected = option.value === selectedValue;
+            const overlayAction = renderOverlayAction?.(option);
 
             return (
-              <button
+              <div
                 key={option.value}
-                type="button"
-                onClick={() => onSelect(option.value)}
-                title={showLabels ? (option.description ? `${option.label} - ${option.description}` : option.label) : undefined}
-                aria-pressed={isSelected}
-                className={`compact-preview-option ${isSelected ? 'compact-preview-option-selected' : ''} group relative w-full overflow-hidden rounded-xl bg-white transition-all ${
-                  isSelected
-                    ? 'ring-2 ring-stone-300 shadow-[0_6px_18px_rgba(120,113,108,0.18)]'
-                    : 'ring-1 ring-stone-200 hover:ring-stone-300'
-                }`}
-                style={{
-                  aspectRatio: cardAspectRatio,
-                  maxWidth: `${maxCardWidth}px`
-                }}
+                className="relative w-full"
+                style={{ aspectRatio: cardAspectRatio, maxWidth: `${maxCardWidth}px` }}
               >
-                <div className="relative h-full w-full">
-                  {renderPreview(option, isSelected)}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelect(option.value)}
+                  title={showLabels ? (option.description ? `${option.label} - ${option.description}` : option.label) : undefined}
+                  aria-pressed={isSelected}
+                  className={`compact-preview-option ${isSelected ? 'compact-preview-option-selected' : ''} group relative h-full w-full overflow-hidden rounded-xl bg-white transition-all ${
+                    isSelected
+                      ? 'ring-2 ring-stone-300 shadow-[0_6px_18px_rgba(120,113,108,0.18)]'
+                      : 'ring-1 ring-stone-200 hover:ring-stone-300'
+                  }`}
+                >
+                  <div className="relative h-full w-full">
+                    {renderPreview(option, isSelected)}
+                  </div>
 
-                {isSelected && (
-                  <div className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-stone-800 shadow-lg">
-                    <Check size={12} className="text-white" />
+                  {isSelected && (
+                    <div className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-stone-800 shadow-lg">
+                      <Check size={12} className="text-white" />
+                    </div>
+                  )}
+
+                  {showLabels && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/58 via-black/24 to-transparent px-2 py-1.5">
+                      <p className="text-center text-[10px] font-medium leading-tight text-white">
+                        {option.label}
+                      </p>
+                    </div>
+                  )}
+                </button>
+                {overlayAction && (
+                  <div className="absolute left-1 top-1 z-20">
+                    {overlayAction}
                   </div>
                 )}
-
-                {showLabels && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/58 via-black/24 to-transparent px-2 py-1.5">
-                    <p className="text-center text-[10px] font-medium leading-tight text-white">
-                      {option.label}
-                    </p>
-                  </div>
-                )}
-              </button>
+              </div>
             );
           })}
         </div>
