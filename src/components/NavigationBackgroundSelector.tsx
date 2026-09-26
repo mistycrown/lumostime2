@@ -7,7 +7,7 @@
  * @updated 2026-09-25: Added the navigation icon mode selector for the new navigation bar.
  * @updated 2026-09-25: Added the opt-in transparent navigation toggle above the new navigation mode setting.
  * @updated 2026-09-26: Adds dedicated dark-mode styling hooks to keep navigation setting switches visible.
- * @updated 2026-09-26: Constrained new navigation background cards to a compact left-aligned wrapping layout.
+ * @updated 2026-09-26: Constrained new navigation background cards to a 96px left-aligned grid.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
@@ -162,14 +162,14 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         </button>
                     </div>
 
-                    <div className="flex flex-wrap items-start justify-start gap-2">
+                    <div className="grid justify-start gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, 96px)' }}>
                         {backgrounds.map((background) => (
                             <div
                                 key={background.id}
                                 role="button"
                                 tabIndex={0}
                                 onClick={() => handleSelect(background.id)}
-                                className={`relative w-full max-w-32 aspect-[2/1] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}
+                                className={`relative w-full max-w-24 justify-self-start aspect-[2/1] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}
                             >
                                 <img src={background.thumbnail || background.url} alt={background.name} className="h-full w-full object-cover" />
                                 {currentId === background.id && (
@@ -192,7 +192,7 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
                             disabled={isUploading}
-                            className="w-full max-w-32 aspect-[2/1] rounded-lg border-2 border-dashed border-stone-300 text-stone-500 hover:border-stone-400"
+                            className="w-full max-w-24 justify-self-start aspect-[2/1] rounded-lg border-2 border-dashed border-stone-300 text-stone-500 hover:border-stone-400"
                         >
                             {isUploading ? <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-stone-400 border-t-transparent" /> : <span className="inline-flex items-center gap-1 text-xs"><Plus size={15} /> 添加</span>}
                         </button>
