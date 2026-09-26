@@ -5,6 +5,7 @@
  * @pos Service (Theme Package Import)
  * @description Parses and validates LumoTime theme packages before any persistent resource or setting mutation.
  * @updated 2026-09-26: Added version-one theme package manifest parsing and archive safety validation.
+ * @updated 2026-09-26: Ignores .gitkeep directory markers used by the editable package template.
  */
 
 import JSZip from 'jszip';
@@ -282,7 +283,7 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
       throw new ThemePackageValidationError('UNSAFE_ARCHIVE_PATH', `主题包包含不安全路径：${originalPath}`, originalPath);
     }
 
-    if (archivePath === 'theme.json' || archivePath.startsWith('__MACOSX/')) {
+    if (archivePath === 'theme.json' || archivePath.startsWith('__MACOSX/') || archivePath.endsWith('/.gitkeep')) {
       continue;
     }
 
