@@ -146,7 +146,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 
 ## Recently Added (2026-03)
 - `navigationDecorationService.ts`: 支持自定义导航栏装饰上传和存储
-- `navigationIconService.ts`: 管理新版导航栏文字、粉色内置方案、多套自定义方案及图片引用
+- `navigationIconService.ts`: 管理新版导航栏文字、粉色内置方案、多套自定义方案、图片引用及图标下文字显示偏好
 
 > ⚠️ Once the folder I belong to changes, please update me.
 > ⚠️ 本文档最后更新：2026-09-25

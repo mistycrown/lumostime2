@@ -19,6 +19,7 @@
  * @updated 2026-09-25: Added opt-in navigation-background rendering while preserving legacy foreground decorations.
  * @updated 2026-09-25: Moved new-mode tuning to the main screen, removed background tiling, and removed the opaque navigation surface.
  * @updated 2026-09-25: Added page-scoped transparent navigation styling with schedule-calendar exclusion for Todo.
+ * @updated 2026-09-26: Added optional small labels below image navigation icons.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -293,19 +294,26 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                                 className={`relative z-10 flex-1 h-full flex items-center justify-center cursor-pointer transition-all duration-200 ${isActive ? 'text-stone-900' : 'text-stone-400'}`}
                             >
                                 {showIcon ? (
-                                    <img
-                                        src={icon?.url}
-                                        alt={item.label}
-                                        className={`h-7 w-7 object-contain transition-all duration-200 md:h-9 md:w-9 ${isActive ? 'opacity-100' : 'opacity-55'}`}
-                                        onError={(event) => {
-                                            const fallbackUrl = icon?.url ? getNavigationIconFallbackUrl(icon.url) : '';
-                                            if (fallbackUrl && event.currentTarget.src !== fallbackUrl && icon?.url.endsWith('.webp')) {
-                                                event.currentTarget.src = fallbackUrl;
-                                                return;
-                                            }
-                                            setFailedIconSlots((previous) => ({ ...previous, [item.key]: true }));
-                                        }}
-                                    />
+                                    <div className={`flex flex-col items-center justify-center ${iconSelection.showLabelWithIcon ? 'gap-0.5' : ''}`}>
+                                        <img
+                                            src={icon?.url}
+                                            alt={item.label}
+                                            className={`h-7 w-7 object-contain transition-all duration-200 md:h-9 md:w-9 ${isActive ? 'opacity-100' : 'opacity-55'}`}
+                                            onError={(event) => {
+                                                const fallbackUrl = icon?.url ? getNavigationIconFallbackUrl(icon.url) : '';
+                                                if (fallbackUrl && event.currentTarget.src !== fallbackUrl && icon?.url.endsWith('.webp')) {
+                                                    event.currentTarget.src = fallbackUrl;
+                                                    return;
+                                                }
+                                                setFailedIconSlots((previous) => ({ ...previous, [item.key]: true }));
+                                            }}
+                                        />
+                                        {iconSelection.showLabelWithIcon && (
+                                            <span className={`font-serif text-[10px] leading-3 tracking-[0.5px] transition-all duration-200 md:text-[11px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+                                                {item.label}
+                                            </span>
+                                        )}
+                                    </div>
                                 ) : (
                                     <span className={`font-serif text-[13px] tracking-[1px] transition-all duration-200 ${isActive ? 'font-black' : 'font-medium'}`}>
                                         {item.label}
