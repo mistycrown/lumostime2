@@ -3031,7 +3031,9 @@ html[data-theme-mode=dark] .memoir-mood-calendar {
 }
 
 html[data-theme-mode=dark] .memoir-mood-calendar.has-custom-background {
+  border: 0 !important;
   background-color: transparent !important;
+  box-shadow: none !important;
 }
 
 html[data-theme-mode=dark] .memoir-calendar-weekday,

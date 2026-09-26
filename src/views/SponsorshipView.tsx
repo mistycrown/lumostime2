@@ -32,7 +32,7 @@ import { AchievementBottleIconPackSelector } from '../components/achievement/Ach
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
-import { Category, CustomStickerRecord, CustomStickerSetRecord } from '../types';
+import { AppView, Category, CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -259,7 +259,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setStickerSelectorConfig
     } = useSettings();
     const { dailyReviews } = useReview();
-    const { setIsSettingsOpen } = useNavigation();
+    const { setIsSettingsOpen, setCurrentView, setIsJournalMode } = useNavigation();
     
     // 根据时间段随机选择背景图片
     const [bannerImage] = useState(() => {
@@ -1804,10 +1804,20 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         onToast={onToast}
                                         onOpenDebugger={() => {
                                             onBack();
+                                            setIsJournalMode(true);
+                                            setCurrentView(AppView.REVIEW);
                                             setIsSettingsOpen(false);
-                                            window.setTimeout(() => {
-                                                (window as any).LumosTime?.debug?.enableMoodCalendarBackground?.();
-                                            }, 0);
+                                            let attempts = 0;
+                                            const openDebugger = () => {
+                                                const open = (window as any).LumosTime?.debug?.enableMoodCalendarBackground;
+                                                if (typeof open === 'function') {
+                                                    open();
+                                                    return;
+                                                }
+                                                attempts += 1;
+                                                if (attempts < 90) window.requestAnimationFrame(openDebugger);
+                                            };
+                                            window.requestAnimationFrame(openDebugger);
                                         }}
                                     />
                                 </div>

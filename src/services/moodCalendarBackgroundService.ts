@@ -41,7 +41,7 @@ export const MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT = 'moodCalendarBackgroundPre
 const DEFAULT_SETTINGS: Required<Omit<MoodCalendarBackgroundSettings, 'weekScale'>> & { weekScale: Required<MoodCalendarWeekScale> } = {
     offsetY: '0px',
     offsetX: '0px',
-    scale: 1,
+    scale: 1.35,
     opacity: 1,
     weekScale: {
         fiveWeek: 1,
@@ -88,9 +88,9 @@ class MoodCalendarBackgroundService {
             url: '/calendar/1.webp',
             offsetY: '0px',
             offsetX: '0px',
-            scale: 1,
+            scale: 1.35,
             opacity: 1,
-            weekScale: { ...DEFAULT_SETTINGS.weekScale }
+            weekScale: { ...DEFAULT_SETTINGS.weekScale, sixWeek: 0.86 }
         }
     ];
 

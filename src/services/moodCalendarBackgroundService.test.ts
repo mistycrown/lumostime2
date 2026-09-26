@@ -72,7 +72,7 @@ describe('getMoodCalendarMappedScale', () => {
   });
 
   it('uses stable default mappings when settings are missing', () => {
-    expect(getMoodCalendarMappedScale({}, 5)).toBe(1);
-    expect(getMoodCalendarMappedScale({}, 6)).toBeCloseTo(0.86);
+    expect(getMoodCalendarMappedScale({}, 5)).toBeCloseTo(1.35);
+    expect(getMoodCalendarMappedScale({}, 6)).toBeCloseTo(1.161);
   });
 });
