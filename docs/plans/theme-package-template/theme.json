@@ -1,6 +1,6 @@
 {
   "format": "lumostime-theme-package",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "package": {
     "id": "my-theme",
     "name": "我的主题",
@@ -8,5 +8,6 @@
     "author": "作者名称",
     "description": "主题简介"
   },
-  "config": {}
+  "resources": {},
+  "apply": {}
 }

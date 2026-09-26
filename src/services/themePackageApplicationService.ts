@@ -50,6 +50,8 @@ const CUSTOM_MOOD_CALENDAR_SETTINGS_KEY = 'mood_calendar_background_settings';
 const NAVIGATION_ICON_CUSTOM_KEY = 'navigation_icon_custom_list_v1';
 const NAVIGATION_ICON_SCHEMES_KEY = 'navigation_icon_schemes_v1';
 const NAVIGATION_ICON_SELECTION_KEY = 'navigation_icon_selection_v1';
+const DEFAULT_SELECTOR_PAGE_KEY = 'lumostime_default_selector_page';
+const STICKER_SELECTOR_CONFIG_KEY = 'lumostime_sticker_selector_config';
 
 const readArray = <T>(key: string): T[] => {
   try {
@@ -367,6 +369,44 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
   );
   storage.setJSON(CUSTOM_STICKER_SETS_KEY, next.customStickerSets);
   storage.setJSON(CUSTOM_STICKERS_KEY, next.customStickers);
+
+  const stickerSelector = getConfigObject(record, 'stickerSelector');
+  if (importedSets.length > 0) {
+    const importedIds = new Set(importedSets.map((set) => set.id));
+    const groups = Array.isArray(stickerSelector?.groups)
+      ? stickerSelector.groups.flatMap((rawGroup, index) => {
+        if (!rawGroup || typeof rawGroup !== 'object' || Array.isArray(rawGroup)) return [];
+        const group = rawGroup as Record<string, unknown>;
+        const sourceSetIds = Array.isArray(group.sourceSetIds)
+          ? group.sourceSetIds.filter((id): id is string => typeof id === 'string' && config.some((set) => (
+            Boolean(set) && typeof set === 'object' && (set as Record<string, unknown>).id === id
+          ))).map((id) => getNamespacedId(record, `sticker-set-${id}`))
+          : [];
+        if (!sourceSetIds.length) return [];
+        return [{
+          id: getNamespacedId(record, `sticker-group-${String(group.id || index + 1)}`),
+          name: typeof group.name === 'string' ? group.name : record.name,
+          sourceSetIds
+        }];
+      })
+      : importedSets.length > 1
+        ? [{
+          id: getNamespacedId(record, 'sticker-group-all'),
+          name: record.name,
+          sourceSetIds: importedSets.map((set) => set.id)
+        }]
+        : [];
+    const defaultPageId = typeof stickerSelector?.defaultPage === 'string'
+      ? stickerSelector.defaultPage
+      : importedSets[0].id.replace(`theme:${record.id}:sticker-set-`, '');
+    const defaultSet = importedSets.find((set) => set.id === getNamespacedId(record, `sticker-set-${defaultPageId}`));
+    const defaultGroup = groups.find((group) => group.id === getNamespacedId(record, `sticker-group-${defaultPageId}`));
+    localStorage.setItem(DEFAULT_SELECTOR_PAGE_KEY, defaultSet?.id || defaultGroup?.id || importedSets[0].id);
+    localStorage.setItem(STICKER_SELECTOR_CONFIG_KEY, JSON.stringify({
+      enabled: stickerSelector?.enabled === true || groups.length > 0,
+      groups
+    }));
+  }
 };
 
 const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
@@ -547,7 +587,9 @@ export const applyImportedThemePackage = async (
       ? hasSettingsConfiguration
       : section === 'navigation-icons'
         ? navigationConfig?.icons !== undefined
-        : record.manifest.config[section] !== undefined;
+        : section === 'stickers'
+          ? record.manifest.config.stickers !== undefined || record.manifest.config.stickerSelector !== undefined
+          : record.manifest.config[section] !== undefined;
     if (!shouldApply) continue;
     await task();
     appliedSections.push(section);

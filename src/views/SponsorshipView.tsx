@@ -13,7 +13,7 @@
  * @updated 2026-09-25: Registers custom sticker uploads in the theme image manifest group.
  * @updated 2026-09-25: Added direct ZIP import for folder-based custom sticker groups.
  * @updated 2026-09-26: Added Memoir mood-calendar background management to personalization.
- * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and version overwrite confirmation.
+ * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and direct same-ID replacement.
  * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
  * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
  */
@@ -756,18 +756,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setPendingThemePackage(null);
         setIsImportingThemePackage(true);
         try {
-            let result;
-            try {
-                result = await themePackageImportService.importPackage(packageFile);
-            } catch (error) {
-                if (!(error instanceof ThemePackageImportError)) throw error;
-                const canOverride = error.code === 'SAME_VERSION_EXISTS' || error.code === 'DOWNGRADE_NOT_ALLOWED';
-                if (!canOverride || !window.confirm(`${error.message}。仍要覆盖吗？`)) throw error;
-                result = await themePackageImportService.importPackage(packageFile, {
-                    allowSameVersionOverwrite: true,
-                    allowDowngrade: error.code === 'DOWNGRADE_NOT_ALLOWED'
-                });
-            }
+            const result = await themePackageImportService.importPackage(packageFile);
+            const replacedActiveTheme = currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${result.record.id}`;
             setImportedThemePackages(themePackageImportService.getImportedPackages());
             if (applyAfterImport) {
                 const application = await applyImportedThemePackage(result.record);
@@ -781,6 +771,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                     `主题「${result.record.name}」已导入并应用${warningText}`
                 );
             } else {
+                if (replacedActiveTheme) await applyDefaultTheme();
                 onToast('success', `主题「${result.record.name}」已导入`);
             }
         } catch (error) {
@@ -842,12 +833,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             if (isActive) await applyDefaultTheme();
 
             if (target.source === 'package') {
-                const protectedImages = dailyReviews.flatMap((review) => (
-                    typeof review?.moodEmoji === 'string' && review.moodEmoji.startsWith('image:')
-                        ? [review.moodEmoji.slice(6)]
-                        : []
-                ));
-                await themePackageImportService.deletePackage(target.id, protectedImages);
+                await themePackageImportService.deletePackage(target.id);
                 setImportedThemePackages(themePackageImportService.getImportedPackages());
             } else if (!deleteCustomPreset(target.id)) {
                 throw new Error('方案删除失败，请重试');
@@ -2054,8 +2040,12 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 title="删除主题方案"
                 description={pendingThemeDelete && (currentPresetId === pendingThemeDelete.id
                     || (pendingThemeDelete.source === 'package' && currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${pendingThemeDelete.id}`))
-                    ? `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。仍被其他方案或日记引用的资源会保留。`
-                    : `确定删除「${pendingThemeDelete?.name || ''}」？仍被其他方案或日记引用的资源会保留。`}
+                    ? pendingThemeDelete.source === 'package'
+                        ? `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。主题包图片、字体和贴纸也会一并删除。`
+                        : `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。`
+                    : pendingThemeDelete?.source === 'package'
+                        ? `确定删除「${pendingThemeDelete.name}」？主题包图片、字体和贴纸也会一并删除。`
+                        : `确定删除「${pendingThemeDelete?.name || ''}」？`}
                 confirmText={isDeletingTheme ? '删除中…' : '删除'}
                 cancelText="取消"
                 type="danger"

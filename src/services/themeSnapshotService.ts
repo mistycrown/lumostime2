@@ -33,7 +33,9 @@ const SNAPSHOT_EXTRA_KEYS = [
   'navigation_new_background_custom_list',
   'navigation_new_background_settings',
   'lumostime_custom_sticker_sets_v2',
-  'lumostime_custom_stickers_v2'
+  'lumostime_custom_stickers_v2',
+  'lumostime_default_selector_page',
+  'lumostime_sticker_selector_config'
 ] as const;
 
 const SNAPSHOT_EXCLUDED_KEYS = new Set<string>([
@@ -138,6 +140,7 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
   const currentFontId = snapshot.storage.lumostime_font_family || 'default';
 
   SNAPSHOT_EXTRA_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(snapshot.storage, key)) return;
     const value = snapshot.storage[key];
     if (typeof value === 'string') localStorage.setItem(key, value);
     else localStorage.removeItem(key);

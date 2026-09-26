@@ -1,77 +1,47 @@
-# 主题压缩包导入规范设计
+# LumoTime 主题包格式规范
 
 日期：2026-09-26
 
-## 目标
+## 目标与兼容
 
-把“投喂小鱼干”中的主题发布方式统一为一个可导入的主题压缩包：主题作者只需发布一个 ZIP，用户在方案 Tab 导入后即可得到一个可切换的主题方案。
+主题作者发布一个 ZIP，用户从方案 Tab 导入后即可切换使用。新主题包将“随包导入的资源”和“应用时选择的设置”分开：`resources` 描述主题带来的资源，`apply` 描述启用哪些配置及选择哪个资源。
 
-主题包同时承载：
+已有内置主题和用户保存的主题方案都是 apply-only，不包含资源包；它们继续使用现有快照格式。导入 ZIP 使用 `schemaVersion: 2`。应用继续兼容 `schemaVersion: 1` 的旧 ZIP（`config` 中资源定义和应用选择混合的旧格式），新发布包必须使用 v2。
 
-- 可选的主题配置；
-- 主题所需的图片、贴纸、图标、字体等资源；
-- 主题的元数据、版本和预览图。
+## 导入与生命周期
 
-导入后的配置继续通过现有主题方案和用户数据同步机制同步；图片、贴纸和图标进入主题资源清单，字体只保存在当前设备，不把大文件直接塞入 localStorage。
+- `package.id` 是稳定覆盖键。相同 ID 的 ZIP 再次导入时直接覆盖，不检查版本升降，也不保留旧版。
+- 不同 ID 不可使用相同主题名。
+- 删除主题需用户确认；确认后删除主题记录及该包拥有的图片、缩略图、贴纸、导航/时间小友/日历等资源和本机字体，不做引用保护。
+- `apply` 中缺省的配置保持当前值；不要通过省略字段暗示默认值。
+- 应用主题后，贴纸默认页指向导入的贴纸组；多个贴纸组可以在一个选择器合并组中作为大组展示。
 
-## 已确认的产品决策
+## ZIP 目录
 
-### 导入结果
-
-主题包导入后生成一个独立的、可命名和可切换的主题方案，而不是直接覆盖当前方案。
-
-导入界面提供两种动作：
-
-- **导入并应用**：导入完成后立即切换到新主题；
-- **仅导入**：只保存主题，不改变当前使用的主题。
-
-### 部分配置
-
-所有配置项均为可选项。主题包只声明它想控制的内容：
-
-- JSON 字段不存在：保持用户当前值；
-- 字段存在且有值：应用主题包值；
-- 字段显式为 `null`：恢复该配置项的应用默认值。
-
-### 更新规则
-
-主题包使用稳定的 `package.id` 和语义化 `package.version`：
-
-- 同一 `package.id` 导入更高版本：更新原主题方案；
-- 同一 ID、同一版本：要求用户确认覆盖；
-- 导入更低版本：默认拒绝降级，允许用户显式确认。
-
-## ZIP 目录规范
-
-压缩包根目录必须包含 `theme.json`，所有资源放在 `assets/` 下。路径使用 `/`，不得使用绝对路径、盘符、`..` 或反斜杠。
-
-推荐目录结构：
+ZIP 根目录直接包含 `theme.json` 和 `assets/`，不可额外套目录。资源路径使用 `/`，必须在 `assets/` 下，不得含盘符、绝对路径、反斜线或 `..`。
 
 ```text
-moonlit-garden-1.0.0.zip
-├─ theme.json
-└─ assets/
-   ├─ preview.webp
-   ├─ background/main.webp
-   ├─ uiicon/*.webp
-   ├─ stickers/<set-id>/*
-   ├─ navigation/background.webp
-   ├─ navigation/icons/*
-   ├─ timepal/<timepal-id>/stage-1.webp ... stage-5.webp
-   ├─ fonts/*.(woff2|woff|ttf|otf)
-   ├─ achievement-bottle/<pack-id>/*.webp
-   └─ memoir-calendar/five-week.webp
-      memoir-calendar/six-week.webp
+theme.json
+assets/
+  preview.webp
+  background/main.webp
+  stickers/<set-id>/*
+  navigation/background.webp
+  navigation/icons/*
+  timepal/<item-id>/stage-1.webp ... stage-5.webp
+  fonts/*.(woff2|woff|ttf|otf)
+  achievement-bottle/<pack-id>/*.webp
+  memoir-calendar/*
 ```
 
-资源命名使用英文、数字、短横线和下划线。图片第一版支持 WebP、PNG、JPG；字体支持 WOFF2、WOFF、TTF、OTF。JSON 使用 UTF-8。
+图片支持 BMP、GIF、JPG/JPEG、PNG、SVG、WebP；成就瓶帧限定 PNG/WebP。字体支持 WOFF、WOFF2、TTF、OTF。单 ZIP 最大 100 MB，单文件最大 30 MB，总解包资源最大 200 MB。JSON 使用 UTF-8 标准 JSON，不加注释和尾随逗号。
 
-## `theme.json` 顶层结构
+## 顶层结构
 
 ```json
 {
   "format": "lumostime-theme-package",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "package": {
     "id": "moonlit-garden",
     "name": "月下花园",
@@ -80,283 +50,171 @@ moonlit-garden-1.0.0.zip
     "description": "一套月光与花园风格的主题",
     "preview": "assets/preview.webp"
   },
-  "config": {
-    "background": {},
-    "uiIcon": {},
+  "resources": {
+    "backgrounds": [],
+    "uiIcons": [],
     "stickers": [],
-    "color": {},
-    "navigation": {},
-    "timePal": {},
-    "font": {},
-    "achievementBottle": {},
-    "timeline": {},
-    "memoirCalendar": {}
-  }
+    "navigationBackgrounds": [],
+    "navigationIcons": [],
+    "navigationDecorations": [],
+    "timePal": [],
+    "fonts": [],
+    "achievementBottleIconPacks": [],
+    "memoirCalendarBackgrounds": []
+  },
+  "apply": {}
 }
 ```
 
-`package.id` 必须稳定且只包含小写英文、数字和短横线；`package.version` 使用 `主版本.次版本.修订版本`；`preview` 必须引用包内资源。
+所有资源列表和 `apply` 字段均可选。每个包资源在其类别列表中有稳定 `id`，资源文件路径写在 `resources`，应用配置只使用对应 ID。`apply` 引用不存在的资源 ID 时导入失败。内置应用资源写在 `apply` 中，只填 ID，不复制应用文件到主题 ZIP。
 
-## 配置项规范
+## 资源与应用字段
 
 ### 整体背景
 
+资源背景：
+
 ```json
-"background": {
-  "source": "asset",
+"resources": { "backgrounds": [{
+  "id": "main",
   "file": "assets/background/main.webp",
   "fit": "cover",
-  "position": "center",
-  "opacity": 0.92
-}
+  "position": "center"
+}] },
+"apply": { "background": { "resourceId": "main", "opacity": 0.3 } }
 ```
 
-内置背景使用：
-
-```json
-"background": { "source": "builtin", "id": "forest" }
-```
+内置背景不放在资源列表中：`"apply": { "background": { "source": "builtin", "id": "forest" } }`。透明度范围为 0 到 1。
 
 ### UIIcon
 
-内置 UIIcon：
+内置图标系列直接引用应用资源，例如：`"apply": { "uiIcon": { "source": "builtin", "themeId": "pencil" } }`。无需声明 `resources.uiIcons`，也不要重复导入图标。
+
+自定义图标资源示例：
 
 ```json
-"uiIcon": { "source": "builtin", "themeId": "cat" }
-```
-
-主题包自带 UIIcon：
-
-```json
-"uiIcon": {
-  "source": "asset",
-  "themeId": "moonlit-garden",
+"resources": { "uiIcons": [{
+  "id": "outline",
   "files": {
     "record": "assets/uiicon/record.webp",
     "todo": "assets/uiicon/todo.webp",
     "timeline": "assets/uiicon/timeline.webp"
   }
-}
+}] },
+"apply": { "uiIcon": { "resourceId": "outline" } }
 ```
 
-图标通过逻辑槽位 ID 绑定，不能绑定到 DOM 位置。未声明的槽位保持现有配置。
+`files` 通过应用逻辑槽位 ID 绑定，不绑定 DOM 位置。未声明的槽位保持不变。
 
 ### Sticker
 
-```json
-"stickers": [
-  {
-    "id": "moon",
-    "name": "月亮贴纸",
-    "cover": "assets/stickers/moon/cover.webp",
-    "items": [
-      {
-        "id": "moon-001",
-        "name": "月亮",
-        "file": "assets/stickers/moon/001.webp",
-        "keywords": ["月亮", "夜晚"]
-      }
-    ]
-  }
-]
-```
-
-每套 sticker 的 `id` 必须稳定；同一套内的条目 ID 不得重复；一个主题可以包含多套 sticker。
-
-### 整体配色
-
-第一版复用应用内置配色方案：
+`resources.stickers` 是贴纸组数组，每组有稳定 `id`、`name`、可选 `cover` 和 `items`。每项包含稳定 `id`、可选 `name`、`file` 和可选 `keywords`。例如：
 
 ```json
-"color": { "schemeId": "morandi-purple" }
+"resources": { "stickers": [
+  { "id": "moon", "name": "月亮", "items": [
+    { "id": "moon-001", "name": "月亮", "file": "assets/stickers/moon/001.webp" }
+  ] },
+  { "id": "stars", "name": "星星", "items": [
+    { "id": "star-001", "file": "assets/stickers/stars/001.webp" }
+  ] }
+] },
+"apply": { "stickers": {
+  "defaultPage": "moon",
+  "enabled": true,
+  "groups": [{ "id": "all", "name": "主题贴纸", "sourceSetIds": ["moon", "stars"] }]
+} }
 ```
 
-第一版不允许主题包注入任意 CSS。自定义颜色 Token 作为后续 schema 版本扩展。
+`defaultPage` 可为导入贴纸组 ID 或配置组 ID。`groups` 是可选大组；一组可合并多套，`sourceSetIds` 必须引用 `resources.stickers[].id`。未指定 groups 且导入多套贴纸时，应用会将其合并成一个主题贴纸大组。
 
-### 新版导航栏
+### 配色
+
+第一版引用应用内置配色，不允许任意 CSS：`"apply": { "color": { "schemeId": "morandi-purple" } }`。自定义颜色 Token 留待后续 schema 版本。
+
+### 导航栏
 
 ```json
-"navigation": {
-  "background": {
-    "source": "asset",
-    "file": "assets/navigation/background.webp",
-    "position": "center",
-    "opacity": 0.9
-  },
-  "icons": {
-    "source": "asset",
-    "files": {
-      "record": "assets/navigation/icons/record.webp",
-      "todo": "assets/navigation/icons/todo.webp",
-      "timeline": "assets/navigation/icons/timeline.webp",
-      "review": "assets/navigation/icons/review.webp"
-    }
-  }
-}
+"resources": {
+  "navigationBackgrounds": [{ "id": "main", "file": "assets/navigation/background.webp", "position": "center", "opacity": 0.9 }],
+  "navigationIcons": [{ "id": "main", "files": {
+    "record": "assets/navigation/icons/record.webp",
+    "todo": "assets/navigation/icons/todo.webp",
+    "timeline": "assets/navigation/icons/timeline.webp",
+    "review": "assets/navigation/icons/review.webp"
+  } }]
+},
+"apply": { "navigation": { "mode": "modern", "backgroundId": "main", "iconsId": "main" } }
 ```
+
+新版导航 `mode` 为 `modern`。旧版导航用 `mode: "legacy"` 并通过 `decorationId` 指定应用内置装饰 ID，或引用 `resources.navigationDecorations` 中自定义装饰。未声明模式的旧 ZIP 按旧配置兼容。
 
 ### 时间小友
 
-```json
-"timePal": {
-  "selected": "moon-cat",
-  "items": [
-    {
-      "id": "moon-cat",
-      "name": "月光猫",
-      "stages": {
-        "1": "assets/timepal/moon-cat/stage-1.webp",
-        "2": "assets/timepal/moon-cat/stage-2.webp",
-        "3": "assets/timepal/moon-cat/stage-3.webp",
-        "4": "assets/timepal/moon-cat/stage-4.webp",
-        "5": "assets/timepal/moon-cat/stage-5.webp"
-      },
-      "thresholds": [0, 60, 180, 360, 720]
-    }
-  ]
-}
-```
+每个 `resources.timePal[]` 项包含 `id`、`name` 和五阶段 `stages` 路径；`apply.timePal.selected` 引用条目 ID，`thresholds` 可选，缺省使用应用默认阈值。
 
-每个自定义时间小友必须提供 5 张阶段图；阈值可选，缺省时使用应用默认阈值。
+```json
+"resources": { "timePal": [{ "id": "moon-cat", "name": "月光猫", "stages": {
+  "1": "assets/timepal/moon-cat/stage-1.webp",
+  "2": "assets/timepal/moon-cat/stage-2.webp",
+  "3": "assets/timepal/moon-cat/stage-3.webp",
+  "4": "assets/timepal/moon-cat/stage-4.webp",
+  "5": "assets/timepal/moon-cat/stage-5.webp"
+} }] },
+"apply": { "timePal": { "selected": "moon-cat", "thresholds": [0, 60, 180, 360, 720] } }
+```
 
 ### 字体
 
-内置字体：
+内置字体直接用 `"apply": { "font": { "source": "builtin", "fontId": "lxgw-wenkai" } }`。
 
-```json
-"font": { "source": "builtin", "fontId": "lxgw-wenkai" }
-```
-
-自定义字体：
-
-```json
-"font": {
-  "source": "asset",
-  "file": "assets/fonts/moon-serif.woff2",
-  "fontId": "moon-serif",
-  "displayName": "月光宋",
-  "familyName": "LumoThemeMoonSerif",
-  "format": "woff2"
-}
-```
-
-字体导入后生成主题命名空间内的本机内部 ID，不直接使用上传文件名。字体不进入云同步，也不写入跨设备外观备份；其他设备没有对应字体时回退到默认字体，用户需要重新导入主题包才能使用该字体。
+自定义字体放入 `resources.fonts`，字段包含 `id`、`file`、`displayName`、`familyName`、`format`；通过 `apply.font.resourceId` 选择。字体在导入设备本机保存，不参与云同步和跨设备外观备份；另一设备需重新导入主题包。
 
 ### 成就瓶
 
-```json
-"achievementBottle": {
-  "iconPack": {
-    "source": "asset",
-    "id": "moon-stars",
-    "frames": [
-      "assets/achievement-bottle/moon-stars/01.webp",
-      "assets/achievement-bottle/moon-stars/02.webp"
-    ]
-  },
-  "style": {
-    "source": "builtin",
-    "id": "pearlMist"
-  }
-}
-```
+自定义帧在 `resources.achievementBottleIconPacks` 中声明 `id`、可选 `name` 和按播放顺序排列的 `frames`。应用时写 `apply.achievementBottle.iconPackId`；也可直接使用内置图标包 ID。瓶身样式用 `apply.achievementBottle.style.id` 指定现有样式 ID。
 
-第一版样式使用现有样式 ID；自定义样式对象留给后续 schema 版本。
+```json
+"resources": { "achievementBottleIconPacks": [{
+  "id": "moon-stars", "name": "月星", "frames": [
+    "assets/achievement-bottle/moon-stars/01.webp",
+    "assets/achievement-bottle/moon-stars/02.webp"
+  ]
+}] },
+"apply": { "achievementBottle": { "iconPackId": "moon-stars", "style": { "id": "blushBloom" } } }
+```
 
 ### 时间线样式
 
-```json
-"timeline": {
-  "themeId": "celestial",
-  "configVersion": 1,
-  "config": {
-    "lineColor": "#8f91b8",
-    "nodeColor": "#d9d8ef",
-    "lineOpacity": 0.72,
-    "lineWidth": 2,
-    "nodeRadius": 6
-  }
-}
-```
-
-`config` 只能包含应用当前版本明确支持的字段，并由导入器做范围校验。
+时间线使用应用内置主题 ID；`apply.timeline` 可包含 `themeId` 和经过应用范围校验的 `config`。例如：`"apply": { "timeline": { "themeId": "celestial" } }`。
 
 ### Memoir 日历背景
 
+图片和模式属于资源；`apply.memoirCalendar.backgroundId` 选择资源 ID。`mode: "overflow"` 必须同时提供 `fiveWeek` 和 `sixWeek`；`mode: "fill"` 只提供 `image`。如需调节图片布局，将设置写入资源的 `settings`。
+
 ```json
-"memoirCalendar": {
-  "background": {
-    "fiveWeek": "assets/memoir-calendar/five-week.webp",
-    "sixWeek": "assets/memoir-calendar/six-week.webp",
-    "settings": {
-      "offsetX": "0px",
-      "offsetY": "0px",
-      "scale": 1.35,
-      "opacity": 1
-    }
-  }
-}
+"resources": { "memoirCalendarBackgrounds": [{
+  "id": "main", "mode": "overflow",
+  "fiveWeek": "assets/memoir-calendar/five-week.webp",
+  "sixWeek": "assets/memoir-calendar/six-week.webp",
+  "settings": { "offsetX": "0px", "offsetY": "0px", "scale": 1.35, "opacity": 1 }
+}] },
+"apply": { "memoirCalendar": { "backgroundId": "main" } }
 ```
 
-五周和六周图片必须同时提供。
+若只有一张图片，使用 `mode: "fill"` 和 `image`。旧版 v1 成对图片缺省 mode 时仍按 overflow 兼容。
 
-## 导入事务与错误处理
+## 安全与校验
 
-导入器按以下顺序执行：
+主题包是资源和受控设置，不是插件。禁止 JavaScript、HTML、任意 CSS、Tailwind class、外部 URL 和通过路径访问应用数据。导入器会校验包路径、类型、体积、所有资源文件引用、资源 ID、时间小友阶段数和 Memoir 背景模式。错误应包含具体路径，如 `resources.timePal[0].stages.3` 或 `apply.background.resourceId`。
 
-1. 读取 ZIP 并确认根目录存在 `theme.json`。
-2. 校验 `format`、`schemaVersion`、包 ID、版本号和 JSON 结构。
-3. 校验所有资源引用存在，拒绝路径穿越和绝对路径。
-4. 校验文件类型、文件大小和各资源数量；时间小友必须有 5 张阶段图，Memoir 必须有两种尺寸。
-5. 将资源写入临时区域并计算稳定资源 ID。
-6. 写入主题元数据和配置。
-7. 根据用户选择应用主题。
-8. 触发现有主题、贴纸、导航、TimePal、字体和日历背景刷新事件。
+图片经现有主题图片服务导入；自定义贴纸、导航和日历资源写入现有运行时数据结构；字体写入本机字体存储。应用或删除后应触发现有界面刷新事件。相同 ID 覆盖不会创建第二个方案；删除会清理主题包自己的资源和贴纸。
 
-任意一步失败都回滚本次新增的配置和资源，不能留下“半套主题”。导入错误应明确指出配置路径，例如 `config.timePal.items[0].stages.3`。
+## 验收标准
 
-## 同步与资源生命周期
-
-主题配置元数据进入现有用户数据 / 外观同步 JSON；图片、贴纸和图标进入现有主题资源清单与资源同步通道。字体只保存在当前设备的字体存储中，不进入云端资源清单。
-
-资源引用使用稳定命名空间，例如：
-
-```text
-theme:moonlit-garden:1.0.0:background.main
-theme:moonlit-garden:1.0.0:timepal.moon-cat.stage-1
-```
-
-删除或更新主题时，图片资源只有在不再被任何主题或用户配置引用时才允许清理；字体由本机字体记录独立管理，不参与云端资源清理。
-
-## 安全边界
-
-主题包是“资源 + 受控配置”，不是插件。第一版禁止：
-
-- 任意 JavaScript；
-- 任意 HTML；
-- 任意 CSS 注入；
-- 任意 Tailwind class；
-- 外部 URL 资源；
-- 通过资源路径访问应用数据。
-
-这样可以保证主题包不会绕过应用权限，也不会因为主题资源导致用户数据泄露或界面执行未知代码。
-
-## 实现拆分
-
-后续实现分为五个阶段：
-
-1. 定义 TypeScript 类型和 `theme.json` JSON Schema。
-2. 实现 ZIP 读取、路径安全检查、资源校验和临时导入事务。
-3. 扩展现有主题、贴纸、导航、TimePal、字体、成就瓶、时间线和 Memoir 服务的导入适配器。
-4. 将主题包元数据和资源清单接入现有用户数据同步。
-5. 在方案 Tab 增加导入、预览、版本更新、仅导入和导入并应用流程，并补充单元测试和手动 smoke test。
-
-## 验证标准
-
-- 只包含背景的最小主题包可以成功导入，其他设置保持不变。
-- 含多套 sticker 和多组资源的主题包可以完整导入和切换。
-- 无效路径、缺少资源、非法字体和版本不兼容时不会产生半套数据。
-- 导入后的配置和图片类二进制资源可以通过现有同步机制在另一设备恢复；字体在另一设备上按默认字体回退。
-- 删除主题不会误删仍被其他主题使用的资源。
-- 重新导入同一主题的更高版本会更新原方案，不产生重复主题。
-- 执行 `npm run build`，并完成方案 Tab、背景、导航、贴纸、TimePal、字体、成就瓶和 Memoir 的手动验证。
+- v2 最小包、完整包均能导入；v1 ZIP 仍能导入并按原语义应用。
+- 缺失文件、路径穿越、未知资源 ID、非法字体等错误不会留下半套主题。
+- 两套以上贴纸能默认进入导入贴纸，并可按 `sourceSetIds` 合并成一个大组。
+- 主题删除后，该主题的静态资源、贴纸和字体记录消失。
+- 相同 ID 直接覆盖；不同 ID 同名拒绝；保存方案仍为 apply-only。
+- 完成相关 Vitest、`npm run build` 和方案 Tab 手动冒烟验证。

@@ -776,6 +776,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
                 : DEFAULT_TIMELINE_LAYOUT_MODE);
             const storedEmojiStyle = localStorage.getItem('lumostime_emoji_style');
             setEmojiStyle(storedEmojiStyle === 'twemoji' || storedEmojiStyle === 'openmoji' ? storedEmojiStyle : 'native');
+            const storedSelectorPage = localStorage.getItem('lumostime_default_selector_page');
+            if (storedSelectorPage) setDefaultSelectorPage(storedSelectorPage);
+            try {
+                const storedSelectorConfig = localStorage.getItem('lumostime_sticker_selector_config');
+                if (storedSelectorConfig) setStickerSelectorConfig(normalizeStickerSelectorConfig(JSON.parse(storedSelectorConfig)));
+            } catch {
+                setStickerSelectorConfig(DEFAULT_STICKER_SELECTOR_CONFIG);
+            }
             setCustomStickerSets(restoredStickerState.customStickerSets);
             setCustomStickers(restoredStickerState.customStickers);
         };

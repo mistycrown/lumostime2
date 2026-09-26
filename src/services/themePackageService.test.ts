@@ -55,6 +55,58 @@ describe('parseThemePackage', () => {
     expect(result.assets.get('assets/background/main.webp')?.type).toBe('image/webp');
   });
 
+  it('adapts schema-version-two resources and apply selections to the existing config model', async () => {
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'split-theme', name: '分区主题', version: '1.0.0' },
+      resources: {
+        backgrounds: [{ id: 'main', file: 'assets/background/main.webp' }],
+        stickers: [
+          { id: 'one', name: 'One', items: [{ id: 'one-1', file: 'assets/stickers/one/1.webp' }] },
+          { id: 'two', name: 'Two', items: [{ id: 'two-1', file: 'assets/stickers/two/1.webp' }] }
+        ]
+      },
+      apply: {
+        background: { resourceId: 'main', opacity: 0.3 },
+        stickers: {
+          defaultPage: 'one',
+          enabled: true,
+          groups: [{ id: 'all', name: 'All', sourceSetIds: ['one', 'two'] }]
+        }
+      }
+    };
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/background/main.webp': 'background',
+      'assets/stickers/one/1.webp': 'one',
+      'assets/stickers/two/1.webp': 'two'
+    }));
+
+    expect(result.manifest.config.background).toEqual({
+      id: 'main', file: 'assets/background/main.webp', opacity: 0.3
+    });
+    expect(result.manifest.config.stickers).toHaveLength(2);
+    expect(result.manifest.config.stickerSelector).toEqual({
+      defaultPage: 'one',
+      enabled: true,
+      groups: [{ id: 'all', name: 'All', sourceSetIds: ['one', 'two'] }]
+    });
+    expect(result.assets.size).toBe(3);
+  });
+
+  it('rejects apply selections that reference an undeclared resource ID', async () => {
+    await expect(parseThemePackage(await createZip({
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'invalid-theme', name: 'Invalid', version: '1.0.0' },
+      resources: { backgrounds: [] },
+      apply: { background: { resourceId: 'missing' } }
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'apply.background.resourceId'
+    });
+  });
+
   it('allows optional configuration sections to be omitted', async () => {
     const manifest = {
       ...baseManifest,

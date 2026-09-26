@@ -178,4 +178,57 @@ describe('applyImportedThemePackage', () => {
     expect(customStickerSets).toHaveLength(1);
     expect(customStickers).toMatchObject([{ setId: 'theme:asset-theme:sticker-set-stickers', imageFilename: 'theme-sticker.png' }]);
   });
+
+  it('sets the imported sticker default page and merges package sets into one selector group', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'sticker-theme',
+      name: 'Sticker Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'sticker-theme', name: 'Sticker Theme', version: '1.0.0' },
+        resources: {},
+        apply: {},
+        config: {
+          stickers: [
+            { id: 'one', name: 'One', items: [{ id: 'one-1', file: 'assets/stickers/one.webp' }] },
+            { id: 'two', name: 'Two', items: [{ id: 'two-1', file: 'assets/stickers/two.webp' }] }
+          ],
+          stickerSelector: {
+            defaultPage: 'one',
+            enabled: true,
+            groups: [{ id: 'all', name: 'All Stickers', sourceSetIds: ['one', 'two'] }]
+          }
+        }
+      },
+      imageAssets: {
+        'assets/stickers/one.webp': 'sticker-one.webp',
+        'assets/stickers/two.webp': 'sticker-two.webp'
+      },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(values.get('lumostime_default_selector_page')).toBe('theme:sticker-theme:sticker-set-one');
+    expect(JSON.parse(values.get('lumostime_sticker_selector_config') || '{}')).toEqual({
+      enabled: true,
+      groups: [{
+        id: 'theme:sticker-theme:sticker-group-all',
+        name: 'All Stickers',
+        sourceSetIds: [
+          'theme:sticker-theme:sticker-set-one',
+          'theme:sticker-theme:sticker-set-two'
+        ]
+      }]
+    });
+  });
 });
