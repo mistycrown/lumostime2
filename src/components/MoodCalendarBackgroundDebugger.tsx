@@ -27,7 +27,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
     const [activeId, setActiveId] = useState(backgroundId);
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
-    const [widthScale, setWidthScale] = useState(135);
+    const [widthScale, setWidthScale] = useState(100);
     const [heightScale, setHeightScale] = useState(100);
     const [opacity, setOpacity] = useState(100);
     const [previewWeeks, setPreviewWeeks] = useState<5 | 6>(5);

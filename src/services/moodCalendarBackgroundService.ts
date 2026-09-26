@@ -45,7 +45,7 @@ export const MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT = 'moodCalendarBackgroundPre
 const DEFAULT_SETTINGS: Required<MoodCalendarBackgroundSettings> = {
     offsetY: '0px',
     offsetX: '0px',
-    scale: 1.35,
+    scale: 1,
     heightScale: 1,
     opacity: 1
 };
@@ -78,7 +78,7 @@ class MoodCalendarBackgroundService {
             sixWeekUrl: '/calendar/tuzi/6.png',
             offsetY: '0px',
             offsetX: '0px',
-            scale: 1.35,
+            scale: 1,
             // 5.png 的透明上下留白较多，默认提高纵向主体高度以覆盖五周日历。
             heightScale: 1.2,
             opacity: 1
@@ -174,10 +174,15 @@ class MoodCalendarBackgroundService {
                 sixWeekUrl: background.sixWeekUrl ? resolveAssetPath(background.sixWeekUrl) : background.sixWeekUrl,
                 sixWeekThumbnail: background.sixWeekThumbnail ? resolveAssetPath(background.sixWeekThumbnail) : background.sixWeekThumbnail
             })),
-            ...this.loadCustomBackgrounds('overflow').map((background) => ({
-                ...background,
-                ...normalizeSettings(background)
-            }))
+            ...this.loadCustomBackgrounds('overflow').map((background) => {
+                const savedSettings = this.getCustomSettings()[background.id];
+                const legacyDefaultScale = !savedSettings || savedSettings.scale === undefined;
+                const scale = legacyDefaultScale && background.scale === 1.35 ? 1 : background.scale;
+                return {
+                    ...background,
+                    ...normalizeSettings({ ...background, scale })
+                };
+            })
         ];
     }
 
