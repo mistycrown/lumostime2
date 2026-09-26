@@ -37,6 +37,12 @@ import {
   type TimelineStyleConfig
 } from './timelineStyleService';
 import { registerCustomAchievementBottleIconPack } from './achievementBottleIconPackService';
+import {
+  CARD_BACKGROUND_CHANGED_EVENT,
+  CARD_BACKGROUND_CURRENT_KEY,
+  CARD_BACKGROUND_GROUPS_KEY,
+  CARD_BACKGROUND_OPACITY_EVENT
+} from './cardBackgroundService';
 
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
@@ -373,7 +379,7 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
   const stickerSelector = getConfigObject(record, 'stickerSelector');
   if (importedSets.length > 0) {
     const importedIds = new Set(importedSets.map((set) => set.id));
-    const groups = Array.isArray(stickerSelector?.groups)
+    const packageGroups = Array.isArray(stickerSelector?.groups)
       ? stickerSelector.groups.flatMap((rawGroup, index) => {
         if (!rawGroup || typeof rawGroup !== 'object' || Array.isArray(rawGroup)) return [];
         const group = rawGroup as Record<string, unknown>;
@@ -396,6 +402,14 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
           sourceSetIds: importedSets.map((set) => set.id)
         }]
         : [];
+    const existingSelector = readObject<Record<string, unknown>>(STICKER_SELECTOR_CONFIG_KEY, {});
+    const existingGroups = Array.isArray(existingSelector.groups) ? existingSelector.groups : [];
+    const groups = [
+      ...existingGroups.filter((group) => (
+        !group || typeof group !== 'object' || !String((group as Record<string, unknown>).id || '').startsWith(`theme:${record.id}:sticker-group-`)
+      )),
+      ...packageGroups
+    ];
     const defaultPageId = typeof stickerSelector?.defaultPage === 'string'
       ? stickerSelector.defaultPage
       : importedSets[0].id.replace(`theme:${record.id}:sticker-set-`, '');
@@ -403,10 +417,50 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
     const defaultGroup = groups.find((group) => group.id === getNamespacedId(record, `sticker-group-${defaultPageId}`));
     localStorage.setItem(DEFAULT_SELECTOR_PAGE_KEY, defaultSet?.id || defaultGroup?.id || importedSets[0].id);
     localStorage.setItem(STICKER_SELECTOR_CONFIG_KEY, JSON.stringify({
-      enabled: stickerSelector?.enabled === true || groups.length > 0,
+      enabled: existingSelector.enabled === true || stickerSelector?.enabled === true || groups.length > 0,
       groups
     }));
   }
+};
+
+const applyCardBackground = (record: ImportedThemePackageRecord): void => {
+  const config = getConfigObject(record, 'cardBackground');
+  if (!config) return;
+
+  const groupId = typeof config.id === 'string' ? config.id : undefined;
+  const files = Array.isArray(config.files) ? config.files : [];
+  if (!groupId || files.length === 0) return;
+  const imageFilenames = files
+    .map((path) => getAssetFilename(record, path))
+    .filter((filename): filename is string => Boolean(filename));
+  if (!imageFilenames.length) return;
+
+  const id = getNamespacedId(record, `card-background-${groupId}`);
+  const groups = readArray<Record<string, unknown>>(CARD_BACKGROUND_GROUPS_KEY)
+    .filter((group) => group.id !== id);
+  groups.push({
+    id,
+    name: typeof config.name === 'string' ? config.name : record.name,
+    imageFilenames,
+    alignment: config.alignment === 'right-top' || config.alignment === 'right-bottom'
+      ? config.alignment
+      : 'right'
+  });
+  localStorage.setItem(CARD_BACKGROUND_GROUPS_KEY, JSON.stringify(groups));
+
+  if (typeof config.groupId === 'string') {
+    const selectedGroupId = getNamespacedId(record, `card-background-${config.groupId}`);
+    if (groups.some((group) => group.id === selectedGroupId)) {
+      localStorage.setItem(CARD_BACKGROUND_CURRENT_KEY, selectedGroupId);
+    }
+  } else {
+    localStorage.setItem(CARD_BACKGROUND_CURRENT_KEY, id);
+  }
+  if (typeof config.opacity === 'number') {
+    localStorage.setItem('lumostime_card_background_opacity_v1', String(Math.min(1, Math.max(0, config.opacity))));
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(CARD_BACKGROUND_OPACITY_EVENT));
+  }
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
 };
 
 const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
@@ -575,6 +629,7 @@ export const applyImportedThemePackage = async (
     ['navigation-icons', () => applyNavigationIcons(record, warnings)],
     ['timePal', async () => applyTimePal(record, warnings)],
     ['stickers', async () => applyStickers(record)],
+    ['cardBackground', async () => applyCardBackground(record)],
     ['memoirCalendar', () => applyMemoirCalendar(record, warnings)],
     ['settings', async () => applySettings(record, warnings)]
   ];
