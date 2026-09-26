@@ -5,6 +5,7 @@
  * @pos Component (Sponsorship Personalization)
  * @description Manages five-week and six-week background image pairs with a navigation-icon-style upload modal.
  * @updated 2026-09-26: Requires separate five-week and six-week images for each uploaded background.
+ * @updated 2026-09-26: Constrained mood calendar background cards to a compact left-aligned wrapping layout.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -135,13 +136,13 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
         <>
             <section className="space-y-4">
                 <div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-medium text-stone-700">心情日历背景</h3><p className="mt-1 text-xs text-stone-500">用于 Memoir 顶部月历</p></div><button type="button" onClick={() => onOpenDebugger?.()} className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-white px-3 text-xs font-medium text-stone-600 shadow-sm hover:bg-stone-100"><Settings size={14} /> 调整</button></div>
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(96px, 1fr))' }}>
-                    {backgrounds.map((background) => <div key={background.id} role="button" tabIndex={0} aria-label={`选择心情日历背景：${background.name}`} aria-pressed={currentId === background.id} onClick={() => moodCalendarBackgroundService.setCurrentBackground(background.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); moodCalendarBackgroundService.setCurrentBackground(background.id); } }} className={`relative aspect-[3/2] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
+                <div className="flex flex-wrap items-start justify-start gap-2">
+                    {backgrounds.map((background) => <div key={background.id} role="button" tabIndex={0} aria-label={`选择心情日历背景：${background.name}`} aria-pressed={currentId === background.id} onClick={() => moodCalendarBackgroundService.setCurrentBackground(background.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); moodCalendarBackgroundService.setCurrentBackground(background.id); } }} className={`relative w-full max-w-32 aspect-[3/2] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
                         {background.url ? <img src={background.thumbnail || background.url} alt={background.name} className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-xs text-stone-400">无背景</span>}
                         {currentId === background.id && <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-800 text-white shadow"><Check size={12} /></span>}
                         {background.type === 'custom' && <button type="button" aria-label={`删除心情日历背景：${background.name}`} onClick={(event) => void handleDelete(background.id, event)} className="absolute left-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow"><X size={10} /></button>}
                     </div>)}
-                    <button type="button" onClick={openAddModal} className="aspect-[3/2] rounded-lg border-2 border-dashed border-stone-300 text-stone-500 hover:border-stone-400"><span className="inline-flex items-center gap-1 text-xs"><Plus size={15} /> 添加</span></button>
+                    <button type="button" onClick={openAddModal} className="w-full max-w-32 aspect-[3/2] rounded-lg border-2 border-dashed border-stone-300 text-stone-500 hover:border-stone-400"><span className="inline-flex items-center gap-1 text-xs"><Plus size={15} /> 添加</span></button>
                 </div>
             </section>
             {editor && (typeof document === 'undefined' ? editor : createPortal(editor, document.body))}
