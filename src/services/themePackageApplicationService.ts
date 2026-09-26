@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Applies imported achievement-bottle image packs and fixes TimePal package replacement IDs.
  * @updated 2026-09-26: Applies navigation changes through service events and supports Memoir overflow/fill package modes.
  * @updated 2026-09-26: Applies achievement-bottle and other appearance settings from their manifest sections.
+ * @updated 2026-09-26: Applies nested navigation icons, live background opacity, and refreshes packaged stickers.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -116,7 +117,7 @@ const applyBackground = async (record: ImportedThemePackageRecord, warnings: str
   backgroundService.setCurrentBackground(id);
   await backgroundService.hydrateImageBackedCustomBackgrounds();
   if (typeof config.opacity === 'number') {
-    localStorage.setItem('lumos_background_opacity', String(Math.min(1, Math.max(0, config.opacity))));
+    backgroundService.setBackgroundOpacity(config.opacity);
   }
 };
 
@@ -165,6 +166,7 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
   const backgroundConfig = config as Record<string, unknown>;
   if (backgroundConfig.source === 'builtin' && typeof backgroundConfig.id === 'string') {
     navigationBackgroundService.setCurrentBackground(backgroundConfig.id);
+    if (navigation.mode === 'modern') navigationBackgroundService.setEnabled(true);
     return;
   }
 
@@ -240,6 +242,8 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
   }
 
   if (Object.keys(mapping).length === 0) return;
+
+  if (navigation?.mode !== 'legacy') navigationBackgroundService.setEnabled(true);
 
   writeJson(NAVIGATION_ICON_CUSTOM_KEY, customIcons);
   const schemes = readArray<Record<string, unknown>>(NAVIGATION_ICON_SCHEMES_KEY)
@@ -538,9 +542,12 @@ export const applyImportedThemePackage = async (
   const hasSettingsConfiguration = ['color', 'font', 'achievementBottle', 'timeline']
     .some((key) => record.manifest.config[key] !== undefined);
   for (const [section, task] of sectionTasks) {
+    const navigationConfig = getConfigObject(record, 'navigation');
     const shouldApply = section === 'settings'
       ? hasSettingsConfiguration
-      : record.manifest.config[section] !== undefined;
+      : section === 'navigation-icons'
+        ? navigationConfig?.icons !== undefined
+        : record.manifest.config[section] !== undefined;
     if (!shouldApply) continue;
     await task();
     appliedSections.push(section);

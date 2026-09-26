@@ -14,7 +14,7 @@
       "file": "assets/background/main.png",
       "fit": "cover",
       "position": "center",
-      "opacity": 1
+      "opacity": 0.3
     },
     "color": {
       "schemeId": "morandi-purple"
@@ -75,6 +75,7 @@
       }
     ],
     "navigation": {
+      "mode": "modern",
       "background": {
         "source": "asset",
         "file": "assets/navigation/background.png",
