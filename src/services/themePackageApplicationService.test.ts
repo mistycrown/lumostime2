@@ -78,7 +78,6 @@ describe('applyImportedThemePackage', () => {
       setItem: (key: string, value: string) => values.set(key, value),
       removeItem: (key: string) => values.delete(key)
     });
-
     const { applyImportedThemePackage } = await import('./themePackageApplicationService');
     const result = await applyImportedThemePackage({
       id: 'test-theme',
@@ -186,6 +185,10 @@ describe('applyImportedThemePackage', () => {
       setItem: (key: string, value: string) => values.set(key, value),
       removeItem: (key: string) => values.delete(key)
     });
+    values.set('lumostime_sticker_selector_config', JSON.stringify({
+      enabled: true,
+      groups: [{ id: 'existing-big-group', name: 'Existing', sourceSetIds: ['custom-sticker-set-existing'] }]
+    }));
 
     const { applyImportedThemePackage } = await import('./themePackageApplicationService');
     await applyImportedThemePackage({
@@ -221,14 +224,72 @@ describe('applyImportedThemePackage', () => {
     expect(values.get('lumostime_default_selector_page')).toBe('theme:sticker-theme:sticker-set-one');
     expect(JSON.parse(values.get('lumostime_sticker_selector_config') || '{}')).toEqual({
       enabled: true,
-      groups: [{
-        id: 'theme:sticker-theme:sticker-group-all',
-        name: 'All Stickers',
-        sourceSetIds: [
-          'theme:sticker-theme:sticker-set-one',
-          'theme:sticker-theme:sticker-set-two'
-        ]
-      }]
+      groups: [
+        { id: 'existing-big-group', name: 'Existing', sourceSetIds: ['custom-sticker-set-existing'] },
+        {
+          id: 'theme:sticker-theme:sticker-group-all',
+          name: 'All Stickers',
+          sourceSetIds: [
+            'theme:sticker-theme:sticker-set-one',
+            'theme:sticker-theme:sticker-set-two'
+          ]
+        }
+      ]
     });
+  });
+
+  it('imports card background groups without replacing existing groups', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    values.set('lumostime_card_background_groups_v1', JSON.stringify([
+      { id: 'existing-card-group', name: 'Existing Cards', imageFilenames: ['existing.webp'], alignment: 'right' }
+    ]));
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'card-theme',
+      name: 'Card Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'card-theme', name: 'Card Theme', version: '1.0.0' },
+        resources: {},
+        apply: {},
+        config: {
+          cardBackground: {
+            id: 'cards',
+            name: 'Theme Cards',
+            files: ['assets/cards/one.png', 'assets/cards/two.png'],
+            alignment: 'right-bottom',
+            groupId: 'cards',
+            opacity: 0.25
+          }
+        }
+      },
+      imageAssets: {
+        'assets/cards/one.png': 'one.png',
+        'assets/cards/two.png': 'two.png'
+      },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(JSON.parse(values.get('lumostime_card_background_groups_v1') || '[]')).toEqual([
+      { id: 'existing-card-group', name: 'Existing Cards', imageFilenames: ['existing.webp'], alignment: 'right' },
+      {
+        id: 'theme:card-theme:card-background-cards',
+        name: 'Theme Cards',
+        imageFilenames: ['one.png', 'two.png'],
+        alignment: 'right-bottom'
+      }
+    ]);
+    expect(values.get('lumostime_card_background_current_v1')).toBe('theme:card-theme:card-background-cards');
+    expect(values.get('lumostime_card_background_opacity_v1')).toBe('0.25');
   });
 });

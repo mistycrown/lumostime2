@@ -8,6 +8,8 @@
     "author": "作者名称",
     "description": "主题简介"
   },
-  "resources": {},
+  "resources": {
+    "cardBackgroundGroups": []
+  },
   "apply": {}
 }

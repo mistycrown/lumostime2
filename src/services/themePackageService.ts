@@ -178,6 +178,7 @@ const adaptResourcesAndApply = (
     );
   }
   requireSelection('memoirCalendar', resources.memoirCalendarBackgrounds, 'backgroundId', 'apply.memoirCalendar.backgroundId');
+  requireSelection('cardBackground', resources.cardBackgroundGroups, 'groupId', 'apply.cardBackground.groupId');
 
   const background = selected('background', resources.backgrounds);
   if (background || Object.prototype.hasOwnProperty.call(apply, 'background')) {
@@ -246,6 +247,12 @@ const adaptResourcesAndApply = (
   const memoirBackground = findById(resources.memoirCalendarBackgrounds, memoirApply.backgroundId);
   if (memoirBackground || Object.keys(memoirApply).length) {
     config.memoirCalendar = { background: memoirBackground || memoirApply };
+  }
+
+  const cardBackgroundApply = applyRecord('cardBackground');
+  const cardBackgroundGroup = findById(resources.cardBackgroundGroups, cardBackgroundApply.groupId);
+  if (cardBackgroundGroup || Object.keys(cardBackgroundApply).length) {
+    config.cardBackground = { ...(cardBackgroundGroup || {}), ...cardBackgroundApply };
   }
   return config;
 };
@@ -417,7 +424,8 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
     'timePal',
     'fonts',
     'achievementBottleIconPacks',
-    'memoirCalendarBackgrounds'
+    'memoirCalendarBackgrounds',
+    'cardBackgroundGroups'
   ];
   for (const key of collections) {
     const value = resources[key];
@@ -435,6 +443,23 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
         throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path}.id 重复：${item.id}`, `${path}.id`);
       }
       ids.add(item.id);
+      if (key === 'cardBackgroundGroups') {
+        if (!Array.isArray(item.files) || item.files.length === 0
+          || item.files.some((file) => typeof file !== 'string')) {
+          throw new ThemePackageValidationError(
+            'INVALID_CONFIGURATION',
+            `${path}.files 必须至少包含一个资源路径`,
+            `${path}.files`
+          );
+        }
+        if (item.alignment !== undefined && !['right', 'right-top', 'right-bottom'].includes(String(item.alignment))) {
+          throw new ThemePackageValidationError(
+            'INVALID_CONFIGURATION',
+            `${path}.alignment 只支持 right、right-top 或 right-bottom`,
+            `${path}.alignment`
+          );
+        }
+      }
     });
   }
 
@@ -457,6 +482,16 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
   validateSelection('navigation', 'decorationResourceId', 'navigationDecorations');
   validateSelection('font', 'resourceId', 'fonts');
   validateSelection('memoirCalendar', 'backgroundId', 'memoirCalendarBackgrounds');
+  validateSelection('cardBackground', 'groupId', 'cardBackgroundGroups');
+  const cardBackgroundApply = apply.cardBackground;
+  if (isRecord(cardBackgroundApply) && cardBackgroundApply.opacity !== undefined
+    && (typeof cardBackgroundApply.opacity !== 'number' || cardBackgroundApply.opacity < 0 || cardBackgroundApply.opacity > 1)) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      'apply.cardBackground.opacity 必须是 0 到 1 之间的数字',
+      'apply.cardBackground.opacity'
+    );
+  }
 
   const timePal = apply.timePal;
   if (isRecord(timePal) && typeof timePal.selected === 'string'

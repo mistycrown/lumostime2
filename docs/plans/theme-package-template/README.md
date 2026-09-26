@@ -26,6 +26,29 @@ assets/
 
 复制本文件夹后，可按主题需要创建资源子目录；空目录和 `.gitkeep` 不会作为资源导入。
 
+## 卡片背景
+
+卡片背景资源组放在 `resources.cardBackgroundGroups`，应用时用 `apply.cardBackground.groupId` 选择。每组可配置多张图片和右侧对齐位置；透明度范围为 0 到 1。主题组会追加到用户已有卡片背景组，不会覆盖原有组。
+
+```json
+{
+  "resources": {
+    "cardBackgroundGroups": [{
+      "id": "scene-cards",
+      "name": "场景卡片",
+      "alignment": "right-bottom",
+      "files": [
+        "assets/card-backgrounds/scene-01.webp",
+        "assets/card-backgrounds/scene-02.webp"
+      ]
+    }]
+  },
+  "apply": {
+    "cardBackground": { "groupId": "scene-cards", "opacity": 0.3 }
+  }
+}
+```
+
 ## 贴纸
 
 将图片定义在 `resources.stickers`，然后在 `apply.stickers` 设置默认页。多套贴纸可以并到一个大组：

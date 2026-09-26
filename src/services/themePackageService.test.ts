@@ -62,6 +62,7 @@ describe('parseThemePackage', () => {
       package: { id: 'split-theme', name: '分区主题', version: '1.0.0' },
       resources: {
         backgrounds: [{ id: 'main', file: 'assets/background/main.webp' }],
+        cardBackgroundGroups: [{ id: 'cards', name: 'Cards', alignment: 'right-bottom', files: ['assets/cards/one.webp'] }],
         stickers: [
           { id: 'one', name: 'One', items: [{ id: 'one-1', file: 'assets/stickers/one/1.webp' }] },
           { id: 'two', name: 'Two', items: [{ id: 'two-1', file: 'assets/stickers/two/1.webp' }] }
@@ -69,6 +70,7 @@ describe('parseThemePackage', () => {
       },
       apply: {
         background: { resourceId: 'main', opacity: 0.3 },
+        cardBackground: { groupId: 'cards', opacity: 0.25 },
         stickers: {
           defaultPage: 'one',
           enabled: true,
@@ -78,6 +80,7 @@ describe('parseThemePackage', () => {
     };
     const result = await parseThemePackage(await createZip(manifest, {
       'assets/background/main.webp': 'background',
+      'assets/cards/one.webp': 'card',
       'assets/stickers/one/1.webp': 'one',
       'assets/stickers/two/1.webp': 'two'
     }));
@@ -91,7 +94,15 @@ describe('parseThemePackage', () => {
       enabled: true,
       groups: [{ id: 'all', name: 'All', sourceSetIds: ['one', 'two'] }]
     });
-    expect(result.assets.size).toBe(3);
+    expect(result.manifest.config.cardBackground).toEqual({
+      id: 'cards',
+      name: 'Cards',
+      alignment: 'right-bottom',
+      files: ['assets/cards/one.webp'],
+      groupId: 'cards',
+      opacity: 0.25
+    });
+    expect(result.assets.size).toBe(4);
   });
 
   it('rejects apply selections that reference an undeclared resource ID', async () => {

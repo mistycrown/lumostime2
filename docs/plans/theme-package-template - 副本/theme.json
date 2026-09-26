@@ -89,6 +89,9 @@
     ],
     "memoirCalendarBackgrounds": [
       { "id": "main", "mode": "overflow", "fiveWeek": "assets/memoir-calendar/five-week.png", "sixWeek": "assets/memoir-calendar/six-week.png" }
+    ],
+    "cardBackgroundGroups": [
+      { "id": "test-cards", "name": "测试卡片背景", "alignment": "right-bottom", "files": ["assets/background/main.png"] }
     ]
   },
   "apply": {
@@ -105,6 +108,7 @@
     "timePal": { "selected": "test-companion" },
     "font": { "resourceId": "test-font" },
     "achievementBottle": { "iconPackId": "test-bottle", "style": { "id": "blushBloom" } },
-    "memoirCalendar": { "backgroundId": "main" }
+    "memoirCalendar": { "backgroundId": "main" },
+    "cardBackground": { "groupId": "test-cards", "opacity": 0.3 }
   }
 }

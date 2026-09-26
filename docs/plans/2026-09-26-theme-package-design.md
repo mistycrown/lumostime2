@@ -15,6 +15,8 @@
 - 删除主题需用户确认；确认后删除主题记录及该包拥有的图片、缩略图、贴纸、导航/时间小友/日历等资源和本机字体，不做引用保护。
 - `apply` 中缺省的配置保持当前值；不要通过省略字段暗示默认值。
 - 应用主题后，贴纸默认页指向导入的贴纸组；多个贴纸组可以在一个选择器合并组中作为大组展示。
+- 贴纸合并组为追加式：应用新包只追加/替换该包命名空间的组，不覆盖用户已有的大组。
+- 卡片背景组属于可导入资源；应用配置可选择导入组和透明度，导入的分组追加到用户现有卡片背景组。
 
 ## ZIP 目录
 
@@ -25,6 +27,7 @@ theme.json
 assets/
   preview.webp
   background/main.webp
+  card-backgrounds/*
   stickers/<set-id>/*
   navigation/background.webp
   navigation/icons/*
@@ -60,7 +63,8 @@ assets/
     "timePal": [],
     "fonts": [],
     "achievementBottleIconPacks": [],
-    "memoirCalendarBackgrounds": []
+    "memoirCalendarBackgrounds": [],
+    "cardBackgroundGroups": []
   },
   "apply": {}
 }
@@ -127,6 +131,8 @@ assets/
 ```
 
 `defaultPage` 可为导入贴纸组 ID 或配置组 ID。`groups` 是可选大组；一组可合并多套，`sourceSetIds` 必须引用 `resources.stickers[].id`。未指定 groups 且导入多套贴纸时，应用会将其合并成一个主题贴纸大组。
+
+应用包中的贴纸组时，新增的大组追加到现有 `lumostime_sticker_selector_config.groups`；相同包 ID 的组只替换该包自己命名空间的旧组，其他来源的大组保留。默认页切换到本次包声明的默认贴纸页。
 
 ### 配色
 
@@ -204,6 +210,25 @@ assets/
 
 若只有一张图片，使用 `mode: "fill"` 和 `image`。旧版 v1 成对图片缺省 mode 时仍按 overflow 兼容。
 
+### 卡片背景
+
+每个资源组有稳定 `id`、`name`、图片文件 `files` 和 `alignment`。对齐值为 `right`、`right-top`、`right-bottom`。应用配置选择资源组，并可设透明度（0 到 1）：
+
+```json
+"resources": { "cardBackgroundGroups": [{
+  "id": "scene-cards",
+  "name": "场景卡片",
+  "alignment": "right-bottom",
+  "files": [
+    "assets/card-backgrounds/scene-01.webp",
+    "assets/card-backgrounds/scene-02.webp"
+  ]
+}] },
+"apply": { "cardBackground": { "groupId": "scene-cards", "opacity": 0.3 } }
+```
+
+导入及应用会把该组追加到现有卡片背景组，并选中它；已有组不被替换。省略 `apply.cardBackground` 时只导入清单和图片，不切换当前卡片背景。
+
 ## 安全与校验
 
 主题包是资源和受控设置，不是插件。禁止 JavaScript、HTML、任意 CSS、Tailwind class、外部 URL 和通过路径访问应用数据。导入器会校验包路径、类型、体积、所有资源文件引用、资源 ID、时间小友阶段数和 Memoir 背景模式。错误应包含具体路径，如 `resources.timePal[0].stages.3` 或 `apply.background.resourceId`。
@@ -215,6 +240,6 @@ assets/
 - v2 最小包、完整包均能导入；v1 ZIP 仍能导入并按原语义应用。
 - 缺失文件、路径穿越、未知资源 ID、非法字体等错误不会留下半套主题。
 - 两套以上贴纸能默认进入导入贴纸，并可按 `sourceSetIds` 合并成一个大组。
-- 主题删除后，该主题的静态资源、贴纸和字体记录消失。
+- 主题删除后，该主题的静态资源、贴纸、卡片背景组和字体记录消失。
 - 相同 ID 直接覆盖；不同 ID 同名拒绝；保存方案仍为 apply-only。
 - 完成相关 Vitest、`npm run build` 和方案 Tab 手动冒烟验证。

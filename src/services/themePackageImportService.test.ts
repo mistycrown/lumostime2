@@ -93,10 +93,17 @@ describe('themePackageImportService', () => {
 
     const { themePackageImportService } = await import('./themePackageImportService');
     await themePackageImportService.importPackage(await createPackage('delete-me', 'Delete Me', '1.0.0'));
+    localStorage.setItem('lumostime_card_background_groups_v1', JSON.stringify([
+      { id: 'theme:delete-me:card-background-cards', name: 'Package Cards', imageFilenames: ['package-card.webp'] },
+      { id: 'user-cards', name: 'User Cards', imageFilenames: ['user-card.webp'] }
+    ]));
     deleteImage.mockClear();
 
     await expect(themePackageImportService.deletePackage('delete-me')).resolves.toBe(true);
     expect(deleteImage).toHaveBeenCalledWith('image-image-1.0.0.webp');
     expect(themePackageImportService.getImportedPackages()).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([
+      { id: 'user-cards', name: 'User Cards', imageFilenames: ['user-card.webp'] }
+    ]);
   });
 });

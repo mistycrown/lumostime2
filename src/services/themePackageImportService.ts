@@ -18,6 +18,7 @@ import {
   type ThemePackageManifest
 } from './themePackageService';
 import { APPEARANCE_RESTORED_EVENT } from './appearanceBackupService';
+import { CARD_BACKGROUND_CHANGED_EVENT, CARD_BACKGROUND_CURRENT_KEY, CARD_BACKGROUND_GROUPS_KEY } from './cardBackgroundService';
 
 const LOCAL_THEME_PACKAGE_ASSETS_KEY = 'lumostime_theme_package_local_assets_v1';
 const THEME_PACKAGE_IMPORTED_EVENT = 'lumostime:theme-package-imported';
@@ -164,6 +165,7 @@ const removePackageDerivedState = (record: ImportedThemePackageRecord): void => 
   removeArrayItems('navigation_icon_custom_list_v1', (item) => String(item.id || ''));
   removeArrayItems('navigation_icon_schemes_v1', (item) => String(item.id || ''));
   removeArrayItems(TIMEPAL_KEYS.CUSTOM_ITEMS, (item) => String(item.id || ''));
+  removeArrayItems(CARD_BACKGROUND_GROUPS_KEY, (item) => String(item.id || ''));
 
   const setIds = new Set<string>();
   try {
@@ -194,6 +196,7 @@ const removePackageDerivedState = (record: ImportedThemePackageRecord): void => 
   clearNamespacedSelection('navigation_new_background', 'default');
   clearNamespacedSelection('mood_calendar_background', 'none');
   clearNamespacedSelection('mood_calendar_fill_background', 'none');
+  clearNamespacedSelection(CARD_BACKGROUND_CURRENT_KEY, '');
 
   const navigationSelectionKey = 'navigation_icon_selection_v1';
   try {
@@ -301,6 +304,7 @@ export const themePackageImportService = {
       window.dispatchEvent(new Event('stickerSetsChanged'));
       window.dispatchEvent(new Event('imageListChanged'));
       window.dispatchEvent(new Event('timepal-custom-changed'));
+      window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
     }
     return true;
   },
@@ -409,6 +413,7 @@ export const themePackageImportService = {
           window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
           window.dispatchEvent(new Event('stickerSetsChanged'));
           window.dispatchEvent(new Event('imageListChanged'));
+          window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
         }
       }
 
