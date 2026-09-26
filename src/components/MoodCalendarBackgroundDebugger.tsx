@@ -5,6 +5,7 @@
  * @pos Component (Memoir Background Tuning)
  * @description Provides navigation-adjuster-style button controls for the Memoir mood calendar.
  * @updated 2026-09-26: Replaced sliders with mobile-friendly step buttons and separated width/height mapping.
+ * @updated 2026-09-26: Constrained the mobile panel above bottom navigation and enabled compact scrolling.
  */
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Move, RotateCcw, Save, Sun, X, ZoomIn } from 'lucide-react';
@@ -112,14 +113,14 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
     );
 
     return (
-        <div className="fixed bottom-5 right-4 z-[90] max-h-[calc(100vh-2rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-4 shadow-2xl backdrop-blur">
-            <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3">
+        <div className="fixed bottom-20 right-4 z-[90] max-h-[min(28rem,55vh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+            <div className="mb-3 flex items-center justify-between border-b border-stone-100 pb-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-bold text-stone-800"><span className="h-2 w-2 rounded-full bg-amber-400" /> 心情日历背景调整</h3>
                 <div className="flex items-center gap-1"><button type="button" onClick={reset} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="重置" aria-label="重置"><RotateCcw size={14} /></button><button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="关闭" aria-label="关闭"><X size={14} /></button></div>
             </div>
-            <div className="mb-4 flex items-center justify-between rounded-lg bg-stone-50 p-2"><button type="button" onClick={() => switchBackground('prev')} className="rounded p-1.5 text-stone-600 shadow-sm hover:bg-white" aria-label="上一个背景"><ChevronLeft size={16} /></button><span className="max-w-[140px] truncate text-center text-xs font-mono font-medium">{activeId}</span><button type="button" onClick={() => switchBackground('next')} className="rounded p-1.5 text-stone-600 shadow-sm hover:bg-white" aria-label="下一个背景"><ChevronRight size={16} /></button></div>
-            <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3"><span className="text-[11px] text-stone-500">预览周数</span><div role="group" aria-label="预览周数" className="inline-flex border-b border-stone-200">{([5, 6] as const).map((weeks) => <button key={weeks} type="button" aria-pressed={previewWeeks === weeks} onClick={() => setPreviewWeeks(weeks)} className={`px-3 py-1.5 text-xs ${previewWeeks === weeks ? 'border-b-2 border-stone-800 text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}>{weeks} 周</button>)}</div></div>
-            <div className="mb-4 space-y-4">
+            <div className="mb-3 flex items-center justify-between rounded-lg bg-stone-50 p-1.5"><button type="button" onClick={() => switchBackground('prev')} className="rounded p-1.5 text-stone-600 shadow-sm hover:bg-white" aria-label="上一个背景"><ChevronLeft size={16} /></button><span className="max-w-[140px] truncate text-center text-xs font-mono font-medium">{activeId}</span><button type="button" onClick={() => switchBackground('next')} className="rounded p-1.5 text-stone-600 shadow-sm hover:bg-white" aria-label="下一个背景"><ChevronRight size={16} /></button></div>
+            <div className="mb-3 flex items-center justify-between border-b border-stone-100 pb-2"><span className="text-[11px] text-stone-500">预览周数</span><div role="group" aria-label="预览周数" className="inline-flex border-b border-stone-200">{([5, 6] as const).map((weeks) => <button key={weeks} type="button" aria-pressed={previewWeeks === weeks} onClick={() => setPreviewWeeks(weeks)} className={`px-3 py-1.5 text-xs ${previewWeeks === weeks ? 'border-b-2 border-stone-800 text-stone-900' : 'text-stone-400 hover:text-stone-700'}`}>{weeks} 周</button>)}</div></div>
+            <div className="mb-3 space-y-3">
                 {stepControl(<><Move size={11} /> 水平位置</>, offsetX, -240, 240, setOffsetX, 'px')}
                 {stepControl(<><Move size={11} className="rotate-90" /> 垂直位置</>, offsetY, -240, 240, setOffsetY, 'px')}
                 {stepControl(<><ZoomIn size={11} /> 图片宽度</>, widthScale, 30, 300, setWidthScale, '%')}
@@ -128,7 +129,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
                 {stepControl('六周高度映射', sixWeekScale, 50, 150, setSixWeekScale, '%')}
                 {stepControl(<><Sun size={11} /> 透明度</>, opacity, 0, 100, setOpacity, '%')}
             </div>
-            <button type="button" onClick={save} disabled={isSaved} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold shadow-sm transition-all ${isSaved ? 'border border-green-200 bg-green-100 text-green-700' : 'bg-stone-800 text-white hover:bg-stone-900'}`}><Save size={14} /> <span>{isSaved ? '已保存设置' : '保存当前状态'}</span></button>
+            <button type="button" onClick={save} disabled={isSaved} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-bold shadow-sm transition-all ${isSaved ? 'border border-green-200 bg-green-100 text-green-700' : 'bg-stone-800 text-white hover:bg-stone-900'}`}><Save size={14} /> <span>{isSaved ? '已保存设置' : '保存当前状态'}</span></button>
         </div>
     );
 };
