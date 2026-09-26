@@ -82,4 +82,28 @@ describe('card background settings', () => {
     expect(cardBackgroundService.getCurrentGroupId()).toBe(group.id);
     expect(saveImage).toHaveBeenCalledTimes(2);
   });
+
+  it('updates a group while retaining selected images and adding new uploads', async () => {
+    const initial = await cardBackgroundService.addGroup('Clouds', [
+      new File(['one'], 'one.png', { type: 'image/png' }),
+      new File(['two'], 'two.png', { type: 'image/png' })
+    ], 'right');
+
+    const updated = await cardBackgroundService.updateGroup(
+      initial.id,
+      'Clouds updated',
+      ['two.png'],
+      [new File(['three'], 'three.png', { type: 'image/png' })],
+      'right-bottom'
+    );
+
+    expect(updated).toMatchObject({
+      id: initial.id,
+      name: 'Clouds updated',
+      imageFilenames: ['two.png', 'three.png'],
+      alignment: 'right-bottom'
+    });
+    expect(cardBackgroundService.getGroups()).toEqual([updated]);
+    expect(deleteImage).toHaveBeenCalledWith('one.png');
+  });
 });

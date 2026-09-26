@@ -143,6 +143,51 @@ class CardBackgroundService {
     return group;
   }
 
+  async updateGroup(
+    id: string,
+    name: string,
+    retainedFilenames: string[],
+    files: File[],
+    alignment: CardBackgroundAlignment
+  ): Promise<CardBackgroundGroup> {
+    const groups = this.getGroups();
+    const target = groups.find((group) => group.id === id);
+    if (!target) throw new Error('鍗＄墖鑳屾櫙缁勪笉瀛樺湪');
+
+    const normalizedName = name.trim().slice(0, 30);
+    if (!normalizedName) throw new Error('请输入分组名称');
+    if (!ALIGNMENTS.has(alignment)) throw new Error('瀵归綈鏂瑰紡鏃犳晥');
+    if (files.some((file) => !file.type.startsWith('image/'))) throw new Error('璇烽€夋嫨鍥剧墖鏂囦欢');
+    if (files.some((file) => file.size > 10 * 1024 * 1024)) throw new Error('鍗曞紶鍥剧墖涓嶈兘瓒呰繃 10MB');
+
+    const kept = Array.from(new Set(retainedFilenames.filter((filename) => target.imageFilenames.includes(filename))));
+    if (kept.length === 0 && files.length === 0) throw new Error('请至少保留或添加一张图片');
+
+    const addedFilenames: string[] = [];
+    try {
+      for (const file of files) addedFilenames.push(await imageService.saveImage(file, 'theme'));
+      const updated: CardBackgroundGroup = {
+        ...target,
+        name: normalizedName,
+        imageFilenames: [...kept, ...addedFilenames],
+        alignment
+      };
+      localStorage.setItem(CARD_BACKGROUND_GROUPS_KEY, JSON.stringify(groups.map((group) => group.id === id ? updated : group)));
+
+      const retainedImages = getSettingsReferencedImages();
+      await Promise.all(target.imageFilenames.filter((filename) => !updated.imageFilenames.includes(filename)).map(async (filename) => {
+        if (!retainedImages.has(filename) && !retainedImages.has(`thumb_${filename}`)) {
+          await imageService.deleteImage(filename).catch(() => undefined);
+        }
+      }));
+      this.notifyChanged();
+      return updated;
+    } catch (error) {
+      await Promise.all(addedFilenames.map((filename) => imageService.deleteImage(filename).catch(() => undefined)));
+      throw error;
+    }
+  }
+
   async deleteGroup(id: string): Promise<boolean> {
     const groups = this.getGroups();
     const target = groups.find((group) => group.id === id);
