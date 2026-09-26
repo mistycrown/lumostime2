@@ -3,6 +3,7 @@
  * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
  * @updated 2026-09-26: Added independent background width and week-mapped height rendering.
+ * @updated 2026-09-26: Added a clipped single-image Fill mode while preserving paired Overflow rendering.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -13,7 +14,8 @@ import {
     moodCalendarBackgroundService,
     MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
     MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT,
-    type MoodCalendarBackgroundSettings
+    type MoodCalendarBackgroundSettings,
+    type MoodCalendarBackgroundMode
 } from '../services/moodCalendarBackgroundService';
 import { MoodCalendarBackgroundDebugger } from './MoodCalendarBackgroundDebugger';
 
@@ -41,6 +43,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
     const [backgroundId, setBackgroundId] = useState(() => moodCalendarBackgroundService.getCurrentBackground());
+    const [backgroundMode, setBackgroundMode] = useState<MoodCalendarBackgroundMode>(() => moodCalendarBackgroundService.getMode());
     const [backgroundSettings, setBackgroundSettings] = useState<MoodCalendarBackgroundSettings>(() => (
         moodCalendarBackgroundService.getBackgroundById(moodCalendarBackgroundService.getCurrentBackground()) || {}
     ));
@@ -50,14 +53,16 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     useEffect(() => {
         const updateBackground = (event?: Event) => {
-            const eventId = (event as CustomEvent<{ backgroundId?: string }> | undefined)?.detail?.backgroundId;
-            const nextId = eventId || moodCalendarBackgroundService.getCurrentBackground();
+            const detail = (event as CustomEvent<{ backgroundId?: string; mode?: MoodCalendarBackgroundMode }> | undefined)?.detail;
+            const nextMode = detail?.mode || moodCalendarBackgroundService.getMode();
+            const nextId = detail?.backgroundId || moodCalendarBackgroundService.getCurrentBackground(nextMode);
+            setBackgroundMode(nextMode);
             setBackgroundId(nextId);
             setBackgroundSettings(moodCalendarBackgroundService.getBackgroundById(nextId) || {});
         };
         const handlePreview = (event: Event) => {
             const detail = (event as CustomEvent<{ id: string; settings: MoodCalendarBackgroundSettings; previewWeeks?: number }>).detail;
-            if (detail.id !== moodCalendarBackgroundService.getCurrentBackground()) return;
+            if (moodCalendarBackgroundService.getMode() !== 'overflow' || detail.id !== moodCalendarBackgroundService.getCurrentBackground('overflow')) return;
             setBackgroundId(detail.id);
             setBackgroundSettings(detail.settings);
             setPreviewWeeks(detail.previewWeeks || null);
@@ -137,7 +142,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     const calendarWeekCount = Math.ceil(calendarData.length / 7);
     const activeWeekCount = previewWeeks || calendarWeekCount;
     const selectedBackground = moodCalendarBackgroundService.getBackgroundById(backgroundId);
-    const selectedBackgroundUrl = activeWeekCount >= 6
+    const selectedBackgroundUrl = backgroundMode === 'overflow' && activeWeekCount >= 6
         ? (selectedBackground?.sixWeekUrl || selectedBackground?.url)
         : selectedBackground?.url;
     const hasCalendarBackground = Boolean(selectedBackgroundUrl);
@@ -187,20 +192,9 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         <>
             <div className={`memoir-mood-calendar relative overflow-visible ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
                 {hasCalendarBackground && (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
-                        <img
-                            src={selectedBackgroundUrl}
-                            alt=""
-                            className="absolute left-1/2 top-1/2 max-w-none"
-                            style={{
-                                width: `${Math.max(10, backgroundWidthScale * 100)}%`,
-                                height: 'auto',
-                                opacity: backgroundSettings.opacity ?? 1,
-                                transformOrigin: 'center center',
-                                transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px)) scaleY(${backgroundHeightScale})`
-                            }}
-                        />
-                    </div>
+                    backgroundMode === 'fill'
+                        ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-right-bottom" /></div>
+                        : <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible"><img src={selectedBackgroundUrl} alt="" className="absolute left-1/2 top-1/2 max-w-none" style={{ width: `${Math.max(10, backgroundWidthScale * 100)}%`, height: 'auto', opacity: backgroundSettings.opacity ?? 1, transformOrigin: 'center center', transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px)) scaleY(${backgroundHeightScale})` }} /></div>
                 )}
                 {/* Weekday Headers */}
                 <div className="relative z-10 grid grid-cols-7 mb-4">
@@ -259,7 +253,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                 </div>
             </div>
 
-            {isBackgroundDebuggerOpen && (
+            {isBackgroundDebuggerOpen && backgroundMode === 'overflow' && (
                 <MoodCalendarBackgroundDebugger
                     backgroundId={backgroundId}
                     onClose={() => {

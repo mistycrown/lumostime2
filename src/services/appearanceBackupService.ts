@@ -10,6 +10,7 @@
  * @updated 2026-09-26: Included Memoir mood-calendar backgrounds in appearance backups and image references.
  * @updated 2026-09-26: Included imported theme package metadata while keeping local-only font binaries out of sync.
  * @updated 2026-09-26: Syncs custom achievement-bottle image mappings without uploading their binary data directly.
+ * @updated 2026-09-26: Includes independent Memoir calendar background modes in appearance backup and restore.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -40,6 +41,9 @@ const APPEARANCE_STORAGE_KEYS = [
   'mood_calendar_background',
   'mood_calendar_background_settings',
   'mood_calendar_background_custom_list',
+  'mood_calendar_background_mode',
+  'mood_calendar_fill_background',
+  'mood_calendar_fill_background_custom_list',
   'lumos_custom_backgrounds',
   THEME_KEYS.CUSTOM_PRESETS,
   THEME_KEYS.IMPORTED_THEME_PACKAGES,
@@ -142,6 +146,11 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
       addImageReference(referenced, item?.imageFilename);
       addImageReference(referenced, item?.sixWeekImageFilename);
     });
+  }
+
+  const customMoodCalendarFillBackgrounds = parseJsonValue(snapshot, 'mood_calendar_fill_background_custom_list');
+  if (Array.isArray(customMoodCalendarFillBackgrounds)) {
+    customMoodCalendarFillBackgrounds.forEach((item) => addImageReference(referenced, item?.imageFilename));
   }
 
   return [...referenced];
