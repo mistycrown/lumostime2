@@ -6,6 +6,7 @@
  * @description Applies validated imported package configuration to the existing theme-related persistence models.
  * @updated 2026-09-26: Added package configuration application for appearance, stickers, TimePal, navigation, timeline, and Memoir.
  * @updated 2026-09-26: Applies imported achievement-bottle image packs and fixes TimePal package replacement IDs.
+ * @updated 2026-09-26: Applies navigation changes through service events and supports Memoir overflow/fill package modes.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -13,9 +14,14 @@ import { APPEARANCE_RESTORED_EVENT } from './appearanceBackupService';
 import { backgroundService } from './backgroundService';
 import { colorSchemeService } from './colorSchemeService';
 import { fontService } from './fontService';
-import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
+import {
+  FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY,
+  FILL_MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY,
+  moodCalendarBackgroundService,
+  type MoodCalendarBackgroundMode
+} from './moodCalendarBackgroundService';
 import { navigationBackgroundService } from './navigationBackgroundService';
-import { navigationIconService } from './navigationIconService';
+import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { themePackageImportService, type ImportedThemePackageRecord } from './themePackageImportService';
 import { uiIconService } from './uiIconService';
 import { normalizeCustomStickerState } from './customStickerAssetService';
@@ -31,8 +37,6 @@ import { registerCustomAchievementBottleIconPack } from './achievementBottleIcon
 
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
-const CUSTOM_NAVIGATION_BACKGROUND_CURRENT_KEY = 'navigation_new_background';
-const CUSTOM_NAVIGATION_BACKGROUND_ENABLED_KEY = 'navigation_new_mode_enabled';
 const CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY = 'navigation_new_background_settings';
 const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
@@ -145,8 +149,8 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
     opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
   });
   writeJson(CUSTOM_NAVIGATION_BACKGROUND_KEY, backgrounds);
-  localStorage.setItem(CUSTOM_NAVIGATION_BACKGROUND_CURRENT_KEY, id);
-  localStorage.setItem(CUSTOM_NAVIGATION_BACKGROUND_ENABLED_KEY, 'true');
+  navigationBackgroundService.setCurrentBackground(id);
+  navigationBackgroundService.setEnabled(true);
   writeJson(CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY, {
     ...readObject<Record<string, unknown>>(CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY, {}),
     [id]: {
@@ -214,6 +218,9 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
     showLabelWithIcon: navigationIconService.getSelection().showLabelWithIcon
   });
   await navigationIconService.hydrateCustomIcons();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(NAVIGATION_ICON_CHANGE_EVENT));
+  }
 };
 
 const applyTimePal = (record: ImportedThemePackageRecord, warnings: string[]): void => {
@@ -324,29 +331,51 @@ const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings:
   if (!background || typeof background !== 'object' || Array.isArray(background)) return;
 
   const config = background as Record<string, unknown>;
-  const fiveWeekFilename = getAssetFilename(record, config.fiveWeek);
-  const sixWeekFilename = getAssetFilename(record, config.sixWeek);
-  if (!fiveWeekFilename || !sixWeekFilename) {
-    warnings.push('Memoir 背景资源不完整');
-    return;
-  }
-
+  const mode: MoodCalendarBackgroundMode = config.mode === 'fill' ? 'fill' : 'overflow';
   const id = getNamespacedId(record, 'memoir-calendar');
-  const backgrounds = readArray<Record<string, unknown>>(CUSTOM_MOOD_CALENDAR_KEY).filter((item) => item.id !== id);
-  backgrounds.push({
-    id,
-    name: record.name,
-    type: 'custom',
-    url: '',
-    thumbnail: '',
-    sixWeekUrl: '',
-    sixWeekThumbnail: '',
-    imageFilename: fiveWeekFilename,
-    sixWeekImageFilename: sixWeekFilename,
-    ...(config.settings && typeof config.settings === 'object' ? config.settings : {})
-  });
-  writeJson(CUSTOM_MOOD_CALENDAR_KEY, backgrounds);
-  localStorage.setItem(CUSTOM_MOOD_CALENDAR_CURRENT_KEY, id);
+  if (mode === 'fill') {
+    const imageFilename = getAssetFilename(record, config.image);
+    if (!imageFilename) {
+      warnings.push('Memoir 填充模式需要提供 background.image 图片资源');
+      return;
+    }
+    const backgrounds = readArray<Record<string, unknown>>(FILL_MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY)
+      .filter((item) => item.id !== id);
+    backgrounds.push({
+      id,
+      name: record.name,
+      type: 'custom',
+      url: '',
+      thumbnail: '',
+      imageFilename,
+      ...(config.settings && typeof config.settings === 'object' ? config.settings : {})
+    });
+    writeJson(FILL_MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, backgrounds);
+    localStorage.setItem(FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY, id);
+  } else {
+    const fiveWeekFilename = getAssetFilename(record, config.fiveWeek);
+    const sixWeekFilename = getAssetFilename(record, config.sixWeek);
+    if (!fiveWeekFilename || !sixWeekFilename) {
+      warnings.push('Memoir 溢出模式需要同时提供 fiveWeek 和 sixWeek 图片资源');
+      return;
+    }
+    const backgrounds = readArray<Record<string, unknown>>(CUSTOM_MOOD_CALENDAR_KEY).filter((item) => item.id !== id);
+    backgrounds.push({
+      id,
+      name: record.name,
+      type: 'custom',
+      url: '',
+      thumbnail: '',
+      sixWeekUrl: '',
+      sixWeekThumbnail: '',
+      imageFilename: fiveWeekFilename,
+      sixWeekImageFilename: sixWeekFilename,
+      ...(config.settings && typeof config.settings === 'object' ? config.settings : {})
+    });
+    writeJson(CUSTOM_MOOD_CALENDAR_KEY, backgrounds);
+    localStorage.setItem(CUSTOM_MOOD_CALENDAR_CURRENT_KEY, id);
+  }
+  moodCalendarBackgroundService.setMode(mode);
   await moodCalendarBackgroundService.hydrateCustomBackgrounds();
 };
 
@@ -386,11 +415,13 @@ const applySettings = async (record: ImportedThemePackageRecord, warnings: strin
 
   const font = getConfigObject(record, 'font');
   if (font?.source === 'builtin' && typeof font.fontId === 'string') {
-    fontService.setFont(font.fontId);
+    const result = fontService.setFont(font.fontId);
+    if (!result.success) warnings.push(`无法应用主题字体：${result.message}`);
   } else if (font?.source === 'asset') {
     const localFontId = themePackageImportService.getLocalAssets(record.id)?.fontId;
     if (localFontId) {
-      fontService.setFont(localFontId);
+      const result = fontService.setFont(localFontId);
+      if (!result.success) warnings.push(`无法应用主题字体：${result.message}`);
     } else {
       warnings.push('当前设备未找到主题字体，已保留默认字体');
     }
