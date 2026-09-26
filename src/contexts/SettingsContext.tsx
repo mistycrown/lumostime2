@@ -13,6 +13,7 @@
  * @updated 2026-09-15: Fixed missing font-scale storage to default to 100% instead of the minimum value.
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
  * @updated 2026-09-25: Added persisted new sticker selector layout configuration.
+ * @updated 2026-09-26: Rehydrates custom sticker state after appearance restoration.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -728,6 +729,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const restoreAppearanceState = () => {
             const storedScheduleStyle = localStorage.getItem(THEME_KEYS.SCHEDULE_STYLE);
             const storedTimelineConfigs = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
+            const restoredStickerState = buildInitialCustomStickerState();
 
             setUiIconTheme(localStorage.getItem(THEME_KEYS.UI_ICON_THEME) || 'default');
             setColorScheme(localStorage.getItem(THEME_KEYS.COLOR_SCHEME) || 'default');
@@ -774,6 +776,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
                 : DEFAULT_TIMELINE_LAYOUT_MODE);
             const storedEmojiStyle = localStorage.getItem('lumostime_emoji_style');
             setEmojiStyle(storedEmojiStyle === 'twemoji' || storedEmojiStyle === 'openmoji' ? storedEmojiStyle : 'native');
+            setCustomStickerSets(restoredStickerState.customStickerSets);
+            setCustomStickers(restoredStickerState.customStickers);
         };
 
         window.addEventListener(APPEARANCE_RESTORED_EVENT, restoreAppearanceState);

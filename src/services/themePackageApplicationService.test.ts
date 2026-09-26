@@ -1,16 +1,18 @@
 /**
  * @file themePackageApplicationService.test.ts
  * @input Imported theme package records with supported configuration sections
- * @output Regression coverage for applying packaged achievement-bottle settings
+ * @output Regression coverage for applying packaged theme settings and assets
  * @pos Test (Theme Package Import)
  * @description Verifies achievement-bottle configuration is applied without a synthetic config.settings section.
- * @updated 2026-09-26: Covers custom icon-pack application from theme packages.
+ * @updated 2026-09-26: Covers custom icon-pack, sticker, and navigation icon application.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack } = vi.hoisted(() => ({
-  registerIconPack: vi.fn(async () => undefined)
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled } = vi.hoisted(() => ({
+  registerIconPack: vi.fn(async () => undefined),
+  hydrateNavigationIcons: vi.fn(async () => undefined),
+  setNavigationEnabled: vi.fn()
 }));
 
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -19,6 +21,31 @@ vi.mock('./achievementBottleIconPackService', () => ({
 
 vi.mock('./colorSchemeService', () => ({
   colorSchemeService: { setScheme: vi.fn() }
+}));
+
+vi.mock('./backgroundService', () => ({
+  backgroundService: {
+    setCurrentBackground: vi.fn(),
+    setBackgroundOpacity: vi.fn(),
+    hydrateImageBackedCustomBackgrounds: vi.fn(async () => undefined)
+  }
+}));
+
+vi.mock('./navigationIconService', () => ({
+  NAVIGATION_ICON_CHANGE_EVENT: 'navigationIconChange',
+  navigationIconService: {
+    getSlots: () => ['record', 'todo', 'timeline', 'review', 'index'],
+    getSelection: () => ({ showLabelWithIcon: false }),
+    hydrateCustomIcons: hydrateNavigationIcons
+  }
+}));
+
+vi.mock('./navigationBackgroundService', () => ({
+  navigationBackgroundService: {
+    setEnabled: setNavigationEnabled,
+    setCurrentBackground: vi.fn(),
+    hydrateCustomBackgrounds: vi.fn(async () => undefined)
+  }
 }));
 
 vi.mock('./appearanceBackupService', () => ({
@@ -40,6 +67,8 @@ describe('applyImportedThemePackage', () => {
     vi.resetModules();
     vi.unstubAllGlobals();
     registerIconPack.mockClear();
+    hydrateNavigationIcons.mockClear();
+    setNavigationEnabled.mockClear();
   });
 
   it('applies custom bottle frames when achievementBottle is a top-level config section', async () => {
@@ -87,5 +116,66 @@ describe('applyImportedThemePackage', () => {
       ['theme-frame-01.webp'],
       'Test Bottle'
     );
+  });
+
+  it('applies nested navigation icons and refreshes custom sticker state', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    const result = await applyImportedThemePackage({
+      id: 'asset-theme',
+      name: 'Asset Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 1,
+        package: { id: 'asset-theme', name: 'Asset Theme', version: '1.0.0' },
+        config: {
+          background: {
+            source: 'asset',
+            file: 'assets/background/main.png',
+            opacity: 0.3
+          },
+          navigation: {
+            icons: {
+              source: 'asset',
+              files: { record: 'assets/navigation/record.png' }
+            }
+          },
+          stickers: [{
+            id: 'stickers',
+            name: 'Theme Stickers',
+            items: [{ id: 'sticker-1', name: 'One', file: 'assets/stickers/one.png' }]
+          }]
+        }
+      },
+      imageAssets: {
+        'assets/background/main.png': 'theme-background.png',
+        'assets/navigation/record.png': 'navigation-record.png',
+        'assets/stickers/one.png': 'theme-sticker.png'
+      },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    const iconSelection = JSON.parse(values.get('navigation_icon_selection_v1') || '{}');
+    const customStickerSets = JSON.parse(values.get('lumostime_custom_sticker_sets_v2') || '[]');
+    const customStickers = JSON.parse(values.get('lumostime_custom_stickers_v2') || '[]');
+
+    expect(result.appliedSections).toContain('navigation-icons');
+    expect(iconSelection).toMatchObject({ mode: 'custom', schemeId: 'theme:asset-theme:navigation-icons' });
+    expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
+    expect(setNavigationEnabled).toHaveBeenCalledWith(true);
+    const { backgroundService } = await import('./backgroundService');
+    expect(backgroundService.setBackgroundOpacity).toHaveBeenCalledWith(0.3);
+    expect(result.appliedSections).toContain('stickers');
+    expect(customStickerSets).toHaveLength(1);
+    expect(customStickers).toMatchObject([{ setId: 'theme:asset-theme:sticker-set-stickers', imageFilename: 'theme-sticker.png' }]);
   });
 });
