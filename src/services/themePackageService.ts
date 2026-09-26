@@ -29,6 +29,20 @@ const ALLOWED_ASSET_EXTENSIONS = new Set([
   'otf'
 ]);
 
+const ASSET_MIME_TYPES: Record<string, string> = {
+  bmp: 'image/bmp',
+  gif: 'image/gif',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  webp: 'image/webp',
+  woff: 'font/woff',
+  woff2: 'font/woff2',
+  ttf: 'font/ttf',
+  otf: 'font/otf'
+};
+
 export interface ThemePackageMetadata {
   id: string;
   name: string;
@@ -256,7 +270,11 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
       throw new ThemePackageValidationError('UNSUPPORTED_ASSET_TYPE', `不支持的主题资源类型：${archivePath}`, archivePath);
     }
 
-    const blob = await entry.async('blob');
+    const extractedBlob = await entry.async('blob');
+    const mimeType = ASSET_MIME_TYPES[getExtension(archivePath)] || 'application/octet-stream';
+    const blob = extractedBlob.type
+      ? extractedBlob
+      : new Blob([extractedBlob], { type: mimeType });
     assets.set(archivePath, blob);
   }
 

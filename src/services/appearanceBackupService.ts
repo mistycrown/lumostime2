@@ -8,6 +8,7 @@
  * @updated 2026-09-15: Included the global font-scale preference in appearance backups.
  * @updated 2026-09-25: Included navigation icon selections and custom image hydration in appearance backups.
  * @updated 2026-09-26: Included Memoir mood-calendar backgrounds in appearance backups and image references.
+ * @updated 2026-09-26: Included imported theme package metadata while keeping local-only font binaries out of sync.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -38,6 +39,7 @@ const APPEARANCE_STORAGE_KEYS = [
   'mood_calendar_background_custom_list',
   'lumos_custom_backgrounds',
   THEME_KEYS.CUSTOM_PRESETS,
+  THEME_KEYS.IMPORTED_THEME_PACKAGES,
   THEME_KEYS.SCHEDULE_STYLE,
   THEME_KEYS.CALENDAR_NUMBER_STYLE,
   THEME_KEYS.CALENDAR_LUNAR_DISPLAY,
