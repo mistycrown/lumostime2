@@ -1,7 +1,7 @@
 /**
  * @file MoodCalendarBackgroundDebugger.tsx
  * @input Current Memoir mood-calendar background and tuning callbacks
- * @output Live preview and persisted position, width, and opacity for paired background images
+ * @output Live preview and persisted position, width, height ratio, and opacity for paired background images
  * @pos Component (Memoir Background Tuning)
  * @description Provides navigation-adjuster-style button controls for the Memoir mood calendar.
  * @updated 2026-09-26: Replaced sliders with mobile-friendly step buttons for paired background images.
@@ -28,6 +28,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
     const [offsetX, setOffsetX] = useState(0);
     const [offsetY, setOffsetY] = useState(0);
     const [widthScale, setWidthScale] = useState(135);
+    const [heightScale, setHeightScale] = useState(100);
     const [opacity, setOpacity] = useState(100);
     const [previewWeeks, setPreviewWeeks] = useState<5 | 6>(5);
     const [isSaved, setIsSaved] = useState(false);
@@ -40,6 +41,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
         setOffsetX(parseOffset(background.offsetX));
         setOffsetY(parseOffset(background.offsetY));
         setWidthScale(Math.round((background.scale || 1) * 100));
+        setHeightScale(Math.round((background.heightScale || 1) * 100));
         setOpacity(Math.round((background.opacity ?? 1) * 100));
     }, [activeId]);
 
@@ -47,6 +49,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
         offsetX: `${offsetX}px`,
         offsetY: `${offsetY}px`,
         scale: widthScale / 100,
+        heightScale: heightScale / 100,
         opacity: opacity / 100,
     };
 
@@ -54,7 +57,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
         window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT, {
             detail: { id: activeId, settings, previewWeeks }
         }));
-    }, [activeId, offsetX, offsetY, widthScale, opacity, previewWeeks]);
+    }, [activeId, offsetX, offsetY, widthScale, heightScale, opacity, previewWeeks]);
 
     const save = () => {
         moodCalendarBackgroundService.saveCustomSettings(activeId, settings);
@@ -68,12 +71,14 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
             offsetX: parseOffset(defaults?.offsetX),
             offsetY: parseOffset(defaults?.offsetY),
             widthScale: Math.round((defaults?.scale || 1) * 100),
+            heightScale: Math.round((defaults?.heightScale || 1) * 100),
             opacity: Math.round((defaults?.opacity ?? 1) * 100)
         };
-        setOffsetX(next.offsetX); setOffsetY(next.offsetY); setWidthScale(next.widthScale);
+        setOffsetX(next.offsetX); setOffsetY(next.offsetY); setWidthScale(next.widthScale); setHeightScale(next.heightScale);
         setOpacity(next.opacity);
         moodCalendarBackgroundService.saveCustomSettings(activeId, {
             offsetX: `${next.offsetX}px`, offsetY: `${next.offsetY}px`, scale: next.widthScale / 100,
+            heightScale: next.heightScale / 100,
             opacity: next.opacity / 100
         });
     };
@@ -101,7 +106,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
     );
 
     return (
-        <div className="fixed bottom-20 right-4 z-[90] max-h-[min(28rem,55vh)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-3 shadow-2xl backdrop-blur">
+        <div className="fixed bottom-20 right-3 z-[90] max-h-[min(20rem,32vh)] w-[min(16rem,calc(100vw-1.5rem))] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-2.5 shadow-2xl backdrop-blur">
             <div className="mb-3 flex items-center justify-between border-b border-stone-100 pb-2">
                 <h3 className="flex items-center gap-1.5 text-sm font-bold text-stone-800"><span className="h-2 w-2 rounded-full bg-amber-400" /> 心情日历背景调整</h3>
                 <div className="flex items-center gap-1"><button type="button" onClick={reset} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="重置" aria-label="重置"><RotateCcw size={14} /></button><button type="button" onClick={onClose} className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-600" title="关闭" aria-label="关闭"><X size={14} /></button></div>
@@ -112,6 +117,7 @@ export const MoodCalendarBackgroundDebugger: React.FC<MoodCalendarBackgroundDebu
                 {stepControl(<><Move size={11} /> 水平位置</>, offsetX, -240, 240, setOffsetX, 'px')}
                 {stepControl(<><Move size={11} className="rotate-90" /> 垂直位置</>, offsetY, -240, 240, setOffsetY, 'px')}
                 {stepControl(<><ZoomIn size={11} /> 图片宽度</>, widthScale, 30, 300, setWidthScale, '%')}
+                {stepControl(<><ZoomIn size={11} /> 纵向高度</>, heightScale, 30, 300, setHeightScale, '%')}
                 {stepControl(<><Sun size={11} /> 透明度</>, opacity, 0, 100, setOpacity, '%')}
             </div>
             <button type="button" onClick={save} disabled={isSaved} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-sm font-bold shadow-sm transition-all ${isSaved ? 'border border-green-200 bg-green-100 text-green-700' : 'bg-stone-800 text-white hover:bg-stone-900'}`}><Save size={14} /> <span>{isSaved ? '已保存设置' : '保存当前状态'}</span></button>

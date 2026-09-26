@@ -13,6 +13,7 @@ export type MoodCalendarBackgroundSettings = {
     offsetY?: string;
     offsetX?: string;
     scale?: number;
+    heightScale?: number;
     opacity?: number;
 };
 
@@ -39,6 +40,7 @@ const DEFAULT_SETTINGS: Required<MoodCalendarBackgroundSettings> = {
     offsetY: '0px',
     offsetX: '0px',
     scale: 1.35,
+    heightScale: 1,
     opacity: 1
 };
 
@@ -48,6 +50,7 @@ const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined)
     offsetY: settings?.offsetY || DEFAULT_SETTINGS.offsetY,
     offsetX: settings?.offsetX || DEFAULT_SETTINGS.offsetX,
     scale: clamp(Number(settings?.scale ?? DEFAULT_SETTINGS.scale) || DEFAULT_SETTINGS.scale, 0.1, 3),
+    heightScale: clamp(Number(settings?.heightScale ?? DEFAULT_SETTINGS.heightScale) || DEFAULT_SETTINGS.heightScale, 0.1, 3),
     opacity: clamp(Number(settings?.opacity ?? DEFAULT_SETTINGS.opacity) || 0, 0, 1)
 });
 
