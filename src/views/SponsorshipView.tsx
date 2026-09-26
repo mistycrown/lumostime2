@@ -14,9 +14,10 @@
  * @updated 2026-09-25: Added direct ZIP import for folder-based custom sticker groups.
  * @updated 2026-09-26: Added Memoir mood-calendar background management to personalization.
  * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and version overwrite confirmation.
+ * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
  */
 import React, { useRef, useState, useEffect } from 'react';
-import { ChevronLeft, Fish, Check, X, Plus, Upload } from 'lucide-react';
+import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -38,7 +39,6 @@ import { useSettings } from '../contexts/SettingsContext';
 import { useReview } from '../contexts/ReviewContext';
 import { useNavigation } from '../contexts/NavigationContext';
 import { InputModal } from '../components/InputModal';
-import { PresetEditModal } from '../components/PresetEditModal';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useCustomPresets, ThemePreset, getValidationErrorMessage } from '../hooks/useCustomPresets';
 import { TimePalSettings } from '../components/TimePalSettings';
@@ -58,6 +58,10 @@ import {
 } from '../services/themePackageImportService';
 import { applyImportedThemePackage } from '../services/themePackageApplicationService';
 import { THEME_PACKAGE_CHANGE_EVENT } from '../services/themePackageImportService';
+import {
+    applyDefaultThemeSupplement,
+    applyThemeSettingsSnapshot
+} from '../services/themeSnapshotService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
 import {
@@ -87,8 +91,73 @@ type StickerDeleteTarget =
     }
     | null;
 
+interface ThemeCardEntry {
+    id: string;
+    name: string;
+    description: string;
+    source: 'builtin' | 'saved' | 'package';
+    version?: string;
+    colorScheme: string;
+    uiTheme: string;
+    deletable: boolean;
+    selected: boolean;
+    onApply: () => void;
+    onDelete?: () => void;
+}
+
+const PACKAGE_THEME_ID_PREFIX = 'package:';
+
+const THEME_SWATCH_COLORS: Record<string, string> = {
+    default: '#e7e5e4',
+    'morandi-purple': '#b8a5c8',
+    'morandi-pink': '#e8b4b8',
+    'dunhuang-feitian': '#e8c4a0',
+    'bamboo-green': '#a8c5a8',
+    'morandi-cyan': '#a8c8d8',
+    'latte-caramel': '#d4b5a0',
+    'morandi-green': '#b5c8b5',
+    'klein-blue': '#5a8fc8',
+    'morandi-yellow': '#e8d4a8',
+    'sky-blue': '#7ab8d8',
+    'film-japanese': '#8fbec8'
+};
+
+const ThemeSchemeCard: React.FC<ThemeCardEntry> = ({
+    name,
+    description,
+    source,
+    version,
+    colorScheme,
+    uiTheme,
+    deletable,
+    selected,
+    onApply,
+    onDelete
+}) => (
+    <div className={`flex items-center rounded-lg border transition-colors ${selected ? 'border-stone-400 bg-white' : 'border-stone-200 bg-white hover:border-stone-300'}`}>
+        <button type="button" onClick={onApply} className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-stone-200 text-xs font-semibold text-stone-600" style={{ backgroundColor: THEME_SWATCH_COLORS[colorScheme] || '#e7e5e4' }}>
+                {uiTheme === 'default' ? 'Aa' : uiTheme.slice(0, 2)}
+            </span>
+            <span className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-stone-800">{name}</span>
+                    <span className="shrink-0 text-[10px] text-stone-400">{source === 'builtin' ? '内置' : source === 'package' ? '导入' : '已保存'}</span>
+                </span>
+                <span className="block truncate text-xs text-stone-500">{description || '主题外观方案'}{version ? ` · v${version}` : ''}</span>
+            </span>
+            {selected && <Check size={16} className="shrink-0 text-stone-700" />}
+        </button>
+        {deletable && onDelete && (
+            <button type="button" onClick={onDelete} title={`删除${name}`} aria-label={`删除${name}`} className="mr-2 grid h-9 w-9 shrink-0 place-items-center rounded-md text-stone-400 transition-colors hover:bg-red-50 hover:text-red-600">
+                <Trash2 size={16} />
+            </button>
+        )}
+    </div>
+);
+
 // 主题方案数据
-const THEME_PRESETS: ThemePreset[] = [
+const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'default',
         name: '默认',
@@ -233,7 +302,7 @@ const THEME_PRESETS: ThemePreset[] = [
         navigation: 'pencil',
         timePal: 'dog2'
     }
-];
+] as ThemePreset[]).map((preset) => ({ ...preset, navigationMode: 'legacy' }));
 
 // UI 主题列表
 const UI_THEMES = ['purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'paper', 'pencil', 'old'];
@@ -324,14 +393,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const { 
         customPresets, 
         addCustomPreset, 
-        updateCustomPreset,
         deleteCustomPreset,
         validatePresetName 
     } = useCustomPresets();
     
     // Custom preset modals state
     const [isNameModalOpen, setIsNameModalOpen] = useState(false);
-    const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+    const [pendingThemeDelete, setPendingThemeDelete] = useState<{ id: string; name: string; source: 'saved' | 'package' } | null>(null);
+    const [isDeletingTheme, setIsDeletingTheme] = useState(false);
     
     // Tab 页状态
     type TabType = 'preset' | 'icon' | 'colorScheme' | 'background' | 'navigation' | 'timepal' | 'font' | 'style';
@@ -359,17 +428,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [currentPresetId, setCurrentPresetId] = useState<string>(() => {
         return localStorage.getItem('lumostime_current_preset') || 'default';
     });
+    const allPresets = React.useMemo(() => [...THEME_PRESETS, ...customPresets], [customPresets]);
     
-    // Merge preset and custom presets
-    const allPresets = React.useMemo(() => {
-        return [...THEME_PRESETS, ...customPresets];
-    }, [customPresets]);
-    
-    // Get editing preset
-    const editingPreset = React.useMemo(() => {
-        if (!editingPresetId) return null;
-        return customPresets.find(p => p.id === editingPresetId) || null;
-    }, [editingPresetId, customPresets]);
     const customStickerViewSets = buildCustomStickerViewSets(customStickerSets, customStickers, { includeEmptySets: true });
     const editingStickerSet = React.useMemo(() => {
         if (!editingStickerSetId) {
@@ -417,49 +477,19 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         return error ? getValidationErrorMessage(error) : null;
     };
     
-    // Handle edit preset save
-    const handleEditPresetSave = (updatedPreset: ThemePreset) => {
-        const result = updateCustomPreset(updatedPreset);
-        
-        if (result.success) {
-            onToast('success', '方案已更新');
-            setEditingPresetId(null);
-            
-            // If editing the current preset, apply the changes
-            if (currentPresetId === updatedPreset.id) {
-                applyThemePreset(updatedPreset);
-            }
-        } else {
-            const errorMsg = getValidationErrorMessage(result.error || null);
-            onToast('error', errorMsg || '更新失败，请重试');
-        }
-    };
-    
-    // Handle delete preset
-    const handleDeletePreset = () => {
-        if (!editingPresetId) return;
-        
-        const success = deleteCustomPreset(editingPresetId);
-        
-        if (success) {
-            onToast('success', '方案已删除');
-            setEditingPresetId(null);
-            
-            // If deleted preset was current, switch to default
-            if (currentPresetId === editingPresetId) {
-                const defaultPreset = THEME_PRESETS.find(p => p.id === 'default');
-                if (defaultPreset) {
-                    applyThemePreset(defaultPreset);
-                }
-            }
-        } else {
-            onToast('error', '删除失败，请重试');
-        }
-    };
-
     // 应用主题方案
     const applyThemePreset = async (preset: ThemePreset) => {
         try {
+            if (preset.snapshot) {
+                const warnings = await applyThemeSettingsSnapshot(preset.snapshot);
+                localStorage.setItem('lumostime_current_preset', preset.id);
+                setCurrentPresetId(preset.id);
+                onToast(
+                    warnings.length > 0 ? 'info' : 'success',
+                    warnings.length > 0 ? `方案「${preset.name}」已应用（${warnings.join('；')}）` : `方案「${preset.name}」已应用`
+                );
+                return;
+            }
             const oldTheme = uiIconTheme;
             
             // 直接执行主题切换，不再显示确认对话框
@@ -739,8 +769,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             setImportedThemePackages(themePackageImportService.getImportedPackages());
             if (applyAfterImport) {
                 const application = await applyImportedThemePackage(result.record);
-                setCurrentPresetId(result.record.id);
-                localStorage.setItem('lumostime_current_preset', result.record.id);
+                setCurrentPresetId(`${PACKAGE_THEME_ID_PREFIX}${result.record.id}`);
+                localStorage.setItem('lumostime_current_preset', `${PACKAGE_THEME_ID_PREFIX}${result.record.id}`);
                 const warningText = application.warnings.length > 0
                     ? `（${application.warnings.join('；')}）`
                     : '';
@@ -769,8 +799,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
         try {
             const application = await applyImportedThemePackage(record);
-            setCurrentPresetId(record.id);
-            localStorage.setItem('lumostime_current_preset', record.id);
+            setCurrentPresetId(`${PACKAGE_THEME_ID_PREFIX}${record.id}`);
+            localStorage.setItem('lumostime_current_preset', `${PACKAGE_THEME_ID_PREFIX}${record.id}`);
             onToast(
                 application.warnings.length > 0 ? 'info' : 'success',
                 application.warnings.length > 0
@@ -780,6 +810,53 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         } catch (error) {
             console.error('[SponsorshipView] 应用已导入主题失败:', error);
             onToast('error', '应用主题失败，请重试');
+        }
+    };
+
+    const applyDefaultTheme = async (): Promise<void> => {
+        const preset = THEME_PRESETS[0];
+        const result = await ThemePresetService.applyThemePreset(
+            preset,
+            uiIconTheme,
+            setUiIconTheme,
+            setColorScheme,
+            setAchievementBottleStyle,
+            setAchievementBottleIconPack,
+            setCurrentPresetId
+        );
+        if (!result.success) throw new Error(result.message);
+        await applyDefaultThemeSupplement();
+        localStorage.setItem('lumostime_current_preset', 'default');
+        setCurrentPresetId('default');
+    };
+
+    const confirmDeleteTheme = async () => {
+        if (!pendingThemeDelete || isDeletingTheme) return;
+        const target = pendingThemeDelete;
+        setIsDeletingTheme(true);
+        try {
+            const isActive = currentPresetId === target.id
+                || (target.source === 'package' && currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${target.id}`);
+            if (isActive) await applyDefaultTheme();
+
+            if (target.source === 'package') {
+                const protectedImages = dailyReviews.flatMap((review) => (
+                    typeof review?.moodEmoji === 'string' && review.moodEmoji.startsWith('image:')
+                        ? [review.moodEmoji.slice(6)]
+                        : []
+                ));
+                await themePackageImportService.deletePackage(target.id, protectedImages);
+                setImportedThemePackages(themePackageImportService.getImportedPackages());
+            } else if (!deleteCustomPreset(target.id)) {
+                throw new Error('方案删除失败，请重试');
+            }
+            setPendingThemeDelete(null);
+            onToast('success', `方案「${target.name}」已删除`);
+        } catch (error) {
+            console.error('[SponsorshipView] 删除主题方案失败:', error);
+            onToast('error', error instanceof Error ? error.message : '方案删除失败，请重试');
+        } finally {
+            setIsDeletingTheme(false);
         }
     };
 
@@ -1379,177 +1456,49 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 {isImportingThemePackage ? '主题包导入中…' : '导入主题压缩包'}
                                             </span>
                                         </button>
-                                        {importedThemePackages.length > 0 && (
-                                            <div className="mt-3 space-y-2">
-                                                {importedThemePackages.map((record) => (
-                                                    <button
-                                                        key={`${record.id}:${record.version}`}
-                                                        type="button"
-                                                        onClick={() => void applyImportedTheme(record.id)}
-                                                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
-                                                            currentPresetId === record.id
-                                                                ? 'border-stone-300 bg-stone-100'
-                                                                : 'border-stone-100 bg-white hover:bg-stone-50'
-                                                        }`}
-                                                    >
-                                                        <span className="min-w-0">
-                                                            <span className="block truncate text-sm font-medium text-stone-700">{record.name}</span>
-                                                            <span className="block text-[11px] text-stone-400">v{record.version}</span>
-                                                        </span>
-                                                        {currentPresetId === record.id && <Check size={15} className="shrink-0 text-stone-700" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
                                     </div>
 
-                                    {allPresets.map((preset) => {
-                                        const isSelected = currentPresetId === preset.id;
-                                        const isCustom = preset.isCustom === true;
-                                        
+                                    {allPresets.map((preset) => (
+                                        <ThemeSchemeCard
+                                            key={preset.id}
+                                            id={preset.id}
+                                            name={preset.name}
+                                            description={preset.description}
+                                            source={preset.isCustom ? 'saved' : 'builtin'}
+                                            colorScheme={preset.colorScheme}
+                                            uiTheme={preset.uiTheme}
+                                            deletable={preset.isCustom === true}
+                                            selected={currentPresetId === preset.id}
+                                            onApply={() => void applyThemePreset(preset)}
+                                            onDelete={preset.isCustom ? () => setPendingThemeDelete({ id: preset.id, name: preset.name, source: 'saved' }) : undefined}
+                                        />
+                                    ))}
+                                    {importedThemePackages.map((record) => {
+                                        const color = record.manifest.config.color;
+                                        const uiIcon = record.manifest.config.uiIcon;
+                                        const colorScheme = color && typeof color === 'object' && !Array.isArray(color)
+                                            && typeof (color as Record<string, unknown>).schemeId === 'string'
+                                            ? String((color as Record<string, unknown>).schemeId)
+                                            : 'default';
+                                        const uiTheme = uiIcon && typeof uiIcon === 'object' && !Array.isArray(uiIcon)
+                                            && typeof (uiIcon as Record<string, unknown>).themeId === 'string'
+                                            ? String((uiIcon as Record<string, unknown>).themeId)
+                                            : 'default';
                                         return (
-                                            <div key={preset.id} className="relative">
-                                                <button
-                                                    onClick={() => applyThemePreset(preset)}
-                                                    className={`w-full rounded-2xl transition-all overflow-hidden text-left ${
-                                                        isSelected
-                                                            ? 'border-2 border-stone-300 ring-1 ring-stone-200 bg-white shadow-sm'
-                                                            : 'border border-stone-100 hover:border-stone-200 bg-white hover:bg-stone-50'
-                                                    }`}
-                                                >
-                                                    <div className="p-3 flex items-center gap-3">
-                                                        {/* 左侧：方案名称（缩窄宽度，自动换行） */}
-                                                        <div className="w-16 shrink-0 flex items-center justify-center">
-                                                            <h5 className="text-sm font-bold text-stone-800 text-center leading-tight break-words">
-                                                                {preset.name}
-                                                            </h5>
-                                                        </div>
-                                                        
-                                                        {/* 右侧：配置预览框 - 一行显示所有预览 */}
-                                                        <div className="flex-1 bg-stone-50 rounded-lg p-2 flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                                                            {/* UI主题图标预览 - 只显示一个图标 */}
-                                                            {preset.uiTheme === 'default' ? (
-                                                                /* 默认主题显示 emoji */
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200 flex items-center justify-center">
-                                                                    <span className="text-lg">➕</span>
-                                                                </div>
-                                                            ) : (
-                                                                /* 自定义主题显示图片 - 使用 01.webp */
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200 flex items-center justify-center">
-                                                                    <img 
-                                                                        src={resolveAssetPath(`/uiicon/${preset.uiTheme}/01.webp`)}
-                                                                        alt="UI"
-                                                                        className="w-6 h-6 object-contain"
-                                                                        onError={(e) => {
-                                                                            e.currentTarget.style.display = 'none';
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* 背景预览 */}
-                                                            {preset.background === 'default' ? (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
-                                                                    <span className="text-[8px] text-stone-400">默认</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
-                                                                    <img 
-                                                                        src={resolveAssetPath(`/background/${preset.background}.webp`)}
-                                                                        alt="背景"
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            e.currentTarget.style.display = 'none';
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* 导航装饰预览 */}
-                                                            {preset.navigation === 'default' ? (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
-                                                                    <span className="text-[8px] text-stone-400">默认</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
-                                                                    <img 
-                                                                        src={resolveAssetPath(`/dchh/${preset.navigation}.webp`)}
-                                                                        alt="导航"
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            e.currentTarget.style.display = 'none';
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* 时间小友预览 */}
-                                                            {preset.timePal === 'none' || preset.timePal === 'default' ? (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-gradient-to-br from-stone-100 to-stone-200 border border-stone-200 flex items-center justify-center">
-                                                                    <span className="text-[8px] text-stone-400">关闭</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden bg-white border border-stone-200">
-                                                                    <img 
-                                                                        src={getTimePalPreviewPath(preset.timePal as any)}
-                                                                        alt="时间小友"
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            // 尝试 PNG 格式
-                                                                            const pngSrc = resolveAssetPath(`/time_pal_origin/${preset.timePal}/1.png`);
-                                                                            if (e.currentTarget.src.indexOf('.png') === -1) {
-                                                                                e.currentTarget.src = pngSrc;
-                                                                            } else {
-                                                                                e.currentTarget.style.display = 'none';
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* 配色方案色块 */}
-                                                            <div className="shrink-0 w-10 h-10 rounded-md overflow-hidden border border-stone-200" 
-                                                                 style={{
-                                                                     background: preset.colorScheme === 'default' ? '#f5f5f4' :
-                                                                                preset.colorScheme === 'morandi-purple' ? 'linear-gradient(135deg, #b8a5c8 0%, #9b8aad 100%)' :
-                                                                                preset.colorScheme === 'morandi-pink' ? 'linear-gradient(135deg, #e8b4b8 0%, #d4a5a5 100%)' :
-                                                                                preset.colorScheme === 'dunhuang-feitian' ? 'linear-gradient(135deg, #f4d5a6 0%, #e8c4a0 100%)' :
-                                                                                preset.colorScheme === 'bamboo-green' ? 'linear-gradient(135deg, #a8c5a8 0%, #8fb58f 100%)' :
-                                                                                preset.colorScheme === 'morandi-cyan' ? 'linear-gradient(135deg, #a8c8d8 0%, #8fb5c5 100%)' :
-                                                                                preset.colorScheme === 'latte-caramel' ? 'linear-gradient(135deg, #d4b5a0 0%, #c4a590 100%)' :
-                                                                                preset.colorScheme === 'morandi-green' ? 'linear-gradient(135deg, #b5c8b5 0%, #a0b5a0 100%)' :
-                                                                                preset.colorScheme === 'klein-blue' ? 'linear-gradient(135deg, #5a8fc8 0%, #4a7fb8 100%)' :
-                                                                                preset.colorScheme === 'morandi-yellow' ? 'linear-gradient(135deg, #e8d4a8 0%, #d8c498 100%)' :
-                                                                                preset.colorScheme === 'sky-blue' ? 'linear-gradient(135deg, #7ab8d8 0%, #6aa8c8 100%)' :
-                                                                                preset.colorScheme === 'film-japanese' ? 'linear-gradient(135deg, #8fbec8 0%, #7faeb8 100%)' :
-                                                                                '#f5f5f4'
-                                                                 }}
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* 选中标记 */}
-                                                        {isSelected && (
-                                                            <div className="shrink-0 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center">
-                                                                <Check size={12} className="text-white" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </button>
-                                                
-                                                {/* 编辑按钮 - 仅自定义方案显示 */}
-                                                {isCustom && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setEditingPresetId(preset.id);
-                                                        }}
-                                                        className="absolute right-3 top-1/2 -translate-y-1/2 px-3 py-1.5 text-xs font-medium text-stone-600 bg-white border border-stone-200 rounded-lg hover:bg-stone-50 hover:border-stone-300 transition-colors shadow-sm"
-                                                        aria-label={`编辑 ${preset.name}`}
-                                                    >
-                                                        编辑
-                                                    </button>
-                                                )}
-                                            </div>
+                                            <ThemeSchemeCard
+                                                key={`package:${record.id}`}
+                                                id={`${PACKAGE_THEME_ID_PREFIX}${record.id}`}
+                                                name={record.name}
+                                                description={record.description || '导入的主题压缩包'}
+                                                source="package"
+                                                version={record.version}
+                                                colorScheme={colorScheme}
+                                                uiTheme={uiTheme}
+                                                deletable
+                                                selected={currentPresetId === record.id || currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${record.id}`}
+                                                onApply={() => void applyImportedTheme(record.id)}
+                                                onDelete={() => setPendingThemeDelete({ id: record.id, name: record.name, source: 'package' })}
+                                            />
                                         );
                                     })}
 
@@ -2095,14 +2044,18 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 validateFn={validatePresetNameForModal}
             />
             
-            {/* 编辑方案模态框 */}
-            <PresetEditModal
-                isOpen={!!editingPresetId}
-                preset={editingPreset}
-                onClose={() => setEditingPresetId(null)}
-                onSave={handleEditPresetSave}
-                onDelete={handleDeletePreset}
-                onToast={onToast}
+            <ConfirmModal
+                isOpen={!!pendingThemeDelete}
+                onClose={() => !isDeletingTheme && setPendingThemeDelete(null)}
+                onConfirm={() => void confirmDeleteTheme()}
+                title="删除主题方案"
+                description={pendingThemeDelete && (currentPresetId === pendingThemeDelete.id
+                    || (pendingThemeDelete.source === 'package' && currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${pendingThemeDelete.id}`))
+                    ? `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。仍被其他方案或日记引用的资源会保留。`
+                    : `确定删除「${pendingThemeDelete?.name || ''}」？仍被其他方案或日记引用的资源会保留。`}
+                confirmText={isDeletingTheme ? '删除中…' : '删除'}
+                cancelText="取消"
+                type="danger"
             />
 
             {pendingThemePackage && (

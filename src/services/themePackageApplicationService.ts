@@ -21,6 +21,7 @@ import {
   type MoodCalendarBackgroundMode
 } from './moodCalendarBackgroundService';
 import { navigationBackgroundService } from './navigationBackgroundService';
+import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { themePackageImportService, type ImportedThemePackageRecord } from './themePackageImportService';
 import { uiIconService } from './uiIconService';
@@ -37,6 +38,7 @@ import { registerCustomAchievementBottleIconPack } from './achievementBottleIcon
 
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
+const LEGACY_NAVIGATION_DECORATIONS_KEY = 'navigation_decoration_custom_list';
 const CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY = 'navigation_new_background_settings';
 const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
@@ -119,6 +121,43 @@ const applyBackground = async (record: ImportedThemePackageRecord, warnings: str
 
 const applyNavigationBackground = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
   const navigation = getConfigObject(record, 'navigation');
+  if (navigation?.mode === 'legacy') {
+    const decorationId = typeof navigation.decorationId === 'string' ? navigation.decorationId : 'default';
+    if (navigation.decoration && typeof navigation.decoration === 'object' && !Array.isArray(navigation.decoration)) {
+      const decoration = navigation.decoration as Record<string, unknown>;
+      if (decoration.source === 'asset') {
+        const imageFilename = getAssetFilename(record, decoration.file);
+        if (!imageFilename) {
+          warnings.push('旧版导航装饰资源不存在');
+          return;
+        }
+        const id = getNamespacedId(record, 'navigation-decoration');
+        const decorations = readArray<Record<string, unknown>>(LEGACY_NAVIGATION_DECORATIONS_KEY)
+          .filter((item) => item.id !== id);
+        decorations.push({
+          id,
+          name: record.name,
+          type: 'custom',
+          url: '',
+          thumbnail: '',
+          imageFilename,
+          offsetY: typeof decoration.offsetY === 'string' ? decoration.offsetY : '60px',
+          offsetX: typeof decoration.offsetX === 'string' ? decoration.offsetX : '0px',
+          scale: typeof decoration.scale === 'number' ? decoration.scale : 1,
+          opacity: typeof decoration.opacity === 'number' ? decoration.opacity : 1
+        });
+        writeJson(LEGACY_NAVIGATION_DECORATIONS_KEY, decorations);
+        navigationBackgroundService.setEnabled(false);
+        navigationDecorationService.setCurrentDecoration(id);
+        await navigationDecorationService.hydrateImageBackedCustomDecorations();
+        return;
+      }
+    }
+    navigationBackgroundService.setEnabled(false);
+    navigationDecorationService.setCurrentDecoration(decorationId);
+    return;
+  }
+
   const config = navigation?.background;
   if (!config || typeof config !== 'object' || Array.isArray(config)) return;
 

@@ -6,12 +6,14 @@
  * @description Centralized theme preset application service. Applies theme-related settings in a consistent order and handles icon migration side effects.
  *
  * @updated 2026-03-28: Added achievement bottle icon-pack support so preset save/apply keeps bottle sprites in sync.
+ * @updated 2026-09-26: Marks legacy presets and disables the modern navigation background when applying them.
  */
 
 import { ThemePreset } from '../hooks/useCustomPresets';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
+import { navigationBackgroundService } from './navigationBackgroundService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE, type AchievementBottleStyle } from './achievementBottleStyleService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, type AchievementBottleIconPack } from './achievementBottleIconPackService';
 
@@ -43,6 +45,7 @@ export class ThemePresetService {
 
     static async applyNavigation(navigation: string): Promise<void> {
         console.log('[ThemePresetService] apply navigation decoration:', navigation);
+        navigationBackgroundService.setEnabled(false);
         navigationDecorationService.setCurrentDecoration(navigation);
     }
 
