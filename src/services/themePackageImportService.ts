@@ -6,18 +6,18 @@
  * @description Imports validated theme package resources transactionally while keeping fonts local to the current device.
  * @updated 2026-09-26: Added transactional image and local-font persistence for versioned theme packages.
  * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
- * @updated 2026-09-26: Adds package deletion with namespaced state cleanup and reference-aware asset removal.
+ * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK } from './achievementBottleIconPackService';
 import { fontService } from './fontService';
 import { imageService } from './imageService';
-import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import {
   parseThemePackage,
   type ThemePackageManifest
 } from './themePackageService';
+import { APPEARANCE_RESTORED_EVENT } from './appearanceBackupService';
 
 const LOCAL_THEME_PACKAGE_ASSETS_KEY = 'lumostime_theme_package_local_assets_v1';
 const THEME_PACKAGE_IMPORTED_EVENT = 'lumostime:theme-package-imported';
@@ -44,11 +44,6 @@ export interface LocalThemePackageAssets {
   fontId?: string;
 }
 
-export interface ThemePackageImportOptions {
-  allowSameVersionOverwrite?: boolean;
-  allowDowngrade?: boolean;
-}
-
 export interface ThemePackageImportResult {
   record: ImportedThemePackageRecord;
   localAssets: LocalThemePackageAssets;
@@ -56,8 +51,7 @@ export interface ThemePackageImportResult {
 }
 
 export type ThemePackageImportErrorCode =
-  | 'SAME_VERSION_EXISTS'
-  | 'DOWNGRADE_NOT_ALLOWED'
+  | 'DUPLICATE_NAME'
   | 'FONT_IMPORT_FAILED'
   | 'PERSISTENCE_FAILED';
 
@@ -241,6 +235,26 @@ const removePackageDerivedState = (record: ImportedThemePackageRecord): void => 
   };
   removeNamespacedObjectKeys('lumostime_achievement_bottle_custom_icon_packs_v1', prefix);
 
+  if (localStorage.getItem(THEME_KEYS.CURRENT_PRESET) === `package:${record.id}`) {
+    localStorage.setItem(THEME_KEYS.CURRENT_PRESET, 'default');
+  }
+  const defaultStickerPage = localStorage.getItem('lumostime_default_selector_page') || '';
+  if (defaultStickerPage.startsWith(`${prefix}sticker-set-`)) {
+    localStorage.setItem('lumostime_default_selector_page', 'emoji');
+  }
+  try {
+    const selector = JSON.parse(localStorage.getItem('lumostime_sticker_selector_config') || '{"enabled":false,"groups":[]}');
+    if (selector && Array.isArray(selector.groups)) {
+      const groups = selector.groups.map((group: Record<string, unknown>) => ({
+        ...group,
+        sourceSetIds: Array.isArray(group.sourceSetIds)
+          ? group.sourceSetIds.filter((id: unknown) => typeof id === 'string' && !id.startsWith(`${prefix}sticker-set-`))
+          : []
+      })).filter((group: Record<string, unknown>) => Array.isArray(group.sourceSetIds) && group.sourceSetIds.length > 0);
+      localStorage.setItem('lumostime_sticker_selector_config', JSON.stringify({ enabled: selector.enabled === true && groups.length > 0, groups }));
+    }
+  } catch { /* Preserve malformed user data for manual recovery. */ }
+
   const currentTimePal = localStorage.getItem(TIMEPAL_KEYS.TYPE) || '';
   if (currentTimePal.includes(prefix)) localStorage.setItem(TIMEPAL_KEYS.TYPE, 'none');
 };
@@ -254,7 +268,7 @@ export const themePackageImportService = {
     return readLocalThemePackageAssets().find((item) => item.packageId === packageId);
   },
 
-  async deletePackage(packageId: string, protectedImageFilenames: string[] = []): Promise<boolean> {
+  async deletePackage(packageId: string): Promise<boolean> {
     const packages = readImportedThemePackages();
     const record = packages.find((item) => item.id === packageId);
     if (!record) return false;
@@ -268,31 +282,14 @@ export const themePackageImportService = {
     writeLocalThemePackageAssets(localAssets.filter((item) => item.packageId !== packageId));
     removePackageDerivedState(record);
 
-    const otherFontIds = new Set([
-      ...readImportedThemePackages().map((item) => readLocalThemePackageAssets().find((asset) => asset.packageId === item.id)?.fontId),
-      ...(() => {
-        try {
-          const presets = JSON.parse(localStorage.getItem(THEME_KEYS.CUSTOM_PRESETS) || '[]');
-          return Array.isArray(presets)
-            ? presets.map((preset) => preset?.snapshot?.storage?.lumostime_font_family)
-            : [];
-        } catch { return []; }
-      })()
-    ].filter((fontId): fontId is string => typeof fontId === 'string'));
     const currentFontId = localStorage.getItem('lumostime_font_family');
-    if (deletedLocalAssets?.fontId && deletedLocalAssets.fontId !== currentFontId && !otherFontIds.has(deletedLocalAssets.fontId)) {
+    if (deletedLocalAssets?.fontId) {
+      if (deletedLocalAssets.fontId === currentFontId) fontService.setFont('default');
       await fontService.removeCustomFont(deletedLocalAssets.fontId).catch(() => undefined);
     }
 
-    const settingsReferences = getSettingsReferencedImages();
-    const contentReferences = new Set(imageService.getReferencedImageManifest().content);
-    protectedImageFilenames.forEach((filename) => {
-      settingsReferences.add(filename);
-      settingsReferences.add(`thumb_${filename}`);
-    });
     const filenames = Array.from(new Set(Object.values(record.imageAssets)));
     for (const filename of filenames) {
-      if (settingsReferences.has(filename) || contentReferences.has(filename)) continue;
       await imageService.deleteImage(filename).catch(() => undefined);
     }
 
@@ -300,30 +297,28 @@ export const themePackageImportService = {
       window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
         detail: { packageId, deleted: true }
       }));
+      window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
+      window.dispatchEvent(new Event('stickerSetsChanged'));
+      window.dispatchEvent(new Event('imageListChanged'));
+      window.dispatchEvent(new Event('timepal-custom-changed'));
     }
     return true;
   },
 
-  async importPackage(
-    source: Blob | File,
-    options: ThemePackageImportOptions = {}
-  ): Promise<ThemePackageImportResult> {
+  async importPackage(source: Blob | File): Promise<ThemePackageImportResult> {
     const parsedPackage = await parseThemePackage(source);
     const { manifest, assets } = parsedPackage;
     const existingPackages = readImportedThemePackages();
     const existingRecord = existingPackages.find((record) => record.id === manifest.package.id);
+    const conflictingName = existingPackages.find((record) => (
+      record.id !== manifest.package.id
+      && record.name.trim().toLocaleLowerCase() === manifest.package.name.trim().toLocaleLowerCase()
+    ));
+    if (conflictingName) {
+      throw new ThemePackageImportError('DUPLICATE_NAME', `已有同名主题「${conflictingName.name}」，请使用原主题包 ID 覆盖它`);
+    }
     const existingLocalAssets = readLocalThemePackageAssets();
     const existingLocalRecord = existingLocalAssets.find((record) => record.packageId === manifest.package.id);
-
-    if (existingRecord) {
-      const comparison = compareThemePackageVersions(manifest.package.version, existingRecord.version);
-      if (comparison === 0 && !options.allowSameVersionOverwrite) {
-        throw new ThemePackageImportError('SAME_VERSION_EXISTS', '相同版本的主题已经导入');
-      }
-      if (comparison < 0 && !options.allowDowngrade) {
-        throw new ThemePackageImportError('DOWNGRADE_NOT_ALLOWED', '导入版本低于已安装版本');
-      }
-    }
 
     const previousPackagesRaw = localStorage.getItem(THEME_KEYS.IMPORTED_THEME_PACKAGES);
     const previousLocalAssetsRaw = localStorage.getItem(LOCAL_THEME_PACKAGE_ASSETS_KEY);
@@ -375,7 +370,7 @@ export const themePackageImportService = {
       const localRecord: LocalThemePackageAssets = {
         packageId: manifest.package.id,
         version: manifest.package.version,
-        fontId: importedFontId ?? (manifest.config.font === undefined ? existingLocalRecord?.fontId : undefined)
+        fontId: importedFontId
       };
 
       const nextPackages = [
@@ -392,7 +387,17 @@ export const themePackageImportService = {
       }
       writeLocalThemePackageAssets(nextLocalAssets);
 
+      if (existingRecord) {
+        removePackageDerivedState(existingRecord);
+        for (const filename of new Set(Object.values(existingRecord.imageAssets))) {
+          await imageService.deleteImage(filename).catch(() => undefined);
+        }
+      }
+
       if (existingLocalRecord?.fontId && existingLocalRecord.fontId !== localRecord.fontId) {
+        if (localStorage.getItem('lumostime_font_family') === existingLocalRecord.fontId) {
+          fontService.setFont('default');
+        }
         await fontService.removeCustomFont(existingLocalRecord.fontId).catch(() => undefined);
       }
 
@@ -400,6 +405,11 @@ export const themePackageImportService = {
         window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
           detail: { packageId: record.id, version: record.version }
         }));
+        if (existingRecord) {
+          window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
+          window.dispatchEvent(new Event('stickerSetsChanged'));
+          window.dispatchEvent(new Event('imageListChanged'));
+        }
       }
 
       return {

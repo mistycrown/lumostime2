@@ -14,7 +14,8 @@
 import JSZip from 'jszip';
 
 export const THEME_PACKAGE_FORMAT = 'lumostime-theme-package';
-export const SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION = 1;
+export const SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION = 2;
+const LEGACY_THEME_PACKAGE_SCHEMA_VERSION = 1;
 
 const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
@@ -22,6 +23,9 @@ const SAFE_ASSET_PATH_PATTERN = /^assets\/[A-Za-z0-9._/-]+$/;
 const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_ASSET_BYTES = 30 * 1024 * 1024;
 const MAX_TOTAL_ASSET_BYTES = 200 * 1024 * 1024;
+const BUILTIN_ACHIEVEMENT_BOTTLE_ICON_PACKS = new Set([
+  'star1', 'flower1', 'sea', 'coin', 'candy', 'leaf', 'paper', 'planet', 'stone'
+]);
 const ALLOWED_ASSET_EXTENSIONS = new Set([
   'bmp',
   'gif',
@@ -64,6 +68,8 @@ export interface ThemePackageManifest {
   schemaVersion: number;
   package: ThemePackageMetadata;
   config: Record<string, unknown>;
+  resources?: Record<string, unknown>;
+  apply?: Record<string, unknown>;
 }
 
 export interface ParsedThemePackage {
@@ -131,6 +137,119 @@ const collectAssetReferences = (value: unknown, path = 'config', references = ne
   return references;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const findById = (resources: unknown, id: unknown): Record<string, unknown> | undefined => (
+  Array.isArray(resources) && typeof id === 'string'
+    ? resources.find((item) => isRecord(item) && item.id === id) as Record<string, unknown> | undefined
+    : undefined
+);
+
+const adaptResourcesAndApply = (
+  resources: Record<string, unknown>,
+  apply: Record<string, unknown>
+): Record<string, unknown> => {
+  const config: Record<string, unknown> = {};
+  const applyRecord = (key: string): Record<string, unknown> => isRecord(apply[key]) ? apply[key] as Record<string, unknown> : {};
+  const selected = (key: string, collection: unknown, idKey = 'resourceId'): Record<string, unknown> | undefined =>
+    findById(collection, applyRecord(key)[idKey]);
+  const requireSelection = (key: string, collection: unknown, idKey: string, path: string): void => {
+    const id = applyRecord(key)[idKey];
+    if (id !== undefined && !findById(collection, id)) {
+      throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path} 引用了不存在的资源 ID：${String(id)}`, path);
+    }
+  };
+
+  requireSelection('background', resources.backgrounds, 'resourceId', 'apply.background.resourceId');
+  requireSelection('uiIcon', resources.uiIcons, 'resourceId', 'apply.uiIcon.resourceId');
+  requireSelection('navigation', resources.navigationBackgrounds, 'backgroundId', 'apply.navigation.backgroundId');
+  requireSelection('navigation', resources.navigationIcons, 'iconsId', 'apply.navigation.iconsId');
+  requireSelection('navigation', resources.navigationDecorations, 'decorationResourceId', 'apply.navigation.decorationResourceId');
+  requireSelection('font', resources.fonts, 'resourceId', 'apply.font.resourceId');
+  const bottlePackId = applyRecord('achievementBottle').iconPackId;
+  if (bottlePackId !== undefined && !findById(resources.achievementBottleIconPacks, bottlePackId)
+    && !(typeof bottlePackId === 'string' && BUILTIN_ACHIEVEMENT_BOTTLE_ICON_PACKS.has(bottlePackId))) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      `apply.achievementBottle.iconPackId 引用了不存在的资源 ID：${String(bottlePackId)}`,
+      'apply.achievementBottle.iconPackId'
+    );
+  }
+  requireSelection('memoirCalendar', resources.memoirCalendarBackgrounds, 'backgroundId', 'apply.memoirCalendar.backgroundId');
+
+  const background = selected('background', resources.backgrounds);
+  if (background || Object.prototype.hasOwnProperty.call(apply, 'background')) {
+    config.background = { ...(background || {}), ...applyRecord('background') };
+    delete (config.background as Record<string, unknown>).resourceId;
+  }
+  for (const key of ['color', 'timeline'] as const) {
+    if (Object.prototype.hasOwnProperty.call(apply, key)) config[key] = apply[key];
+  }
+
+  const uiIcon = applyRecord('uiIcon');
+  if (uiIcon.source === 'builtin') config.uiIcon = uiIcon;
+  else {
+    const resource = selected('uiIcon', resources.uiIcons);
+    if (resource) config.uiIcon = { ...resource, themeId: resource.themeId || resource.id, source: 'asset' };
+  }
+
+  const navigationApply = applyRecord('navigation');
+  if (Object.keys(navigationApply).length) {
+    const navigation: Record<string, unknown> = { mode: navigationApply.mode };
+    const navBackground = findById(resources.navigationBackgrounds, navigationApply.backgroundId);
+    if (navBackground) navigation.background = navBackground;
+    const navIcons = findById(resources.navigationIcons, navigationApply.iconsId);
+    if (navIcons) navigation.icons = navIcons;
+    if (navigationApply.decorationId) navigation.decorationId = navigationApply.decorationId;
+    const decoration = findById(resources.navigationDecorations, navigationApply.decorationResourceId);
+    if (decoration) navigation.decoration = { ...decoration, source: 'asset' };
+    config.navigation = navigation;
+  }
+
+  const stickerResources = Array.isArray(resources.stickers) ? resources.stickers : [];
+  if (stickerResources.length || Object.prototype.hasOwnProperty.call(apply, 'stickers')) {
+    const stickerApply = applyRecord('stickers');
+    config.stickers = stickerResources;
+    config.stickerSelector = {
+      defaultPage: stickerApply.defaultPage,
+      enabled: stickerApply.enabled,
+      groups: stickerApply.groups
+    };
+  }
+
+  const timePalResources = Array.isArray(resources.timePal) ? resources.timePal : [];
+  const timePalApply = applyRecord('timePal');
+  if (timePalResources.length || Object.keys(timePalApply).length) {
+    config.timePal = { ...timePalApply, items: timePalResources };
+  }
+
+  const fontApply = applyRecord('font');
+  if (fontApply.source === 'builtin') config.font = fontApply;
+  else {
+    const font = findById(resources.fonts, fontApply.resourceId);
+    if (font) config.font = { ...font, source: 'asset', fontId: font.id };
+  }
+
+  const bottleApply = applyRecord('achievementBottle');
+  const bottlePack = findById(resources.achievementBottleIconPacks, bottleApply.iconPackId);
+  if (Object.keys(bottleApply).length || bottlePack) {
+    config.achievementBottle = {
+      ...(bottlePack ? { iconPack: { ...bottlePack, source: 'asset' } } : {}),
+      ...(isRecord(bottleApply.style) ? { style: bottleApply.style } : {}),
+      ...(!bottlePack && typeof bottleApply.iconPackId === 'string' ? { iconPack: { id: bottleApply.iconPackId } } : {})
+    };
+  }
+
+  const memoirApply = applyRecord('memoirCalendar');
+  const memoirBackground = findById(resources.memoirCalendarBackgrounds, memoirApply.backgroundId);
+  if (memoirBackground || Object.keys(memoirApply).length) {
+    config.memoirCalendar = { background: memoirBackground || memoirApply };
+  }
+  return config;
+};
+
 const assertManifestShape = (value: unknown): ThemePackageManifest => {
   if (!value || typeof value !== 'object') {
     throw new ThemePackageValidationError('INVALID_MANIFEST_JSON', 'theme.json 必须是 JSON 对象');
@@ -141,7 +260,8 @@ const assertManifestShape = (value: unknown): ThemePackageManifest => {
     throw new ThemePackageValidationError('UNSUPPORTED_FORMAT', 'theme.json 的 format 不受支持', 'format');
   }
 
-  if (manifest.schemaVersion !== SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION) {
+  if (manifest.schemaVersion !== LEGACY_THEME_PACKAGE_SCHEMA_VERSION
+    && manifest.schemaVersion !== SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION) {
     throw new ThemePackageValidationError(
       'UNSUPPORTED_SCHEMA_VERSION',
       `不支持的主题包 schemaVersion：${String(manifest.schemaVersion)}`,
@@ -169,11 +289,21 @@ const assertManifestShape = (value: unknown): ThemePackageManifest => {
     );
   }
 
-  if (!manifest.config || typeof manifest.config !== 'object' || Array.isArray(manifest.config)) {
-    throw new ThemePackageValidationError('INVALID_CONFIGURATION', 'config 必须是对象', 'config');
+  if (manifest.schemaVersion === LEGACY_THEME_PACKAGE_SCHEMA_VERSION
+    && (!isRecord(manifest.config))) {
+    throw new ThemePackageValidationError('INVALID_CONFIGURATION', 'schemaVersion 1 的 config 必须是对象', 'config');
   }
 
-  return manifest as ThemePackageManifest;
+  if (manifest.schemaVersion === SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION
+    && (!isRecord(manifest.resources) || !isRecord(manifest.apply))) {
+    throw new ThemePackageValidationError('INVALID_CONFIGURATION', 'schemaVersion 2 必须同时包含 resources 和 apply 对象');
+  }
+
+  const normalized = manifest.schemaVersion === SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION
+    ? adaptResourcesAndApply(manifest.resources as Record<string, unknown>, manifest.apply as Record<string, unknown>)
+    : manifest.config as Record<string, unknown>;
+
+  return { ...manifest, config: normalized } as ThemePackageManifest;
 };
 
 const validateConfigurationInvariants = (manifest: ThemePackageManifest): void => {
@@ -276,6 +406,95 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
   }
 };
 
+const validateResourceCollections = (resources: Record<string, unknown>, apply: Record<string, unknown>): void => {
+  const collections = [
+    'backgrounds',
+    'uiIcons',
+    'stickers',
+    'navigationBackgrounds',
+    'navigationIcons',
+    'navigationDecorations',
+    'timePal',
+    'fonts',
+    'achievementBottleIconPacks',
+    'memoirCalendarBackgrounds'
+  ];
+  for (const key of collections) {
+    const value = resources[key];
+    if (value === undefined) continue;
+    if (!Array.isArray(value)) {
+      throw new ThemePackageValidationError('INVALID_CONFIGURATION', `resources.${key} 必须是数组`, `resources.${key}`);
+    }
+    const ids = new Set<string>();
+    value.forEach((item, index) => {
+      const path = `resources.${key}[${index}]`;
+      if (!isRecord(item) || typeof item.id !== 'string' || !item.id.trim()) {
+        throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path}.id 必须是非空字符串`, `${path}.id`);
+      }
+      if (ids.has(item.id)) {
+        throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path}.id 重复：${item.id}`, `${path}.id`);
+      }
+      ids.add(item.id);
+    });
+  }
+
+  const validateSelection = (section: string, idKey: string, collection: string): void => {
+    const config = apply[section];
+    if (!isRecord(config) || config[idKey] === undefined) return;
+    const id = config[idKey];
+    if (typeof id !== 'string' || !findById(resources[collection], id)) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        `apply.${section}.${idKey} 引用了不存在的资源 ID：${String(id)}`,
+        `apply.${section}.${idKey}`
+      );
+    }
+  };
+  validateSelection('background', 'resourceId', 'backgrounds');
+  validateSelection('uiIcon', 'resourceId', 'uiIcons');
+  validateSelection('navigation', 'backgroundId', 'navigationBackgrounds');
+  validateSelection('navigation', 'iconsId', 'navigationIcons');
+  validateSelection('navigation', 'decorationResourceId', 'navigationDecorations');
+  validateSelection('font', 'resourceId', 'fonts');
+  validateSelection('memoirCalendar', 'backgroundId', 'memoirCalendarBackgrounds');
+
+  const timePal = apply.timePal;
+  if (isRecord(timePal) && typeof timePal.selected === 'string'
+    && !findById(resources.timePal, timePal.selected)) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      `apply.timePal.selected 引用了不存在的资源 ID：${timePal.selected}`,
+      'apply.timePal.selected'
+    );
+  }
+  const stickers = apply.stickers;
+  if (isRecord(stickers)) {
+    const groups = Array.isArray(stickers.groups) ? stickers.groups : [];
+    groups.forEach((group, index) => {
+      if (!isRecord(group) || !Array.isArray(group.sourceSetIds)) return;
+      group.sourceSetIds.forEach((id, sourceIndex) => {
+        if (typeof id !== 'string' || !findById(resources.stickers, id)) {
+          throw new ThemePackageValidationError(
+            'INVALID_CONFIGURATION',
+            `apply.stickers.groups[${index}].sourceSetIds 引用了不存在的贴纸组 ID：${String(id)}`,
+            `apply.stickers.groups[${index}].sourceSetIds[${sourceIndex}]`
+          );
+        }
+      });
+    });
+    const defaultPage = stickers.defaultPage;
+    if (typeof defaultPage === 'string'
+      && !findById(resources.stickers, defaultPage)
+      && !groups.some((group) => isRecord(group) && group.id === defaultPage)) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        `apply.stickers.defaultPage 引用了不存在的贴纸组 ID：${defaultPage}`,
+        'apply.stickers.defaultPage'
+      );
+    }
+  }
+}
+
 export const parseThemePackage = async (source: Blob | File): Promise<ParsedThemePackage> => {
   if (source.size > MAX_PACKAGE_BYTES) {
     throw new ThemePackageValidationError('INVALID_ZIP', '主题压缩包不能超过 100 MB');
@@ -306,6 +525,9 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
   }
 
   validateConfigurationInvariants(manifest);
+  if (manifest.schemaVersion === SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION) {
+    validateResourceCollections(manifest.resources as Record<string, unknown>, manifest.apply as Record<string, unknown>);
+  }
 
   const assets = new Map<string, Blob>();
   let totalAssetBytes = 0;
@@ -345,7 +567,8 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
     assets.set(archivePath, blob);
   }
 
-  const references = collectAssetReferences(manifest.config);
+  const references = collectAssetReferences(manifest.resources || manifest.config, manifest.resources ? 'resources' : 'config');
+  collectAssetReferences(manifest.config, 'config', references);
   if (manifest.package.preview) {
     references.set(manifest.package.preview, 'package.preview');
   }
