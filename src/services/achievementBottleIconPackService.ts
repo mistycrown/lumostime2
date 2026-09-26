@@ -3,9 +3,11 @@
  * @description Shared achievement bottle icon-pack metadata used by settings persistence, sponsorship controls, and bottle rendering.
  *
  * @updated 2026-04-06: Replaced invalid public asset imports with generated public URL paths shared by settings and bottle rendering.
+ * @updated 2026-09-26: Added imported image-backed achievement-bottle icon packs.
  */
 
 import { resolveAssetPath } from '../utils/assetPath';
+import { imageService } from './imageService';
 
 export type AchievementBottleIconPack = string;
 
@@ -40,6 +42,46 @@ const FALLBACK_ICON_PACKS: AchievementBottleIconPack[] = [
   'planet',
   'stone'
 ];
+const CUSTOM_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
+export const ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY = CUSTOM_ICON_PACKS_KEY;
+export const ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT = 'achievement-bottle-icon-packs-changed';
+const customFramePaths: Record<string, string[]> = {};
+
+const readCustomIconPacks = (): Record<string, string[]> => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOM_ICON_PACKS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const hydrateCustomIconPacks = async (): Promise<void> => {
+  const stored = readCustomIconPacks();
+  for (const [packId, filenames] of Object.entries(stored)) {
+    const paths = await Promise.all(filenames.map((filename) => imageService.getImageUrl(filename).catch(() => '')));
+    customFramePaths[packId] = paths.filter(Boolean);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT));
+  }
+};
+
+void hydrateCustomIconPacks();
+
+export const registerCustomAchievementBottleIconPack = async (
+  packId: string,
+  filenames: string[]
+): Promise<void> => {
+  const stored = readCustomIconPacks();
+  stored[packId] = filenames;
+  localStorage.setItem(CUSTOM_ICON_PACKS_KEY, JSON.stringify(stored));
+  const paths = await Promise.all(filenames.map((filename) => imageService.getImageUrl(filename).catch(() => '')));
+  customFramePaths[packId] = paths.filter(Boolean);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(ACHIEVEMENT_BOTTLE_ICON_PACKS_CHANGED_EVENT));
+  }
+};
 
 const getAchievementBottleIconPackFrameFileName = (frameNumber: number): string => {
   return `${String(frameNumber).padStart(2, '0')}.webp`;
@@ -116,6 +158,10 @@ export const getAchievementBottleIconPackFramePaths = (
   packName: AchievementBottleIconPack,
   baseUri?: string
 ): string[] => {
+  if (customFramePaths[packName]) {
+    return customFramePaths[packName];
+  }
+
   const frameCount = ICON_PACK_FRAME_COUNTS[packName];
 
   if (!frameCount || frameCount < 1) {
@@ -143,7 +189,9 @@ export const ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS: AchievementBottleIconPackOpti
 export const isAchievementBottleIconPack = (
   value: string | null | undefined
 ): value is AchievementBottleIconPack => {
-  return ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS.some((option) => option.value === value);
+  if (!value) return false;
+  return ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS.some((option) => option.value === value)
+    || Object.prototype.hasOwnProperty.call(readCustomIconPacks(), value);
 };
 
 export const getAchievementBottleIconPackOption = (

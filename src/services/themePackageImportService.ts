@@ -5,6 +5,7 @@
  * @pos Service (Theme Package Import)
  * @description Imports validated theme package resources transactionally while keeping fonts local to the current device.
  * @updated 2026-09-26: Added transactional image and local-font persistence for versioned theme packages.
+ * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
  */
 
 import { THEME_KEYS, storage } from '../constants/storageKeys';
@@ -220,7 +221,7 @@ export const themePackageImportService = {
       const localRecord: LocalThemePackageAssets = {
         packageId: manifest.package.id,
         version: manifest.package.version,
-        fontId: importedFontId
+        fontId: importedFontId ?? (manifest.config.font === undefined ? existingLocalRecord?.fontId : undefined)
       };
 
       const nextPackages = [
@@ -237,7 +238,7 @@ export const themePackageImportService = {
       }
       writeLocalThemePackageAssets(nextLocalAssets);
 
-      if (existingLocalRecord?.fontId && existingLocalRecord.fontId !== importedFontId) {
+      if (existingLocalRecord?.fontId && existingLocalRecord.fontId !== localRecord.fontId) {
         await fontService.removeCustomFont(existingLocalRecord.fontId).catch(() => undefined);
       }
 
@@ -278,4 +279,3 @@ export const themePackageImportService = {
 
 export const THEME_PACKAGE_LOCAL_ASSETS_STORAGE_KEY = LOCAL_THEME_PACKAGE_ASSETS_KEY;
 export const THEME_PACKAGE_CHANGE_EVENT = THEME_PACKAGE_IMPORTED_EVENT;
-

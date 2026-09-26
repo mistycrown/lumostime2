@@ -1,0 +1,485 @@
+/**
+ * @file themePackageApplicationService.ts
+ * @input Imported theme package metadata, image filename mappings, and local-only font mappings
+ * @output Applied theme settings and refresh events across appearance services
+ * @pos Service (Theme Package Import)
+ * @description Applies validated imported package configuration to the existing theme-related persistence models.
+ * @updated 2026-09-26: Added package configuration application for appearance, stickers, TimePal, navigation, timeline, and Memoir.
+ * @updated 2026-09-26: Applies imported achievement-bottle image packs and fixes TimePal package replacement IDs.
+ */
+
+import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
+import { APPEARANCE_RESTORED_EVENT } from './appearanceBackupService';
+import { backgroundService } from './backgroundService';
+import { colorSchemeService } from './colorSchemeService';
+import { fontService } from './fontService';
+import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
+import { navigationBackgroundService } from './navigationBackgroundService';
+import { navigationIconService } from './navigationIconService';
+import { themePackageImportService, type ImportedThemePackageRecord } from './themePackageImportService';
+import { uiIconService } from './uiIconService';
+import { normalizeCustomStickerState } from './customStickerAssetService';
+import type { CustomStickerRecord, CustomStickerSetRecord } from '../types';
+import { CUSTOM_TIMEPAL_PREFIX } from '../constants/timePalConfig';
+import {
+  DEFAULT_TIMELINE_STYLE_CONFIGS,
+  isTimelineStyleTheme,
+  normalizeTimelineStyleConfigs,
+  type TimelineStyleConfig
+} from './timelineStyleService';
+import { registerCustomAchievementBottleIconPack } from './achievementBottleIconPackService';
+
+const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
+const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
+const CUSTOM_NAVIGATION_BACKGROUND_CURRENT_KEY = 'navigation_new_background';
+const CUSTOM_NAVIGATION_BACKGROUND_ENABLED_KEY = 'navigation_new_mode_enabled';
+const CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY = 'navigation_new_background_settings';
+const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
+const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
+const CUSTOM_MOOD_CALENDAR_KEY = 'mood_calendar_background_custom_list';
+const CUSTOM_MOOD_CALENDAR_CURRENT_KEY = 'mood_calendar_background';
+const CUSTOM_MOOD_CALENDAR_SETTINGS_KEY = 'mood_calendar_background_settings';
+const NAVIGATION_ICON_CUSTOM_KEY = 'navigation_icon_custom_list_v1';
+const NAVIGATION_ICON_SCHEMES_KEY = 'navigation_icon_schemes_v1';
+const NAVIGATION_ICON_SELECTION_KEY = 'navigation_icon_selection_v1';
+
+const readArray = <T>(key: string): T[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const readObject = <T extends object>(key: string, fallback: T): T => {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : fallback;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writeJson = (key: string, value: unknown): void => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+const getConfigObject = (record: ImportedThemePackageRecord, key: string): Record<string, unknown> | null => {
+  const value = record.manifest.config[key];
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+};
+
+const getAssetFilename = (record: ImportedThemePackageRecord, path: unknown): string | undefined => {
+  return typeof path === 'string' ? record.imageAssets[path] : undefined;
+};
+
+const getNamespacedId = (record: ImportedThemePackageRecord, suffix: string): string => (
+  `theme:${record.id}:${suffix}`
+);
+
+const applyBackground = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
+  const config = getConfigObject(record, 'background');
+  if (!config) return;
+
+  if (config.source === 'builtin' && typeof config.id === 'string') {
+    backgroundService.setCurrentBackground(config.id);
+    return;
+  }
+
+  const imageFilename = getAssetFilename(record, config.file);
+  if (!imageFilename) {
+    warnings.push('整体背景资源不存在');
+    return;
+  }
+
+  const id = getNamespacedId(record, 'background');
+  const backgrounds = readArray<Record<string, unknown>>(CUSTOM_BACKGROUND_KEY).filter((item) => item.id !== id);
+  backgrounds.push({
+    id,
+    name: record.name,
+    type: 'custom',
+    url: '',
+    thumbnail: '',
+    imageFilename
+  });
+  writeJson(CUSTOM_BACKGROUND_KEY, backgrounds);
+  backgroundService.setCurrentBackground(id);
+  await backgroundService.hydrateImageBackedCustomBackgrounds();
+  if (typeof config.opacity === 'number') {
+    localStorage.setItem('lumos_background_opacity', String(Math.min(1, Math.max(0, config.opacity))));
+  }
+};
+
+const applyNavigationBackground = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
+  const navigation = getConfigObject(record, 'navigation');
+  const config = navigation?.background;
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return;
+
+  const backgroundConfig = config as Record<string, unknown>;
+  if (backgroundConfig.source === 'builtin' && typeof backgroundConfig.id === 'string') {
+    navigationBackgroundService.setCurrentBackground(backgroundConfig.id);
+    return;
+  }
+
+  const imageFilename = getAssetFilename(record, backgroundConfig.file);
+  if (!imageFilename) {
+    warnings.push('新版导航栏背景资源不存在');
+    return;
+  }
+
+  const id = getNamespacedId(record, 'navigation-background');
+  const backgrounds = readArray<Record<string, unknown>>(CUSTOM_NAVIGATION_BACKGROUND_KEY).filter((item) => item.id !== id);
+  backgrounds.push({
+    id,
+    name: record.name,
+    type: 'custom',
+    url: '',
+    thumbnail: '',
+    imageFilename,
+    offsetY: '0px',
+    offsetX: '0px',
+    scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
+    opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
+  });
+  writeJson(CUSTOM_NAVIGATION_BACKGROUND_KEY, backgrounds);
+  localStorage.setItem(CUSTOM_NAVIGATION_BACKGROUND_CURRENT_KEY, id);
+  localStorage.setItem(CUSTOM_NAVIGATION_BACKGROUND_ENABLED_KEY, 'true');
+  writeJson(CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY, {
+    ...readObject<Record<string, unknown>>(CUSTOM_NAVIGATION_BACKGROUND_SETTINGS_KEY, {}),
+    [id]: {
+      offsetY: typeof backgroundConfig.offsetY === 'string' ? backgroundConfig.offsetY : '0px',
+      offsetX: typeof backgroundConfig.offsetX === 'string' ? backgroundConfig.offsetX : '0px',
+      scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
+      opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
+    }
+  });
+  await navigationBackgroundService.hydrateCustomBackgrounds();
+};
+
+const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
+  const navigation = getConfigObject(record, 'navigation');
+  const icons = navigation?.icons;
+  if (!icons || typeof icons !== 'object' || Array.isArray(icons)) return;
+
+  const files = (icons as Record<string, unknown>).files;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) return;
+
+  const customIcons = readArray<Record<string, unknown>>(NAVIGATION_ICON_CUSTOM_KEY)
+    .filter((item) => !String(item.id || '').startsWith(`theme:${record.id}:`));
+  const mapping: Record<string, string> = {};
+  const validSlots = new Set(navigationIconService.getSlots());
+
+  for (const [slot, path] of Object.entries(files as Record<string, unknown>)) {
+    if (!validSlots.has(slot as never)) {
+      warnings.push(`未知导航图标槽位：${slot}`);
+      continue;
+    }
+
+    const imageFilename = getAssetFilename(record, path);
+    if (!imageFilename) {
+      warnings.push(`导航图标资源不存在：${slot}`);
+      continue;
+    }
+
+    const iconId = getNamespacedId(record, `navigation-icon-${slot}`);
+    customIcons.push({
+      id: iconId,
+      name: `${record.name} · ${slot}`,
+      type: 'custom',
+      url: '',
+      imageFilename
+    });
+    mapping[slot] = iconId;
+  }
+
+  if (Object.keys(mapping).length === 0) return;
+
+  writeJson(NAVIGATION_ICON_CUSTOM_KEY, customIcons);
+  const schemes = readArray<Record<string, unknown>>(NAVIGATION_ICON_SCHEMES_KEY)
+    .filter((item) => item.id !== getNamespacedId(record, 'navigation-icons'));
+  schemes.push({
+    id: getNamespacedId(record, 'navigation-icons'),
+    name: record.name,
+    type: 'custom',
+    mapping
+  });
+  writeJson(NAVIGATION_ICON_SCHEMES_KEY, schemes);
+  writeJson(NAVIGATION_ICON_SELECTION_KEY, {
+    mode: 'custom',
+    schemeId: getNamespacedId(record, 'navigation-icons'),
+    customMapping: mapping,
+    showLabelWithIcon: navigationIconService.getSelection().showLabelWithIcon
+  });
+  await navigationIconService.hydrateCustomIcons();
+};
+
+const applyTimePal = (record: ImportedThemePackageRecord, warnings: string[]): void => {
+  const config = getConfigObject(record, 'timePal');
+  if (!config) return;
+
+  const items = Array.isArray(config.items) ? config.items : [];
+  const existingItems = storage.getJSON<Record<string, unknown>[]>(TIMEPAL_KEYS.CUSTOM_ITEMS, []) || [];
+  const nextItems = existingItems.filter((item) => !String(item.id || '').startsWith(`theme:${record.id}:timepal-`));
+
+  items.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    const candidate = item as Record<string, unknown>;
+    const stages = candidate.stages;
+    if (!stages || typeof stages !== 'object' || Array.isArray(stages)) return;
+
+    const stageFilenames = ['1', '2', '3', '4', '5'].map((stage) => getAssetFilename(record, (stages as Record<string, unknown>)[stage]));
+    if (stageFilenames.some((filename) => !filename)) {
+      warnings.push(`时间小友阶段资源不完整：${String(candidate.id || index)}`);
+      return;
+    }
+
+    nextItems.push({
+      id: getNamespacedId(record, `timepal-${String(candidate.id || index)}`),
+      name: typeof candidate.name === 'string' ? candidate.name : record.name,
+      stageFilenames,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+  });
+
+  storage.setJSON(TIMEPAL_KEYS.CUSTOM_ITEMS, nextItems);
+  if (typeof config.selected === 'string') {
+    const selectedId = getNamespacedId(record, `timepal-${config.selected}`);
+    if (nextItems.some((item) => item.id === selectedId)) {
+      storage.set(TIMEPAL_KEYS.TYPE, `${CUSTOM_TIMEPAL_PREFIX}${selectedId}`);
+    }
+  }
+  if (Array.isArray(config.thresholds)) {
+    storage.setJSON(TIMEPAL_KEYS.STAGE_THRESHOLDS, config.thresholds);
+  }
+};
+
+const applyStickers = (record: ImportedThemePackageRecord): void => {
+  const config = record.manifest.config.stickers;
+  if (!Array.isArray(config)) return;
+
+  const now = Date.now();
+  const current = normalizeCustomStickerState(
+    readArray<CustomStickerSetRecord>(CUSTOM_STICKER_SETS_KEY),
+    readArray<CustomStickerRecord>(CUSTOM_STICKERS_KEY)
+  );
+  const importedSetIds = new Set<string>();
+  const importedSets: CustomStickerSetRecord[] = [];
+  const importedStickers: CustomStickerRecord[] = [];
+
+  config.forEach((rawSet, setIndex) => {
+    if (!rawSet || typeof rawSet !== 'object') return;
+    const set = rawSet as Record<string, unknown>;
+    const setId = getNamespacedId(record, `sticker-set-${String(set.id || setIndex)}`);
+    importedSetIds.add(setId);
+
+    const items = Array.isArray(set.items) ? set.items : [];
+    const stickers = items.slice(0, 16).flatMap((rawItem, itemIndex) => {
+      if (!rawItem || typeof rawItem !== 'object') return [];
+      const item = rawItem as Record<string, unknown>;
+      const imageFilename = getAssetFilename(record, item.file);
+      if (!imageFilename) return [];
+
+      return [{
+        id: getNamespacedId(record, `sticker-${String(set.id || setIndex)}-${String(item.id || itemIndex)}`),
+        setId,
+        imageFilename,
+        thumbnailFilename: `thumb_${imageFilename}`,
+        label: typeof item.name === 'string' ? item.name : undefined,
+        sortOrder: itemIndex,
+        status: 'active' as const,
+        createdAt: now,
+        updatedAt: now
+      }];
+    });
+
+    importedSets.push({
+      id: setId,
+      name: typeof set.name === 'string' ? set.name : record.name,
+      description: undefined,
+      stickerIds: stickers.map((item) => item.id),
+      status: 'active',
+      createdAt: now,
+      updatedAt: now
+    });
+    importedStickers.push(...stickers);
+  });
+
+  const otherSets = current.customStickerSets.filter((set) => !importedSetIds.has(set.id));
+  const otherStickers = current.customStickers.filter((sticker) => !importedSetIds.has(sticker.setId));
+  const next = normalizeCustomStickerState(
+    [...otherSets, ...importedSets],
+    [...otherStickers, ...importedStickers]
+  );
+  storage.setJSON(CUSTOM_STICKER_SETS_KEY, next.customStickerSets);
+  storage.setJSON(CUSTOM_STICKERS_KEY, next.customStickers);
+};
+
+const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
+  const memoir = getConfigObject(record, 'memoirCalendar');
+  const background = memoir?.background;
+  if (!background || typeof background !== 'object' || Array.isArray(background)) return;
+
+  const config = background as Record<string, unknown>;
+  const fiveWeekFilename = getAssetFilename(record, config.fiveWeek);
+  const sixWeekFilename = getAssetFilename(record, config.sixWeek);
+  if (!fiveWeekFilename || !sixWeekFilename) {
+    warnings.push('Memoir 背景资源不完整');
+    return;
+  }
+
+  const id = getNamespacedId(record, 'memoir-calendar');
+  const backgrounds = readArray<Record<string, unknown>>(CUSTOM_MOOD_CALENDAR_KEY).filter((item) => item.id !== id);
+  backgrounds.push({
+    id,
+    name: record.name,
+    type: 'custom',
+    url: '',
+    thumbnail: '',
+    sixWeekUrl: '',
+    sixWeekThumbnail: '',
+    imageFilename: fiveWeekFilename,
+    sixWeekImageFilename: sixWeekFilename,
+    ...(config.settings && typeof config.settings === 'object' ? config.settings : {})
+  });
+  writeJson(CUSTOM_MOOD_CALENDAR_KEY, backgrounds);
+  localStorage.setItem(CUSTOM_MOOD_CALENDAR_CURRENT_KEY, id);
+  await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+};
+
+const applySettings = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
+  const color = getConfigObject(record, 'color');
+  if (typeof color?.schemeId === 'string') {
+    localStorage.setItem(THEME_KEYS.COLOR_SCHEME, color.schemeId);
+    colorSchemeService.setScheme(color.schemeId as never);
+  }
+
+  const uiIcon = getConfigObject(record, 'uiIcon');
+  if (uiIcon?.source === 'builtin' && typeof uiIcon.themeId === 'string') {
+    localStorage.setItem(THEME_KEYS.UI_ICON_THEME, uiIcon.themeId);
+    uiIconService.setTheme(uiIcon.themeId as never);
+  } else if (uiIcon?.source === 'asset') {
+    const files = uiIcon.files;
+    const themeId = typeof uiIcon.themeId === 'string' ? uiIcon.themeId : record.id;
+    if (!files || typeof files !== 'object' || Array.isArray(files)) {
+      warnings.push('主题包自定义 UIIcon 缺少 files 配置');
+    } else {
+      const mapping: Record<string, string> = {};
+      Object.entries(files as Record<string, unknown>).forEach(([iconType, path]) => {
+        const imageFilename = getAssetFilename(record, path);
+        if (imageFilename) {
+          mapping[iconType] = imageFilename;
+        }
+      });
+      if (Object.keys(mapping).length === 0) {
+        warnings.push('主题包自定义 UIIcon 没有可用图标资源');
+      } else {
+        await uiIconService.registerCustomThemeAssets(themeId, mapping);
+        localStorage.setItem(THEME_KEYS.UI_ICON_THEME, themeId);
+        uiIconService.setTheme(themeId as never);
+      }
+    }
+  }
+
+  const font = getConfigObject(record, 'font');
+  if (font?.source === 'builtin' && typeof font.fontId === 'string') {
+    fontService.setFont(font.fontId);
+  } else if (font?.source === 'asset') {
+    const localFontId = themePackageImportService.getLocalAssets(record.id)?.fontId;
+    if (localFontId) {
+      fontService.setFont(localFontId);
+    } else {
+      warnings.push('当前设备未找到主题字体，已保留默认字体');
+    }
+  }
+
+  const achievementBottle = getConfigObject(record, 'achievementBottle');
+  if (achievementBottle) {
+    const style = achievementBottle.style;
+    const iconPack = achievementBottle.iconPack;
+    if (style && typeof style === 'object' && !Array.isArray(style) && typeof (style as Record<string, unknown>).id === 'string') {
+      localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, String((style as Record<string, unknown>).id));
+    }
+    if (iconPack && typeof iconPack === 'object' && !Array.isArray(iconPack)) {
+      const iconPackConfig = iconPack as Record<string, unknown>;
+      if (iconPackConfig.source === 'asset' && Array.isArray(iconPackConfig.frames)) {
+        const filenames = iconPackConfig.frames
+          .map((path) => getAssetFilename(record, path))
+          .filter((filename): filename is string => Boolean(filename));
+        if (filenames.length > 0) {
+          const packId = getNamespacedId(record, `achievement-bottle-${String(iconPackConfig.id || 'custom')}`);
+          await registerCustomAchievementBottleIconPack(packId, filenames);
+          localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, packId);
+        } else {
+          warnings.push('成就瓶图标包没有可用图片');
+        }
+      } else if (typeof iconPackConfig.id === 'string') {
+        localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, iconPackConfig.id);
+      }
+    }
+  }
+
+  const timeline = getConfigObject(record, 'timeline');
+  if (timeline) {
+    if (typeof timeline.themeId === 'string' && isTimelineStyleTheme(timeline.themeId)) {
+      localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, timeline.themeId);
+    }
+    const themeId = typeof timeline.themeId === 'string' && isTimelineStyleTheme(timeline.themeId)
+      ? timeline.themeId
+      : 'default';
+    const defaults = DEFAULT_TIMELINE_STYLE_CONFIGS[themeId];
+    const rawConfig = timeline.config && typeof timeline.config === 'object' && !Array.isArray(timeline.config)
+      ? timeline.config as Partial<TimelineStyleConfig>
+      : {};
+    const configs = normalizeTimelineStyleConfigs({
+      ...readObject<Record<string, unknown>>(THEME_KEYS.TIMELINE_STYLE_CONFIGS, {}),
+      [themeId]: { ...defaults, ...rawConfig }
+    });
+    localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(configs));
+  }
+};
+
+export interface ThemePackageApplicationResult {
+  warnings: string[];
+  appliedSections: string[];
+}
+
+export const applyImportedThemePackage = async (
+  record: ImportedThemePackageRecord
+): Promise<ThemePackageApplicationResult> => {
+  const warnings: string[] = [];
+  const appliedSections: string[] = [];
+
+  const sectionTasks: Array<[string, () => Promise<void>]> = [
+    ['background', () => applyBackground(record, warnings)],
+    ['navigation', () => applyNavigationBackground(record, warnings)],
+    ['navigation-icons', () => applyNavigationIcons(record, warnings)],
+    ['timePal', async () => applyTimePal(record, warnings)],
+    ['stickers', async () => applyStickers(record)],
+    ['memoirCalendar', () => applyMemoirCalendar(record, warnings)],
+    ['settings', async () => applySettings(record, warnings)]
+  ];
+
+  for (const [section, task] of sectionTasks) {
+    if (record.manifest.config[section] === undefined) continue;
+    await task();
+    appliedSections.push(section);
+  }
+
+  await new Promise<void>((resolve) => {
+    queueMicrotask(resolve);
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
+    window.dispatchEvent(new Event('timepal-custom-changed'));
+    window.dispatchEvent(new Event('timepal-type-changed'));
+    window.dispatchEvent(new Event('timepal-stage-thresholds-changed'));
+    window.dispatchEvent(new Event('stickerSetsChanged'));
+    window.dispatchEvent(new Event('imageListChanged'));
+  }
+
+  return { warnings, appliedSections };
+};

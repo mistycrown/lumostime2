@@ -13,6 +13,7 @@
  * @updated 2026-09-25: Registers custom sticker uploads in the theme image manifest group.
  * @updated 2026-09-25: Added direct ZIP import for folder-based custom sticker groups.
  * @updated 2026-09-26: Added Memoir mood-calendar background management to personalization.
+ * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and version overwrite confirmation.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload } from 'lucide-react';
@@ -51,6 +52,12 @@ import { StickerSetEditModal } from '../components/StickerSetEditModal';
 import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { parseCustomStickerZip } from '../services/customStickerZipService';
+import {
+    themePackageImportService,
+    ThemePackageImportError
+} from '../services/themePackageImportService';
+import { applyImportedThemePackage } from '../services/themePackageApplicationService';
+import { THEME_PACKAGE_CHANGE_EVENT } from '../services/themePackageImportService';
 import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
 import {
@@ -339,7 +346,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
     const [isClearCodeConfirmOpen, setIsClearCodeConfirmOpen] = useState(false);
     const [isImportingStickerZip, setIsImportingStickerZip] = useState(false);
+    const [isImportingThemePackage, setIsImportingThemePackage] = useState(false);
+    const [pendingThemePackage, setPendingThemePackage] = useState<File | null>(null);
+    const [importedThemePackages, setImportedThemePackages] = useState(() => themePackageImportService.getImportedPackages());
     const stickerZipInputRef = useRef<HTMLInputElement>(null);
+    const themePackageInputRef = useRef<HTMLInputElement>(null);
 
     // 用户统计数据
     const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -558,6 +569,15 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         loadCurrentIcon();
     }, []);
 
+    useEffect(() => {
+        const refreshImportedThemePackages = () => {
+            setImportedThemePackages(themePackageImportService.getImportedPackages());
+        };
+
+        window.addEventListener(THEME_PACKAGE_CHANGE_EVENT, refreshImportedThemePackages);
+        return () => window.removeEventListener(THEME_PACKAGE_CHANGE_EVENT, refreshImportedThemePackages);
+    }, []);
+
     // 加载用户统计数据
     const loadUserStats = async () => {
         try {
@@ -686,6 +706,80 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         }));
         if (editingSelectorGroupId === groupId) {
             closeSelectorGroupEditor();
+        }
+    };
+
+    const handleThemePackageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const packageFile = event.target.files?.[0];
+        event.target.value = '';
+
+        if (!packageFile) {
+            return;
+        }
+
+        setPendingThemePackage(packageFile);
+    };
+
+    const importThemePackage = async (packageFile: File, applyAfterImport: boolean) => {
+        setPendingThemePackage(null);
+        setIsImportingThemePackage(true);
+        try {
+            let result;
+            try {
+                result = await themePackageImportService.importPackage(packageFile);
+            } catch (error) {
+                if (!(error instanceof ThemePackageImportError)) throw error;
+                const canOverride = error.code === 'SAME_VERSION_EXISTS' || error.code === 'DOWNGRADE_NOT_ALLOWED';
+                if (!canOverride || !window.confirm(`${error.message}。仍要覆盖吗？`)) throw error;
+                result = await themePackageImportService.importPackage(packageFile, {
+                    allowSameVersionOverwrite: true,
+                    allowDowngrade: error.code === 'DOWNGRADE_NOT_ALLOWED'
+                });
+            }
+            setImportedThemePackages(themePackageImportService.getImportedPackages());
+            if (applyAfterImport) {
+                const application = await applyImportedThemePackage(result.record);
+                setCurrentPresetId(result.record.id);
+                localStorage.setItem('lumostime_current_preset', result.record.id);
+                const warningText = application.warnings.length > 0
+                    ? `（${application.warnings.join('；')}）`
+                    : '';
+                onToast(
+                    application.warnings.length > 0 ? 'info' : 'success',
+                    `主题「${result.record.name}」已导入并应用${warningText}`
+                );
+            } else {
+                onToast('success', `主题「${result.record.name}」已导入`);
+            }
+        } catch (error) {
+            if (error instanceof ThemePackageImportError) {
+                onToast('error', error.message);
+            } else {
+                console.error('[SponsorshipView] 导入主题包失败:', error);
+                onToast('error', error instanceof Error ? error.message : '主题包导入失败，请检查压缩包格式');
+            }
+        } finally {
+            setIsImportingThemePackage(false);
+        }
+    };
+
+    const applyImportedTheme = async (packageId: string) => {
+        const record = importedThemePackages.find((item) => item.id === packageId);
+        if (!record) return;
+
+        try {
+            const application = await applyImportedThemePackage(record);
+            setCurrentPresetId(record.id);
+            localStorage.setItem('lumostime_current_preset', record.id);
+            onToast(
+                application.warnings.length > 0 ? 'info' : 'success',
+                application.warnings.length > 0
+                    ? `主题「${record.name}」已应用（${application.warnings.join('；')}）`
+                    : `主题「${record.name}」已应用`
+            );
+        } catch (error) {
+            console.error('[SponsorshipView] 应用已导入主题失败:', error);
+            onToast('error', '应用主题失败，请重试');
         }
     };
 
@@ -1266,6 +1360,49 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             {activeTab === 'preset' && (
                                 /* 方案预设 */
                                 <div className="space-y-3">
+                                    <div className="rounded-2xl border border-dashed border-stone-200 bg-white p-4">
+                                        <input
+                                            ref={themePackageInputRef}
+                                            type="file"
+                                            accept=".zip,application/zip,application/x-zip-compressed"
+                                            className="hidden"
+                                            onChange={handleThemePackageChange}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => themePackageInputRef.current?.click()}
+                                            disabled={isImportingThemePackage}
+                                            className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-100 disabled:cursor-wait disabled:opacity-60"
+                                        >
+                                            <span className="inline-flex items-center gap-2">
+                                                <Upload size={16} />
+                                                {isImportingThemePackage ? '主题包导入中…' : '导入主题压缩包'}
+                                            </span>
+                                        </button>
+                                        {importedThemePackages.length > 0 && (
+                                            <div className="mt-3 space-y-2">
+                                                {importedThemePackages.map((record) => (
+                                                    <button
+                                                        key={`${record.id}:${record.version}`}
+                                                        type="button"
+                                                        onClick={() => void applyImportedTheme(record.id)}
+                                                        className={`flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors ${
+                                                            currentPresetId === record.id
+                                                                ? 'border-stone-300 bg-stone-100'
+                                                                : 'border-stone-100 bg-white hover:bg-stone-50'
+                                                        }`}
+                                                    >
+                                                        <span className="min-w-0">
+                                                            <span className="block truncate text-sm font-medium text-stone-700">{record.name}</span>
+                                                            <span className="block text-[11px] text-stone-400">v{record.version}</span>
+                                                        </span>
+                                                        {currentPresetId === record.id && <Check size={15} className="shrink-0 text-stone-700" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
                                     {allPresets.map((preset) => {
                                         const isSelected = currentPresetId === preset.id;
                                         const isCustom = preset.isCustom === true;
@@ -1967,6 +2104,40 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 onDelete={handleDeletePreset}
                 onToast={onToast}
             />
+
+            {pendingThemePackage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
+                    <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                        <div className="mb-4">
+                            <h3 className="text-base font-semibold text-stone-800">导入主题</h3>
+                            <p className="mt-1 break-all text-sm text-stone-500">{pendingThemePackage.name}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setPendingThemePackage(null)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-600"
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void importThemePackage(pendingThemePackage, false)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700"
+                            >
+                                仅导入
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void importThemePackage(pendingThemePackage, true)}
+                                className="flex-1 rounded-md bg-stone-800 px-3 py-2 text-sm text-white"
+                            >
+                                导入并应用
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
