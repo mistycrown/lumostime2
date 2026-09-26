@@ -12,6 +12,7 @@
  * @updated 2026-09-25: Added the opt-in merged-group sticker selector settings and management UI.
  * @updated 2026-09-25: Registers custom sticker uploads in the theme image manifest group.
  * @updated 2026-09-25: Added direct ZIP import for folder-based custom sticker groups.
+ * @updated 2026-09-26: Added Memoir mood-calendar background management to personalization.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload } from 'lucide-react';
@@ -21,6 +22,7 @@ import { RedemptionService } from '../services/redemptionService';
 import { IconPreview } from '../components/IconPreview';
 import { BackgroundSelector } from '../components/BackgroundSelector';
 import { NavigationBackgroundSelector } from '../components/NavigationBackgroundSelector';
+import { MoodCalendarBackgroundSelector } from '../components/MoodCalendarBackgroundSelector';
 import { TimelineStyleSelector } from '../components/TimelineStyleSelector';
 import { ScheduleStyleSelector } from '../components/ScheduleStyleSelector';
 import { ColorSchemeSelector } from '../components/ColorSchemeSelector';
@@ -1786,6 +1788,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'navigation' && (
                                 /* 导航栏样式 */
+                                <>
                                 <NavigationBackgroundSelector
                                     onToast={onToast}
                                     onOpenDebugger={() => {
@@ -1796,6 +1799,19 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         }, 0);
                                     }}
                                 />
+                                <div className="mt-6 border-t border-stone-200 pt-5">
+                                    <MoodCalendarBackgroundSelector
+                                        onToast={onToast}
+                                        onOpenDebugger={() => {
+                                            onBack();
+                                            setIsSettingsOpen(false);
+                                            window.setTimeout(() => {
+                                                (window as any).LumosTime?.debug?.enableMoodCalendarBackground?.();
+                                            }, 0);
+                                        }}
+                                    />
+                                </div>
+                                </>
                             )}
 
                             {activeTab === 'timepal' && (

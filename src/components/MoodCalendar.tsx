@@ -2,12 +2,21 @@
  * @file MoodCalendar.tsx
  * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
+ * @updated 2026-09-26: Added an overflow-visible, week-mapped custom background layer and tuning preview events.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
 import { IconRenderer } from './IconRenderer';
 import { MoodPickerModal } from './MoodPicker';
 import { useSettings } from '../contexts/SettingsContext';
+import {
+    getMoodCalendarMappedScale,
+    moodCalendarBackgroundService,
+    MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
+    MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT,
+    type MoodCalendarBackgroundSettings
+} from '../services/moodCalendarBackgroundService';
+import { MoodCalendarBackgroundDebugger } from './MoodCalendarBackgroundDebugger';
 
 interface MoodCalendarProps {
     year: number;
@@ -32,7 +41,40 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 }) => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
+    const [backgroundId, setBackgroundId] = useState(() => moodCalendarBackgroundService.getCurrentBackground());
+    const [backgroundSettings, setBackgroundSettings] = useState<MoodCalendarBackgroundSettings>(() => (
+        moodCalendarBackgroundService.getBackgroundById(moodCalendarBackgroundService.getCurrentBackground()) || {}
+    ));
+    const [previewWeeks, setPreviewWeeks] = useState<number | null>(null);
+    const [isBackgroundDebuggerOpen, setIsBackgroundDebuggerOpen] = useState(false);
     const { uiIconTheme } = useSettings();
+
+    useEffect(() => {
+        const updateBackground = (event?: Event) => {
+            const eventId = (event as CustomEvent<{ backgroundId?: string }> | undefined)?.detail?.backgroundId;
+            const nextId = eventId || moodCalendarBackgroundService.getCurrentBackground();
+            setBackgroundId(nextId);
+            setBackgroundSettings(moodCalendarBackgroundService.getBackgroundById(nextId) || {});
+        };
+        const handlePreview = (event: Event) => {
+            const detail = (event as CustomEvent<{ id: string; settings: MoodCalendarBackgroundSettings; previewWeeks?: number }>).detail;
+            if (detail.id !== moodCalendarBackgroundService.getCurrentBackground()) return;
+            setBackgroundId(detail.id);
+            setBackgroundSettings(detail.settings);
+            setPreviewWeeks(detail.previewWeeks || null);
+        };
+        window.addEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, updateBackground);
+        window.addEventListener(MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT, handlePreview);
+        const debug = (window as any).LumosTime?.debug || ((window as any).LumosTime = { ...(window as any).LumosTime, debug: {} }).debug;
+        debug.enableMoodCalendarBackground = () => setIsBackgroundDebuggerOpen(true);
+        debug.disableMoodCalendarBackground = () => setIsBackgroundDebuggerOpen(false);
+        return () => {
+            window.removeEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, updateBackground);
+            window.removeEventListener(MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT, handlePreview);
+            delete debug.enableMoodCalendarBackground;
+            delete debug.disableMoodCalendarBackground;
+        };
+    }, []);
 
     // 获取当前的 accent color - 不再需要
     // useEffect(() => {
@@ -89,8 +131,17 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
             days.push(day);
         }
 
+        while (days.length % 7 !== 0) days.push(null);
         return days;
     }, [year, month]);
+
+    const calendarWeekCount = Math.ceil(calendarData.length / 7);
+    const activeWeekCount = previewWeeks || calendarWeekCount;
+    const selectedBackground = moodCalendarBackgroundService.getBackgroundById(backgroundId);
+    const hasCalendarBackground = Boolean(selectedBackground?.url);
+    const mappedScale = getMoodCalendarMappedScale(backgroundSettings, activeWeekCount);
+    const backgroundOffsetX = Number(backgroundSettings.offsetX?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
+    const backgroundOffsetY = Number(backgroundSettings.offsetY?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
 
     // 获取指定日期的心情 emoji/贴纸
     const getMoodForDate = (day: number): string | undefined => {
@@ -131,9 +182,24 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className="memoir-mood-calendar bg-stone-50 shadow-sm p-6 rounded-2xl mb-6">
+            <div className={`memoir-mood-calendar relative isolate ${hasCalendarBackground ? 'has-custom-background bg-transparent' : 'bg-stone-50'} shadow-sm p-6 rounded-2xl mb-6`}>
+                {hasCalendarBackground && (
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
+                        <img
+                            src={selectedBackground?.url}
+                            alt=""
+                            className="absolute left-1/2 top-1/2 max-w-none"
+                            style={{
+                                width: `${Math.max(30, mappedScale * 100)}%`,
+                                height: 'auto',
+                                opacity: backgroundSettings.opacity ?? 1,
+                                transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px))`
+                            }}
+                        />
+                    </div>
+                )}
                 {/* Weekday Headers */}
-                <div className="grid grid-cols-7 mb-4">
+                <div className="relative z-10 grid grid-cols-7 mb-4">
                     {WEEK_DAYS.map((day, i) => (
                         <div key={i} className="memoir-calendar-weekday text-center text-sm text-stone-400 font-light">
                             {day}
@@ -142,7 +208,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                 </div>
 
                 {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-2">
+                <div className="relative z-10 grid grid-cols-7 gap-2">
                     {calendarData.map((day, index) => {
                         if (day === null) {
                             return (
@@ -188,6 +254,17 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                     })}
                 </div>
             </div>
+
+            {isBackgroundDebuggerOpen && (
+                <MoodCalendarBackgroundDebugger
+                    backgroundId={backgroundId}
+                    onClose={() => {
+                        setIsBackgroundDebuggerOpen(false);
+                        setPreviewWeeks(null);
+                        setBackgroundSettings(moodCalendarBackgroundService.getBackgroundById(backgroundId) || {});
+                    }}
+                />
+            )}
 
             {/* Mood Picker Modal */}
             <MoodPickerModal
