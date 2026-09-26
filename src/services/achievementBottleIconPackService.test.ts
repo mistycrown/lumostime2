@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { imageService } from './imageService';
 import {
   ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS,
   DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
@@ -8,6 +9,25 @@ import {
 } from './achievementBottleIconPackService';
 
 const ELECTRON_BASE_URI = 'file:///E:/lumostime/resources/app.asar/dist/index.html';
+
+const localStorageData = new Map<string, string>();
+
+beforeEach(() => {
+  localStorageData.clear();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => localStorageData.get(key) || null,
+      setItem: (key: string, value: string) => localStorageData.set(key, value),
+      removeItem: (key: string) => localStorageData.delete(key)
+    }
+  });
+  vi.spyOn(imageService, 'getImageUrl').mockResolvedValue('blob:custom-frame');
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('achievementBottleIconPackService', () => {
   it('builds stable public URLs for each icon pack frame', () => {
@@ -57,5 +77,21 @@ describe('achievementBottleIconPackService', () => {
   it('keeps the default pack first and uses the first frame as preview', () => {
     expect(ACHIEVEMENT_BOTTLE_ICON_PACK_OPTIONS[0]?.value).toBe(DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
     expect(getAchievementBottleIconPackOption('stone').previewImageSrc).toContain('/stars/stone/01.webp');
+  });
+
+  it('registers named custom packs and removes them without affecting bundled packs', async () => {
+    const { removeCustomAchievementBottleIconPack, registerCustomAchievementBottleIconPack } = await import('./achievementBottleIconPackService');
+
+    await registerCustomAchievementBottleIconPack('custom-comet', ['comet-1.webp', 'comet-2.png'], 'Comet Pack');
+
+    expect(getAchievementBottleIconPackOption('custom-comet')).toMatchObject({
+      label: 'Comet Pack',
+      previewImageSrc: 'blob:custom-frame'
+    });
+    expect(getAchievementBottleIconPackFramePaths('custom-comet')).toEqual(['blob:custom-frame', 'blob:custom-frame']);
+    expect(localStorageData.get('lumostime_achievement_bottle_custom_icon_packs_v1')).toContain('Comet Pack');
+    expect(removeCustomAchievementBottleIconPack('custom-comet')).toBe(true);
+    expect(removeCustomAchievementBottleIconPack('star1')).toBe(false);
+    expect(getAchievementBottleIconPackFramePaths('custom-comet')).toEqual([]);
   });
 });

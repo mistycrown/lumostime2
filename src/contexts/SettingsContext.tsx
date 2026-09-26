@@ -928,6 +928,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, achievementBottleIconPack);
+        window.dispatchEvent(new Event('achievement-bottle-icon-pack-selection-changed'));
     }, [achievementBottleIconPack]);
 
     useEffect(() => {

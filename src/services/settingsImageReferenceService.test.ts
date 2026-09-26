@@ -114,4 +114,31 @@ describe('getSettingsReferencedImages', () => {
       'thumb_theme-sticker.webp'
     ]);
   });
+
+  it('keeps named custom achievement icon-pack images and thumbnails protected', () => {
+    localStorage.setItem('lumostime_achievement_bottle_custom_icon_packs_v1', JSON.stringify({
+      'custom-comet': {
+        name: 'Comet Pack',
+        filenames: ['frame-1.png', 'frame-2.webp']
+      }
+    }));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'frame-1.png',
+      'frame-2.webp',
+      'thumb_frame-1.png',
+      'thumb_frame-2.webp'
+    ]);
+  });
+
+  it('continues to read legacy achievement icon-pack filename arrays', () => {
+    localStorage.setItem('lumostime_achievement_bottle_custom_icon_packs_v1', JSON.stringify({
+      legacy: ['legacy-frame.png']
+    }));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'legacy-frame.png',
+      'thumb_legacy-frame.png'
+    ]);
+  });
 });

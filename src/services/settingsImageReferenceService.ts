@@ -169,7 +169,12 @@ export const getSettingsReferencedImages = (): Set<string> => {
     });
   });
 
-  Object.values(customAchievementIconPacks).forEach((filenames) => {
+  Object.values(customAchievementIconPacks).forEach((pack) => {
+    const filenames = Array.isArray(pack)
+      ? pack
+      : pack && typeof pack === 'object' && Array.isArray((pack as { filenames?: unknown }).filenames)
+        ? (pack as { filenames: unknown[] }).filenames
+        : [];
     if (!Array.isArray(filenames)) return;
     filenames.forEach((filename) => {
       if (isValidFilename(filename)) {
