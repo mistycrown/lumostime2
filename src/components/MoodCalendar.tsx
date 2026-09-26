@@ -2,7 +2,7 @@
  * @file MoodCalendar.tsx
  * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
- * @updated 2026-09-26: Added an overflow-visible, week-mapped custom background layer and tuning preview events.
+ * @updated 2026-09-26: Added independent background width and week-mapped height rendering.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -10,7 +10,7 @@ import { IconRenderer } from './IconRenderer';
 import { MoodPickerModal } from './MoodPicker';
 import { useSettings } from '../contexts/SettingsContext';
 import {
-    getMoodCalendarMappedScale,
+    getMoodCalendarMappedHeightScale,
     moodCalendarBackgroundService,
     MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
     MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT,
@@ -139,7 +139,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     const activeWeekCount = previewWeeks || calendarWeekCount;
     const selectedBackground = moodCalendarBackgroundService.getBackgroundById(backgroundId);
     const hasCalendarBackground = Boolean(selectedBackground?.url);
-    const mappedScale = getMoodCalendarMappedScale(backgroundSettings, activeWeekCount);
+    const mappedHeightScale = getMoodCalendarMappedHeightScale(backgroundSettings, activeWeekCount);
+    const backgroundWidthScale = backgroundSettings.scale || 1;
     const backgroundOffsetX = Number(backgroundSettings.offsetX?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
     const backgroundOffsetY = Number(backgroundSettings.offsetY?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
 
@@ -182,7 +183,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className={`memoir-mood-calendar relative ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
+            <div className={`memoir-mood-calendar relative overflow-visible ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
                 {hasCalendarBackground && (
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
                         <img
@@ -190,8 +191,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                             alt=""
                             className="absolute left-1/2 top-1/2 max-w-none"
                             style={{
-                                width: `${Math.max(30, mappedScale * 100)}%`,
-                                height: 'auto',
+                                width: `${Math.max(10, backgroundWidthScale * 100)}%`,
+                                height: `${Math.max(10, mappedHeightScale * 100)}%`,
                                 opacity: backgroundSettings.opacity ?? 1,
                                 transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px))`
                             }}

@@ -1,11 +1,11 @@
 /**
  * @file moodCalendarBackgroundService.test.ts
  * @input Persisted mood-calendar background tuning settings
- * @output Regression coverage for five-week/six-week image scale mapping
+ * @output Regression coverage for independent width and five-week/six-week height mapping
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  getMoodCalendarMappedScale,
+  getMoodCalendarMappedHeightScale,
   moodCalendarBackgroundService
 } from './moodCalendarBackgroundService';
 
@@ -39,12 +39,14 @@ describe('mood calendar background persistence', () => {
     moodCalendarBackgroundService.saveCustomSettings('calendar-1', {
       offsetX: '12px',
       scale: 1.2,
+      heightScale: 1.05,
       weekScale: { fiveWeek: 1.1, sixWeek: 0.9 }
     });
 
     expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')).toMatchObject({
       offsetX: '12px',
       scale: 1.2,
+      heightScale: 1.05,
       weekScale: { fiveWeek: 1.1, sixWeek: 0.9 }
     });
   });
@@ -61,18 +63,18 @@ describe('mood calendar background persistence', () => {
   });
 });
 
-describe('getMoodCalendarMappedScale', () => {
+describe('getMoodCalendarMappedHeightScale', () => {
   it('uses the five-week mapping for five or fewer calendar rows', () => {
-    expect(getMoodCalendarMappedScale({ scale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 5)).toBeCloseTo(1.32);
-    expect(getMoodCalendarMappedScale({ scale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 4)).toBeCloseTo(1.32);
+    expect(getMoodCalendarMappedHeightScale({ heightScale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 5)).toBeCloseTo(1.32);
+    expect(getMoodCalendarMappedHeightScale({ heightScale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 4)).toBeCloseTo(1.32);
   });
 
   it('uses the six-week mapping for six-row months', () => {
-    expect(getMoodCalendarMappedScale({ scale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 6)).toBeCloseTo(1.032);
+    expect(getMoodCalendarMappedHeightScale({ heightScale: 1.2, weekScale: { fiveWeek: 1.1, sixWeek: 0.86 } }, 6)).toBeCloseTo(1.032);
   });
 
   it('uses stable default mappings when settings are missing', () => {
-    expect(getMoodCalendarMappedScale({}, 5)).toBeCloseTo(1.35);
-    expect(getMoodCalendarMappedScale({}, 6)).toBeCloseTo(1.161);
+    expect(getMoodCalendarMappedHeightScale({}, 5)).toBeCloseTo(1);
+    expect(getMoodCalendarMappedHeightScale({}, 6)).toBeCloseTo(1);
   });
 });
