@@ -34,6 +34,7 @@ interface StoredAIChatUserProfile {
 
 interface StoredImageAsset {
   imageFilename?: unknown;
+  sixWeekImageFilename?: unknown;
 }
 
 interface StoredCustomSticker {
@@ -100,6 +101,10 @@ export const getSettingsReferencedImages = (): Set<string> => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
       referencedImages.add(`thumb_${asset.imageFilename}`);
+    }
+    if (isValidFilename(asset?.sixWeekImageFilename)) {
+      referencedImages.add(asset.sixWeekImageFilename);
+      referencedImages.add(`thumb_${asset.sixWeekImageFilename}`);
     }
   });
 

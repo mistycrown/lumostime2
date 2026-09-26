@@ -10,7 +10,6 @@ import { IconRenderer } from './IconRenderer';
 import { MoodPickerModal } from './MoodPicker';
 import { useSettings } from '../contexts/SettingsContext';
 import {
-    getMoodCalendarMappedHeightScale,
     moodCalendarBackgroundService,
     MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
     MOOD_CALENDAR_BACKGROUND_PREVIEW_EVENT,
@@ -138,8 +137,10 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     const calendarWeekCount = Math.ceil(calendarData.length / 7);
     const activeWeekCount = previewWeeks || calendarWeekCount;
     const selectedBackground = moodCalendarBackgroundService.getBackgroundById(backgroundId);
-    const hasCalendarBackground = Boolean(selectedBackground?.url);
-    const mappedHeightScale = getMoodCalendarMappedHeightScale(backgroundSettings, activeWeekCount);
+    const selectedBackgroundUrl = activeWeekCount >= 6
+        ? (selectedBackground?.sixWeekUrl || selectedBackground?.url)
+        : selectedBackground?.url;
+    const hasCalendarBackground = Boolean(selectedBackgroundUrl);
     const backgroundWidthScale = backgroundSettings.scale || 1;
     const backgroundOffsetX = Number(backgroundSettings.offsetX?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
     const backgroundOffsetY = Number(backgroundSettings.offsetY?.match(/-?\d+(?:\.\d+)?/)?.[0] || 0);
@@ -187,12 +188,12 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                 {hasCalendarBackground && (
                     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-visible">
                         <img
-                            src={selectedBackground?.url}
+                            src={selectedBackgroundUrl}
                             alt=""
                             className="absolute left-1/2 top-1/2 max-w-none"
                             style={{
                                 width: `${Math.max(10, backgroundWidthScale * 100)}%`,
-                                height: `${Math.max(10, mappedHeightScale * 100)}%`,
+                                height: 'auto',
                                 opacity: backgroundSettings.opacity ?? 1,
                                 transform: `translate(calc(-50% + ${backgroundOffsetX}px), calc(-50% + ${backgroundOffsetY}px))`
                             }}
