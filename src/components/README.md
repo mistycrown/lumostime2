@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-26: `NavigationBackgroundSelector.tsx` keeps both navigation setting switches visible in dark mode with an outlined track, distinct enabled state, and light thumb.
+
 - Update 2026-09-20: `ActivityAttributeStatistics.tsx` presents tag-wide statistic cards, including tag duration, notes, and custom attribute sources.
 
 - Update 2026-09-21: `ActivityAttributeStatistics.tsx` accepts restricted sources so category details can reuse the same cards for category duration, notes, and second-level activity choices.
