@@ -6,6 +6,7 @@
  * @pos View (Main Tab)
  * @description The main landing page for the "Scopes" (Domains) feature. Displays a card list of all active scopes with summary statistics (Total Time, Monthly Time).
  * @updated 2026-08-09: Planned timeline blocks are excluded from scope overview statistics.
+ * @updated 2026-09-26: Removes the extra transparent-title-bar background mask from the scope index.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -184,7 +185,6 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
             className="relative isolate h-full bg-[#faf9f6] overflow-y-auto pb-24 no-scrollbar"
             id="scopes-content"
         >
-            <div aria-hidden="true" className="transparent-index-overlay pointer-events-none fixed inset-0 z-0" />
             {/* Scope Cards */}
             <div className="p-6 space-y-3">
                 {activeScopes.length === 0 ? (
