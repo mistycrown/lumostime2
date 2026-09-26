@@ -10,6 +10,7 @@
  * @updated 2026-08-26: Hides archived todo categories from the main list and scheduling presentation.
  * @updated 2026-07-21: Applied the shared calendar number typography to the single-column week view.
  * @updated 2026-09-12: Added explicit min-size constraints, contained touch scrolling, and an isolated schedule surface to prevent Android WebView edge clipping on Huawei P70-class devices.
+ * @updated 2026-09-25: Applies the custom background opacity to all schedule layouts while keeping the schedule surface lighter than Memoir.
  * @updated 2026-05-18: Hid pinned recurring todos from the mobile `今天 + Pin` section when today's occurrence is explicitly skipped, while still preserving pin-only rows and other explicit today matches.
  * @updated 2026-05-14: Added a persisted schedule lock toggle across the standard week, bento week, and month planners so schedule and deadline rows can be frozen against drag-to-move until explicitly unlocked.
  * @updated 2026-05-18: 支持点击周视图一列（标准周视图）下循环排期的 Repeat 标签以唤起快捷编辑栏。
@@ -1037,6 +1038,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const pageOverlayOpacity = hasBackground
     ? Math.min(0.64, Math.max(0.46, panelOverlayOpacity + 0.06))
     : 0.5;
+  const scheduleOverlayOpacity = hasBackground
+    ? Math.min(0.98, panelOverlayOpacity + 0.12)
+    : 0.92;
   const pageSurfaceColor = `rgba(250, 249, 246, ${pageOverlayOpacity})`;
   const panelLayerOpacity = hasBackground
     ? Math.max(0.18, panelOverlayOpacity - 0.08)
@@ -2309,7 +2313,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           />
         )}
 
-        <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: 'rgba(250, 249, 246, 0.92)' }}></div>
+        <div className="page-background-overlay absolute inset-0 -z-10" style={{ backgroundColor: `rgba(250, 249, 246, ${scheduleOverlayOpacity})` }}></div>
 
         <div className={`relative z-10 flex h-full min-h-0 min-w-0 flex-col pb-[calc(3rem+env(safe-area-inset-bottom))] pt-[var(--app-safe-area-top)] ${isWeekScheduleView ? 'px-4 md:px-8' : ''}`}>
           {isWeekScheduleView ? (
