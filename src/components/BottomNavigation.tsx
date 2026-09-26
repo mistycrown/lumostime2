@@ -20,6 +20,7 @@
  * @updated 2026-09-25: Moved new-mode tuning to the main screen, removed background tiling, and removed the opaque navigation surface.
  * @updated 2026-09-25: Added page-scoped transparent navigation styling with schedule-calendar exclusion for Todo.
  * @updated 2026-09-26: Added optional small labels below image navigation icons.
+ * @updated 2026-09-26: Restores the default navigation surface when the new navigation has no background selected.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -213,7 +214,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         || currentView === AppView.REVIEW
         || isIndexView(currentView);
     const shouldUseTransparentNavigation = isTransparentNavigation && supportsTransparentNavigation;
-    const bgColor = isNewNavigation || shouldUseTransparentNavigation
+    const hasNavigationBackground = isNewNavigation && Boolean(backgroundUrl);
+    const bgColor = hasNavigationBackground || shouldUseTransparentNavigation
         ? 'bg-transparent'
         : (currentView === AppView.TIMELINE || isIndexView(currentView))
             ? 'bg-[#faf9f6]/80 backdrop-blur-md'
@@ -256,7 +258,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 )}
 
                 {/* 导航栏 */}
-                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${isNewNavigation || shouldUseTransparentNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
+                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${hasNavigationBackground || shouldUseTransparentNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
                     {isNewNavigation && backgroundUrl && (
                         <div
                             aria-hidden="true"

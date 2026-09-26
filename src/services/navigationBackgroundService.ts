@@ -6,6 +6,7 @@
  * @description Keeps the new navigation-background mode isolated from the legacy foreground decoration mode.
  * @updated 2026-09-25: Registers uploaded navigation backgrounds in the theme image manifest group.
  * @updated 2026-09-25: Added a persisted transparent-navigation toggle for the supported primary pages.
+ * @updated 2026-09-26: Added a built-in no-background option that restores the default navigation surface.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -31,6 +32,12 @@ export const NAVIGATION_TRANSPARENCY_CHANGE_EVENT = 'navigationTransparencyChang
 
 class NavigationBackgroundService {
     private readonly builtIn: NavigationDecorationOption[] = [
+        {
+            id: 'new-none',
+            name: '无背景',
+            type: 'preset',
+            url: ''
+        },
         {
             id: 'new-default',
             name: '1',
