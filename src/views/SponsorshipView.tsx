@@ -15,6 +15,7 @@
  * @updated 2026-09-26: Added Memoir mood-calendar background management to personalization.
  * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and version overwrite confirmation.
  * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
+ * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -33,6 +34,7 @@ import { ChartPaletteSequenceManager } from '../components/ChartPaletteSequenceM
 import { AchievementBottleIconPackSelector } from '../components/achievement/AchievementBottleIconPackSelector';
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
+import { CardBackgroundSelector } from '../components/CardBackgroundSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { AppView, Category, CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
@@ -1927,6 +1929,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     <CalendarNumberStyleSelector />
                                     <TimelineStyleSelector onToast={onToast} />
                                     <ScheduleStyleSelector />
+                                    <CardBackgroundSelector onToast={onToast} />
                                 </div>
                             )}
                         </div>

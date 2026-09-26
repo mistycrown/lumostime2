@@ -4,6 +4,8 @@ Update 2026-09-20: `backgroundService.ts` now keeps custom background image byte
 
 Update 2026-09-22: `preferencesBackupService.ts` now snapshots user-facing preferences and Memoir filters for export/cloud restore while excluding sync-provider credentials; custom background and TimePal files continue to use the protected canonical image manifest.
 
+Update 2026-09-26: `cardBackgroundService.ts` stores selectable multi-image card-background groups, alignment, and opacity; appearance snapshots and protected theme image references keep the settings and files synchronized.
+
 Update 2026-09-21: `aiService.ts` now supplies the full user dictionary to dedicated quick-add todo/backfill requests, which select real todo-category, activity-category, activity, and scope ids instead of routing quick adds into the reserved 小事 bucket.
 
 Update 2026-09-21: `quickAddService.ts` now owns the independent quick-add todo, backfill, and append-only note request contracts/prompts; `aiService.ts` remains focused on shared AI configuration and general structured turns.

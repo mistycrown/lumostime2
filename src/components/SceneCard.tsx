@@ -5,8 +5,10 @@
  * @updated 2026-05-10: Split timer/todo back-side locking from manual flips so timeline-forced backs block swipe return without persisting that forced state.
  * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
  * @updated 2026-05-05: Added parent-driven flip synchronization so scene timer/todo cards can react to widget-started sessions.
+ * @updated 2026-09-26: Added synchronized image backgrounds to scene cards.
  */
 import React, { useState, useRef } from 'react';
+import { useCardBackground } from '../hooks/useCardBackground';
 import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
 import { SceneCardData, DailyReview, Log } from '../types';
 import { CardStatsBadge } from './CardStatsBadge';
@@ -41,6 +43,7 @@ interface SceneCardProps {
   onAction?: (action: SceneCardData['action'], autoEnterFocus?: boolean) => void;
   sceneCardTimerMode?: 'realtime' | 'backfill'; // 场景卡片计时模式
   forceBackSide?: boolean;
+  backgroundIndex?: number;
 }
 
 export const SceneCard: React.FC<SceneCardProps> = ({
@@ -49,8 +52,10 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   logs = [],
   onAction,
   sceneCardTimerMode = 'realtime',
-  forceBackSide = false
+  forceBackSide = false,
+  backgroundIndex = 0
 }) => {
+  const cardBackground = useCardBackground(backgroundIndex);
   // 获取卡片颜色（优先使用自定义颜色，否则使用默认颜色）
   const cardColor = data.color || DEFAULT_COLORS[data.type];
   const cardPresentation = getSceneCardColorPresentation(cardColor);
@@ -404,6 +409,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({
             data={data}
             displayData={displayData}
             cardPresentation={cardPresentation}
+            backgroundStyle={cardBackground.style}
+            hasBackground={cardBackground.active}
           />
         </div>
 
@@ -423,6 +430,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({
             swipeProgress={swipeOffset / maxSwipeDistance}
             isClickable={data.type === 'timer' || data.type === 'todo' || data.type === 'navigation'}
             swipeBackDisabled={swipeBackDisabled}
+            backgroundStyle={cardBackground.style}
+            hasBackground={cardBackground.active}
           />
         </div>
       </div>
@@ -435,7 +444,9 @@ const CardFront: React.FC<{
   data: SceneCardData;
   displayData: SceneCardData;
   cardPresentation: SceneCardColorPresentation;
-}> = ({ data, displayData, cardPresentation }) => {
+  backgroundStyle: React.CSSProperties;
+  hasBackground: boolean;
+}> = ({ data, displayData, cardPresentation, backgroundStyle, hasBackground }) => {
   // 根据文字长度获取字号
   const getFontSize = (text: string) => {
     const length = text.length;
@@ -470,8 +481,8 @@ const CardFront: React.FC<{
 
   return (
     <div 
-      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm relative"
-      style={getSceneCardSurfaceStyle(cardPresentation.frontBorderColor)}
+      className={`rounded-2xl p-4 ${hasBackground ? '' : 'bg-white/90'} backdrop-blur-sm relative`}
+      style={{ ...getSceneCardSurfaceStyle(cardPresentation.frontBorderColor), ...(hasBackground ? backgroundStyle : {}) }}
     >
       {/* 右上角状态指示 */}
       <div className="absolute top-4 right-4">
@@ -580,7 +591,9 @@ const CardBack: React.FC<{
   swipeProgress?: number;
   isClickable?: boolean;
   swipeBackDisabled?: boolean;
-}> = ({ data, displayData, cardPresentation, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false, swipeBackDisabled = false }) => {
+  backgroundStyle: React.CSSProperties;
+  hasBackground: boolean;
+}> = ({ data, displayData, cardPresentation, dailyReviews = [], logs = [], isSwiping, swipeProgress = 0, isClickable = false, swipeBackDisabled = false, backgroundStyle, hasBackground }) => {
   // 根据文字长度获取字号
   const getFontSize = (text: string) => {
     const length = text.length;
@@ -618,9 +631,10 @@ const CardBack: React.FC<{
 
   return (
     <div 
-      className="rounded-2xl p-4 bg-white/90 backdrop-blur-sm transition-opacity relative"
+      className={`rounded-2xl p-4 ${hasBackground ? '' : 'bg-white/90'} backdrop-blur-sm transition-opacity relative`}
       style={{ 
         ...getSceneCardSurfaceStyle(cardPresentation.backBorderColor),
+        ...(hasBackground ? backgroundStyle : {}),
         opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1,
         cursor: isClickable ? 'pointer' : 'default'
       }}

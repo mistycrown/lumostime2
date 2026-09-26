@@ -131,6 +131,19 @@ describe('getSettingsReferencedImages', () => {
     ]);
   });
 
+  it('keeps custom card-background group images and thumbnails', () => {
+    localStorage.setItem('lumostime_card_background_groups_v1', JSON.stringify([
+      { imageFilenames: ['card-background-1.webp', 'card-background-2.png'] }
+    ]));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'card-background-1.webp',
+      'card-background-2.png',
+      'thumb_card-background-1.webp',
+      'thumb_card-background-2.png'
+    ]);
+  });
+
   it('continues to read legacy achievement icon-pack filename arrays', () => {
     localStorage.setItem('lumostime_achievement_bottle_custom_icon_packs_v1', JSON.stringify({
       legacy: ['legacy-frame.png']
