@@ -73,6 +73,8 @@ class MoodCalendarBackgroundService {
             offsetY: '0px',
             offsetX: '0px',
             scale: 1.35,
+            // 5.png 的透明上下留白较多，默认提高纵向主体高度以覆盖五周日历。
+            heightScale: 1.2,
             opacity: 1
         }
     ];
