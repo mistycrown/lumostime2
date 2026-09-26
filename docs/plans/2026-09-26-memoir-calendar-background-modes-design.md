@@ -12,6 +12,7 @@ Add a single-image Fill mode for custom Memoir mood-calendar backgrounds while p
 - Keep Fill backgrounds and selection in separate persisted keys. Continue reading the existing background list and selection as Overflow data so existing users retain their setup.
 - Keep the calendar contents above either background. Clip only the Fill background layer to the frame.
 - Include Fill assets in appearance backup/restore and settings image-reference collection so sync and cleanup preserve them.
+- Default all unconfigured Overflow background widths to 100%. Normalize legacy auto-populated 135% values while preserving widths explicitly stored in per-background tuning settings.
 
 ## Verification
 

@@ -76,6 +76,20 @@ describe('mood calendar background persistence', () => {
     });
   });
 
+  it('defaults Overflow image widths to 100% and normalizes legacy defaults only', () => {
+    localStorage.setItem('mood_calendar_background_custom_list', JSON.stringify([
+      { id: 'legacy-default', name: 'Legacy default', type: 'custom', url: 'blob:legacy', scale: 1.35 },
+      { id: 'legacy-customized', name: 'Customized', type: 'custom', url: 'blob:custom', scale: 1.35 }
+    ]));
+    localStorage.setItem('mood_calendar_background_settings', JSON.stringify({
+      'legacy-customized': { scale: 1.6 }
+    }));
+
+    expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')?.scale).toBe(1);
+    expect(moodCalendarBackgroundService.getBackgroundById('legacy-default')?.scale).toBe(1);
+    expect(moodCalendarBackgroundService.getBackgroundById('legacy-customized')?.scale).toBe(1.6);
+  });
+
   it('exposes separate built-in assets for five-week and six-week calendars', () => {
     expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')).toMatchObject({
       url: expect.stringContaining('/calendar/tuzi/5.png'),
