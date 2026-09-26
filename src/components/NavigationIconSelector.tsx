@@ -6,7 +6,7 @@
  * @description Compact TimePal-style scheme selector with a separate editor modal.
  * @updated 2026-09-25: Reworked the page view into a compact multi-scheme selector.
  * @updated 2026-09-26: Added an opt-in switch for displaying small labels below image icons.
- * @updated 2026-09-26: Constrained icon scheme cards to a compact left-aligned wrapping layout.
+ * @updated 2026-09-26: Constrained icon scheme cards to a 96px left-aligned grid.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -220,11 +220,11 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                         <Plus size={14} /> 新增方案
                     </button>
                 </div>
-                <div className="flex flex-wrap items-start justify-start gap-2">
+                <div className="grid justify-start gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, 96px)' }}>
                     <button
                         type="button"
                         onClick={() => selectMode('text')}
-                        className={`relative flex w-full max-w-32 aspect-square flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'text' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                        className={`relative flex w-full max-w-24 justify-self-start aspect-square flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'text' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
                     >
                         <span className="flex aspect-square h-10 items-center justify-center font-serif text-lg">Aa</span><span>文字</span>
                         {selection.mode === 'text' && <Check size={13} className="absolute right-1.5 top-1.5" />}
@@ -232,7 +232,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                     <button
                         type="button"
                         onClick={() => selectMode('pink')}
-                        className={`relative flex w-full max-w-32 aspect-square flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
+                        className={`relative flex w-full max-w-24 justify-self-start aspect-square flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
                     >
                         {renderIcon(navigationIconService.getBuiltInIcons()[0], '粉色图标', 'aspect-square h-10 w-10 object-contain')}<span>粉色</span>
                         {selection.mode === 'pink' && <Check size={13} className="absolute right-1.5 top-1.5" />}
@@ -240,7 +240,7 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                     {schemes.map((scheme) => {
                         const isActive = selection.mode === 'custom' && selection.schemeId === scheme.id;
                         return (
-                            <div key={scheme.id} className={`relative flex w-full max-w-32 aspect-square items-center justify-center rounded-xl border px-2 transition-colors ${isActive ? 'border-stone-700 bg-stone-50' : 'border-stone-200 hover:border-stone-400'}`}>
+                            <div key={scheme.id} className={`relative flex w-full max-w-24 justify-self-start aspect-square items-center justify-center rounded-xl border px-2 transition-colors ${isActive ? 'border-stone-700 bg-stone-50' : 'border-stone-200 hover:border-stone-400'}`}>
                                 <button type="button" onClick={() => selectScheme(scheme.id)} className="flex min-w-0 flex-col items-center justify-center gap-1 text-xs text-stone-600">
                                     {renderIcon(getSchemePreview(scheme, customIcons), scheme.name, 'aspect-square h-10 w-10 object-contain')}
                                     <span className="max-w-full truncate">{scheme.name}</span>
