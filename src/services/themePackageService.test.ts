@@ -6,6 +6,7 @@
  * @description Verifies manifest validation, optional sections, required paired assets, and archive path safety.
  * @updated 2026-09-26: Added parser coverage for version-one theme packages.
  * @updated 2026-09-26: Added validation coverage for custom achievement-bottle frames.
+ * @updated 2026-09-26: Ensures empty template directory markers are ignored.
  */
 
 import JSZip from 'jszip';
@@ -109,5 +110,18 @@ describe('parseThemePackage', () => {
     zip.file('../escape.webp', 'escape');
 
     await expect(parseThemePackage(await zip.generateAsync({ type: 'blob' }))).rejects.toBeInstanceOf(ThemePackageValidationError);
+  });
+
+  it('ignores empty-directory markers from the editable template', async () => {
+    const zip = new JSZip();
+    zip.file('theme.json', JSON.stringify({
+      ...baseManifest,
+      package: { ...baseManifest.package, preview: undefined },
+      config: {}
+    }));
+    zip.file('assets/background/.gitkeep', '');
+
+    const result = await parseThemePackage(await zip.generateAsync({ type: 'blob' }));
+    expect(result.assets.size).toBe(0);
   });
 });

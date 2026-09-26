@@ -1,0 +1,12 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 1,
+  "package": {
+    "id": "my-theme",
+    "name": "我的主题",
+    "version": "1.0.0",
+    "author": "作者名称",
+    "description": "主题简介"
+  },
+  "config": {}
+}
