@@ -23,6 +23,7 @@
  * @updated 2026-09-26: Restores the default navigation surface when the new navigation has no background selected.
  * @updated 2026-09-26: Restores the original text navigation layout for the no-background selection.
  * @updated 2026-09-26: Keeps the no-background navigation surface solid white regardless of transparency settings.
+ * @updated 2026-09-26: Keeps title-bar transparency scoped to the top header, independent of legacy navigation surfaces.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -33,8 +34,7 @@ import {
     navigationBackgroundService,
     NAVIGATION_BACKGROUND_CHANGE_EVENT,
     NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
-    NAVIGATION_BACKGROUND_PREVIEW_EVENT,
-    NAVIGATION_TRANSPARENCY_CHANGE_EVENT
+    NAVIGATION_BACKGROUND_PREVIEW_EVENT
 } from '../services/navigationBackgroundService';
 import { getNavigationIconFallbackUrl, NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from '../services/navigationIconService';
 
@@ -76,7 +76,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const [showDebugger, setShowDebugger] = useState(false);
     const [showBackgroundDebugger, setShowBackgroundDebugger] = useState(false);
     const [isNewNavigation, setIsNewNavigation] = useState(() => navigationBackgroundService.isEnabled());
-    const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState(() => localStorage.getItem('todoScreenMode') === 'week');
     const [currentBackground, setCurrentBackground] = useState(() => navigationBackgroundService.getCurrentBackground());
     const [backgroundUrl, setBackgroundUrl] = useState('');
@@ -157,9 +156,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setShowDebugger(false);
             if (!event.detail.enabled) setShowBackgroundDebugger(false);
         };
-        const handleTransparencyChange = (event: CustomEvent<{ enabled: boolean }>) => {
-            setIsTransparentNavigation(event.detail.enabled);
-        };
         const handleTodoScheduleModeChange = (event: CustomEvent<{ isWeekMode?: boolean }>) => {
             setIsTodoScheduleMode(Boolean(event.detail?.isWeekMode));
         };
@@ -171,7 +167,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         window.addEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
         window.addEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
-        window.addEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange as EventListener);
         window.addEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
         window.addEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
 
@@ -193,7 +188,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             window.removeEventListener(NAVIGATION_BACKGROUND_CHANGE_EVENT, handleBackgroundChange as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_PREVIEW_EVENT, handleBackgroundPreview as EventListener);
             window.removeEventListener(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, handleModeChange as EventListener);
-            window.removeEventListener(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, handleTransparencyChange as EventListener);
             window.removeEventListener('todo-schedule-mode-changed', handleTodoScheduleModeChange as EventListener);
             window.removeEventListener(NAVIGATION_ICON_CHANGE_EVENT, handleIconChange);
             if ((window as any).LumosTime?.debug) {
@@ -211,19 +205,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     if (!isVisible) return null;
 
-    const supportsTransparentNavigation = currentView === AppView.RECORD
-        || (currentView === AppView.TODO && !isTodoScheduleMode)
-        || currentView === AppView.REVIEW
-        || isIndexView(currentView);
     const isNoBackgroundNavigation = isNewNavigation && currentBackground === 'new-none';
-    const shouldUseTransparentNavigation = !isNoBackgroundNavigation
-        && isTransparentNavigation
-        && supportsTransparentNavigation;
     const useNewNavigationStyle = isNewNavigation && currentBackground !== 'new-none';
     const hasNavigationBackground = useNewNavigationStyle && Boolean(backgroundUrl);
     const bgColor = isNoBackgroundNavigation
         ? 'bg-white'
-        : hasNavigationBackground || shouldUseTransparentNavigation
+        : hasNavigationBackground
             ? 'bg-transparent'
             : (currentView === AppView.TIMELINE || isIndexView(currentView))
                 ? 'bg-[#faf9f6]/80 backdrop-blur-md'
@@ -266,7 +253,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 )}
 
                 {/* 导航栏 */}
-                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${hasNavigationBackground || shouldUseTransparentNavigation ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
+                <nav className={`relative h-12 md:h-16 box-content flex justify-around items-center pb-[env(safe-area-inset-bottom)] ${hasNavigationBackground ? 'border-t border-transparent' : 'border-t border-stone-100'} ${bgColor}`}>
                     {useNewNavigationStyle && backgroundUrl && (
                         <div
                             aria-hidden="true"
