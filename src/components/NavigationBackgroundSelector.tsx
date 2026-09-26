@@ -8,6 +8,7 @@
  * @updated 2026-09-25: Added the opt-in transparent navigation toggle above the new navigation mode setting.
  * @updated 2026-09-26: Adds dedicated dark-mode styling hooks to keep navigation setting switches visible.
  * @updated 2026-09-26: Constrained new navigation background cards to a 96px left-aligned grid.
+ * @updated 2026-09-26: Added a no-background option that restores the default navigation surface.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
@@ -171,7 +172,11 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                                 onClick={() => handleSelect(background.id)}
                                 className={`relative w-full max-w-24 justify-self-start aspect-[2/1] overflow-hidden rounded-lg border-2 bg-stone-50 ${currentId === background.id ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}
                             >
-                                <img src={background.thumbnail || background.url} alt={background.name} className="h-full w-full object-cover" />
+                                {background.url ? (
+                                    <img src={background.thumbnail || background.url} alt={background.name} className="h-full w-full object-cover" />
+                                ) : (
+                                    <span className="flex h-full items-center justify-center text-xs text-stone-400">无背景</span>
+                                )}
                                 {currentId === background.id && (
                                     <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-stone-800 text-white shadow">
                                         <Check size={12} />
