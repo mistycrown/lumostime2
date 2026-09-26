@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Ignores .gitkeep directory markers used by the editable package template.
  * @updated 2026-09-26: Validates Memoir overflow/fill background mode and matching image shape.
  * @updated 2026-09-26: Validates explicit legacy/modern navigation modes for compatible theme packages.
+ * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
  */
 
 import JSZip from 'jszip';
@@ -258,7 +259,13 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
     const iconPack = (achievementBottle as { iconPack?: unknown }).iconPack;
     if (iconPack && typeof iconPack === 'object' && !Array.isArray(iconPack)) {
       const iconPackRecord = iconPack as Record<string, unknown>;
-      if (iconPackRecord.source === 'asset' && (!Array.isArray(iconPackRecord.frames) || iconPackRecord.frames.length === 0)) {
+      if (iconPackRecord.source === 'asset' && (
+        !Array.isArray(iconPackRecord.frames)
+        || iconPackRecord.frames.length === 0
+        || iconPackRecord.frames.some((frame) => (
+          typeof frame !== 'string' || !/^assets\/.+\.(png|webp)$/i.test(frame)
+        ))
+      )) {
         throw new ThemePackageValidationError(
           'INVALID_CONFIGURATION',
           '自定义成就瓶图标包必须至少包含一张图片',

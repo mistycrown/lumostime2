@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Ensures empty template directory markers are ignored.
  * @updated 2026-09-26: Covers single-image fill-mode backgrounds and mode/image mismatches.
  * @updated 2026-09-26: Covers explicit legacy-navigation theme package configuration.
+ * @updated 2026-09-26: Covers custom achievement-bottle icon-pack assets.
  */
 
 import JSZip from 'jszip';
@@ -160,6 +161,51 @@ describe('parseThemePackage', () => {
 
     await expect(parseThemePackage(await createZip(manifest, {
       'assets/preview.webp': 'preview'
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'config.achievementBottle.iconPack.frames'
+    });
+  });
+
+  it('accepts custom achievement-bottle frames referenced from package assets', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: {
+        achievementBottle: {
+          iconPack: {
+            source: 'asset',
+            id: 'test-bottle',
+            name: 'Test Bottle',
+            frames: ['assets/achievement-bottle/test-bottle/01.webp', 'assets/achievement-bottle/test-bottle/02.png']
+          }
+        }
+      }
+    };
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview',
+      'assets/achievement-bottle/test-bottle/01.webp': 'frame-1',
+      'assets/achievement-bottle/test-bottle/02.png': 'frame-2'
+    }));
+
+    expect(result.assets.has('assets/achievement-bottle/test-bottle/01.webp')).toBe(true);
+    expect(result.manifest.config.achievementBottle).toMatchObject({
+      iconPack: { source: 'asset', id: 'test-bottle', name: 'Test Bottle' }
+    });
+  });
+
+  it('rejects custom achievement-bottle frames that are not supported image paths', async () => {
+    const manifest = {
+      ...baseManifest,
+      config: {
+        achievementBottle: {
+          iconPack: { source: 'asset', id: 'test-bottle', frames: ['assets/achievement-bottle/test-bottle/frame.gif'] }
+        }
+      }
+    };
+
+    await expect(parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview',
+      'assets/achievement-bottle/test-bottle/frame.gif': 'frame'
     }))).rejects.toMatchObject({
       code: 'INVALID_CONFIGURATION',
       path: 'config.achievementBottle.iconPack.frames'

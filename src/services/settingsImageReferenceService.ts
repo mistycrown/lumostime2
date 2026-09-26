@@ -12,6 +12,7 @@
  * @updated 2026-09-26: Reads named custom icon-pack configuration while retaining legacy filename-array support.
  * @updated 2026-09-26: Protects single-image Memoir Fill backgrounds from cleanup and sync manifest rebuilds.
  * @updated 2026-09-26: Protects image assets retained by immutable saved theme snapshots.
+ * @updated 2026-09-26: Reads achievement icon-pack filenames without treating display names as assets.
  * @updated 2026-05-05: Added AI assistant persona and AI user avatar images to the protected settings reference set.
  * @updated 2026-08-10: Added custom background and navigation decoration image filenames to the protected settings reference set.
  */
@@ -234,25 +235,40 @@ export const getSettingsReferencedImages = (): Set<string> => {
         });
       });
 
-      [CUSTOM_UI_ICON_ASSETS_KEY, CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY].forEach((key) => {
-        let value: unknown;
-        try {
-          value = JSON.parse(snapshot[key] || 'null');
-        } catch {
-          return;
+      const collect = (candidate: unknown) => {
+        if (typeof candidate === 'string' && isValidFilename(candidate)) {
+          referencedImages.add(candidate);
+          referencedImages.add(`thumb_${candidate}`);
+        } else if (Array.isArray(candidate)) {
+          candidate.forEach(collect);
+        } else if (candidate && typeof candidate === 'object') {
+          Object.values(candidate).forEach(collect);
         }
-        const collect = (candidate: unknown) => {
-          if (typeof candidate === 'string' && isValidFilename(candidate)) {
-            referencedImages.add(candidate);
-            referencedImages.add(`thumb_${candidate}`);
-          } else if (Array.isArray(candidate)) {
-            candidate.forEach(collect);
-          } else if (candidate && typeof candidate === 'object') {
-            Object.values(candidate).forEach(collect);
-          }
-        };
-        collect(value);
-      });
+      };
+      let uiIconAssets: unknown;
+      try {
+        uiIconAssets = JSON.parse(snapshot[CUSTOM_UI_ICON_ASSETS_KEY] || 'null');
+      } catch {
+        uiIconAssets = null;
+      }
+      collect(uiIconAssets);
+
+      let achievementIconPacks: unknown;
+      try {
+        achievementIconPacks = JSON.parse(snapshot[CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY] || 'null');
+      } catch {
+        achievementIconPacks = null;
+      }
+      if (achievementIconPacks && typeof achievementIconPacks === 'object' && !Array.isArray(achievementIconPacks)) {
+        Object.values(achievementIconPacks).forEach((pack) => {
+          const filenames = Array.isArray(pack)
+            ? pack
+            : pack && typeof pack === 'object' && Array.isArray((pack as { filenames?: unknown }).filenames)
+              ? (pack as { filenames: unknown[] }).filenames
+              : [];
+          filenames.forEach(collect);
+        });
+      }
     });
   }
 
