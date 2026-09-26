@@ -51,6 +51,17 @@ describe('mood calendar background persistence', () => {
     expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('fill-custom');
   });
 
+  it('persists Fill image opacity per background', () => {
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
+      { id: 'fill-custom', name: 'Fill', type: 'custom', url: 'blob:fill', imageFilename: 'fill.png' }
+    ]));
+    moodCalendarBackgroundService.setMode('fill');
+
+    moodCalendarBackgroundService.saveCustomSettings('fill-custom', { opacity: 0.45 });
+
+    expect(moodCalendarBackgroundService.getBackgroundById('fill-custom')?.opacity).toBe(0.45);
+  });
+
   it('persists per-background tuning values', () => {
     moodCalendarBackgroundService.saveCustomSettings('calendar-1', {
       offsetX: '12px',
