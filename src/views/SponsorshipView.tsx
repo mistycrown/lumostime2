@@ -18,6 +18,7 @@
  * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
  * @updated 2026-09-27: Uses each theme's first UIIcon image as its scheme-card preview.
  * @updated 2026-09-27: Resolves imported UIIcon previews from archived assets and built-in theme IDs.
+ * @updated 2026-09-27: Moved Memoir mood-calendar background settings from navigation to the style tab.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -1938,7 +1939,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'navigation' && (
                                 /* 导航栏样式 */
-                                <>
                                 <NavigationBackgroundSelector
                                     onToast={onToast}
                                     onOpenDebugger={() => {
@@ -1949,29 +1949,6 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         }, 0);
                                     }}
                                 />
-                                <div className="mt-6 border-t border-stone-200 pt-5">
-                                    <MoodCalendarBackgroundSelector
-                                        onToast={onToast}
-                                        onOpenDebugger={() => {
-                                            onBack();
-                                            setIsJournalMode(true);
-                                            setCurrentView(AppView.REVIEW);
-                                            setIsSettingsOpen(false);
-                                            let attempts = 0;
-                                            const openDebugger = () => {
-                                                const open = (window as any).LumosTime?.debug?.enableMoodCalendarBackground;
-                                                if (typeof open === 'function') {
-                                                    open();
-                                                    return;
-                                                }
-                                                attempts += 1;
-                                                if (attempts < 90) window.requestAnimationFrame(openDebugger);
-                                            };
-                                            window.requestAnimationFrame(openDebugger);
-                                        }}
-                                    />
-                                </div>
-                                </>
                             )}
 
                             {activeTab === 'timepal' && (
@@ -1985,10 +1962,32 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             )}
 
                             {activeTab === 'style' && (
-                                <div className="pt-2 space-y-4">
+                                <div className="space-y-5 pt-2">
                                     <AchievementBottleIconPackSelector />
                                     <AchievementBottleStyleSelector />
                                     <CalendarNumberStyleSelector />
+                                    <div className="border-t border-stone-200 px-1 pt-5">
+                                        <MoodCalendarBackgroundSelector
+                                            onToast={onToast}
+                                            onOpenDebugger={() => {
+                                                onBack();
+                                                setIsJournalMode(true);
+                                                setCurrentView(AppView.REVIEW);
+                                                setIsSettingsOpen(false);
+                                                let attempts = 0;
+                                                const openDebugger = () => {
+                                                    const open = (window as any).LumosTime?.debug?.enableMoodCalendarBackground;
+                                                    if (typeof open === 'function') {
+                                                        open();
+                                                        return;
+                                                    }
+                                                    attempts += 1;
+                                                    if (attempts < 90) window.requestAnimationFrame(openDebugger);
+                                                };
+                                                window.requestAnimationFrame(openDebugger);
+                                            }}
+                                        />
+                                    </div>
                                     <TimelineStyleSelector onToast={onToast} />
                                     <ScheduleStyleSelector />
                                     <CardBackgroundSelector onToast={onToast} />
