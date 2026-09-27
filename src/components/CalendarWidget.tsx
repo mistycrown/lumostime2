@@ -7,6 +7,7 @@
  * @updated 2026-08-24: Allows timeline header menus to overflow the calendar container without clipping.
  * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
  * @updated 2026-09-27: Supports a non-interactive themed decoration layer for the timeline header and collapsed week card.
+ * @updated 2026-09-27: Aligns themed week cards to the calendar top and removes their lower divider.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -43,7 +44,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
-    const collapsedCalendarHeight = headerThemeConfig ? 85 : 75;
+    const collapsedCalendarHeight = headerThemeConfig ? 77 : 75;
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -133,7 +134,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     return (
         <div className={hideTopBar
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
-            : "relative bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
+            : `relative bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-200'} pt-[var(--app-safe-area-top)]`
         }>
             <TimelineHeaderDecorations theme={headerTheme} scope="header" />
 
@@ -212,7 +213,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={calendarAreaTransition}
-                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? `mx-2 mt-2 h-[77px] ${headerThemeConfig.collapsedCardClassName}` : 'h-[75px]'}`}
+                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? `mx-2 h-[77px] ${headerThemeConfig.collapsedCardClassName}` : 'h-[75px]'}`}
                         style={headerThemeConfig ? undefined : { width: '100%' }}
                     >
                         <TimelineHeaderDecorations theme={headerTheme} scope="week-card" />

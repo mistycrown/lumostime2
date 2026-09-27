@@ -5,6 +5,7 @@
  * @description Keeps timeline header artwork in declarative theme configuration so visual themes do not change calendar behavior.
  * @updated 2026-09-27: Added the configurable pink-notebook header decoration theme.
  * @updated 2026-09-27: Added persisted selection metadata for the timeline style settings entry.
+ * @updated 2026-09-27: Kept the week-card paw sticker within the animated calendar clipping boundary.
  */
 import React from 'react';
 
@@ -77,7 +78,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
       },
       {
         src: `${PINK_ASSET_ROOT}/06_large_corner_paw_sticker.png`,
-        className: 'absolute -bottom-2 -right-1 z-0 w-8 rotate-[-12deg]',
+        className: 'absolute bottom-1 right-1 z-0 w-8 rotate-[-12deg]',
         opacity: 0.92
       },
       {
