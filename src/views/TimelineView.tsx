@@ -33,6 +33,7 @@
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
  * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
+ * @updated 2026-09-27: Enabled the pink-notebook decoration theme for the timeline header trial.
  */
 import React, { useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1449,6 +1450,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     currentDate={currentDate}
                     onDateChange={handleCalendarDateChange}
                     logs={calendarLogs}
+                    headerTheme="pink-notebook"
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     galleryMode={timelineGalleryMode}
