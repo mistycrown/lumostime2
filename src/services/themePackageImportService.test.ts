@@ -109,14 +109,14 @@ describe('themePackageImportService', () => {
       .rejects.toBeInstanceOf(ThemePackageImportError);
   });
 
-  it('uses uiicon/01.webp as the preview when a package does not declare one', async () => {
+  it('finds uiicon/01.webp as the first UIIcon image for a theme card', async () => {
     vi.stubGlobal('localStorage', makeLocalStorage());
     saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
 
     const { themePackageImportService, getThemePackageUiIconPreviewFallbackFilename } = await import('./themePackageImportService');
     const { record } = await themePackageImportService.importPackage(await createUiIconPackage());
 
-    expect(record.previewImageFilename).toBe('image-first-icon.webp');
+    expect(record.previewImageFilename).toBeUndefined();
     expect(getThemePackageUiIconPreviewFallbackFilename(record)).toBe('image-first-icon.webp');
   });
 

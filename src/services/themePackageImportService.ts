@@ -7,7 +7,7 @@
  * @updated 2026-09-26: Added transactional image and local-font persistence for versioned theme packages.
  * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
  * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
- * @updated 2026-09-27: Falls back to the first packaged UI icon when a theme package omits its card preview.
+ * @updated 2026-09-27: Exposes the first packaged UI icon for theme-card previews.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -392,7 +392,6 @@ export const themePackageImportService = {
         importedAt: existingRecord?.importedAt || now,
         updatedAt: now
       };
-      record.previewImageFilename ||= getThemePackageUiIconPreviewFallbackFilename(record);
       const localRecord: LocalThemePackageAssets = {
         packageId: manifest.package.id,
         version: manifest.package.version,
