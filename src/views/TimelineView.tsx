@@ -37,6 +37,7 @@
  * @updated 2026-09-27: Uses theme-scoped date-strip scaling and sticker adjustments in the layered timeline header renderer.
  * @updated 2026-09-27: Stabilizes saved header-theme adjustments so debugger previews cannot cause an update loop.
  * @updated 2026-09-27: Passes the saved per-theme toolbar foreground color into the calendar header.
+ * @updated 2026-09-27: Passes all persisted header-layer size and opacity adjustments into the calendar renderer.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1485,7 +1486,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     logs={calendarLogs}
                     headerTheme={timelineHeaderTheme === 'none' ? undefined : timelineHeaderTheme}
                     headerStickerOffsets={activeTimelineHeaderThemeAdjustments?.stickerOffsets}
+                    headerStickerScales={activeTimelineHeaderThemeAdjustments?.stickerScales}
+                    headerStickerOpacities={activeTimelineHeaderThemeAdjustments?.stickerOpacities}
+                    headerTopBackgroundScale={activeTimelineHeaderThemeAdjustments?.topBackgroundScale}
+                    headerTopBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.topBackgroundOpacity}
                     headerDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.dateBackgroundScale}
+                    headerDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.dateBackgroundOpacity}
+                    headerSelectedDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundScale}
+                    headerSelectedDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundOpacity}
                     headerToolbarForegroundColor={activeTimelineHeaderThemeAdjustments?.toolbarForegroundColor}
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
