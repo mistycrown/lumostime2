@@ -34,6 +34,7 @@
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
  * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
  * @updated 2026-09-27: Adds a live, save-on-demand debugger for individual timeline header stickers.
+ * @updated 2026-09-27: Uses theme-scoped date-strip scaling and sticker adjustments in the layered timeline header renderer.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -69,7 +70,7 @@ import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
 import { TimelineHeaderDecorationDebugger } from '../components/TimelineHeaderDecorationDebugger';
-import type { TimelineHeaderStickerOffsets } from '../components/TimelineHeaderDecorations';
+import { getTimelineHeaderThemeAdjustments, type TimelineHeaderThemeAdjustments } from '../components/TimelineHeaderDecorations';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { TIMELINE_QUICK_ACTION_OPTIONS, type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
@@ -270,7 +271,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const timelineQuickActionsButtonRef = useRef<HTMLButtonElement | null>(null);
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
     const [showTimelineHeaderDecorationDebugger, setShowTimelineHeaderDecorationDebugger] = useState(false);
-    const [timelineHeaderStickerPreview, setTimelineHeaderStickerPreview] = useState<TimelineHeaderStickerOffsets | null>(null);
+    const [timelineHeaderThemePreview, setTimelineHeaderThemePreview] = useState<TimelineHeaderThemeAdjustments | null>(null);
     const {
         isGalleryViewOpen,
         setIsGalleryViewOpen,
@@ -289,8 +290,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const {
         timelineStyleTheme,
         timelineHeaderTheme,
-        timelineHeaderStickerOffsets,
-        setTimelineHeaderStickerOffsets,
+        timelineHeaderThemeAdjustments,
+        setTimelineHeaderThemeAdjustments,
         timelineStyleConfigs,
         timelineSortOrder,
         timelineQuickActions,
@@ -305,9 +306,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         setTimelineStyleAdjusterOpen
     } = useSettings();
     const timelineLayout = timelineLayoutMode;
-    const handleTimelineHeaderStickerPreview = useCallback((offsets: TimelineHeaderStickerOffsets | null) => {
-        setTimelineHeaderStickerPreview(offsets);
+    const handleTimelineHeaderThemePreview = useCallback((adjustments: TimelineHeaderThemeAdjustments | null) => {
+        setTimelineHeaderThemePreview(adjustments);
     }, []);
+    const activeTimelineHeaderThemeAdjustments = timelineHeaderTheme === 'none'
+        ? undefined
+        : timelineHeaderThemePreview || getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme);
     const timelineEntityLogs = useMemo(() => logs.filter((log) => log.isPlanned !== true), [logs]);
     const calendarLogs = timelineLayout === 'timeline-todo' ? logs : timelineEntityLogs;
     const timelineDateString = getLocalDateStr(currentDate);
@@ -1473,7 +1477,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     onDateChange={handleCalendarDateChange}
                     logs={calendarLogs}
                     headerTheme={timelineHeaderTheme === 'none' ? undefined : timelineHeaderTheme}
-                    headerStickerOffsets={timelineHeaderStickerPreview || timelineHeaderStickerOffsets}
+                    headerStickerOffsets={activeTimelineHeaderThemeAdjustments?.stickerOffsets}
+                    headerDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.dateBackgroundScale}
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     galleryMode={timelineGalleryMode}
@@ -2592,11 +2597,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             {showTimelineHeaderDecorationDebugger && timelineHeaderTheme !== 'none' && (
                 <TimelineHeaderDecorationDebugger
                     theme={timelineHeaderTheme}
-                    savedOffsets={timelineHeaderStickerOffsets}
-                    onPreview={handleTimelineHeaderStickerPreview}
-                    onSave={setTimelineHeaderStickerOffsets}
+                    savedAdjustments={getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme)}
+                    onPreview={handleTimelineHeaderThemePreview}
+                    onSave={(adjustments) => setTimelineHeaderThemeAdjustments((current) => ({
+                        ...current,
+                        [timelineHeaderTheme]: adjustments
+                    }))}
                     onClose={() => {
-                        setTimelineHeaderStickerPreview(null);
+                        setTimelineHeaderThemePreview(null);
                         setShowTimelineHeaderDecorationDebugger(false);
                     }}
                 />
