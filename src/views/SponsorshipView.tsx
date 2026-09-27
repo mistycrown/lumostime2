@@ -16,6 +16,7 @@
  * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and direct same-ID replacement.
  * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
  * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
+ * @updated 2026-09-27: Displays a packaged UIIcon first image when a theme card has no dedicated preview.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -56,7 +57,8 @@ import { buildCustomStickerViewSets } from '../services/customStickerAssetServic
 import { parseCustomStickerZip } from '../services/customStickerZipService';
 import {
     themePackageImportService,
-    ThemePackageImportError
+    ThemePackageImportError,
+    getThemePackageUiIconPreviewFallbackFilename
 } from '../services/themePackageImportService';
 import { applyImportedThemePackage } from '../services/themePackageApplicationService';
 import { THEME_PACKAGE_CHANGE_EVENT } from '../services/themePackageImportService';
@@ -101,6 +103,8 @@ interface ThemeCardEntry {
     version?: string;
     colorScheme: string;
     uiTheme: string;
+    previewImageFilename?: string;
+    fallbackPreviewImageFilename?: string;
     deletable: boolean;
     selected: boolean;
     onApply: () => void;
@@ -124,13 +128,79 @@ const THEME_SWATCH_COLORS: Record<string, string> = {
     'film-japanese': '#8fbec8'
 };
 
+const ThemeSchemePreview: React.FC<{
+    name: string;
+    uiTheme: string;
+    colorScheme: string;
+    previewImageFilename?: string;
+    fallbackPreviewImageFilename?: string;
+}> = ({ name, uiTheme, colorScheme, previewImageFilename, fallbackPreviewImageFilename }) => {
+    const [primaryUrl, setPrimaryUrl] = useState('');
+    const [fallbackUrl, setFallbackUrl] = useState('');
+    const [useFallback, setUseFallback] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        setUseFallback(false);
+        setPrimaryUrl('');
+        setFallbackUrl('');
+
+        void Promise.all([
+            previewImageFilename ? imageService.getImageUrl(previewImageFilename).catch(() => '') : Promise.resolve(''),
+            fallbackPreviewImageFilename && fallbackPreviewImageFilename !== previewImageFilename
+                ? imageService.getImageUrl(fallbackPreviewImageFilename).catch(() => '')
+                : Promise.resolve('')
+        ]).then(([nextPrimaryUrl, nextFallbackUrl]) => {
+            if (!cancelled) {
+                setPrimaryUrl(nextPrimaryUrl);
+                setFallbackUrl(nextFallbackUrl);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [fallbackPreviewImageFilename, previewImageFilename]);
+
+    const imageUrl = useFallback || !primaryUrl ? fallbackUrl : primaryUrl;
+    const isUsingFallback = useFallback || !primaryUrl;
+
+    if (imageUrl) {
+        return (
+            <img
+                src={imageUrl}
+                alt={`${name}主题预览`}
+                className="h-full w-full rounded-[inherit] object-cover"
+                onError={() => {
+                    if (isUsingFallback) {
+                        setFallbackUrl('');
+                    } else {
+                        setUseFallback(true);
+                    }
+                }}
+            />
+        );
+    }
+
+    return (
+        <span
+            className="grid h-full w-full place-items-center rounded-[inherit] text-xs font-semibold text-stone-600"
+            style={{ backgroundColor: THEME_SWATCH_COLORS[colorScheme] || '#e7e5e4' }}
+        >
+            {uiTheme === 'default' ? 'Aa' : uiTheme.slice(0, 2)}
+        </span>
+    );
+};
+
 const ThemeSchemeCard: React.FC<ThemeCardEntry> = ({
     name,
+    colorScheme,
+    uiTheme,
+    previewImageFilename,
+    fallbackPreviewImageFilename,
     description,
     source,
     version,
-    colorScheme,
-    uiTheme,
     deletable,
     selected,
     onApply,
@@ -138,8 +208,14 @@ const ThemeSchemeCard: React.FC<ThemeCardEntry> = ({
 }) => (
     <div className={`flex items-center rounded-lg border transition-colors ${selected ? 'border-stone-400 bg-white' : 'border-stone-200 bg-white hover:border-stone-300'}`}>
         <button type="button" onClick={onApply} className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-stone-200 text-xs font-semibold text-stone-600" style={{ backgroundColor: THEME_SWATCH_COLORS[colorScheme] || '#e7e5e4' }}>
-                {uiTheme === 'default' ? 'Aa' : uiTheme.slice(0, 2)}
+            <span className="h-10 w-10 shrink-0 overflow-hidden rounded-md border border-stone-200">
+                <ThemeSchemePreview
+                    name={name}
+                    uiTheme={uiTheme}
+                    colorScheme={colorScheme}
+                    previewImageFilename={previewImageFilename}
+                    fallbackPreviewImageFilename={fallbackPreviewImageFilename}
+                />
             </span>
             <span className="min-w-0 flex-1">
                 <span className="flex min-w-0 items-center gap-2">
@@ -1482,6 +1558,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 version={record.version}
                                                 colorScheme={colorScheme}
                                                 uiTheme={uiTheme}
+                                                previewImageFilename={record.previewImageFilename}
+                                                fallbackPreviewImageFilename={getThemePackageUiIconPreviewFallbackFilename(record)}
                                                 deletable
                                                 selected={currentPresetId === record.id || currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${record.id}`}
                                                 onApply={() => void applyImportedTheme(record.id)}

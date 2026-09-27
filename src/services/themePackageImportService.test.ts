@@ -4,6 +4,7 @@
  * @output Regression coverage for package replacement, name conflicts, and resource deletion
  * @pos Test (Theme Package Import)
  * @description Verifies same-ID overwrite and direct cleanup of package-owned assets.
+ * @updated 2026-09-27: Covers UIIcon first-image preview fallback for theme cards.
  */
 
 import JSZip from 'jszip';
@@ -41,6 +42,28 @@ const createPackage = async (id: string, name: string, version: string, asset = 
     apply: { background: { resourceId: 'main' } }
   }));
   zip.file(asset, `image-${version}`);
+  return zip.generateAsync({ type: 'blob' });
+};
+
+const createUiIconPackage = async (): Promise<Blob> => {
+  const zip = new JSZip();
+  zip.file('theme.json', JSON.stringify({
+    format: 'lumostime-theme-package',
+    schemaVersion: 2,
+    package: { id: 'fish-theme', name: 'Fish Theme', version: '1.0.0' },
+    resources: {
+      uiIcons: [{
+        id: 'fish-icons',
+        files: {
+          record: 'assets/uiicon/01.webp',
+          todo: 'assets/uiicon/02.webp'
+        }
+      }]
+    },
+    apply: { uiIcon: { resourceId: 'fish-icons' } }
+  }));
+  zip.file('assets/uiicon/01.webp', 'first-icon');
+  zip.file('assets/uiicon/02.webp', 'second-icon');
   return zip.generateAsync({ type: 'blob' });
 };
 
@@ -84,6 +107,17 @@ describe('themePackageImportService', () => {
 
     await expect(themePackageImportService.importPackage(await createPackage('second-id', 'same name', '1.0.0')))
       .rejects.toBeInstanceOf(ThemePackageImportError);
+  });
+
+  it('uses uiicon/01.webp as the preview when a package does not declare one', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+
+    const { themePackageImportService, getThemePackageUiIconPreviewFallbackFilename } = await import('./themePackageImportService');
+    const { record } = await themePackageImportService.importPackage(await createUiIconPackage());
+
+    expect(record.previewImageFilename).toBe('image-first-icon.webp');
+    expect(getThemePackageUiIconPreviewFallbackFilename(record)).toBe('image-first-icon.webp');
   });
 
   it('deletes the package image assets without reference checks', async () => {
