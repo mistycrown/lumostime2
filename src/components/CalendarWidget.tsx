@@ -16,6 +16,7 @@
  * @updated 2026-09-27: Supports a theme-configured right-toolbar button surface for reference-matched header compositions.
  * @updated 2026-09-27: Limits themed toolbar button surfaces to the right-side Today and calendar controls.
  * @updated 2026-09-27: Hides header stickers explicitly marked for expanded-calendar mode.
+ * @updated 2026-09-27: Adds the configured low-opacity background surface to left-side themed header controls.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -58,6 +59,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     const collapsedCalendarHeight = headerThemeConfig?.collapsedCalendarHeight || 75;
     const toolbarForegroundColor = headerToolbarForegroundColor || headerThemeConfig?.toolbarForegroundColor;
     const toolbarButtonClassName = headerThemeConfig?.toolbarButtonClassName || '';
+    const toolbarLeftButtonClassName = headerThemeConfig?.toolbarLeftButtonClassName || '';
     const toolbarStyle = toolbarForegroundColor
         ? { '--timeline-header-toolbar-color': toolbarForegroundColor } as React.CSSProperties
         : undefined;
@@ -161,7 +163,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-1 ${toolbarLeftButtonClassName}`}>
                         {extraHeaderControls}
                     </div>
 
