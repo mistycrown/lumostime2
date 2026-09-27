@@ -6,22 +6,6 @@
  * @description A versatile calendar component supporting animated expand/collapse, Week/Month modes, and Heatmap visualization (Duration or Focus).
  * @updated 2026-08-24: Allows timeline header menus to overflow the calendar container without clipping.
  * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
- * @updated 2026-09-27: Supports a non-interactive themed decoration layer for the timeline header and collapsed week card.
- * @updated 2026-09-27: Aligns themed week cards to the calendar top and removes their lower divider.
- * @updated 2026-09-27: Removes themed header card surfaces, shadows, and toolbar separators for a continuous canvas.
- * @updated 2026-09-27: Passes live sticker offsets into the optional timeline header theme.
- * @updated 2026-09-27: Renders the configured date-strip and selected-date background layers without restoring the original card separators.
- * @updated 2026-09-27: Applies the active header theme's adjustable toolbar foreground color to title-bar controls.
- * @updated 2026-09-27: Keeps the themed right-side calendar control transparent so its foreground icon is not lost on a solid fill.
- * @updated 2026-09-27: Supports a theme-configured right-toolbar button surface for reference-matched header compositions.
- * @updated 2026-09-27: Limits themed toolbar button surfaces to the right-side Today and calendar controls.
- * @updated 2026-09-27: Hides header stickers explicitly marked for expanded-calendar mode.
- * @updated 2026-09-27: Adds the configured low-opacity background surface to left-side themed header controls.
- * @updated 2026-09-27: Applies independently adjustable themed layer scale/opacity and synchronizes collapsed date text with toolbar color.
- * @updated 2026-09-27: Keeps themed borders on right-side date controls while allowing independent left shortcut surfaces.
- * @updated 2026-09-27: Passes X/Y offsets for every themed image layer into the calendar renderer.
- * @updated 2026-09-27: Synchronizes regular expanded-calendar text with the active themed toolbar foreground color.
- * @updated 2026-09-27: Tightens the original timeline header controls and weekday/date rhythm.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -31,7 +15,6 @@ import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { filterCountableLogs } from '../utils/statLogUtils';
-import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, TimelineHeaderSelectedDateBackground, type TimelineHeaderDateBackgroundScale, type TimelineHeaderLayerOffset, type TimelineHeaderLayerScale, type TimelineHeaderStickerOffsets, type TimelineHeaderStickerOpacities, type TimelineHeaderStickerScales, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -51,36 +34,11 @@ interface CalendarWidgetProps {
     galleryMode?: boolean; // 画廊模式：显示每天的第一张图片
     todos?: any[]; // 待办列表（用于获取 Cover Image）
     onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
-    headerTheme?: TimelineHeaderTheme;
-    headerStickerOffsets?: TimelineHeaderStickerOffsets;
-    headerStickerScales?: TimelineHeaderStickerScales;
-    headerStickerOpacities?: TimelineHeaderStickerOpacities;
-    headerTopBackgroundOffset?: TimelineHeaderLayerOffset;
-    headerTopBackgroundScale?: TimelineHeaderLayerScale;
-    headerTopBackgroundOpacity?: number;
-    headerDateBackgroundScale?: TimelineHeaderDateBackgroundScale;
-    headerDateBackgroundOffset?: TimelineHeaderLayerOffset;
-    headerDateBackgroundOpacity?: number;
-    headerSelectedDateBackgroundOffset?: TimelineHeaderLayerOffset;
-    headerSelectedDateBackgroundScale?: TimelineHeaderLayerScale;
-    headerSelectedDateBackgroundOpacity?: number;
-    headerToolbarForegroundColor?: string;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerStickerScales, headerStickerOpacities, headerTopBackgroundOffset, headerTopBackgroundScale, headerTopBackgroundOpacity, headerDateBackgroundOffset, headerDateBackgroundScale, headerDateBackgroundOpacity, headerSelectedDateBackgroundOffset, headerSelectedDateBackgroundScale, headerSelectedDateBackgroundOpacity, headerToolbarForegroundColor }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
-    const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
-    const collapsedCalendarHeight = headerThemeConfig?.collapsedCalendarHeight || 75;
-    const toolbarForegroundColor = headerToolbarForegroundColor || headerThemeConfig?.toolbarForegroundColor;
-    const toolbarButtonClassName = headerThemeConfig?.toolbarButtonClassName || '';
-    const toolbarLeftButtonClassName = headerThemeConfig?.toolbarLeftButtonClassName || '';
-    const toolbarStyle = toolbarForegroundColor
-        ? { '--timeline-header-toolbar-color': toolbarForegroundColor } as React.CSSProperties
-        : undefined;
-    const dateTextStyle = headerThemeConfig && toolbarForegroundColor
-        ? { color: toolbarForegroundColor }
-        : undefined;
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -169,30 +127,26 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
     return (
         <div className={hideTopBar
-            ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
-            : `relative ${headerThemeConfig?.containerClassName || 'bg-white/80 backdrop-blur-md'} z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
+            ? "z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
+            : "bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
         }>
-            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} topBackgroundOffset={headerTopBackgroundOffset} topBackgroundScale={headerTopBackgroundScale} topBackgroundOpacity={headerTopBackgroundOpacity} isCalendarExpanded={isExpanded} />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
-                <div
-                    className={`relative z-10 flex items-center justify-between px-4 py-2.5 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'} ${toolbarForegroundColor ? '[&_button]:!text-[var(--timeline-header-toolbar-color)] [&_button:hover]:!bg-white/15 [&_button_svg]:!text-[var(--timeline-header-toolbar-color)]' : ''}`}
-                    style={toolbarStyle}
-                >
+                <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className={`flex translate-y-[4px] items-center gap-1 [&_button]:scale-[0.92] ${toolbarLeftButtonClassName}`}>
+                    <div className="flex items-center gap-1">
                         {extraHeaderControls}
                     </div>
 
                     {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className={`flex translate-y-[4px] items-center gap-1 [&_button]:scale-[0.92] ${toolbarButtonClassName} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)]' : ''}`}>
+                    <div className="flex items-center gap-1">
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
                                     <button
                                         onClick={() => onDateChange(new Date())}
-                                        className="text-xs font-bold text-stone-500 border border-stone-300 px-2.5 py-[5px] rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
+                                        className="text-xs font-bold text-stone-500 border border-stone-300 px-3 py-1.5 rounded-full hover:bg-stone-100 active:scale-95 transition-transform"
                                     >
                                         Today
                                     </button>
@@ -209,7 +163,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     }}
                                     className={`
                                p-2 rounded-full border transition-all active:scale-95
-                                ${headerThemeConfig ? 'bg-transparent' : isExpanded ? 'btn-template-filled border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
+                               ${isExpanded ? 'btn-template-filled border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
                                 >
                                     {isExpanded ? <X size={16} /> : <CalendarIcon size={16} />}
@@ -237,9 +191,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Calendar Area */}
             <motion.div
                 initial={false}
-                animate={{ height: isExpanded ? 'auto' : collapsedCalendarHeight }}
+                animate={{ height: isExpanded ? 'auto' : 75 }}
                 transition={calendarAreaTransition}
-                className="overflow-hidden relative z-10"
+                className="overflow-hidden relative"
             >
                 <AnimatePresence initial={false} mode="popLayout">
 
@@ -252,10 +206,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={calendarAreaTransition}
-                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? headerThemeConfig.dateStripClassName : 'h-[75px]'}`}
-                        style={headerThemeConfig ? undefined : { width: '100%' }}
+                        className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]"
+                        style={{ width: '100%' }}
                     >
-                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} dateBackgroundOffset={headerDateBackgroundOffset} dateBackgroundScale={headerDateBackgroundScale} dateBackgroundOpacity={headerDateBackgroundOpacity} />
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -269,40 +222,38 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                             onDayClick(day);
                                         }
                                     }}
-                                    className={`relative z-10
+                                    className={`
                                         w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
                                         ${selected
-                                            ? headerThemeConfig?.selectedDateBackground ? 'text-stone-700' : 'btn-template-filled'
+                                            ? 'btn-template-filled'
                                             : 'bg-transparent text-stone-400'
                                         }
                                     `}
-                                    style={dateTextStyle}
                                 >
-                                    {selected && <TimelineHeaderSelectedDateBackground theme={headerTheme} offset={headerSelectedDateBackgroundOffset} scale={headerSelectedDateBackgroundScale} opacity={headerSelectedDateBackgroundOpacity} />}
                                     {/* Week Day - Fixed Top Position */}
-                                    <div className="absolute top-[14px] left-0 right-0 flex justify-center">
-                                        <span className="text-[8px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
+                                    <div className="absolute top-2.5 left-0 right-0 flex justify-center">
+                                        <span className="text-[10px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
                                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}
                                         </span>
                                     </div>
 
                                     {/* Date Number - Fixed Top Position */}
-                                    <div className="absolute top-[20px] left-0 right-0 flex justify-center h-6 items-center">
+                                    <div className="absolute top-6 left-0 right-0 flex justify-center h-6 items-center">
                                         <span className="text-lg font-serif font-bold leading-none relative">
                                             {day.getDate()}
                                             {/* Custom Underline for Today */}
                                             {today && !selected && (
-                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full" style={dateTextStyle ? { backgroundColor: toolbarForegroundColor } : undefined} />
+                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-[2px] bg-stone-400/80 rounded-full" />
                                             )}
                                         </span>
                                     </div>
 
                                     {/* Data Indicator Dots */}
                                     {hasData && !selected && (
-                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-stone-400" style={dateTextStyle ? { backgroundColor: toolbarForegroundColor } : undefined} />
+                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-stone-400" />
                                     )}
                                     {hasData && selected && (
-                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={dateTextStyle ? { backgroundColor: toolbarForegroundColor } : { backgroundColor: 'var(--icon-button-icon)' }} />
+                                        <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--icon-button-icon)' }} />
                                     )}
                                 </button>
                             );
@@ -323,15 +274,15 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         {viewMode === 'calendar' ? (
                             <>
                                 <div className="flex items-center justify-between mt-3 mb-4 px-2">
-                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronLeft size={20} /></button>
-                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors" style={dateTextStyle}>
+                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
+                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors">
                                         {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
                                     </button>
-                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronRight size={20} /></button>
+                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
                                 </div>
                                 <div className="grid grid-cols-7 gap-y-2 place-items-center">
                                     {weekDaysShort.map(d => (
-                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase" style={dateTextStyle}>{d}</span>
+                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
                                     ))}
                                     {getMonthDays().map((day, idx) => {
                                         if (!day) return <div key={idx} />;
@@ -446,7 +397,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                                 ? 'bg-stone-100 text-stone-600' 
                                                                 : 'bg-stone-50 text-stone-300'
                                                     } ${today && !selected ? 'border border-stone-300' : ''}`}
-                                                    style={selected ? { backgroundColor: 'var(--progress-bar-fill)' } : dateTextStyle}
+                                                    style={selected ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
                                                 >
                                                     {day.getDate()}
                                                 </button>
@@ -547,9 +498,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         ${bgClass} ${textClass}
                                         ${today && !selected && !staticMode ? 'border border-stone-300' : ''}
                                      `}
-                                                style={dateTextStyle && textClass !== 'text-white'
-                                                    ? { ...bgStyle, color: toolbarForegroundColor }
-                                                    : bgStyle}
+                                                style={bgStyle}
                                             >
                                                 {/* Custom Background/Content */}
                                                 {renderCustomDay && (
@@ -572,9 +521,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                             // Month/Year Picker Mode
                             <div className="flex flex-col h-[280px]">
                                 <div className="flex items-center justify-between mt-3 mb-0 px-4">
-                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronLeft size={24} /></button>
-                                    <span className="text-2xl font-bold text-stone-800" style={dateTextStyle}>{currentDate.getFullYear()}</span>
-                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronRight size={24} /></button>
+                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronLeft size={24} /></button>
+                                    <span className="text-2xl font-bold text-stone-800">{currentDate.getFullYear()}</span>
+                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronRight size={24} /></button>
                                 </div>
                                 <div className="grid grid-cols-4 gap-4 flex-1 content-center px-4">
                                     {Array.from({ length: 12 }, (_, i) => i).map(m => (
@@ -587,9 +536,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                     ? 'text-white shadow-md'
                                                     : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}
                                       `}
-                                            style={currentDate.getMonth() === m
-                                                ? { backgroundColor: 'var(--accent-color)' }
-                                                : dateTextStyle}
+                                            style={currentDate.getMonth() === m ? { backgroundColor: 'var(--accent-color)' } : undefined}
                                         >
                                             {new Date(2000, m, 1).toLocaleString('zh-CN', { month: 'short' })}
                                         </button>
