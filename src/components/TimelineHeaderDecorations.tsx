@@ -6,6 +6,7 @@
  * @updated 2026-09-27: Added the configurable pink-notebook header decoration theme.
  * @updated 2026-09-27: Added persisted selection metadata for the timeline style settings entry.
  * @updated 2026-09-27: Kept the week-card paw sticker within the animated calendar clipping boundary.
+ * @updated 2026-09-27: Removed the opaque week-card surface for the continuous pink header layout.
  */
 import React from 'react';
 
@@ -53,7 +54,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
     catWidth: 76,
     catTop: 8,
     catRight: 'clamp(5.75rem, 26vw, 10rem)',
-    collapsedCardClassName: 'rounded-[18px] border border-white/80 bg-white/85 shadow-[0_2px_10px_rgba(117,86,93,0.08)]',
+    collapsedCardClassName: '',
     darkOpacityMultiplier: 0.55,
     headerAssets: [
       {

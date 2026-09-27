@@ -8,6 +8,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
  * @updated 2026-09-27: Supports a non-interactive themed decoration layer for the timeline header and collapsed week card.
  * @updated 2026-09-27: Aligns themed week cards to the calendar top and removes their lower divider.
+ * @updated 2026-09-27: Removes themed header card surfaces, shadows, and toolbar separators for a continuous canvas.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -134,13 +135,13 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     return (
         <div className={hideTopBar
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
-            : `relative bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-200'} pt-[var(--app-safe-area-top)]`
+            : `relative bg-white/80 backdrop-blur-md z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
         }>
             <TimelineHeaderDecorations theme={headerTheme} scope="header" />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
-                <div className="relative z-10 px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
+                <div className={`relative z-10 px-4 py-2.5 flex items-center justify-between ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'}`}>
                     {/* 左侧：控制按钮（同步、排序、统计） */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
