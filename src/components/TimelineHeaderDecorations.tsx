@@ -9,6 +9,7 @@
  * @updated 2026-09-27: Removed the opaque week-card surface for the continuous pink header layout.
  * @updated 2026-09-27: Added stable sticker IDs and offset helpers for live theme debugging.
  * @updated 2026-09-27: Reworked header themes into top, date-strip, selected-date, and sticker layers; added the Little Prince theme and per-theme adjustment helpers.
+ * @updated 2026-09-27: Added Little Prince sticker assets and a persisted, adjustable toolbar foreground color for dark header artwork.
  */
 import React from 'react';
 
@@ -22,6 +23,7 @@ export type TimelineHeaderDateBackgroundScale = { x: number; y: number };
 export interface TimelineHeaderThemeAdjustments {
   stickerOffsets: TimelineHeaderStickerOffsets;
   dateBackgroundScale: TimelineHeaderDateBackgroundScale;
+  toolbarForegroundColor?: string;
 }
 
 export type TimelineHeaderThemeAdjustmentMap = Partial<Record<TimelineHeaderTheme, TimelineHeaderThemeAdjustments>>;
@@ -57,6 +59,7 @@ export type TimelineHeaderThemeConfig = {
   collapsedCalendarHeight: number;
   dateStripClassName: string;
   darkOpacityMultiplier: number;
+  toolbarForegroundColor?: string;
   topBackground?: TimelineHeaderBackgroundAsset;
   dateBackground?: TimelineHeaderBackgroundAsset;
   selectedDateBackground?: TimelineHeaderBackgroundAsset;
@@ -148,11 +151,12 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
     collapsedCalendarHeight: 77,
     dateStripClassName: 'mx-2 h-[77px]',
     darkOpacityMultiplier: 0.5,
+    toolbarForegroundColor: '#FFFFFF',
     topBackground: {
       id: 'prince-top-background',
       kind: 'top-background',
       label: '星空顶部背景',
-      src: `${PRINCE_ASSET_ROOT}/bak.png`,
+      src: `${PRINCE_ASSET_ROOT}/01_top_header_background.png`,
       className: 'absolute inset-x-0 top-0 z-0 h-[132px] w-full object-cover object-[center_43%]',
       opacity: 0.54
     },
@@ -160,7 +164,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
       id: 'prince-date-background',
       kind: 'date-background',
       label: '星空纸张日期栏',
-      src: `${PRINCE_ASSET_ROOT}/calendar.png`,
+      src: `${PRINCE_ASSET_ROOT}/02_date_bar_background.png`,
       className: 'pointer-events-none absolute inset-0 z-0 h-full w-full object-fill',
       opacity: 1
     },
@@ -168,13 +172,55 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
       id: 'prince-selected-date-background',
       kind: 'selected-date-background',
       label: '今日星光卡片',
-      src: `${PRINCE_ASSET_ROOT}/highlight.png`,
+      src: `${PRINCE_ASSET_ROOT}/08_selected_date_card.png`,
       className: 'pointer-events-none absolute inset-0 z-0 h-full w-full object-cover',
       opacity: 0.96
     },
     stickers: {
-      header: [],
-      weekCard: []
+      header: [
+        {
+          id: 'prince-golden-constellation',
+          kind: 'sticker',
+          label: '金色星轨',
+          src: `${PRINCE_ASSET_ROOT}/04_golden_star_constellation.png`,
+          className: 'pointer-events-none absolute -left-10 -top-4 z-[1] w-60',
+          opacity: 0.48
+        },
+        {
+          id: 'prince-peach-planet',
+          kind: 'sticker',
+          label: '蜜桃环形星球',
+          src: `${PRINCE_ASSET_ROOT}/05_peach_ringed_planet.png`,
+          className: 'pointer-events-none absolute left-24 top-1 z-[2] w-11',
+          opacity: 0.84
+        }
+      ],
+      weekCard: [
+        {
+          id: 'prince-with-rose',
+          kind: 'sticker',
+          label: '小王子与玫瑰',
+          src: `${PRINCE_ASSET_ROOT}/03_little_prince_planet_with_rose.png`,
+          className: 'pointer-events-none absolute -bottom-5 -left-2 z-20 w-20',
+          opacity: 0.94
+        },
+        {
+          id: 'prince-beige-planet',
+          kind: 'sticker',
+          label: '云间米色星球',
+          src: `${PRINCE_ASSET_ROOT}/06_beige_ringed_planet_with_clouds.png`,
+          className: 'pointer-events-none absolute -bottom-3 -right-2 z-20 w-20',
+          opacity: 0.8
+        },
+        {
+          id: 'prince-pastel-clouds',
+          kind: 'sticker',
+          label: '粉蓝云团',
+          src: `${PRINCE_ASSET_ROOT}/07_pastel_cloud_cluster.png`,
+          className: 'pointer-events-none absolute -bottom-3 left-24 z-[1] w-28',
+          opacity: 0.5
+        }
+      ]
     }
   }
 };
@@ -221,16 +267,23 @@ export const normalizeTimelineHeaderDateBackgroundScale = (value: unknown): Time
   };
 };
 
-export const getDefaultTimelineHeaderThemeAdjustments = (): TimelineHeaderThemeAdjustments => ({
+const normalizeToolbarForegroundColor = (value: unknown, fallback?: string): string | undefined => {
+  if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) return value.toUpperCase();
+  return fallback;
+};
+
+export const getDefaultTimelineHeaderThemeAdjustments = (theme?: TimelineHeaderTheme): TimelineHeaderThemeAdjustments => ({
   stickerOffsets: {},
-  dateBackgroundScale: { ...DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE }
+  dateBackgroundScale: { ...DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE },
+  toolbarForegroundColor: getTimelineHeaderThemeConfig(theme)?.toolbarForegroundColor
 });
 
 const normalizeThemeAdjustments = (value: unknown, theme: TimelineHeaderTheme): TimelineHeaderThemeAdjustments => {
   const rawValue = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   return {
     stickerOffsets: normalizeTimelineHeaderStickerOffsets(rawValue.stickerOffsets, theme),
-    dateBackgroundScale: normalizeTimelineHeaderDateBackgroundScale(rawValue.dateBackgroundScale)
+    dateBackgroundScale: normalizeTimelineHeaderDateBackgroundScale(rawValue.dateBackgroundScale),
+    toolbarForegroundColor: normalizeToolbarForegroundColor(rawValue.toolbarForegroundColor, getTimelineHeaderThemeConfig(theme)?.toolbarForegroundColor)
   };
 };
 
@@ -243,7 +296,7 @@ export const normalizeTimelineHeaderThemeAdjustmentMap = (value: unknown): Timel
   if (!hasThemeShape) {
     const legacyOffsets = normalizeTimelineHeaderStickerOffsets(rawValue, 'pink-notebook');
     return Object.keys(legacyOffsets).length > 0
-      ? { 'pink-notebook': { ...getDefaultTimelineHeaderThemeAdjustments(), stickerOffsets: legacyOffsets } }
+      ? { 'pink-notebook': { ...getDefaultTimelineHeaderThemeAdjustments('pink-notebook'), stickerOffsets: legacyOffsets } }
       : {};
   }
 
@@ -258,7 +311,7 @@ export const normalizeTimelineHeaderThemeAdjustmentMap = (value: unknown): Timel
 export const getTimelineHeaderThemeAdjustments = (
   adjustmentMap: TimelineHeaderThemeAdjustmentMap,
   theme: TimelineHeaderTheme
-): TimelineHeaderThemeAdjustments => adjustmentMap[theme] || getDefaultTimelineHeaderThemeAdjustments();
+): TimelineHeaderThemeAdjustments => adjustmentMap[theme] || getDefaultTimelineHeaderThemeAdjustments(theme);
 
 export const isTimelineHeaderThemeSelection = (value: unknown): value is TimelineHeaderThemeSelection => (
   value === 'none' || value === 'pink-notebook' || value === 'little-prince'

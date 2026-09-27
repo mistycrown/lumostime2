@@ -11,6 +11,7 @@
  * @updated 2026-09-27: Removes themed header card surfaces, shadows, and toolbar separators for a continuous canvas.
  * @updated 2026-09-27: Passes live sticker offsets into the optional timeline header theme.
  * @updated 2026-09-27: Renders the configured date-strip and selected-date background layers without restoring the original card separators.
+ * @updated 2026-09-27: Applies the active header theme's adjustable toolbar foreground color to title-bar controls.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -43,13 +44,18 @@ interface CalendarWidgetProps {
     headerTheme?: TimelineHeaderTheme;
     headerStickerOffsets?: TimelineHeaderStickerOffsets;
     headerDateBackgroundScale?: TimelineHeaderDateBackgroundScale;
+    headerToolbarForegroundColor?: string;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerDateBackgroundScale }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerDateBackgroundScale, headerToolbarForegroundColor }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
     const collapsedCalendarHeight = headerThemeConfig?.collapsedCalendarHeight || 75;
+    const toolbarForegroundColor = headerToolbarForegroundColor || headerThemeConfig?.toolbarForegroundColor;
+    const toolbarStyle = toolbarForegroundColor
+        ? { '--timeline-header-toolbar-color': toolbarForegroundColor } as React.CSSProperties
+        : undefined;
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -145,7 +151,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
-                <div className={`relative z-10 px-4 py-2.5 flex items-center justify-between ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'}`}>
+                <div
+                    className={`relative z-10 flex items-center justify-between px-4 py-2.5 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)] [&_button]:!text-[var(--timeline-header-toolbar-color)] [&_button:hover]:!bg-white/15 [&_button_svg]:!text-[var(--timeline-header-toolbar-color)]' : ''}`}
+                    style={toolbarStyle}
+                >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
