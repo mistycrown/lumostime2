@@ -20,6 +20,7 @@
  * @updated 2026-09-27: Resolves imported UIIcon previews from archived assets and built-in theme IDs.
  * @updated 2026-09-27: Moved Memoir mood-calendar background settings from navigation to the style tab.
  * @updated 2026-09-27: Wrapped Memoir mood-calendar background settings in the shared style-card treatment.
+ * @updated 2026-09-27: Adds the timeline header sticker debugger entry to the style tab.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -1989,7 +1990,25 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             }}
                                         />
                                     </div>
-                                    <TimelineStyleSelector onToast={onToast} />
+                                    <TimelineStyleSelector
+                                        onToast={onToast}
+                                        onOpenHeaderDebugger={() => {
+                                            onBack();
+                                            setCurrentView(AppView.TIMELINE);
+                                            setIsSettingsOpen(false);
+                                            let attempts = 0;
+                                            const openDebugger = () => {
+                                                const open = (window as any).enableTimelineHeaderThemeDebug;
+                                                if (typeof open === 'function') {
+                                                    open();
+                                                    return;
+                                                }
+                                                attempts += 1;
+                                                if (attempts < 90) window.requestAnimationFrame(openDebugger);
+                                            };
+                                            window.requestAnimationFrame(openDebugger);
+                                        }}
+                                    />
                                     <ScheduleStyleSelector />
                                     <CardBackgroundSelector onToast={onToast} />
                                 </div>

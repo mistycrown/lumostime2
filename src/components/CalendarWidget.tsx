@@ -9,6 +9,7 @@
  * @updated 2026-09-27: Supports a non-interactive themed decoration layer for the timeline header and collapsed week card.
  * @updated 2026-09-27: Aligns themed week cards to the calendar top and removes their lower divider.
  * @updated 2026-09-27: Removes themed header card surfaces, shadows, and toolbar separators for a continuous canvas.
+ * @updated 2026-09-27: Passes live sticker offsets into the optional timeline header theme.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -18,7 +19,7 @@ import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { filterCountableLogs } from '../utils/statLogUtils';
-import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
+import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, type TimelineHeaderStickerOffsets, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -39,9 +40,10 @@ interface CalendarWidgetProps {
     todos?: any[]; // 待办列表（用于获取 Cover Image）
     onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
     headerTheme?: TimelineHeaderTheme;
+    headerStickerOffsets?: TimelineHeaderStickerOffsets;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
@@ -137,7 +139,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
             : `relative bg-white/80 backdrop-blur-md z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
         }>
-            <TimelineHeaderDecorations theme={headerTheme} scope="header" />
+            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
@@ -217,7 +219,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? `mx-2 h-[77px] ${headerThemeConfig.collapsedCardClassName}` : 'h-[75px]'}`}
                         style={headerThemeConfig ? undefined : { width: '100%' }}
                     >
-                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" />
+                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} />
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);

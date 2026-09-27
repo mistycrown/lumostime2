@@ -15,6 +15,7 @@
  * @updated 2026-09-25: Added persisted new sticker selector layout configuration.
  * @updated 2026-09-26: Rehydrates custom sticker state after appearance restoration.
  * @updated 2026-09-27: Added a persisted independent timeline header theme preference.
+ * @updated 2026-09-27: Added persisted per-sticker offsets for the timeline header debugger.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -45,6 +46,8 @@ import {
 import {
     DEFAULT_TIMELINE_HEADER_THEME,
     isTimelineHeaderThemeSelection,
+    normalizeTimelineHeaderStickerOffsets,
+    type TimelineHeaderStickerOffsets,
     type TimelineHeaderThemeSelection
 } from '../components/TimelineHeaderDecorations';
 import {
@@ -245,6 +248,8 @@ interface SettingsContextType {
     setTimelineStyleTheme: React.Dispatch<React.SetStateAction<TimelineStyleTheme>>;
     timelineHeaderTheme: TimelineHeaderThemeSelection;
     setTimelineHeaderTheme: React.Dispatch<React.SetStateAction<TimelineHeaderThemeSelection>>;
+    timelineHeaderStickerOffsets: TimelineHeaderStickerOffsets;
+    setTimelineHeaderStickerOffsets: React.Dispatch<React.SetStateAction<TimelineHeaderStickerOffsets>>;
     timelineStyleConfigs: TimelineStyleConfigMap;
     setTimelineStyleConfigs: React.Dispatch<React.SetStateAction<TimelineStyleConfigMap>>;
     timelineStyleAdjusterOpen: boolean;
@@ -692,6 +697,15 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return isTimelineHeaderThemeSelection(stored) ? stored : DEFAULT_TIMELINE_HEADER_THEME;
     });
 
+    const [timelineHeaderStickerOffsets, setTimelineHeaderStickerOffsets] = useState<TimelineHeaderStickerOffsets>(() => {
+        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_STICKER_OFFSETS);
+        try {
+            return stored ? normalizeTimelineHeaderStickerOffsets(JSON.parse(stored)) : {};
+        } catch {
+            return {};
+        }
+    });
+
     const [timelineStyleConfigs, setTimelineStyleConfigs] = useState<TimelineStyleConfigMap>(() => {
         const stored = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
         if (!stored) return getDefaultTimelineStyleConfigs();
@@ -779,6 +793,14 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineHeaderTheme(isTimelineHeaderThemeSelection(storedTimelineHeaderTheme)
                 ? storedTimelineHeaderTheme
                 : DEFAULT_TIMELINE_HEADER_THEME);
+            const storedTimelineHeaderStickerOffsets = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_STICKER_OFFSETS);
+            try {
+                setTimelineHeaderStickerOffsets(storedTimelineHeaderStickerOffsets
+                    ? normalizeTimelineHeaderStickerOffsets(JSON.parse(storedTimelineHeaderStickerOffsets))
+                    : {});
+            } catch {
+                setTimelineHeaderStickerOffsets({});
+            }
             try {
                 setTimelineStyleConfigs(storedTimelineConfigs
                     ? normalizeTimelineStyleConfigs(JSON.parse(storedTimelineConfigs))
@@ -967,6 +989,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_HEADER_THEME, timelineHeaderTheme);
     }, [timelineHeaderTheme]);
+
+    useEffect(() => {
+        localStorage.setItem(THEME_KEYS.TIMELINE_HEADER_STICKER_OFFSETS, JSON.stringify(timelineHeaderStickerOffsets));
+    }, [timelineHeaderStickerOffsets]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(timelineStyleConfigs));
@@ -1173,6 +1199,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineStyleTheme,
             timelineHeaderTheme,
             setTimelineHeaderTheme,
+            timelineHeaderStickerOffsets,
+            setTimelineHeaderStickerOffsets,
             timelineStyleConfigs,
             setTimelineStyleConfigs,
             timelineStyleAdjusterOpen,
