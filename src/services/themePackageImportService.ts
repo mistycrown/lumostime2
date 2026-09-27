@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
  * @updated 2026-09-27: Resolves the first packaged UI icon from both declared and archived asset paths for theme-card previews.
  * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
+ * @updated 2026-09-27: Migrates stable theme sticker IDs to replacement image filenames during package updates.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -21,9 +22,14 @@ import {
 } from './themePackageService';
 import { APPEARANCE_RESTORED_EVENT } from './appearanceBackupService';
 import { CARD_BACKGROUND_CHANGED_EVENT, CARD_BACKGROUND_CURRENT_KEY, CARD_BACKGROUND_GROUPS_KEY } from './cardBackgroundService';
+import { dataRepository, REVIEW_ENTRIES_UPDATED_EVENT } from '../repositories/dataRepository';
 
 const LOCAL_THEME_PACKAGE_ASSETS_KEY = 'lumostime_theme_package_local_assets_v1';
 const THEME_PACKAGE_IMPORTED_EVENT = 'lumostime:theme-package-imported';
+const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
+const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
+const STICKER_SELECTOR_CONFIG_KEY = 'lumostime_sticker_selector_config';
+const DEFAULT_SELECTOR_PAGE_KEY = 'lumostime_default_selector_page';
 
 const IMAGE_EXTENSIONS = new Set(['bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp']);
 const FONT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf']);
@@ -201,7 +207,143 @@ const rollbackSavedImages = async (filenames: string[]): Promise<void> => {
   }
 };
 
-const removePackageDerivedState = (record: ImportedThemePackageRecord): void => {
+const getPackageStickerImageMap = (record: ImportedThemePackageRecord): {
+  setIds: Set<string>;
+  imageFilenamesByStickerId: Map<string, string>;
+} => {
+  const prefix = `theme:${record.id}:`;
+  const setIds = new Set<string>();
+  const imageFilenamesByStickerId = new Map<string, string>();
+  const stickerSets = record.manifest.config.stickers;
+  if (!Array.isArray(stickerSets)) return { setIds, imageFilenamesByStickerId };
+
+  stickerSets.forEach((rawSet, setIndex) => {
+    if (!isRecord(rawSet)) return;
+    const setKey = String(rawSet.id || setIndex);
+    const setId = `${prefix}sticker-set-${setKey}`;
+    setIds.add(setId);
+    const items = Array.isArray(rawSet.items) ? rawSet.items : [];
+    items.forEach((rawItem, itemIndex) => {
+      if (!isRecord(rawItem) || typeof rawItem.file !== 'string') return;
+      const imageFilename = record.imageAssets[rawItem.file];
+      if (!imageFilename) return;
+      imageFilenamesByStickerId.set(
+        `${prefix}sticker-${setKey}-${String(rawItem.id || itemIndex)}`,
+        imageFilename
+      );
+    });
+  });
+  return { setIds, imageFilenamesByStickerId };
+};
+
+const migratePackageStickerMoodReferences = async (
+  previousImageFilenamesByStickerId: Map<string, string>,
+  nextImageFilenamesByStickerId: Map<string, string>
+): Promise<boolean> => {
+  const replacementFilenames = new Map<string, string>();
+  previousImageFilenamesByStickerId.forEach((previousFilename, stickerId) => {
+    const nextFilename = nextImageFilenamesByStickerId.get(stickerId);
+    if (nextFilename && nextFilename !== previousFilename) {
+      replacementFilenames.set(previousFilename, nextFilename);
+    }
+  });
+  if (replacementFilenames.size === 0) return false;
+
+  const snapshot = await dataRepository.loadReviewEntriesSnapshot();
+  let changed = false;
+  const dailyReviews = snapshot.dailyReviews.map((review) => {
+    const moodEmoji = review.moodEmoji;
+    if (typeof moodEmoji !== 'string' || !moodEmoji.startsWith('image:')) return review;
+    const nextFilename = replacementFilenames.get(moodEmoji.slice('image:'.length));
+    if (!nextFilename) return review;
+    changed = true;
+    return { ...review, moodEmoji: `image:${nextFilename}` };
+  });
+  if (changed) {
+    await dataRepository.saveDailyReviews(dailyReviews);
+  }
+  return changed;
+};
+
+const migratePackageStickers = async (
+  previousRecord: ImportedThemePackageRecord,
+  nextRecord: ImportedThemePackageRecord
+): Promise<boolean> => {
+  const prefix = `theme:${previousRecord.id}:`;
+  const { imageFilenamesByStickerId: previousImageFilenamesByStickerId } = getPackageStickerImageMap(previousRecord);
+  const { setIds, imageFilenamesByStickerId: nextImageFilenamesByStickerId } = getPackageStickerImageMap(nextRecord);
+  const migratedMoodReferences = await migratePackageStickerMoodReferences(
+    previousImageFilenamesByStickerId,
+    nextImageFilenamesByStickerId
+  );
+  try {
+    const rawSets = JSON.parse(localStorage.getItem(CUSTOM_STICKER_SETS_KEY) || '[]');
+    const rawStickers = JSON.parse(localStorage.getItem(CUSTOM_STICKERS_KEY) || '[]');
+    if (!Array.isArray(rawSets) || !Array.isArray(rawStickers)) return migratedMoodReferences;
+
+    const now = Date.now();
+    const stickers = rawStickers.flatMap((rawSticker) => {
+      if (!isRecord(rawSticker)) return [];
+      const stickerId = String(rawSticker.id || '');
+      if (!stickerId.startsWith(`${prefix}sticker-`)) return [rawSticker];
+      const imageFilename = nextImageFilenamesByStickerId.get(stickerId);
+      if (!imageFilename) return [];
+      return [{
+        ...rawSticker,
+        imageFilename,
+        thumbnailFilename: `thumb_${imageFilename}`,
+        updatedAt: now
+      }];
+    });
+    const stickerIdsBySet = new Map<string, string[]>();
+    stickers.forEach((sticker) => {
+      if (!isRecord(sticker)) return;
+      const setId = String(sticker.setId || '');
+      const stickerIds = stickerIdsBySet.get(setId) || [];
+      stickerIds.push(String(sticker.id || ''));
+      stickerIdsBySet.set(setId, stickerIds);
+    });
+    const sets = rawSets.flatMap((rawSet) => {
+      if (!isRecord(rawSet)) return [];
+      const setId = String(rawSet.id || '');
+      if (!setId.startsWith(`${prefix}sticker-set-`)) return [rawSet];
+      const stickerIds = stickerIdsBySet.get(setId) || [];
+      if (!setIds.has(setId) || stickerIds.length === 0) return [];
+      return [{ ...rawSet, stickerIds, updatedAt: now }];
+    });
+    localStorage.setItem(CUSTOM_STICKER_SETS_KEY, JSON.stringify(sets));
+    localStorage.setItem(CUSTOM_STICKERS_KEY, JSON.stringify(stickers));
+
+    const availableSetIds = new Set(sets.filter(isRecord).map((set) => String(set.id || '')));
+    const selector = JSON.parse(localStorage.getItem(STICKER_SELECTOR_CONFIG_KEY) || '{"enabled":false,"groups":[]}');
+    if (isRecord(selector) && Array.isArray(selector.groups)) {
+      const groups = selector.groups.flatMap((rawGroup) => {
+        if (!isRecord(rawGroup)) return [];
+        const sourceSetIds = Array.isArray(rawGroup.sourceSetIds)
+          ? rawGroup.sourceSetIds.filter((id): id is string => (
+            typeof id === 'string' && (!id.startsWith(`${prefix}sticker-set-`) || availableSetIds.has(id))
+          ))
+          : [];
+        return sourceSetIds.length > 0 ? [{ ...rawGroup, sourceSetIds }] : [];
+      });
+      localStorage.setItem(STICKER_SELECTOR_CONFIG_KEY, JSON.stringify({
+        enabled: selector.enabled === true && groups.length > 0,
+        groups
+      }));
+    }
+
+    const currentPage = localStorage.getItem(DEFAULT_SELECTOR_PAGE_KEY) || '';
+    if (currentPage.startsWith(`${prefix}sticker-set-`) && !availableSetIds.has(currentPage)) {
+      localStorage.setItem(DEFAULT_SELECTOR_PAGE_KEY, 'emoji');
+    }
+  } catch { /* Preserve malformed user settings for manual recovery. */ }
+  return migratedMoodReferences;
+};
+
+const removePackageDerivedState = (
+  record: ImportedThemePackageRecord,
+  options: { preserveStickers?: boolean } = {}
+): void => {
   const prefix = `theme:${record.id}:`;
   const removeArrayItems = (key: string, idOf: (item: Record<string, unknown>) => string): void => {
     try {
@@ -229,21 +371,23 @@ const removePackageDerivedState = (record: ImportedThemePackageRecord): void => 
   removeArrayItems(TIMEPAL_KEYS.CUSTOM_ITEMS, (item) => String(item.id || ''));
   removeArrayItems(CARD_BACKGROUND_GROUPS_KEY, (item) => String(item.id || ''));
 
-  const setIds = new Set<string>();
-  try {
-    const sets = JSON.parse(localStorage.getItem('lumostime_custom_sticker_sets_v2') || '[]');
-    if (Array.isArray(sets)) {
-      sets.forEach((item) => {
-        const id = String(item?.id || '');
-        if (id.startsWith(`${prefix}sticker-set-`)) setIds.add(id);
-      });
-      localStorage.setItem('lumostime_custom_sticker_sets_v2', JSON.stringify(sets.filter((item) => !setIds.has(String(item?.id || '')))));
-    }
-    const stickers = JSON.parse(localStorage.getItem('lumostime_custom_stickers_v2') || '[]');
-    if (Array.isArray(stickers)) {
-      localStorage.setItem('lumostime_custom_stickers_v2', JSON.stringify(stickers.filter((item) => !setIds.has(String(item?.setId || '')))));
-    }
-  } catch { /* Preserve malformed user data for manual recovery. */ }
+  if (!options.preserveStickers) {
+    const setIds = new Set<string>();
+    try {
+      const sets = JSON.parse(localStorage.getItem(CUSTOM_STICKER_SETS_KEY) || '[]');
+      if (Array.isArray(sets)) {
+        sets.forEach((item) => {
+          const id = String(item?.id || '');
+          if (id.startsWith(`${prefix}sticker-set-`)) setIds.add(id);
+        });
+        localStorage.setItem(CUSTOM_STICKER_SETS_KEY, JSON.stringify(sets.filter((item) => !setIds.has(String(item?.id || '')))));
+      }
+      const stickers = JSON.parse(localStorage.getItem(CUSTOM_STICKERS_KEY) || '[]');
+      if (Array.isArray(stickers)) {
+        localStorage.setItem(CUSTOM_STICKERS_KEY, JSON.stringify(stickers.filter((item) => !setIds.has(String(item?.setId || '')))));
+      }
+    } catch { /* Preserve malformed user data for manual recovery. */ }
+  }
 
   removeArrayItems('mood_calendar_background_custom_list', (item) => String(item.id || ''));
   removeArrayItems('mood_calendar_fill_background_custom_list', (item) => String(item.id || ''));
@@ -303,22 +447,24 @@ const removePackageDerivedState = (record: ImportedThemePackageRecord): void => 
   if (localStorage.getItem(THEME_KEYS.CURRENT_PRESET) === `package:${record.id}`) {
     localStorage.setItem(THEME_KEYS.CURRENT_PRESET, 'default');
   }
-  const defaultStickerPage = localStorage.getItem('lumostime_default_selector_page') || '';
-  if (defaultStickerPage.startsWith(`${prefix}sticker-set-`)) {
-    localStorage.setItem('lumostime_default_selector_page', 'emoji');
-  }
-  try {
-    const selector = JSON.parse(localStorage.getItem('lumostime_sticker_selector_config') || '{"enabled":false,"groups":[]}');
-    if (selector && Array.isArray(selector.groups)) {
-      const groups = selector.groups.map((group: Record<string, unknown>) => ({
-        ...group,
-        sourceSetIds: Array.isArray(group.sourceSetIds)
-          ? group.sourceSetIds.filter((id: unknown) => typeof id === 'string' && !id.startsWith(`${prefix}sticker-set-`))
-          : []
-      })).filter((group: Record<string, unknown>) => Array.isArray(group.sourceSetIds) && group.sourceSetIds.length > 0);
-      localStorage.setItem('lumostime_sticker_selector_config', JSON.stringify({ enabled: selector.enabled === true && groups.length > 0, groups }));
+  if (!options.preserveStickers) {
+    const defaultStickerPage = localStorage.getItem(DEFAULT_SELECTOR_PAGE_KEY) || '';
+    if (defaultStickerPage.startsWith(`${prefix}sticker-set-`)) {
+      localStorage.setItem(DEFAULT_SELECTOR_PAGE_KEY, 'emoji');
     }
-  } catch { /* Preserve malformed user data for manual recovery. */ }
+    try {
+      const selector = JSON.parse(localStorage.getItem(STICKER_SELECTOR_CONFIG_KEY) || '{"enabled":false,"groups":[]}');
+      if (selector && Array.isArray(selector.groups)) {
+        const groups = selector.groups.map((group: Record<string, unknown>) => ({
+          ...group,
+          sourceSetIds: Array.isArray(group.sourceSetIds)
+            ? group.sourceSetIds.filter((id: unknown) => typeof id === 'string' && !id.startsWith(`${prefix}sticker-set-`))
+            : []
+        })).filter((group: Record<string, unknown>) => Array.isArray(group.sourceSetIds) && group.sourceSetIds.length > 0);
+        localStorage.setItem(STICKER_SELECTOR_CONFIG_KEY, JSON.stringify({ enabled: selector.enabled === true && groups.length > 0, groups }));
+      }
+    } catch { /* Preserve malformed user data for manual recovery. */ }
+  }
 
   const currentTimePal = localStorage.getItem(TIMEPAL_KEYS.TYPE) || '';
   if (currentTimePal.includes(prefix)) localStorage.setItem(TIMEPAL_KEYS.TYPE, 'none');
@@ -453,8 +599,10 @@ export const themePackageImportService = {
       }
       writeLocalThemePackageAssets(nextLocalAssets);
 
+      let migratedMoodReferences = false;
       if (existingRecord) {
-        removePackageDerivedState(existingRecord);
+        migratedMoodReferences = await migratePackageStickers(existingRecord, record);
+        removePackageDerivedState(existingRecord, { preserveStickers: true });
         for (const filename of new Set(Object.values(existingRecord.imageAssets))) {
           await imageService.deleteImage(filename).catch(() => undefined);
         }
@@ -477,6 +625,7 @@ export const themePackageImportService = {
           window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
           window.dispatchEvent(new Event('stickerSetsChanged'));
           window.dispatchEvent(new Event('imageListChanged'));
+          if (migratedMoodReferences) window.dispatchEvent(new Event(REVIEW_ENTRIES_UPDATED_EVENT));
         }
         if (existingRecord || registeredCardBackground) window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
       }

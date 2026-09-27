@@ -5,11 +5,12 @@
  * @updated 2026-08-11: Reports failed review-data hydration through the bootstrap recovery screen.
  * @updated 2026-09-08: Added persistent per-question Review Overview visibility preferences.
  * @updated 2026-09-22: Rehydrates persisted review preference settings from the shared preferences backup block.
+ * @updated 2026-09-27: Refreshes review state after service-side resource migrations.
  */
 import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { DEFAULT_CHECK_TEMPLATES, DEFAULT_REVIEW_TEMPLATES, INITIAL_DAILY_REVIEWS } from '../constants';
 import { REVIEW_KEYS, SETTINGS_KEYS, storage } from '../constants/storageKeys';
-import { dataRepository } from '../repositories/dataRepository';
+import { dataRepository, REVIEW_ENTRIES_UPDATED_EVENT } from '../repositories/dataRepository';
 import { CheckTemplate, DailyReview, MonthlyReview, OnThisDayEntry, ReviewTemplate, WeeklyReview } from '../types';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
 import {
@@ -230,6 +231,30 @@ export const ReviewProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshReviewEntries = async () => {
+      try {
+        const snapshot = await dataRepository.loadReviewEntriesSnapshot();
+        if (cancelled) return;
+        setDailyReviews(snapshot.dailyReviews);
+        setWeeklyReviews(snapshot.weeklyReviews);
+        setMonthlyReviews(snapshot.monthlyReviews);
+        setOnThisDayEntries(snapshot.onThisDayEntries);
+      } catch (error) {
+        console.error('[ReviewContext] Failed to refresh migrated review entries', error);
+      }
+    };
+
+    const handleReviewEntriesUpdated = () => void refreshReviewEntries();
+    window.addEventListener(REVIEW_ENTRIES_UPDATED_EVENT, handleReviewEntriesUpdated);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(REVIEW_ENTRIES_UPDATED_EVENT, handleReviewEntriesUpdated);
     };
   }, []);
 

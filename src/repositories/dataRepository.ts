@@ -13,6 +13,7 @@
  * @updated 2026-05-12: Added repository-backed `DataCollection` and `DataCollectionEntry` persistence to the core data snapshot.
  * @updated 2026-05-10: Flagged fallback-seeded core snapshots so background assistant flows can refuse demo logs/todos when real user data is unavailable.
  * @updated 2026-04-07: Keeps default achievement bottle metadata synced with the latest preset names, descriptions, and archive labels.
+ * @updated 2026-09-27: Exposes a review-entry refresh event for service-side data migrations.
  */
 import {
   DEFAULT_ACHIEVEMENT_COLLECTION_COST,
@@ -53,6 +54,8 @@ import { normalizeAchievementRedemptionRecordFunding, normalizeAchievementStarVa
 import { storageRepository, StorageRepository } from './storageRepository';
 
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
+
+export const REVIEW_ENTRIES_UPDATED_EVENT = 'lumostime:review-entries-updated';
 
 const getTimingNow = (): number => (
   typeof performance !== 'undefined' && typeof performance.now === 'function'
