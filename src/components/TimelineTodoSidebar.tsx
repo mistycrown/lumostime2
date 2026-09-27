@@ -4,6 +4,7 @@
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
+ * @updated 2026-09-27: Lowers the split sidebar surface opacity so the active timeline background remains visibly shared.
  * @updated 2026-08-02: Replaces recurring todo completion toggles in the Chronicle sidebar with a read-only repeat marker.
  * @updated 2026-07-30: Lowered the in-flow minimum width to match the quick-color sidebar's compact limit.
  * @updated 2026-07-30: Removes schedule and PIN badges from the narrow todo column while retaining their data behavior.
@@ -341,7 +342,7 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   onTodoDrop
 }) => (
   <aside
-      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
+      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/75 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/75"
       style={{ width: `${ratio * 100}%`, minWidth: `${TIMELINE_SIDEBAR_MIN_RATIO * 100}%`, maxWidth: `${TIMELINE_SIDEBAR_MAX_RATIO * 100}%` }}
     aria-label="待办与日课"
   >
