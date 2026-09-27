@@ -35,6 +35,7 @@
  * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
  * @updated 2026-09-27: Adds a live, save-on-demand debugger for individual timeline header stickers.
  * @updated 2026-09-27: Uses theme-scoped date-strip scaling and sticker adjustments in the layered timeline header renderer.
+ * @updated 2026-09-27: Stabilizes saved header-theme adjustments so debugger previews cannot cause an update loop.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -309,9 +310,14 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const handleTimelineHeaderThemePreview = useCallback((adjustments: TimelineHeaderThemeAdjustments | null) => {
         setTimelineHeaderThemePreview(adjustments);
     }, []);
+    const savedTimelineHeaderThemeAdjustments = useMemo(() => (
+        timelineHeaderTheme === 'none'
+            ? null
+            : getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme)
+    ), [timelineHeaderTheme, timelineHeaderThemeAdjustments]);
     const activeTimelineHeaderThemeAdjustments = timelineHeaderTheme === 'none'
         ? undefined
-        : timelineHeaderThemePreview || getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme);
+        : timelineHeaderThemePreview || savedTimelineHeaderThemeAdjustments;
     const timelineEntityLogs = useMemo(() => logs.filter((log) => log.isPlanned !== true), [logs]);
     const calendarLogs = timelineLayout === 'timeline-todo' ? logs : timelineEntityLogs;
     const timelineDateString = getLocalDateStr(currentDate);
@@ -2594,10 +2600,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                 <TimePalDebugger onClose={() => setShowTimePalDebugger(false)} />
             )}
 
-            {showTimelineHeaderDecorationDebugger && timelineHeaderTheme !== 'none' && (
+            {showTimelineHeaderDecorationDebugger && timelineHeaderTheme !== 'none' && savedTimelineHeaderThemeAdjustments && (
                 <TimelineHeaderDecorationDebugger
                     theme={timelineHeaderTheme}
-                    savedAdjustments={getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme)}
+                    savedAdjustments={savedTimelineHeaderThemeAdjustments}
                     onPreview={handleTimelineHeaderThemePreview}
                     onSave={(adjustments) => setTimelineHeaderThemeAdjustments((current) => ({
                         ...current,
