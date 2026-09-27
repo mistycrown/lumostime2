@@ -181,12 +181,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarLeftButtonClassName}`}>
+                    <div className={`flex translate-y-[4px] items-center gap-1 [&_button]:scale-[0.92] ${toolbarLeftButtonClassName}`}>
                         {extraHeaderControls}
                     </div>
 
                     {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarButtonClassName} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)]' : ''}`}>
+                    <div className={`flex translate-y-[4px] items-center gap-1 [&_button]:scale-[0.92] ${toolbarButtonClassName} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)]' : ''}`}>
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
