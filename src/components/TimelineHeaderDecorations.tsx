@@ -12,6 +12,7 @@
  * @updated 2026-09-27: Added Little Prince sticker assets and a persisted, adjustable toolbar foreground color for dark header artwork.
  * @updated 2026-09-27: Aligned Little Prince toolbar and sticker defaults with the supplied full-width preview composition.
  * @updated 2026-09-27: Refined Little Prince sticker scale and edge placement to preserve the header's functional controls and date labels.
+ * @updated 2026-09-27: Preserves the Little Prince date-paper artwork aspect ratio instead of stretching it into the date strip.
  */
 import React from 'react';
 
@@ -169,7 +170,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
       kind: 'date-background',
       label: '星空纸张日期栏',
       src: `${PRINCE_ASSET_ROOT}/02_date_bar_background.png`,
-      className: 'pointer-events-none absolute inset-0 z-0 h-full w-full object-fill',
+      className: 'pointer-events-none absolute inset-0 z-0 h-full w-full object-cover object-center',
       opacity: 1
     },
     selectedDateBackground: {
