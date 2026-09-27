@@ -7,10 +7,11 @@
  *
  * @updated 2026-03-28: Restored the default style preview to a classic filled dot so the original timeline option remains visually recognizable in the compact grid.
  * @updated 2026-09-27: Added an independent persisted header-theme selector below the timeline rail styles.
+ * @updated 2026-09-27: Adds a timeline-page entry for the per-sticker header debugger.
  */
 
 import React, { useMemo } from 'react';
-import { Leaf, MapPin, Moon, Music4, PawPrint, Scissors, SlidersHorizontal } from 'lucide-react';
+import { Leaf, MapPin, Moon, Music4, PawPrint, Scissors, Settings, SlidersHorizontal } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { ToastType } from './Toast';
 import { CompactPreviewCardSelector } from './CompactPreviewCardSelector';
@@ -118,9 +119,10 @@ const TimelineHeaderPreview: React.FC<{ option: TimelineHeaderThemeOption }> = (
 
 interface TimelineStyleSelectorProps {
   onToast: (type: ToastType, message: string) => void;
+  onOpenHeaderDebugger?: () => void;
 }
 
-export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ onToast }) => {
+export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ onToast, onOpenHeaderDebugger }) => {
   const {
     timelineStyleTheme,
     setTimelineStyleTheme,
@@ -182,6 +184,16 @@ export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ on
         options={TIMELINE_HEADER_THEME_OPTIONS}
         selectedValue={timelineHeaderTheme}
         onSelect={handleHeaderThemeSelect}
+        actionSlot={(
+          <button
+            type="button"
+            disabled={timelineHeaderTheme === 'none'}
+            onClick={onOpenHeaderDebugger}
+            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${timelineHeaderTheme === 'none' ? 'bg-stone-50 text-stone-300' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}
+          >
+            <Settings size={14} />调试
+          </button>
+        )}
         renderPreview={(option) => <TimelineHeaderPreview option={option as TimelineHeaderThemeOption} />}
         minCardWidth={132}
         maxCardWidth={188}

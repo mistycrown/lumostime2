@@ -33,9 +33,9 @@
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
  * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
- * @updated 2026-09-27: Reads the persisted timeline header theme instead of a fixed decoration trial.
+ * @updated 2026-09-27: Adds a live, save-on-demand debugger for individual timeline header stickers.
  */
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
@@ -68,6 +68,8 @@ import { GalleryView } from '../components/GalleryView';
 import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
+import { TimelineHeaderDecorationDebugger } from '../components/TimelineHeaderDecorationDebugger';
+import type { TimelineHeaderStickerOffsets } from '../components/TimelineHeaderDecorations';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { TIMELINE_QUICK_ACTION_OPTIONS, type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
@@ -267,6 +269,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const [timelineQuickActionsMenuPosition, setTimelineQuickActionsMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const timelineQuickActionsButtonRef = useRef<HTMLButtonElement | null>(null);
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
+    const [showTimelineHeaderDecorationDebugger, setShowTimelineHeaderDecorationDebugger] = useState(false);
+    const [timelineHeaderStickerPreview, setTimelineHeaderStickerPreview] = useState<TimelineHeaderStickerOffsets | null>(null);
     const {
         isGalleryViewOpen,
         setIsGalleryViewOpen,
@@ -285,6 +289,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const {
         timelineStyleTheme,
         timelineHeaderTheme,
+        timelineHeaderStickerOffsets,
+        setTimelineHeaderStickerOffsets,
         timelineStyleConfigs,
         timelineSortOrder,
         timelineQuickActions,
@@ -299,6 +305,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         setTimelineStyleAdjusterOpen
     } = useSettings();
     const timelineLayout = timelineLayoutMode;
+    const handleTimelineHeaderStickerPreview = useCallback((offsets: TimelineHeaderStickerOffsets | null) => {
+        setTimelineHeaderStickerPreview(offsets);
+    }, []);
     const timelineEntityLogs = useMemo(() => logs.filter((log) => log.isPlanned !== true), [logs]);
     const calendarLogs = timelineLayout === 'timeline-todo' ? logs : timelineEntityLogs;
     const timelineDateString = getLocalDateStr(currentDate);
@@ -486,6 +495,18 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             delete (window as any).disableTimePalDebug;
         };
     }, []);
+
+    React.useEffect(() => {
+        (window as any).enableTimelineHeaderThemeDebug = () => {
+            if (timelineHeaderTheme !== 'none') {
+                setShowTimelineHeaderDecorationDebugger(true);
+            }
+        };
+
+        return () => {
+            delete (window as any).enableTimelineHeaderThemeDebug;
+        };
+    }, [timelineHeaderTheme]);
 
     const { openAIChat, unreadCount } = useAIChatWindow();
 
@@ -1452,6 +1473,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     onDateChange={handleCalendarDateChange}
                     logs={calendarLogs}
                     headerTheme={timelineHeaderTheme === 'none' ? undefined : timelineHeaderTheme}
+                    headerStickerOffsets={timelineHeaderStickerPreview || timelineHeaderStickerOffsets}
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     galleryMode={timelineGalleryMode}
@@ -2565,6 +2587,19 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             {/* TimePal 调试器 */}
             {showTimePalDebugger && (
                 <TimePalDebugger onClose={() => setShowTimePalDebugger(false)} />
+            )}
+
+            {showTimelineHeaderDecorationDebugger && timelineHeaderTheme !== 'none' && (
+                <TimelineHeaderDecorationDebugger
+                    theme={timelineHeaderTheme}
+                    savedOffsets={timelineHeaderStickerOffsets}
+                    onPreview={handleTimelineHeaderStickerPreview}
+                    onSave={setTimelineHeaderStickerOffsets}
+                    onClose={() => {
+                        setTimelineHeaderStickerPreview(null);
+                        setShowTimelineHeaderDecorationDebugger(false);
+                    }}
+                />
             )}
 
             {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (
