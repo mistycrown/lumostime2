@@ -9,6 +9,7 @@
  * @updated 2026-09-25: Applies the persisted transparent-navigation setting to supported top title bars while excluding Todo schedule mode.
  * @updated 2026-09-25: Marks transparent-title-bar layouts so page background masks can cover the full viewport without changing normal layout flow.
  * @updated 2026-09-25: Limits transparent title bars to Tags/Scopes index pages and restores the opaque detail-page header.
+ * @updated 2026-09-27: Extends the index reading overlay behind transparent title bars so their paper surface does not split at the content boundary.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -69,7 +70,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
     const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
-    const { backgroundUrl, backgroundOpacity, hasBackground } = useBackgroundDisplay();
+    const { backgroundUrl, backgroundOpacity, panelOverlayOpacity, hasBackground } = useBackgroundDisplay();
     const {
         currentView, setCurrentView,
         isSettingsOpen, setIsSettingsOpen,
@@ -162,9 +163,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         || (currentView === AppView.TAGS && !selectedTagId && !selectedCategoryId)
         || (currentView === AppView.SCOPE && !selectedScopeId);
     const shouldUseTransparentTitleBar = isTransparentNavigation && supportsTransparentTitleBar;
+    const shouldUseIndexSurfaceOverlay = shouldUseTransparentTitleBar
+        && hasBackground
+        && (currentView === AppView.TAGS || currentView === AppView.SCOPE);
 
     return (
-        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)] ${shouldUseTransparentTitleBar ? 'transparent-title-bar-active' : ''}`}>
+        <div className={`h-screen w-screen flex flex-col text-stone-800 overflow-hidden select-none font-serif relative pb-[env(safe-area-inset-bottom)] ${shouldUseTransparentTitleBar ? 'transparent-title-bar-active' : ''} ${shouldUseIndexSurfaceOverlay ? 'transparent-index-surface' : ''}`}>
 
             {shouldUseTransparentTitleBar && hasBackground && (
                 <div
@@ -176,6 +180,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
                         backgroundRepeat: 'no-repeat',
                         opacity: backgroundOpacity
                     }}
+                />
+            )}
+
+            {shouldUseIndexSurfaceOverlay && (
+                <div
+                    aria-hidden="true"
+                    className="page-background-overlay pointer-events-none absolute inset-0 z-0"
+                    style={{ backgroundColor: `rgba(250, 249, 246, ${panelOverlayOpacity})` }}
                 />
             )}
 

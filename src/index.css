@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Keep index content above the shared background image in transparent title-bar mode. */
+/* Keep transparent index surfaces above the shared background image and use one reading overlay across the header and content. */
 .transparent-title-bar-active .page-background-overlay {
   position: fixed;
   inset: 0;
@@ -12,6 +12,16 @@
 .transparent-title-bar-active #scopes-content > *:not(.bg-layer) {
   position: relative;
   z-index: 1;
+}
+
+.transparent-index-surface #tags-content,
+.transparent-index-surface #scopes-content {
+  background-color: transparent;
+}
+
+.transparent-index-surface #tags-content > .bg-layer,
+.transparent-index-surface #scopes-content > .bg-layer {
+  display: none;
 }
 
 html[data-theme-mode='dark'] .navigation-setting-switch {
