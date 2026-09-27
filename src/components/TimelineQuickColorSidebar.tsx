@@ -4,6 +4,7 @@
  * @output A compact right-side activity picker with continuous-mode control for click-to-range and direct-drag timeline record creation
  * @pos Component
  * @description Renders first-level record categories and second-level activities for the Chronicle quick-color split panel.
+ * @updated 2026-09-27: Matches the split todo sidebar's translucent surface so the active timeline background remains visible.
  * @updated 2026-07-30: Replaced the top-right count badge with a batch label and flattened the checkbox affordance to a single square.
  * @updated 2026-07-30: Added the continuous-create checkbox and kept selected rows unfilled while preserving the checkmark.
  * @updated 2026-07-30: Makes activity drags easier to start by waiting for a clearer horizontal leftward gesture before locking the intent.
@@ -155,7 +156,7 @@ export const TimelineQuickColorSidebar: React.FC<TimelineQuickColorSidebarProps>
 
   return (
     <aside
-      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/95 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/95"
+      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/50 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/75"
       style={{ width: `${ratio * 100}%`, minWidth: `${TIMELINE_SIDEBAR_MIN_RATIO * 100}%`, maxWidth: `${TIMELINE_SIDEBAR_MAX_RATIO * 100}%` }}
       aria-label="快速着色"
     >
