@@ -22,6 +22,7 @@ assets/
   fonts/
   achievement-bottle/<pack-id>/
   memoir-calendar/
+  card-backgrounds/
 ```
 
 复制本文件夹后，可按主题需要创建资源子目录；空目录和 `.gitkeep` 不会作为资源导入。

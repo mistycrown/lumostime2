@@ -10,6 +10,7 @@
  * @updated 2026-09-26: Covers single-image fill-mode backgrounds and mode/image mismatches.
  * @updated 2026-09-26: Covers explicit legacy-navigation theme package configuration.
  * @updated 2026-09-26: Covers custom achievement-bottle icon-pack assets.
+ * @updated 2026-09-27: Rejects packages that define more than one card-background group.
  */
 
 import JSZip from 'jszip';
@@ -115,6 +116,27 @@ describe('parseThemePackage', () => {
     }))).rejects.toMatchObject({
       code: 'INVALID_CONFIGURATION',
       path: 'apply.background.resourceId'
+    });
+  });
+
+  it('rejects packages that define more than one card-background group', async () => {
+    await expect(parseThemePackage(await createZip({
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'too-many-cards', name: 'Too Many Cards', version: '1.0.0' },
+      resources: {
+        cardBackgroundGroups: [
+          { id: 'first', files: ['assets/card-backgrounds/first.webp'] },
+          { id: 'second', files: ['assets/card-backgrounds/second.webp'] }
+        ]
+      },
+      apply: {}
+    }, {
+      'assets/card-backgrounds/first.webp': 'first',
+      'assets/card-backgrounds/second.webp': 'second'
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'resources.cardBackgroundGroups'
     });
   });
 
