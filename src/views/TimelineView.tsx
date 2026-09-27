@@ -36,6 +36,7 @@
  * @updated 2026-09-27: Adds a live, save-on-demand debugger for individual timeline header stickers.
  * @updated 2026-09-27: Uses theme-scoped date-strip scaling and sticker adjustments in the layered timeline header renderer.
  * @updated 2026-09-27: Stabilizes saved header-theme adjustments so debugger previews cannot cause an update loop.
+ * @updated 2026-09-27: Passes the saved per-theme toolbar foreground color into the calendar header.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1485,6 +1486,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     headerTheme={timelineHeaderTheme === 'none' ? undefined : timelineHeaderTheme}
                     headerStickerOffsets={activeTimelineHeaderThemeAdjustments?.stickerOffsets}
                     headerDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.dateBackgroundScale}
+                    headerToolbarForegroundColor={activeTimelineHeaderThemeAdjustments?.toolbarForegroundColor}
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     galleryMode={timelineGalleryMode}

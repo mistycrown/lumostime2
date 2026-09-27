@@ -5,6 +5,7 @@
  * @description Mirrors the navigation decoration debugger while deliberately excluding top and selected-date background layers from adjustment.
  * @updated 2026-09-27: Added live X/Y sticker tuning, single/all reset, and explicit save behavior.
  * @updated 2026-09-27: Added per-theme date-strip horizontal/vertical scaling while retaining individual sticker position controls.
+ * @updated 2026-09-27: Adds toolbar foreground color tuning and includes all configured header/date stickers in layer navigation.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, Move, RotateCcw, Save, X } from 'lucide-react';
@@ -25,7 +26,7 @@ interface TimelineHeaderDecorationDebuggerProps {
   onClose: () => void;
 }
 
-type ActiveLayer = 'date-background' | TimelineHeaderStickerId;
+type ActiveLayer = 'date-background' | 'toolbar-foreground' | TimelineHeaderStickerId;
 
 const getOffset = (adjustments: TimelineHeaderThemeAdjustments, id: TimelineHeaderStickerId) => (
   adjustments.stickerOffsets[id] || { x: 0, y: 0 }
@@ -33,7 +34,8 @@ const getOffset = (adjustments: TimelineHeaderThemeAdjustments, id: TimelineHead
 
 const cloneAdjustments = (adjustments: TimelineHeaderThemeAdjustments): TimelineHeaderThemeAdjustments => ({
   stickerOffsets: { ...adjustments.stickerOffsets },
-  dateBackgroundScale: { ...adjustments.dateBackgroundScale }
+  dateBackgroundScale: { ...adjustments.dateBackgroundScale },
+  toolbarForegroundColor: adjustments.toolbarForegroundColor
 });
 
 export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecorationDebuggerProps> = ({
@@ -47,17 +49,19 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
   const assets = useMemo(() => getTimelineHeaderThemeAssets(theme), [theme]);
   const controls = useMemo<ActiveLayer[]>(() => [
     ...(config?.dateBackground ? ['date-background' as const] : []),
+    ...(config?.toolbarForegroundColor ? ['toolbar-foreground' as const] : []),
     ...assets.map((asset) => asset.id)
-  ], [assets, config?.dateBackground]);
+  ], [assets, config?.dateBackground, config?.toolbarForegroundColor]);
   const [activeLayer, setActiveLayer] = useState<ActiveLayer>(controls[0]);
   const [draftAdjustments, setDraftAdjustments] = useState<TimelineHeaderThemeAdjustments>(() => cloneAdjustments(savedAdjustments));
   const [isSaved, setIsSaved] = useState(false);
   const activeIndex = Math.max(controls.indexOf(activeLayer), 0);
   const activeControl = controls[activeIndex];
-  const activeAsset = activeControl === 'date-background'
+  const activeAsset = activeControl === 'date-background' || activeControl === 'toolbar-foreground'
     ? undefined
     : assets.find((asset) => asset.id === activeControl);
   const isDateBackgroundControl = activeControl === 'date-background';
+  const isToolbarForegroundControl = activeControl === 'toolbar-foreground';
   const activeOffset = activeAsset ? getOffset(draftAdjustments, activeAsset.id) : { x: 0, y: 0 };
 
   useEffect(() => {
@@ -119,6 +123,10 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
         return { ...current, dateBackgroundScale: { x: 1, y: 1 } };
       }
 
+      if (isToolbarForegroundControl) {
+        return { ...current, toolbarForegroundColor: config.toolbarForegroundColor };
+      }
+
       if (!activeAsset) return current;
       const stickerOffsets = { ...current.stickerOffsets };
       delete stickerOffsets[activeAsset.id];
@@ -128,7 +136,7 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
   };
 
   const resetAll = () => {
-    setDraftAdjustments(getDefaultTimelineHeaderThemeAdjustments());
+    setDraftAdjustments(getDefaultTimelineHeaderThemeAdjustments(theme));
     setIsSaved(false);
   };
 
@@ -171,8 +179,22 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
     );
   };
 
-  const activeLabel = isDateBackgroundControl ? '日期栏背景' : activeAsset?.label || '贴纸';
-  const activeId = isDateBackgroundControl ? config.dateBackground?.id : activeAsset?.id;
+  const updateToolbarForegroundColor = (toolbarForegroundColor: string) => {
+    setDraftAdjustments((current) => ({ ...current, toolbarForegroundColor }));
+    setIsSaved(false);
+  };
+
+  const activeLabel = isDateBackgroundControl
+    ? '日期栏背景'
+    : isToolbarForegroundControl
+      ? '顶部按钮颜色'
+      : activeAsset?.label || '贴纸';
+  const activeId = isDateBackgroundControl
+    ? config.dateBackground?.id
+    : isToolbarForegroundControl
+      ? 'toolbar-foreground'
+      : activeAsset?.id;
+  const toolbarForegroundColor = draftAdjustments.toolbarForegroundColor || config.toolbarForegroundColor || '#FFFFFF';
 
   return (
     <div className="fixed bottom-28 right-4 z-50 w-72 max-h-[calc(100vh-9rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-4 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-4">
@@ -190,12 +212,28 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
         <button type="button" onClick={() => switchLayer('next')} className="rounded p-1.5 text-stone-600 transition-colors hover:bg-white"><ChevronRight size={16} /></button>
       </div>
 
-      <div className="mb-4 space-y-4">
-        {renderAxisControls('x', isDateBackgroundControl ? '横向缩放' : '水平偏移')}
-        {renderAxisControls('y', isDateBackgroundControl ? '纵向缩放' : '垂直偏移')}
-      </div>
+      {isToolbarForegroundControl ? (
+        <div className="mb-4 rounded-lg bg-stone-50 p-3">
+          <label className="mb-2 block text-[11px] font-medium text-stone-500" htmlFor="timeline-header-toolbar-color">图标、文字与按钮描边</label>
+          <div className="flex items-center gap-3">
+            <input
+              id="timeline-header-toolbar-color"
+              type="color"
+              value={toolbarForegroundColor}
+              onChange={(event) => updateToolbarForegroundColor(event.target.value.toUpperCase())}
+              className="h-9 w-12 cursor-pointer rounded border border-stone-200 bg-white p-1"
+            />
+            <span className="font-mono text-sm font-bold text-stone-700">{toolbarForegroundColor}</span>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-4 space-y-4">
+          {renderAxisControls('x', isDateBackgroundControl ? '横向缩放' : '水平偏移')}
+          {renderAxisControls('y', isDateBackgroundControl ? '纵向缩放' : '垂直偏移')}
+        </div>
+      )}
 
-      <button type="button" onClick={resetCurrent} className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-stone-100 py-2 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"><RotateCcw size={13} />重置当前{isDateBackgroundControl ? '背景' : '贴纸'}</button>
+      <button type="button" onClick={resetCurrent} className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-lg bg-stone-100 py-2 text-xs font-medium text-stone-600 transition-colors hover:bg-stone-200"><RotateCcw size={13} />重置当前{isDateBackgroundControl ? '背景' : isToolbarForegroundControl ? '颜色' : '贴纸'}</button>
       <button type="button" onClick={save} disabled={isSaved} className={`flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold shadow-sm transition-all ${isSaved ? 'border border-green-200 bg-green-100 text-green-700' : 'bg-stone-800 text-white hover:bg-stone-900'}`}><Save size={14} />{isSaved ? '已保存' : '保存调整'}</button>
     </div>
   );
