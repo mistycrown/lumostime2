@@ -16,7 +16,7 @@
  * @updated 2026-09-26: Added theme-package import choices for apply-only or import-only and direct same-ID replacement.
  * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
  * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
- * @updated 2026-09-27: Displays a packaged UIIcon first image when a theme card has no dedicated preview.
+ * @updated 2026-09-27: Uses each theme's first UIIcon image as its scheme-card preview.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -103,8 +103,8 @@ interface ThemeCardEntry {
     version?: string;
     colorScheme: string;
     uiTheme: string;
-    previewImageFilename?: string;
-    fallbackPreviewImageFilename?: string;
+    uiIconPreviewImageFilename?: string;
+    uiIconPreviewImageUrl?: string;
     deletable: boolean;
     selected: boolean;
     onApply: () => void;
@@ -132,52 +132,43 @@ const ThemeSchemePreview: React.FC<{
     name: string;
     uiTheme: string;
     colorScheme: string;
-    previewImageFilename?: string;
-    fallbackPreviewImageFilename?: string;
-}> = ({ name, uiTheme, colorScheme, previewImageFilename, fallbackPreviewImageFilename }) => {
-    const [primaryUrl, setPrimaryUrl] = useState('');
-    const [fallbackUrl, setFallbackUrl] = useState('');
-    const [useFallback, setUseFallback] = useState(false);
+    uiIconPreviewImageFilename?: string;
+    uiIconPreviewImageUrl?: string;
+}> = ({ name, uiTheme, colorScheme, uiIconPreviewImageFilename, uiIconPreviewImageUrl }) => {
+    const [imageUrl, setImageUrl] = useState('');
+    const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
-        setUseFallback(false);
-        setPrimaryUrl('');
-        setFallbackUrl('');
+        setImageLoadFailed(false);
+        setImageUrl(uiIconPreviewImageUrl || '');
 
-        void Promise.all([
-            previewImageFilename ? imageService.getImageUrl(previewImageFilename).catch(() => '') : Promise.resolve(''),
-            fallbackPreviewImageFilename && fallbackPreviewImageFilename !== previewImageFilename
-                ? imageService.getImageUrl(fallbackPreviewImageFilename).catch(() => '')
-                : Promise.resolve('')
-        ]).then(([nextPrimaryUrl, nextFallbackUrl]) => {
-            if (!cancelled) {
-                setPrimaryUrl(nextPrimaryUrl);
-                setFallbackUrl(nextFallbackUrl);
-            }
-        });
+        if (!uiIconPreviewImageFilename || uiIconPreviewImageUrl) {
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        void imageService.getImageUrl(uiIconPreviewImageFilename)
+            .then((nextImageUrl) => {
+                if (!cancelled) setImageUrl(nextImageUrl);
+            })
+            .catch(() => {
+                if (!cancelled) setImageUrl('');
+            });
 
         return () => {
             cancelled = true;
         };
-    }, [fallbackPreviewImageFilename, previewImageFilename]);
+    }, [uiIconPreviewImageFilename, uiIconPreviewImageUrl]);
 
-    const imageUrl = useFallback || !primaryUrl ? fallbackUrl : primaryUrl;
-    const isUsingFallback = useFallback || !primaryUrl;
-
-    if (imageUrl) {
+    if (imageUrl && !imageLoadFailed) {
         return (
             <img
                 src={imageUrl}
                 alt={`${name}主题预览`}
                 className="h-full w-full rounded-[inherit] object-cover"
-                onError={() => {
-                    if (isUsingFallback) {
-                        setFallbackUrl('');
-                    } else {
-                        setUseFallback(true);
-                    }
-                }}
+                onError={() => setImageLoadFailed(true)}
             />
         );
     }
@@ -196,8 +187,8 @@ const ThemeSchemeCard: React.FC<ThemeCardEntry> = ({
     name,
     colorScheme,
     uiTheme,
-    previewImageFilename,
-    fallbackPreviewImageFilename,
+    uiIconPreviewImageFilename,
+    uiIconPreviewImageUrl,
     description,
     source,
     version,
@@ -213,8 +204,8 @@ const ThemeSchemeCard: React.FC<ThemeCardEntry> = ({
                     name={name}
                     uiTheme={uiTheme}
                     colorScheme={colorScheme}
-                    previewImageFilename={previewImageFilename}
-                    fallbackPreviewImageFilename={fallbackPreviewImageFilename}
+                    uiIconPreviewImageFilename={uiIconPreviewImageFilename}
+                    uiIconPreviewImageUrl={uiIconPreviewImageUrl}
                 />
             </span>
             <span className="min-w-0 flex-1">
@@ -1531,6 +1522,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             source={preset.isCustom ? 'saved' : 'builtin'}
                                             colorScheme={preset.colorScheme}
                                             uiTheme={preset.uiTheme}
+                                            uiIconPreviewImageUrl={!preset.isCustom && preset.uiTheme !== 'default'
+                                                ? resolveAssetPath(`/uiicon/${preset.uiTheme}/01.webp`)
+                                                : undefined}
                                             deletable={preset.isCustom === true}
                                             selected={currentPresetId === preset.id}
                                             onApply={() => void applyThemePreset(preset)}
@@ -1558,8 +1552,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 version={record.version}
                                                 colorScheme={colorScheme}
                                                 uiTheme={uiTheme}
-                                                previewImageFilename={record.previewImageFilename}
-                                                fallbackPreviewImageFilename={getThemePackageUiIconPreviewFallbackFilename(record)}
+                                                uiIconPreviewImageFilename={getThemePackageUiIconPreviewFallbackFilename(record)}
                                                 deletable
                                                 selected={currentPresetId === record.id || currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${record.id}`}
                                                 onApply={() => void applyImportedTheme(record.id)}
