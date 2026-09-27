@@ -42,6 +42,7 @@
  * @updated 2026-09-27: Applies the Little Prince shortcut button surface directly to each rendered quick action.
  * @updated 2026-09-27: Uses a translucent white shortcut surface so the starry header artwork remains visible.
  * @updated 2026-09-27: Reduces Little Prince shortcut circles to a compact 36px footprint.
+ * @updated 2026-09-27: Further softens and compacts Little Prince shortcut surfaces.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -619,7 +620,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         .map((actionKey) => quickActionMap[actionKey])
         .filter(Boolean);
     const timelineShortcutButtonClassName = timelineHeaderTheme === 'little-prince'
-        ? 'flex h-9 w-9 items-center justify-center rounded-full !bg-white/55 !p-0 text-stone-400 shadow-[0_2px_8px_rgba(85,65,55,0.1)] transition-colors hover:!bg-white/70 disabled:cursor-not-allowed disabled:opacity-60'
+        ? 'flex h-8 w-8 items-center justify-center rounded-full !bg-white/35 !p-0 text-stone-400 shadow-[0_1px_5px_rgba(85,65,55,0.07)] transition-colors hover:!bg-white/50 disabled:cursor-not-allowed disabled:opacity-60'
         : 'rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-60';
     const moreQuickActions = TIMELINE_QUICK_ACTION_OPTIONS
         .filter((option) => !timelineQuickActions.includes(option.key))
