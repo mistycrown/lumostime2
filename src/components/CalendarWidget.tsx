@@ -12,6 +12,7 @@
  * @updated 2026-09-27: Passes live sticker offsets into the optional timeline header theme.
  * @updated 2026-09-27: Renders the configured date-strip and selected-date background layers without restoring the original card separators.
  * @updated 2026-09-27: Applies the active header theme's adjustable toolbar foreground color to title-bar controls.
+ * @updated 2026-09-27: Keeps the themed right-side calendar control transparent so its foreground icon is not lost on a solid fill.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -184,7 +185,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     }}
                                     className={`
                                p-2 rounded-full border transition-all active:scale-95
-                               ${isExpanded ? 'btn-template-filled border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
+                                ${headerThemeConfig ? 'bg-transparent' : isExpanded ? 'btn-template-filled border-transparent' : 'bg-white text-stone-600 border-stone-300 hover:border-stone-500'}
                             `}
                                 >
                                     {isExpanded ? <X size={16} /> : <CalendarIcon size={16} />}
