@@ -10,6 +10,7 @@
  * @updated 2026-09-27: Added stable sticker IDs and offset helpers for live theme debugging.
  * @updated 2026-09-27: Reworked header themes into top, date-strip, selected-date, and sticker layers; added the Little Prince theme and per-theme adjustment helpers.
  * @updated 2026-09-27: Added Little Prince sticker assets and a persisted, adjustable toolbar foreground color for dark header artwork.
+ * @updated 2026-09-27: Aligned Little Prince toolbar and sticker defaults with the supplied full-width preview composition.
  */
 import React from 'react';
 
@@ -24,6 +25,7 @@ export interface TimelineHeaderThemeAdjustments {
   stickerOffsets: TimelineHeaderStickerOffsets;
   dateBackgroundScale: TimelineHeaderDateBackgroundScale;
   toolbarForegroundColor?: string;
+  toolbarButtonClassName?: string;
 }
 
 export type TimelineHeaderThemeAdjustmentMap = Partial<Record<TimelineHeaderTheme, TimelineHeaderThemeAdjustments>>;
@@ -151,7 +153,8 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
     collapsedCalendarHeight: 77,
     dateStripClassName: 'mx-2 h-[77px]',
     darkOpacityMultiplier: 0.5,
-    toolbarForegroundColor: '#FFFFFF',
+    toolbarForegroundColor: '#806861',
+    toolbarButtonClassName: '[&_button]:!bg-white/90 [&_button]:!shadow-[0_2px_8px_rgba(85,65,55,0.16)]',
     topBackground: {
       id: 'prince-top-background',
       kind: 'top-background',
@@ -183,42 +186,42 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
           kind: 'sticker',
           label: '金色星轨',
           src: `${PRINCE_ASSET_ROOT}/04_golden_star_constellation.png`,
-          className: 'pointer-events-none absolute -left-10 -top-4 z-[1] w-60',
-          opacity: 0.48
+          className: 'pointer-events-none absolute -left-9 -top-2 z-[1] w-44',
+          opacity: 0.16
         },
         {
           id: 'prince-peach-planet',
           kind: 'sticker',
           label: '蜜桃环形星球',
           src: `${PRINCE_ASSET_ROOT}/05_peach_ringed_planet.png`,
-          className: 'pointer-events-none absolute left-24 top-1 z-[2] w-11',
-          opacity: 0.84
-        }
-      ],
-      weekCard: [
+          className: 'pointer-events-none absolute left-2 top-3 z-[2] w-10',
+          opacity: 0.5
+        },
         {
           id: 'prince-with-rose',
           kind: 'sticker',
           label: '小王子与玫瑰',
           src: `${PRINCE_ASSET_ROOT}/03_little_prince_planet_with_rose.png`,
-          className: 'pointer-events-none absolute -bottom-5 -left-2 z-20 w-20',
-          opacity: 0.94
-        },
+          className: 'pointer-events-none absolute right-32 top-0 z-20 w-24 max-[380px]:w-20',
+          opacity: 0.95
+        }
+      ],
+      weekCard: [
         {
           id: 'prince-beige-planet',
           kind: 'sticker',
           label: '云间米色星球',
           src: `${PRINCE_ASSET_ROOT}/06_beige_ringed_planet_with_clouds.png`,
-          className: 'pointer-events-none absolute -bottom-3 -right-2 z-20 w-20',
-          opacity: 0.8
+          className: 'pointer-events-none absolute -bottom-3 right-0 z-20 w-12',
+          opacity: 0.58
         },
         {
           id: 'prince-pastel-clouds',
           kind: 'sticker',
           label: '粉蓝云团',
           src: `${PRINCE_ASSET_ROOT}/07_pastel_cloud_cluster.png`,
-          className: 'pointer-events-none absolute -bottom-3 left-24 z-[1] w-28',
-          opacity: 0.5
+          className: 'pointer-events-none absolute -bottom-2 right-16 z-[1] w-20',
+          opacity: 0.22
         }
       ]
     }
