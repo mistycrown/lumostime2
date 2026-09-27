@@ -28,6 +28,12 @@
 
 所有素材层都使用 `pointer-events: none` 和 `aria-hidden`，业务日期选择、Today、日历展开、快捷操作及其无障碍标签不受影响。
 
+## 入口与持久化
+
+顶部主题作为独立偏好放在“投喂小鱼干”的“时间线样式”卡片下方，不与时间线轨道样式绑定。首轮提供“原版”和“粉色手账”两个选项，默认“原版”。
+
+选择结果使用 `THEME_KEYS.TIMELINE_HEADER_THEME` 写入 localStorage，并由 SettingsContext 统一恢复和提供给 TimelineView。这样可以自由组合，例如“藤蔓轨道 + 粉色手账顶部”，后续新增顶部主题也无需调整日期交互组件。
+
 ## 验证
 
 1. TypeScript 生产构建通过；
