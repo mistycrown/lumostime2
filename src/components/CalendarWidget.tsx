@@ -13,6 +13,7 @@
  * @updated 2026-09-27: Renders the configured date-strip and selected-date background layers without restoring the original card separators.
  * @updated 2026-09-27: Applies the active header theme's adjustable toolbar foreground color to title-bar controls.
  * @updated 2026-09-27: Keeps the themed right-side calendar control transparent so its foreground icon is not lost on a solid fill.
+ * @updated 2026-09-27: Supports a theme-configured right-toolbar button surface for reference-matched header compositions.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -54,6 +55,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
     const collapsedCalendarHeight = headerThemeConfig?.collapsedCalendarHeight || 75;
     const toolbarForegroundColor = headerToolbarForegroundColor || headerThemeConfig?.toolbarForegroundColor;
+    const toolbarButtonClassName = headerThemeConfig?.toolbarButtonClassName || '';
     const toolbarStyle = toolbarForegroundColor
         ? { '--timeline-header-toolbar-color': toolbarForegroundColor } as React.CSSProperties
         : undefined;
@@ -157,7 +159,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-1 ${toolbarButtonClassName}`}>
                         {extraHeaderControls}
                     </div>
 
