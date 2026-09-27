@@ -14,6 +14,7 @@
  * @updated 2026-09-27: Applies the active header theme's adjustable toolbar foreground color to title-bar controls.
  * @updated 2026-09-27: Keeps the themed right-side calendar control transparent so its foreground icon is not lost on a solid fill.
  * @updated 2026-09-27: Supports a theme-configured right-toolbar button surface for reference-matched header compositions.
+ * @updated 2026-09-27: Limits themed toolbar button surfaces to the right-side Today and calendar controls.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -159,12 +160,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className={`flex items-center gap-1 ${toolbarButtonClassName}`}>
+                    <div className="flex items-center gap-1">
                         {extraHeaderControls}
                     </div>
 
                     {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className="flex items-center gap-1">
+                    <div className={`flex items-center gap-1 ${toolbarButtonClassName}`}>
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
