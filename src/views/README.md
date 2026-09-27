@@ -219,6 +219,7 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `TodoView.tsx`: Hid empty quick-action Arrange/Due/Completed metadata rows in the week-view badge editor so unset dates no longer render `None`.
 - `TodoView.tsx`: Added a quick duplicate-edit modal before creating todo copies, with default date cleanup plus optional tag and scope clearing.
 - `SponsorshipView.tsx`: Added a ZIP sticker import button that turns folder-based image groups into custom sticker sets, caps each group at 16 images, and rolls back failed groups.
+- `SponsorshipView.tsx`: Moved Memoir mood-calendar background controls from the Navigation tab to the Style tab, directly after calendar number settings.
 - `SceneView.tsx`, `RecordView.tsx`, `TodoView.tsx`: Moved custom background rendering onto a shared preloaded display hook, removed per-view 500ms background polling, dropped duplicate inner background layers, and reduced heavy blur on lower-end mobile devices to smooth scrolling and background switches.
 - `SceneView.tsx`, `RecordViewContainer.tsx`: Added `min-h-0` and `flex-1` guards around the scene sidebar and card stack so long scene-card lists keep scrolling correctly on some Android WebViews instead of being cut off.
 - `RecordViewContainer.tsx`, `TodoView.tsx`, `DailyReviewView.tsx`, `WeeklyReviewView.tsx`, `MonthlyReviewView.tsx`: Floating switch buttons now let default-theme fallback icons inherit the button color instead of forcing white, so non-default color schemes keep those buttons legible on white surfaces.
