@@ -8,6 +8,7 @@
  * @updated 2026-09-27: Adds toolbar foreground color tuning and includes all configured header/date stickers in layer navigation.
  * @updated 2026-09-27: Extends every background and sticker with independent size and opacity controls.
  * @updated 2026-09-27: Restores independent X/Y adjustment for every background image layer.
+ * @updated 2026-09-27: Caps panel height so extended controls scroll instead of blocking the timeline.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, RotateCcw, Save, X } from 'lucide-react';
@@ -261,7 +262,7 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
   const toolbarForegroundColor = draftAdjustments.toolbarForegroundColor || config.toolbarForegroundColor || '#FFFFFF';
 
   return (
-    <div className="fixed bottom-28 right-4 z-50 w-72 max-h-[calc(100vh-9rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-4 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-4">
+    <div className="fixed bottom-28 right-4 z-50 w-72 max-h-[min(60vh,32rem)] overflow-y-auto rounded-xl border border-stone-200 bg-white/95 p-4 shadow-2xl backdrop-blur animate-in fade-in slide-in-from-bottom-4">
       <div className="mb-4 flex items-center justify-between border-b border-stone-100 pb-3">
         <h3 className="flex items-center gap-1.5 text-sm font-bold text-stone-800"><span className="h-2 w-2 rounded-full bg-pink-400" />顶部装饰调试</h3>
         <div className="flex items-center gap-1">
