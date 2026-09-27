@@ -44,10 +44,7 @@ const APPEARANCE_STORAGE_KEYS = [
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
-  'mood_calendar_background',
   'mood_calendar_background_settings',
-  'mood_calendar_background_custom_list',
-  'mood_calendar_background_mode',
   'mood_calendar_fill_background',
   'mood_calendar_fill_background_custom_list',
   'lumos_custom_backgrounds',
@@ -155,14 +152,6 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
   const customNavigationIcons = parseJsonValue(snapshot, 'navigation_icon_custom_list_v1');
   if (Array.isArray(customNavigationIcons)) {
     customNavigationIcons.forEach((item) => addImageReference(referenced, item?.imageFilename));
-  }
-
-  const customMoodCalendarBackgrounds = parseJsonValue(snapshot, 'mood_calendar_background_custom_list');
-  if (Array.isArray(customMoodCalendarBackgrounds)) {
-    customMoodCalendarBackgrounds.forEach((item) => {
-      addImageReference(referenced, item?.imageFilename);
-      addImageReference(referenced, item?.sixWeekImageFilename);
-    });
   }
 
   const customMoodCalendarFillBackgrounds = parseJsonValue(snapshot, 'mood_calendar_fill_background_custom_list');

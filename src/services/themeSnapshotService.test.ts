@@ -20,7 +20,6 @@ vi.mock('./appearanceBackupService', () => ({
 vi.mock('./timelineStyleService', () => ({ DEFAULT_TIMELINE_STYLE_CONFIGS: {} }));
 vi.mock('./fontService', () => ({ fontService: { setFont: vi.fn(() => ({ success: true })) } }));
 vi.mock('./moodCalendarBackgroundService', () => ({
-  FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY: 'mood_calendar_fill_background',
   moodCalendarBackgroundService: { hydrateCustomBackgrounds: vi.fn(async () => undefined) }
 }));
 vi.mock('./navigationBackgroundService', () => ({ navigationBackgroundService: {

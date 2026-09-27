@@ -25,7 +25,6 @@ const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
 const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
-const CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY = 'mood_calendar_background_custom_list';
 const CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY = 'mood_calendar_fill_background_custom_list';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
 const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
@@ -46,7 +45,6 @@ interface StoredAIChatUserProfile {
 
 interface StoredImageAsset {
   imageFilename?: unknown;
-  sixWeekImageFilename?: unknown;
 }
 
 interface StoredCustomSticker {
@@ -94,7 +92,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
   const customBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_BACKGROUND_KEY, []);
   const customNavigationDecorations = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_KEY, []);
   const customNavigationIcons = readRawJson<StoredImageAsset[]>(CUSTOM_NAVIGATION_ICON_KEY, []);
-  const customMoodCalendarBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY, []);
   const customMoodCalendarFillBackgrounds = readRawJson<StoredImageAsset[]>(CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY, []);
   const customStickers = readRawJson<StoredCustomSticker[]>(CUSTOM_STICKERS_KEY, []);
   const importedThemePackages = readRawJson<StoredThemePackage[]>(
@@ -144,14 +141,10 @@ export const getSettingsReferencedImages = (): Set<string> => {
     referencedImages.add(aiChatUserProfile.avatarImage);
   }
 
-  [...customBackgrounds, ...customNavigationDecorations, ...customMoodCalendarBackgrounds, ...customMoodCalendarFillBackgrounds].forEach((asset) => {
+  [...customBackgrounds, ...customNavigationDecorations, ...customMoodCalendarFillBackgrounds].forEach((asset) => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
       referencedImages.add(`thumb_${asset.imageFilename}`);
-    }
-    if (isValidFilename(asset?.sixWeekImageFilename)) {
-      referencedImages.add(asset.sixWeekImageFilename);
-      referencedImages.add(`thumb_${asset.sixWeekImageFilename}`);
     }
   });
 
@@ -220,7 +213,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
       CUSTOM_NAVIGATION_KEY,
       'navigation_new_background_custom_list',
       CUSTOM_NAVIGATION_ICON_KEY,
-      CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY,
       CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY,
       CUSTOM_STICKERS_KEY
     ];
@@ -240,12 +232,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
             referencedImages.add(item.imageFilename);
             referencedImages.add(`thumb_${item.imageFilename}`);
           }
-          if (isValidFilename(item?.sixWeekImageFilename)) {
-            referencedImages.add(item.sixWeekImageFilename);
-            referencedImages.add(`thumb_${item.sixWeekImageFilename}`);
-          }
           if (isValidFilename(item?.thumbnailFilename)) referencedImages.add(item.thumbnailFilename);
-          if (isValidFilename(item?.sixWeekThumbnail)) referencedImages.add(item.sixWeekThumbnail);
           if (Array.isArray(item?.stageFilenames)) {
             item.stageFilenames.forEach((filename: unknown) => {
               if (isValidFilename(filename)) referencedImages.add(filename);

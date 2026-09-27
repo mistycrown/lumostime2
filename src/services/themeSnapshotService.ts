@@ -17,10 +17,7 @@ import {
 import { APPEARANCE_RESTORED_EVENT, appearanceBackupService } from './appearanceBackupService';
 import { DEFAULT_TIMELINE_STYLE_CONFIGS } from './timelineStyleService';
 import { fontService } from './fontService';
-import {
-  FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY,
-  moodCalendarBackgroundService
-} from './moodCalendarBackgroundService';
+import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 import { navigationBackgroundService } from './navigationBackgroundService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { imageService } from './imageService';
@@ -89,14 +86,12 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
       return null;
     }
   };
-  const addImageList = (key: string, includeSixWeek = false) => {
+  const addImageList = (key: string) => {
     const list = parse(key);
     if (!Array.isArray(list)) return;
     list.forEach((item) => {
       add(item?.imageFilename);
-      if (includeSixWeek) add(item?.sixWeekImageFilename);
       add(item?.thumbnailFilename);
-      add(item?.sixWeekThumbnail);
       if (Array.isArray(item?.stageFilenames)) item.stageFilenames.forEach(add);
     });
   };
@@ -105,7 +100,6 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
   addImageList('navigation_decoration_custom_list');
   addImageList('navigation_new_background_custom_list');
   addImageList('navigation_icon_custom_list_v1');
-  addImageList('mood_calendar_background_custom_list', true);
   addImageList('mood_calendar_fill_background_custom_list');
   addImageList('lumostime_timepal_custom_items');
   addImageList('lumostime_custom_stickers_v2');
@@ -192,9 +186,7 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
 export const applyDefaultThemeSupplement = async (): Promise<void> => {
   navigationBackgroundService.setEnabled(false);
   navigationIconService.setMode('text');
-  moodCalendarBackgroundService.setMode('overflow');
-  moodCalendarBackgroundService.setCurrentBackground('none', 'overflow');
-  localStorage.setItem(FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY, 'none');
+  moodCalendarBackgroundService.setCurrentBackground('none');
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, DEFAULT_ACHIEVEMENT_BOTTLE_STYLE);
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, 'default');

@@ -1,7 +1,8 @@
 /**
  * @file moodCalendarBackgroundService.test.ts
- * @input Persisted mood-calendar background modes and tuning settings
- * @output Regression coverage for isolated Fill and paired Overflow backgrounds
+ * @input Persisted single-image Memoir calendar backgrounds
+ * @output Regression coverage for selection, opacity, and removal
+ * @pos Test (UI Customization)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
@@ -32,79 +33,35 @@ describe('mood calendar background persistence', () => {
     expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
   });
 
-  it('keeps Overflow and Fill selections independent when switching modes', () => {
+  it('reads only the single-image background list', () => {
     localStorage.setItem('mood_calendar_background_custom_list', JSON.stringify([
-      { id: 'overflow-custom', name: 'Overflow', type: 'custom', url: 'blob:overflow' }
+      { id: 'legacy-pair', name: 'Legacy pair', type: 'custom', url: 'blob:legacy' }
     ]));
     localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
-      { id: 'fill-custom', name: 'Fill', type: 'custom', url: 'blob:fill', imageFilename: 'fill.png' }
+      { id: 'single-image', name: 'Single image', type: 'custom', url: 'blob:single', imageFilename: 'single.png' }
     ]));
 
-    moodCalendarBackgroundService.setCurrentBackground('overflow-custom');
-    moodCalendarBackgroundService.setMode('fill');
-    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
-    moodCalendarBackgroundService.setCurrentBackground('fill-custom');
-    moodCalendarBackgroundService.setMode('overflow');
-
-    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('overflow-custom');
-    moodCalendarBackgroundService.setMode('fill');
-    expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('fill-custom');
+    expect(moodCalendarBackgroundService.getAllBackgrounds().map((background) => background.id)).toEqual(['none', 'single-image']);
   });
 
-  it('persists Fill image opacity per background', () => {
+  it('persists opacity per single-image background', () => {
     localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
-      { id: 'fill-custom', name: 'Fill', type: 'custom', url: 'blob:fill', imageFilename: 'fill.png' }
+      { id: 'single-image', name: 'Single image', type: 'custom', url: 'blob:single', imageFilename: 'single.png' }
     ]));
-    moodCalendarBackgroundService.setMode('fill');
 
-    moodCalendarBackgroundService.saveCustomSettings('fill-custom', { opacity: 0.45 });
+    moodCalendarBackgroundService.saveCustomSettings('single-image', { opacity: 0.45 });
 
-    expect(moodCalendarBackgroundService.getBackgroundById('fill-custom')?.opacity).toBe(0.45);
-  });
-
-  it('persists per-background tuning values', () => {
-    moodCalendarBackgroundService.saveCustomSettings('calendar-1', {
-      offsetX: '12px',
-      scale: 1.2,
-      opacity: 0.8
-    });
-
-    expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')).toMatchObject({
-      offsetX: '12px',
-      scale: 1.2,
-      opacity: 0.8
-    });
-  });
-
-  it('defaults Overflow image widths to 100% and normalizes legacy defaults only', () => {
-    localStorage.setItem('mood_calendar_background_custom_list', JSON.stringify([
-      { id: 'legacy-default', name: 'Legacy default', type: 'custom', url: 'blob:legacy', scale: 1.35 },
-      { id: 'legacy-customized', name: 'Customized', type: 'custom', url: 'blob:custom', scale: 1.35 }
-    ]));
-    localStorage.setItem('mood_calendar_background_settings', JSON.stringify({
-      'legacy-customized': { scale: 1.6 }
-    }));
-
-    expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')?.scale).toBe(1);
-    expect(moodCalendarBackgroundService.getBackgroundById('legacy-default')?.scale).toBe(1);
-    expect(moodCalendarBackgroundService.getBackgroundById('legacy-customized')?.scale).toBe(1.6);
-  });
-
-  it('exposes separate built-in assets for five-week and six-week calendars', () => {
-    expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')).toMatchObject({
-      url: expect.stringContaining('/calendar/tuzi/5.png'),
-      sixWeekUrl: expect.stringContaining('/calendar/tuzi/6.png')
-    });
+    expect(moodCalendarBackgroundService.getBackgroundById('single-image')?.opacity).toBe(0.45);
   });
 
   it('falls back to no background after deleting the selected custom image', async () => {
-    localStorage.setItem('mood_calendar_background_custom_list', JSON.stringify([
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
       { id: 'custom-1', name: 'Test', type: 'custom', url: 'blob:test' }
     ]));
     moodCalendarBackgroundService.setCurrentBackground('custom-1');
 
     await expect(moodCalendarBackgroundService.deleteCustomBackground('custom-1')).resolves.toBe(true);
     expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('none');
-    expect(localStorage.getItem('mood_calendar_background')).toBe('none');
+    expect(localStorage.getItem('mood_calendar_fill_background')).toBe('none');
   });
 });

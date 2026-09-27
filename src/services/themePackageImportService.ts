@@ -389,7 +389,6 @@ const removePackageDerivedState = (
     } catch { /* Preserve malformed user data for manual recovery. */ }
   }
 
-  removeArrayItems('mood_calendar_background_custom_list', (item) => String(item.id || ''));
   removeArrayItems('mood_calendar_fill_background_custom_list', (item) => String(item.id || ''));
   removeObjectKey('navigation_new_background_settings', `${prefix}navigation-background`);
 
@@ -400,7 +399,6 @@ const removePackageDerivedState = (
   clearNamespacedSelection(THEME_KEYS.CURRENT_BACKGROUND, 'default');
   clearNamespacedSelection(THEME_KEYS.NAVIGATION_DECORATION, 'default');
   clearNamespacedSelection('navigation_new_background', 'default');
-  clearNamespacedSelection('mood_calendar_background', 'none');
   clearNamespacedSelection('mood_calendar_fill_background', 'none');
   clearNamespacedSelection(CARD_BACKGROUND_CURRENT_KEY, '');
 
