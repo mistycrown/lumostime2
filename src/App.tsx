@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-09-27: Hides the bottom navigation while any AI newspaper detail is open.
  * @updated 2026-09-20: Restores the AI workspace after review newspaper details opened from the AI homepage are closed.
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
  * @updated 2026-08-27: Keeps Routine starts on the Record page by bypassing timer auto-jump preferences.
@@ -1103,6 +1104,7 @@ const AppContent: React.FC = () => {
         isVisible={
           !focusDetailSessionId &&
           !isTodoModalOpen &&
+          !hasReviewNewspaperOpen &&
           !isDailyReviewOpen &&
           !isOnThisDayOpen &&
           !isWeeklyReviewOpen &&
