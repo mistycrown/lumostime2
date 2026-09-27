@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Added imported theme package metadata storage for appearance sync.
  * @updated 2026-09-27: Added the independent timeline header decoration theme key.
  * @updated 2026-09-27: Added persisted per-sticker timeline header adjustment offsets.
+ * @updated 2026-09-27: Added per-theme timeline header adjustment storage for date-background scaling and sticker positions.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -51,6 +52,7 @@ export const THEME_KEYS = {
     TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
     TIMELINE_HEADER_THEME: 'lumostime_timeline_header_theme',
     TIMELINE_HEADER_STICKER_OFFSETS: 'lumostime_timeline_header_sticker_offsets',
+    TIMELINE_HEADER_ADJUSTMENTS: 'lumostime_timeline_header_adjustments_v2',
     TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
     TIMELINE_LAYOUT: 'lumostime_timeline_layout',
     TIMELINE_TODO_SIDEBAR_COLLAPSED: 'lumostime_timeline_todo_sidebar_collapsed',

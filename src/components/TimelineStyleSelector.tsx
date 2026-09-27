@@ -8,6 +8,7 @@
  * @updated 2026-03-28: Restored the default style preview to a classic filled dot so the original timeline option remains visually recognizable in the compact grid.
  * @updated 2026-09-27: Added an independent persisted header-theme selector below the timeline rail styles.
  * @updated 2026-09-27: Adds a timeline-page entry for the per-sticker header debugger.
+ * @updated 2026-09-27: Adds a Little Prince layered-header preview alongside the pink notebook theme.
  */
 
 import React, { useMemo } from 'react';
@@ -103,6 +104,17 @@ const TimelineHeaderPreview: React.FC<{ option: TimelineHeaderThemeOption }> = (
         <div className="absolute inset-x-0 top-0 h-8 border-b border-stone-100 bg-white" />
         <div className="absolute left-3 top-3 flex gap-1"><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /></div>
         <div className="absolute inset-x-3 bottom-3 h-7 rounded-lg border border-stone-100 bg-white" />
+      </div>
+    );
+  }
+
+  if (option.value === 'little-prince') {
+    return (
+      <div className="relative h-full w-full overflow-hidden bg-[#9db9de]">
+        <img src="/mdlo/prince/bak.png" alt="" className="absolute inset-x-0 top-0 h-full w-full object-cover object-[center_38%] opacity-70" />
+        <div className="absolute left-3 top-3 flex gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white/80" /><span className="h-1.5 w-1.5 rounded-full bg-white/80" /><span className="h-1.5 w-1.5 rounded-full bg-white/80" /></div>
+        <img src="/mdlo/prince/calendar.png" alt="" className="absolute inset-x-2 bottom-2 h-8 w-[calc(100%-1rem)] object-fill" />
+        <img src="/mdlo/prince/highlight.png" alt="" className="absolute bottom-2 left-1/2 h-8 w-7 -translate-x-1/2 object-cover" />
       </div>
     );
   }

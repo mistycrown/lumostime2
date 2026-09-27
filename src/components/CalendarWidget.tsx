@@ -10,6 +10,7 @@
  * @updated 2026-09-27: Aligns themed week cards to the calendar top and removes their lower divider.
  * @updated 2026-09-27: Removes themed header card surfaces, shadows, and toolbar separators for a continuous canvas.
  * @updated 2026-09-27: Passes live sticker offsets into the optional timeline header theme.
+ * @updated 2026-09-27: Renders the configured date-strip and selected-date background layers without restoring the original card separators.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -19,7 +20,7 @@ import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { filterCountableLogs } from '../utils/statLogUtils';
-import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, type TimelineHeaderStickerOffsets, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
+import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, TimelineHeaderSelectedDateBackground, type TimelineHeaderDateBackgroundScale, type TimelineHeaderStickerOffsets, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -41,13 +42,14 @@ interface CalendarWidgetProps {
     onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
     headerTheme?: TimelineHeaderTheme;
     headerStickerOffsets?: TimelineHeaderStickerOffsets;
+    headerDateBackgroundScale?: TimelineHeaderDateBackgroundScale;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerDateBackgroundScale }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
-    const collapsedCalendarHeight = headerThemeConfig ? 77 : 75;
+    const collapsedCalendarHeight = headerThemeConfig?.collapsedCalendarHeight || 75;
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -137,7 +139,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
     return (
         <div className={hideTopBar
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
-            : `relative bg-white/80 backdrop-blur-md z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
+            : `relative ${headerThemeConfig?.containerClassName || 'bg-white/80 backdrop-blur-md'} z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
         }>
             <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} />
 
@@ -216,10 +218,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={calendarAreaTransition}
-                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? `mx-2 h-[77px] ${headerThemeConfig.collapsedCardClassName}` : 'h-[75px]'}`}
+                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? headerThemeConfig.dateStripClassName : 'h-[75px]'}`}
                         style={headerThemeConfig ? undefined : { width: '100%' }}
                     >
-                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} />
+                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} dateBackgroundScale={headerDateBackgroundScale} />
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -236,11 +238,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     className={`relative z-10
                                         w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
                                         ${selected
-                                            ? 'btn-template-filled'
+                                            ? headerThemeConfig?.selectedDateBackground ? 'text-stone-700' : 'btn-template-filled'
                                             : 'bg-transparent text-stone-400'
                                         }
                                     `}
                                 >
+                                    {selected && <TimelineHeaderSelectedDateBackground theme={headerTheme} />}
                                     {/* Week Day - Fixed Top Position */}
                                     <div className="absolute top-2.5 left-0 right-0 flex justify-center">
                                         <span className="text-[10px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
