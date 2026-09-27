@@ -175,12 +175,12 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
-                    <div className={`flex translate-y-[2px] items-center gap-1 ${toolbarLeftButtonClassName}`}>
+                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarLeftButtonClassName}`}>
                         {extraHeaderControls}
                     </div>
 
                     {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className={`flex translate-y-[2px] items-center gap-1 ${toolbarButtonClassName}`}>
+                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarButtonClassName}`}>
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
@@ -274,14 +274,14 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                 >
                                     {selected && <TimelineHeaderSelectedDateBackground theme={headerTheme} scale={headerSelectedDateBackgroundScale} opacity={headerSelectedDateBackgroundOpacity} />}
                                     {/* Week Day - Fixed Top Position */}
-                                    <div className="absolute top-[12px] left-0 right-0 flex justify-center">
-                                        <span className="text-[9px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
+                                    <div className="absolute top-[14px] left-0 right-0 flex justify-center">
+                                        <span className="text-[8px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">
                                             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}
                                         </span>
                                     </div>
 
                                     {/* Date Number - Fixed Top Position */}
-                                    <div className="absolute top-[22px] left-0 right-0 flex justify-center h-6 items-center">
+                                    <div className="absolute top-[20px] left-0 right-0 flex justify-center h-6 items-center">
                                         <span className="text-lg font-serif font-bold leading-none relative">
                                             {day.getDate()}
                                             {/* Custom Underline for Today */}
