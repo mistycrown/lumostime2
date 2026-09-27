@@ -39,6 +39,9 @@
  * @updated 2026-09-27: Passes the saved per-theme toolbar foreground color into the calendar header.
  * @updated 2026-09-27: Passes all persisted header-layer size and opacity adjustments into the calendar renderer.
  * @updated 2026-09-27: Passes persisted X/Y offsets for all theme image layers into the calendar renderer.
+ * @updated 2026-09-27: Applies the Little Prince shortcut button surface directly to each rendered quick action.
+ * @updated 2026-09-27: Uses a translucent white shortcut surface so the starry header artwork remains visible.
+ * @updated 2026-09-27: Reduces Little Prince shortcut circles to a compact 36px footprint.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -615,6 +618,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const configuredQuickActions = timelineQuickActions
         .map((actionKey) => quickActionMap[actionKey])
         .filter(Boolean);
+    const timelineShortcutButtonClassName = timelineHeaderTheme === 'little-prince'
+        ? 'flex h-9 w-9 items-center justify-center rounded-full !bg-white/55 !p-0 text-stone-400 shadow-[0_2px_8px_rgba(85,65,55,0.1)] transition-colors hover:!bg-white/70 disabled:cursor-not-allowed disabled:opacity-60'
+        : 'rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-60';
     const moreQuickActions = TIMELINE_QUICK_ACTION_OPTIONS
         .filter((option) => !timelineQuickActions.includes(option.key))
         .map((option) => ({ option, action: quickActionMap[option.key] }))
@@ -1510,7 +1516,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                     type="button"
                                     ref={timelineQuickActionsButtonRef}
                                     onClick={() => setIsTimelineQuickActionsMenuOpen((open) => !open)}
-                                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+                                    className={timelineShortcutButtonClassName}
                                     title="更多"
                                     aria-label="更多快捷操作"
                                     aria-haspopup="menu"
@@ -1553,7 +1559,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                     key={action.label}
                                     onClick={(event) => action.onClick(event)}
                                     disabled={action.disabled}
-                                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                                    className={timelineShortcutButtonClassName}
                                     title={action.title}
                                 >
                                     {action.icon}
