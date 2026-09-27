@@ -64,6 +64,9 @@ export default defineConfig(({ mode }) => {
         }
       },
     },
+    optimizeDeps: {
+      include: ['@capawesome/capacitor-screen-orientation'],
+    },
     plugins: [
       copyPublicAssetsWithoutGit(),
       react(),

@@ -4,6 +4,7 @@
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
  * @description The main component that holds the global state (logs, todos, active sessions) and handles routing between views and overlays, including preserving standalone return paths for search and custom filters while keeping export/import, NFC stop confirmation, and reset flows aligned with repository-backed data.
+ * @updated 2026-09-27: Recovers once from stale Vite dependencies when loading the focus detail overlay.
  * @updated 2026-09-27: Hides the bottom navigation while any AI newspaper detail is open.
  * @updated 2026-09-20: Restores the AI workspace after review newspaper details opened from the AI homepage are closed.
  * @updated 2026-08-26: Makes Routine transitions wait for each stopped step to enter the shared log-save path.
@@ -75,6 +76,7 @@ import { ReferenceDeleteModal } from './components/ReferenceDeleteModal';
 import { SyncConflictModal } from './components/SyncConflictModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
 import { BottomNavigation } from './components/BottomNavigation';
+import { LazyViewRecoveryBoundary } from './components/LazyViewRecoveryBoundary';
 
 import { useLogManager } from './hooks/useLogManager';
 import { useTodoManager } from './hooks/useTodoManager';
@@ -1220,38 +1222,40 @@ const AppContent: React.FC = () => {
         if (!session) return null;
         
         return (
-          <React.Suspense fallback={<OverlayFallback label="正在加载专注详情..." />}>
-            <FocusDetailView
-              session={session}
-              todos={todos}
-              categories={categories}
-              todoCategories={normalizedTodoCategories}
-              scopes={scopes}
-              logs={logs}
-              autoLinkRules={autoLinkRules}
-              autoApplyAutoLinkRules={autoApplyAutoLinkRules}
-              autoApplyTodoLink={autoApplyTodoLink}
-              autoEnterImmersive={shouldAutoEnterImmersive}
-              onClose={() => {
-                setFocusDetailSessionId(null);
-                setShouldAutoEnterImmersive(false);
-              }}
-              onCancel={cancelSession}
-              onComplete={(finalSession) => {
-                handleStopActivityWrapper(finalSession.id, finalSession);
-                setFocusDetailSessionId(null);
-                setShouldAutoEnterImmersive(false);
-              }}
-              onCompleteLinkedTodo={todoManager.handleCompleteTodo}
-              onUpdate={(updated) => {
-                setActiveSessions(prev => prev.map(s =>
-                  s.id === updated.id ? updated : s
-                ));
-              }}
-              onUpdateActivity={handleUpdateActivity}
-              autoFocusNote={autoFocusNote}
-            />
-          </React.Suspense>
+          <LazyViewRecoveryBoundary fallback={<OverlayFallback label="专注详情加载失败，请刷新后重试" />}>
+            <React.Suspense fallback={<OverlayFallback label="正在加载专注详情..." />}>
+              <FocusDetailView
+                session={session}
+                todos={todos}
+                categories={categories}
+                todoCategories={normalizedTodoCategories}
+                scopes={scopes}
+                logs={logs}
+                autoLinkRules={autoLinkRules}
+                autoApplyAutoLinkRules={autoApplyAutoLinkRules}
+                autoApplyTodoLink={autoApplyTodoLink}
+                autoEnterImmersive={shouldAutoEnterImmersive}
+                onClose={() => {
+                  setFocusDetailSessionId(null);
+                  setShouldAutoEnterImmersive(false);
+                }}
+                onCancel={cancelSession}
+                onComplete={(finalSession) => {
+                  handleStopActivityWrapper(finalSession.id, finalSession);
+                  setFocusDetailSessionId(null);
+                  setShouldAutoEnterImmersive(false);
+                }}
+                onCompleteLinkedTodo={todoManager.handleCompleteTodo}
+                onUpdate={(updated) => {
+                  setActiveSessions(prev => prev.map(s =>
+                    s.id === updated.id ? updated : s
+                  ));
+                }}
+                onUpdateActivity={handleUpdateActivity}
+                autoFocusNote={autoFocusNote}
+              />
+            </React.Suspense>
+          </LazyViewRecoveryBoundary>
         );
       })()}
 
