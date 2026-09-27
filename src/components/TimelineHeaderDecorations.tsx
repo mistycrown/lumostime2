@@ -14,6 +14,7 @@
  * @updated 2026-09-27: Refined Little Prince sticker scale and edge placement to preserve the header's functional controls and date labels.
  * @updated 2026-09-27: Preserves the Little Prince date-paper artwork aspect ratio instead of stretching it into the date strip.
  * @updated 2026-09-27: Keeps the Little Prince illustration at sticker scale and hides it during expanded calendar browsing.
+ * @updated 2026-09-27: Extends configured top backgrounds through expanded calendars and adds a subtle left-toolbar control surface.
  */
 import React from 'react';
 
@@ -28,7 +29,6 @@ export interface TimelineHeaderThemeAdjustments {
   stickerOffsets: TimelineHeaderStickerOffsets;
   dateBackgroundScale: TimelineHeaderDateBackgroundScale;
   toolbarForegroundColor?: string;
-  toolbarButtonClassName?: string;
 }
 
 export type TimelineHeaderThemeAdjustmentMap = Partial<Record<TimelineHeaderTheme, TimelineHeaderThemeAdjustments>>;
@@ -46,6 +46,7 @@ type TimelineHeaderLayerAsset = {
   label: string;
   src: string;
   className: string;
+  expandedClassName?: string;
   opacity?: number;
 };
 
@@ -66,6 +67,8 @@ export type TimelineHeaderThemeConfig = {
   dateStripClassName: string;
   darkOpacityMultiplier: number;
   toolbarForegroundColor?: string;
+  toolbarButtonClassName?: string;
+  toolbarLeftButtonClassName?: string;
   topBackground?: TimelineHeaderBackgroundAsset;
   dateBackground?: TimelineHeaderBackgroundAsset;
   selectedDateBackground?: TimelineHeaderBackgroundAsset;
@@ -100,6 +103,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
       label: '顶部浅色云纹',
       src: `${PINK_ASSET_ROOT}/01_top_header_cloud_border.png`,
       className: 'absolute inset-x-0 top-0 z-0 h-[132px] w-full object-cover object-center',
+      expandedClassName: 'absolute inset-0 z-0 h-full w-full object-cover object-center',
       opacity: 0.62
     },
     stickers: {
@@ -159,12 +163,14 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
     darkOpacityMultiplier: 0.5,
     toolbarForegroundColor: '#806861',
     toolbarButtonClassName: '[&_button]:!bg-white/90 [&_button]:!shadow-[0_2px_8px_rgba(85,65,55,0.16)]',
+    toolbarLeftButtonClassName: '[&_button]:!bg-white/24 [&_button]:!shadow-[0_1px_5px_rgba(255,255,255,0.2)]',
     topBackground: {
       id: 'prince-top-background',
       kind: 'top-background',
       label: '星空顶部背景',
       src: `${PRINCE_ASSET_ROOT}/01_top_header_background.png`,
       className: 'absolute inset-x-0 top-0 z-0 h-[132px] w-full object-cover object-[center_43%]',
+      expandedClassName: 'absolute inset-0 z-0 h-full w-full object-cover object-center',
       opacity: 0.54
     },
     dateBackground: {
@@ -367,7 +373,9 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
           src={background.src}
           alt=""
           draggable={false}
-          className={background.className}
+          className={scope === 'header' && isCalendarExpanded
+            ? background.expandedClassName || background.className
+            : background.className}
           style={scope === 'week-card'
             ? { opacity: background.opacity ?? 1, transform: `scale(${dateBackgroundScale.x}, ${dateBackgroundScale.y})` }
             : { opacity: background.opacity ?? 1 }}
