@@ -14,7 +14,6 @@ const AI_CHAT_USER_PROFILE_KEY = 'lumostime_ai_chat_user_profile_v1';
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_KEY = 'navigation_decoration_custom_list';
 const CUSTOM_NAVIGATION_ICON_KEY = 'navigation_icon_custom_list_v1';
-const CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY = 'mood_calendar_background_custom_list';
 const CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY = 'mood_calendar_fill_background_custom_list';
 
 const createLocalStorageMock = (): LocalStorageMock => {
@@ -76,9 +75,6 @@ describe('getSettingsReferencedImages', () => {
     localStorage.setItem(CUSTOM_NAVIGATION_ICON_KEY, JSON.stringify([
       { imageFilename: 'custom-navigation-icon.webp' }
     ]));
-    localStorage.setItem(CUSTOM_MOOD_CALENDAR_BACKGROUND_KEY, JSON.stringify([
-      { imageFilename: 'custom-mood-calendar.png' }
-    ]));
     localStorage.setItem(CUSTOM_MOOD_CALENDAR_FILL_BACKGROUND_KEY, JSON.stringify([
       { imageFilename: 'custom-mood-calendar-fill.png' }
     ]));
@@ -86,12 +82,10 @@ describe('getSettingsReferencedImages', () => {
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'custom-background.png',
       'custom-mood-calendar-fill.png',
-      'custom-mood-calendar.png',
       'custom-navigation-icon.webp',
       'custom-navigation.png',
       'thumb_custom-background.png',
       'thumb_custom-mood-calendar-fill.png',
-      'thumb_custom-mood-calendar.png',
       'thumb_custom-navigation-icon.webp',
       'thumb_custom-navigation.png'
     ]);

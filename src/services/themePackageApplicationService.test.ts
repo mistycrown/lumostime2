@@ -53,12 +53,11 @@ vi.mock('./appearanceBackupService', () => ({
 }));
 
 vi.mock('./moodCalendarBackgroundService', () => ({
-  FILL_MOOD_CALENDAR_BACKGROUND_CURRENT_KEY: 'mood_calendar_fill_background',
-  FILL_MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY: 'mood_calendar_fill_background_custom_list',
+  MOOD_CALENDAR_BACKGROUND_CURRENT_KEY: 'mood_calendar_fill_background',
+  MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY: 'mood_calendar_fill_background_custom_list',
   moodCalendarBackgroundService: {
     hydrateCustomBackgrounds: vi.fn(async () => undefined),
-    setCurrentBackground: vi.fn(),
-    setMode: vi.fn()
+    setCurrentBackground: vi.fn()
   }
 }));
 

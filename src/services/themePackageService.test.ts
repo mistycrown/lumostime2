@@ -153,7 +153,7 @@ describe('parseThemePackage', () => {
     expect(result.manifest.config).toEqual({});
   });
 
-  it('requires both Memoir background sizes when either is declared', async () => {
+  it('rejects a Memoir background that uses a legacy paired-image field', async () => {
     const manifest = {
       ...baseManifest,
       config: {
@@ -174,13 +174,12 @@ describe('parseThemePackage', () => {
     });
   });
 
-  it('accepts a single image for Memoir fill mode', async () => {
+  it('accepts a single image for a Memoir background', async () => {
     const manifest = {
       ...baseManifest,
       config: {
         memoirCalendar: {
           background: {
-            mode: 'fill',
             image: 'assets/memoir-calendar/fill.webp'
           }
         }
@@ -193,11 +192,11 @@ describe('parseThemePackage', () => {
     }));
 
     expect(result.manifest.config.memoirCalendar).toMatchObject({
-      background: { mode: 'fill', image: 'assets/memoir-calendar/fill.webp' }
+      background: { image: 'assets/memoir-calendar/fill.webp' }
     });
   });
 
-  it('requires the image shape to match the Memoir background mode', async () => {
+  it('rejects a Memoir background that mixes a mode with paired-image fields', async () => {
     const manifest = {
       ...baseManifest,
       config: {

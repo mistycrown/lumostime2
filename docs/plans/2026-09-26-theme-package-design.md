@@ -196,14 +196,12 @@ assets/
 
 ### Memoir 日历背景
 
-图片和模式属于资源；`apply.memoirCalendar.backgroundId` 选择资源 ID。`mode: "overflow"` 必须同时提供 `fiveWeek` 和 `sixWeek`；`mode: "fill"` 只提供 `image`。如需调节图片布局，将设置写入资源的 `settings`。
+图片属于资源；`apply.memoirCalendar.backgroundId` 选择资源 ID。Memoir 只支持 `image` 单图，不要配置 `mode`、`fiveWeek` 或 `sixWeek`。如需调节图片透明度，将设置写入资源的 `settings`。
 
 ```json
 "resources": { "memoirCalendarBackgrounds": [{
-  "id": "main", "mode": "overflow",
-  "fiveWeek": "assets/memoir-calendar/five-week.webp",
-  "sixWeek": "assets/memoir-calendar/six-week.webp",
-  "settings": { "offsetX": "0px", "offsetY": "0px", "scale": 1.35, "opacity": 1 }
+  "id": "main", "image": "assets/memoir-calendar/background.webp",
+  "settings": { "opacity": 1 }
 }] },
 "apply": { "memoirCalendar": { "backgroundId": "main" } }
 ```

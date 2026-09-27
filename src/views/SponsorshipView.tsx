@@ -1969,26 +1969,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     <AchievementBottleStyleSelector />
                                     <CalendarNumberStyleSelector />
                                     <div className="rounded-2xl bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
-                                        <MoodCalendarBackgroundSelector
-                                            onToast={onToast}
-                                            onOpenDebugger={() => {
-                                                onBack();
-                                                setIsJournalMode(true);
-                                                setCurrentView(AppView.REVIEW);
-                                                setIsSettingsOpen(false);
-                                                let attempts = 0;
-                                                const openDebugger = () => {
-                                                    const open = (window as any).LumosTime?.debug?.enableMoodCalendarBackground;
-                                                    if (typeof open === 'function') {
-                                                        open();
-                                                        return;
-                                                    }
-                                                    attempts += 1;
-                                                    if (attempts < 90) window.requestAnimationFrame(openDebugger);
-                                                };
-                                                window.requestAnimationFrame(openDebugger);
-                                            }}
-                                        />
+                                        <MoodCalendarBackgroundSelector onToast={onToast} />
                                     </div>
                                     <TimelineStyleSelector
                                         onToast={onToast}

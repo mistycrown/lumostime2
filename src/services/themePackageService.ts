@@ -6,7 +6,7 @@
  * @description Parses and validates LumoTime theme packages before any persistent resource or setting mutation.
  * @updated 2026-09-26: Added version-one theme package manifest parsing and archive safety validation.
  * @updated 2026-09-26: Ignores .gitkeep directory markers used by the editable package template.
- * @updated 2026-09-26: Validates Memoir overflow/fill background mode and matching image shape.
+ * @updated 2026-09-27: Validates a single-image Memoir calendar background.
  * @updated 2026-09-26: Validates explicit legacy/modern navigation modes for compatible theme packages.
  * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
  * @updated 2026-09-27: Limits each version-two theme package to one card-background group.
@@ -372,20 +372,13 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
     const background = (memoirCalendar as { background?: unknown }).background;
     if (background && typeof background === 'object' && !Array.isArray(background)) {
       const backgroundRecord = background as Record<string, unknown>;
-      const mode = backgroundRecord.mode;
       const hasFiveWeek = typeof backgroundRecord.fiveWeek === 'string';
       const hasSixWeek = typeof backgroundRecord.sixWeek === 'string';
-      const hasFillImage = typeof backgroundRecord.image === 'string';
-      const validOverflow = hasFiveWeek && hasSixWeek && !hasFillImage;
-      const validFill = mode === 'fill' && hasFillImage && !hasFiveWeek && !hasSixWeek;
-      const validLegacyOverflow = mode === undefined && hasFiveWeek && hasSixWeek && !hasFillImage;
-      if ((mode === 'overflow' && !validOverflow)
-        || (mode === 'fill' && !validFill)
-        || (mode !== undefined && mode !== 'fill' && mode !== 'overflow')
-        || (mode === undefined && !validLegacyOverflow)) {
+      const hasImage = typeof backgroundRecord.image === 'string';
+      if (!hasImage || hasFiveWeek || hasSixWeek || 'mode' in backgroundRecord) {
         throw new ThemePackageValidationError(
           'INVALID_CONFIGURATION',
-          'Memoir 背景须配置 mode；overflow 需提供 fiveWeek 和 sixWeek，fill 需提供 image',
+          'Memoir 背景仅支持 image 单图配置，且不能包含 mode、fiveWeek 或 sixWeek',
           'config.memoirCalendar.background'
         );
       }

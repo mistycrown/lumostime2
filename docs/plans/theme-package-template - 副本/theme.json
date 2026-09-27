@@ -88,7 +88,7 @@
       ] }
     ],
     "memoirCalendarBackgrounds": [
-      { "id": "main", "mode": "overflow", "fiveWeek": "assets/memoir-calendar/five-week.png", "sixWeek": "assets/memoir-calendar/six-week.png" }
+      { "id": "main", "image": "assets/memoir-calendar/background.png" }
     ],
     "cardBackgroundGroups": [
       { "id": "test-cards", "name": "测试卡片背景", "alignment": "right-bottom", "files": ["assets/background/main.png"] }
