@@ -19,6 +19,7 @@
  * @updated 2026-09-27: Adds the configured low-opacity background surface to left-side themed header controls.
  * @updated 2026-09-27: Applies independently adjustable themed layer scale/opacity and synchronizes collapsed date text with toolbar color.
  * @updated 2026-09-27: Keeps themed borders on right-side date controls while allowing independent left shortcut surfaces.
+ * @updated 2026-09-27: Passes X/Y offsets for every themed image layer into the calendar renderer.
  * @updated 2026-09-27: Tightens the original timeline header controls and weekday/date rhythm.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -29,7 +30,7 @@ import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { filterCountableLogs } from '../utils/statLogUtils';
-import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, TimelineHeaderSelectedDateBackground, type TimelineHeaderDateBackgroundScale, type TimelineHeaderLayerScale, type TimelineHeaderStickerOffsets, type TimelineHeaderStickerOpacities, type TimelineHeaderStickerScales, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
+import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, TimelineHeaderSelectedDateBackground, type TimelineHeaderDateBackgroundScale, type TimelineHeaderLayerOffset, type TimelineHeaderLayerScale, type TimelineHeaderStickerOffsets, type TimelineHeaderStickerOpacities, type TimelineHeaderStickerScales, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -53,16 +54,19 @@ interface CalendarWidgetProps {
     headerStickerOffsets?: TimelineHeaderStickerOffsets;
     headerStickerScales?: TimelineHeaderStickerScales;
     headerStickerOpacities?: TimelineHeaderStickerOpacities;
+    headerTopBackgroundOffset?: TimelineHeaderLayerOffset;
     headerTopBackgroundScale?: TimelineHeaderLayerScale;
     headerTopBackgroundOpacity?: number;
     headerDateBackgroundScale?: TimelineHeaderDateBackgroundScale;
+    headerDateBackgroundOffset?: TimelineHeaderLayerOffset;
     headerDateBackgroundOpacity?: number;
+    headerSelectedDateBackgroundOffset?: TimelineHeaderLayerOffset;
     headerSelectedDateBackgroundScale?: TimelineHeaderLayerScale;
     headerSelectedDateBackgroundOpacity?: number;
     headerToolbarForegroundColor?: string;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerStickerScales, headerStickerOpacities, headerTopBackgroundScale, headerTopBackgroundOpacity, headerDateBackgroundScale, headerDateBackgroundOpacity, headerSelectedDateBackgroundScale, headerSelectedDateBackgroundOpacity, headerToolbarForegroundColor }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme, headerStickerOffsets, headerStickerScales, headerStickerOpacities, headerTopBackgroundOffset, headerTopBackgroundScale, headerTopBackgroundOpacity, headerDateBackgroundOffset, headerDateBackgroundScale, headerDateBackgroundOpacity, headerSelectedDateBackgroundOffset, headerSelectedDateBackgroundScale, headerSelectedDateBackgroundOpacity, headerToolbarForegroundColor }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
     const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
@@ -167,7 +171,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
             : `relative ${headerThemeConfig?.containerClassName || 'bg-white/80 backdrop-blur-md'} z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
         }>
-            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} topBackgroundScale={headerTopBackgroundScale} topBackgroundOpacity={headerTopBackgroundOpacity} isCalendarExpanded={isExpanded} />
+            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} topBackgroundOffset={headerTopBackgroundOffset} topBackgroundScale={headerTopBackgroundScale} topBackgroundOpacity={headerTopBackgroundOpacity} isCalendarExpanded={isExpanded} />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
@@ -250,7 +254,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? headerThemeConfig.dateStripClassName : 'h-[75px]'}`}
                         style={headerThemeConfig ? undefined : { width: '100%' }}
                     >
-                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} dateBackgroundScale={headerDateBackgroundScale} dateBackgroundOpacity={headerDateBackgroundOpacity} />
+                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" stickerOffsets={headerStickerOffsets} stickerScales={headerStickerScales} stickerOpacities={headerStickerOpacities} dateBackgroundOffset={headerDateBackgroundOffset} dateBackgroundScale={headerDateBackgroundScale} dateBackgroundOpacity={headerDateBackgroundOpacity} />
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -273,7 +277,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                     `}
                                     style={dateTextStyle}
                                 >
-                                    {selected && <TimelineHeaderSelectedDateBackground theme={headerTheme} scale={headerSelectedDateBackgroundScale} opacity={headerSelectedDateBackgroundOpacity} />}
+                                    {selected && <TimelineHeaderSelectedDateBackground theme={headerTheme} offset={headerSelectedDateBackgroundOffset} scale={headerSelectedDateBackgroundScale} opacity={headerSelectedDateBackgroundOpacity} />}
                                     {/* Week Day - Fixed Top Position */}
                                     <div className="absolute top-[14px] left-0 right-0 flex justify-center">
                                         <span className="text-[8px] font-serif font-medium uppercase tracking-wider opacity-80 leading-none">

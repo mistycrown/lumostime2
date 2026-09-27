@@ -17,6 +17,7 @@
  * @updated 2026-09-27: Extends configured top backgrounds through expanded calendars and adds a subtle left-toolbar control surface.
  * @updated 2026-09-27: Adds persistent scale and opacity controls for every themed background and sticker layer.
  * @updated 2026-09-27: Gives Little Prince left-toolbar shortcuts distinct white circular surfaces.
+ * @updated 2026-09-27: Adds independent X/Y offsets so every image layer shares the same four visual controls.
  */
 import React from 'react';
 
@@ -26,6 +27,7 @@ export type TimelineHeaderDecorationScope = 'header' | 'week-card';
 export type TimelineHeaderStickerId = string;
 export type TimelineHeaderStickerOffsets = Partial<Record<TimelineHeaderStickerId, { x: number; y: number }>>;
 export type TimelineHeaderLayerScale = { x: number; y: number };
+export type TimelineHeaderLayerOffset = { x: number; y: number };
 export type TimelineHeaderDateBackgroundScale = TimelineHeaderLayerScale;
 export type TimelineHeaderStickerScales = Partial<Record<TimelineHeaderStickerId, number>>;
 export type TimelineHeaderStickerOpacities = Partial<Record<TimelineHeaderStickerId, number>>;
@@ -34,10 +36,13 @@ export interface TimelineHeaderThemeAdjustments {
   stickerOffsets: TimelineHeaderStickerOffsets;
   stickerScales: TimelineHeaderStickerScales;
   stickerOpacities: TimelineHeaderStickerOpacities;
+  topBackgroundOffset: TimelineHeaderLayerOffset;
   topBackgroundScale: TimelineHeaderLayerScale;
   topBackgroundOpacity: number;
+  dateBackgroundOffset: TimelineHeaderLayerOffset;
   dateBackgroundScale: TimelineHeaderDateBackgroundScale;
   dateBackgroundOpacity: number;
+  selectedDateBackgroundOffset: TimelineHeaderLayerOffset;
   selectedDateBackgroundScale: TimelineHeaderLayerScale;
   selectedDateBackgroundOpacity: number;
   toolbarForegroundColor?: string;
@@ -93,6 +98,7 @@ export type TimelineHeaderThemeConfig = {
 export const DEFAULT_TIMELINE_HEADER_THEME: TimelineHeaderThemeSelection = 'none';
 export const DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE: TimelineHeaderDateBackgroundScale = { x: 1, y: 1 };
 export const DEFAULT_TIMELINE_HEADER_LAYER_SCALE: TimelineHeaderLayerScale = { x: 1, y: 1 };
+export const DEFAULT_TIMELINE_HEADER_LAYER_OFFSET: TimelineHeaderLayerOffset = { x: 0, y: 0 };
 
 export const TIMELINE_HEADER_THEME_OPTIONS: TimelineHeaderThemeOption[] = [
   { value: 'none', label: '原版', description: '保留简洁顶部' },
@@ -299,6 +305,14 @@ export const normalizeTimelineHeaderDateBackgroundScale = (value: unknown): Time
   };
 };
 
+export const normalizeTimelineHeaderLayerOffset = (value: unknown): TimelineHeaderLayerOffset => {
+  const rawOffset = value && typeof value === 'object' ? value as { x?: unknown; y?: unknown } : {};
+  return {
+    x: normalizeOffsetValue(rawOffset.x),
+    y: normalizeOffsetValue(rawOffset.y)
+  };
+};
+
 const normalizeTimelineHeaderStickerValues = (
   value: unknown,
   theme: TimelineHeaderTheme,
@@ -333,10 +347,13 @@ export const getDefaultTimelineHeaderThemeAdjustments = (theme?: TimelineHeaderT
   stickerOffsets: {},
   stickerScales: {},
   stickerOpacities: {},
+  topBackgroundOffset: { ...DEFAULT_TIMELINE_HEADER_LAYER_OFFSET },
   topBackgroundScale: { ...DEFAULT_TIMELINE_HEADER_LAYER_SCALE },
   topBackgroundOpacity: 1,
+  dateBackgroundOffset: { ...DEFAULT_TIMELINE_HEADER_LAYER_OFFSET },
   dateBackgroundScale: { ...DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE },
   dateBackgroundOpacity: 1,
+  selectedDateBackgroundOffset: { ...DEFAULT_TIMELINE_HEADER_LAYER_OFFSET },
   selectedDateBackgroundScale: { ...DEFAULT_TIMELINE_HEADER_LAYER_SCALE },
   selectedDateBackgroundOpacity: 1,
   toolbarForegroundColor: getTimelineHeaderThemeConfig(theme)?.toolbarForegroundColor
@@ -348,10 +365,13 @@ const normalizeThemeAdjustments = (value: unknown, theme: TimelineHeaderTheme): 
     stickerOffsets: normalizeTimelineHeaderStickerOffsets(rawValue.stickerOffsets, theme),
     stickerScales: normalizeTimelineHeaderStickerScales(rawValue.stickerScales, theme),
     stickerOpacities: normalizeTimelineHeaderStickerOpacities(rawValue.stickerOpacities, theme),
+    topBackgroundOffset: normalizeTimelineHeaderLayerOffset(rawValue.topBackgroundOffset),
     topBackgroundScale: normalizeTimelineHeaderDateBackgroundScale(rawValue.topBackgroundScale),
     topBackgroundOpacity: normalizeOpacityValue(rawValue.topBackgroundOpacity),
+    dateBackgroundOffset: normalizeTimelineHeaderLayerOffset(rawValue.dateBackgroundOffset),
     dateBackgroundScale: normalizeTimelineHeaderDateBackgroundScale(rawValue.dateBackgroundScale),
     dateBackgroundOpacity: normalizeOpacityValue(rawValue.dateBackgroundOpacity),
+    selectedDateBackgroundOffset: normalizeTimelineHeaderLayerOffset(rawValue.selectedDateBackgroundOffset),
     selectedDateBackgroundScale: normalizeTimelineHeaderDateBackgroundScale(rawValue.selectedDateBackgroundScale),
     selectedDateBackgroundOpacity: normalizeOpacityValue(rawValue.selectedDateBackgroundOpacity),
     toolbarForegroundColor: normalizeToolbarForegroundColor(rawValue.toolbarForegroundColor, getTimelineHeaderThemeConfig(theme)?.toolbarForegroundColor)
@@ -394,8 +414,10 @@ interface TimelineHeaderDecorationsProps {
   stickerOffsets?: TimelineHeaderStickerOffsets;
   stickerScales?: TimelineHeaderStickerScales;
   stickerOpacities?: TimelineHeaderStickerOpacities;
+  topBackgroundOffset?: TimelineHeaderLayerOffset;
   topBackgroundScale?: TimelineHeaderLayerScale;
   topBackgroundOpacity?: number;
+  dateBackgroundOffset?: TimelineHeaderLayerOffset;
   dateBackgroundScale?: TimelineHeaderDateBackgroundScale;
   dateBackgroundOpacity?: number;
   isCalendarExpanded?: boolean;
@@ -422,8 +444,10 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
   stickerOffsets = {},
   stickerScales = {},
   stickerOpacities = {},
+  topBackgroundOffset = DEFAULT_TIMELINE_HEADER_LAYER_OFFSET,
   topBackgroundScale = DEFAULT_TIMELINE_HEADER_LAYER_SCALE,
   topBackgroundOpacity = 1,
+  dateBackgroundOffset = DEFAULT_TIMELINE_HEADER_LAYER_OFFSET,
   dateBackgroundScale = DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE,
   dateBackgroundOpacity = 1,
   isCalendarExpanded = false
@@ -437,6 +461,7 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
     .filter((asset) => !isCalendarExpanded || !asset.hideWhenCalendarExpanded);
   const backgroundScale = scope === 'header' ? topBackgroundScale : dateBackgroundScale;
   const backgroundOpacity = scope === 'header' ? topBackgroundOpacity : dateBackgroundOpacity;
+  const backgroundOffset = scope === 'header' ? topBackgroundOffset : dateBackgroundOffset;
 
   return (
     <>
@@ -451,7 +476,7 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
             : background.className}
           style={{
             opacity: (background.opacity ?? 1) * backgroundOpacity,
-            transform: `scale(${backgroundScale.x}, ${backgroundScale.y})`
+            transform: `translate(${backgroundOffset.x}px, ${backgroundOffset.y}px) scale(${backgroundScale.x}, ${backgroundScale.y})`
           }}
         />
       )}
@@ -472,12 +497,14 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
 
 interface TimelineHeaderSelectedDateBackgroundProps {
   theme?: TimelineHeaderTheme;
+  offset?: TimelineHeaderLayerOffset;
   scale?: TimelineHeaderLayerScale;
   opacity?: number;
 }
 
 export const TimelineHeaderSelectedDateBackground: React.FC<TimelineHeaderSelectedDateBackgroundProps> = ({
   theme,
+  offset = DEFAULT_TIMELINE_HEADER_LAYER_OFFSET,
   scale = DEFAULT_TIMELINE_HEADER_LAYER_SCALE,
   opacity = 1
 }) => {
@@ -492,7 +519,7 @@ export const TimelineHeaderSelectedDateBackground: React.FC<TimelineHeaderSelect
       alt=""
       draggable={false}
       className={background.className}
-      style={{ opacity: (background.opacity ?? 1) * opacity, transform: `scale(${scale.x}, ${scale.y})` }}
+      style={{ opacity: (background.opacity ?? 1) * opacity, transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale.x}, ${scale.y})` }}
     />
   );
 };

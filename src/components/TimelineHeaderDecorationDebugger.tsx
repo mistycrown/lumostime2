@@ -7,6 +7,7 @@
  * @updated 2026-09-27: Added per-theme date-strip horizontal/vertical scaling while retaining individual sticker position controls.
  * @updated 2026-09-27: Adds toolbar foreground color tuning and includes all configured header/date stickers in layer navigation.
  * @updated 2026-09-27: Extends every background and sticker with independent size and opacity controls.
+ * @updated 2026-09-27: Restores independent X/Y adjustment for every background image layer.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, RotateCcw, Save, X } from 'lucide-react';
@@ -53,10 +54,13 @@ const cloneAdjustments = (adjustments: TimelineHeaderThemeAdjustments): Timeline
   stickerOffsets: { ...adjustments.stickerOffsets },
   stickerScales: { ...adjustments.stickerScales },
   stickerOpacities: { ...adjustments.stickerOpacities },
+  topBackgroundOffset: { ...adjustments.topBackgroundOffset },
   topBackgroundScale: { ...adjustments.topBackgroundScale },
   topBackgroundOpacity: adjustments.topBackgroundOpacity,
+  dateBackgroundOffset: { ...adjustments.dateBackgroundOffset },
   dateBackgroundScale: { ...adjustments.dateBackgroundScale },
   dateBackgroundOpacity: adjustments.dateBackgroundOpacity,
+  selectedDateBackgroundOffset: { ...adjustments.selectedDateBackgroundOffset },
   selectedDateBackgroundScale: { ...adjustments.selectedDateBackgroundScale },
   selectedDateBackgroundOpacity: adjustments.selectedDateBackgroundOpacity,
   toolbarForegroundColor: adjustments.toolbarForegroundColor
@@ -116,6 +120,12 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
     return draftAdjustments.selectedDateBackgroundScale;
   };
 
+  const getBackgroundOffset = (layer: BackgroundLayer) => {
+    if (layer === 'top-background') return draftAdjustments.topBackgroundOffset;
+    if (layer === 'date-background') return draftAdjustments.dateBackgroundOffset;
+    return draftAdjustments.selectedDateBackgroundOffset;
+  };
+
   const updateOffset = (axis: 'x' | 'y', delta: number) => {
     if (!activeAsset) return;
 
@@ -138,6 +148,16 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
       if (layer === 'top-background') return { ...current, topBackgroundScale: nextScale(current.topBackgroundScale) };
       if (layer === 'date-background') return { ...current, dateBackgroundScale: nextScale(current.dateBackgroundScale) };
       return { ...current, selectedDateBackgroundScale: nextScale(current.selectedDateBackgroundScale) };
+    });
+    setIsSaved(false);
+  };
+
+  const updateBackgroundOffset = (layer: BackgroundLayer, axis: 'x' | 'y', delta: number) => {
+    setDraftAdjustments((current) => {
+      const nextOffset = (offset: { x: number; y: number }) => ({ ...offset, [axis]: clamp(offset[axis] + delta, -200, 200) });
+      if (layer === 'top-background') return { ...current, topBackgroundOffset: nextOffset(current.topBackgroundOffset) };
+      if (layer === 'date-background') return { ...current, dateBackgroundOffset: nextOffset(current.dateBackgroundOffset) };
+      return { ...current, selectedDateBackgroundOffset: nextOffset(current.selectedDateBackgroundOffset) };
     });
     setIsSaved(false);
   };
@@ -179,9 +199,9 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
 
   const resetCurrent = () => {
     setDraftAdjustments((current) => {
-      if (activeControl === 'top-background') return { ...current, topBackgroundScale: { x: 1, y: 1 }, topBackgroundOpacity: 1 };
-      if (activeControl === 'date-background') return { ...current, dateBackgroundScale: { x: 1, y: 1 }, dateBackgroundOpacity: 1 };
-      if (activeControl === 'selected-date-background') return { ...current, selectedDateBackgroundScale: { x: 1, y: 1 }, selectedDateBackgroundOpacity: 1 };
+      if (activeControl === 'top-background') return { ...current, topBackgroundOffset: { x: 0, y: 0 }, topBackgroundScale: { x: 1, y: 1 }, topBackgroundOpacity: 1 };
+      if (activeControl === 'date-background') return { ...current, dateBackgroundOffset: { x: 0, y: 0 }, dateBackgroundScale: { x: 1, y: 1 }, dateBackgroundOpacity: 1 };
+      if (activeControl === 'selected-date-background') return { ...current, selectedDateBackgroundOffset: { x: 0, y: 0 }, selectedDateBackgroundScale: { x: 1, y: 1 }, selectedDateBackgroundOpacity: 1 };
       if (activeControl === 'toolbar-foreground') return { ...current, toolbarForegroundColor: config.toolbarForegroundColor };
       if (!activeAsset) return current;
 
@@ -266,6 +286,8 @@ export const TimelineHeaderDecorationDebugger: React.FC<TimelineHeaderDecoration
         </div>
       ) : activeBackground ? (
         <div className="mb-4 space-y-4">
+          {renderStepper('水平偏移', `${getBackgroundOffset(activeBackground).x}px`, (delta) => updateBackgroundOffset(activeBackground, 'x', delta), [-5, -1, 1, 5], 'px')}
+          {renderStepper('垂直偏移', `${getBackgroundOffset(activeBackground).y}px`, (delta) => updateBackgroundOffset(activeBackground, 'y', delta), [-5, -1, 1, 5], 'px')}
           {renderStepper('横向缩放', `${Math.round(getBackgroundScale(activeBackground).x * 100)}%`, (delta) => updateBackgroundScale(activeBackground, 'x', delta), [-5, -1, 1, 5], '%')}
           {renderStepper('纵向缩放', `${Math.round(getBackgroundScale(activeBackground).y * 100)}%`, (delta) => updateBackgroundScale(activeBackground, 'y', delta), [-5, -1, 1, 5], '%')}
           {renderStepper('透明度', `${Math.round(getBackgroundOpacityFrom(draftAdjustments, activeBackground) * 100)}%`, (delta) => updateBackgroundOpacity(activeBackground, delta), [-10, -1, 1, 10], '%')}

@@ -38,6 +38,7 @@
  * @updated 2026-09-27: Stabilizes saved header-theme adjustments so debugger previews cannot cause an update loop.
  * @updated 2026-09-27: Passes the saved per-theme toolbar foreground color into the calendar header.
  * @updated 2026-09-27: Passes all persisted header-layer size and opacity adjustments into the calendar renderer.
+ * @updated 2026-09-27: Passes persisted X/Y offsets for all theme image layers into the calendar renderer.
  */
 import React, { useCallback, useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1488,10 +1489,13 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     headerStickerOffsets={activeTimelineHeaderThemeAdjustments?.stickerOffsets}
                     headerStickerScales={activeTimelineHeaderThemeAdjustments?.stickerScales}
                     headerStickerOpacities={activeTimelineHeaderThemeAdjustments?.stickerOpacities}
+                    headerTopBackgroundOffset={activeTimelineHeaderThemeAdjustments?.topBackgroundOffset}
                     headerTopBackgroundScale={activeTimelineHeaderThemeAdjustments?.topBackgroundScale}
                     headerTopBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.topBackgroundOpacity}
+                    headerDateBackgroundOffset={activeTimelineHeaderThemeAdjustments?.dateBackgroundOffset}
                     headerDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.dateBackgroundScale}
                     headerDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.dateBackgroundOpacity}
+                    headerSelectedDateBackgroundOffset={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundOffset}
                     headerSelectedDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundScale}
                     headerSelectedDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundOpacity}
                     headerToolbarForegroundColor={activeTimelineHeaderThemeAdjustments?.toolbarForegroundColor}
