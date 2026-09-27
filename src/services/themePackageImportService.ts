@@ -7,6 +7,7 @@
  * @updated 2026-09-26: Added transactional image and local-font persistence for versioned theme packages.
  * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
  * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
+ * @updated 2026-09-27: Falls back to the first packaged UI icon when a theme package omits its card preview.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -38,6 +39,26 @@ export interface ImportedThemePackageRecord {
   importedAt: number;
   updatedAt: number;
 }
+
+const UI_ICON_FIRST_IMAGE_PATTERN = /(?:^|\/)01\.(?:bmp|gif|jpe?g|png|svg|webp)$/i;
+
+export const getThemePackageUiIconPreviewFallbackFilename = (
+  record: ImportedThemePackageRecord
+): string | undefined => {
+  const uiIcon = record.manifest.config.uiIcon;
+  if (!uiIcon || typeof uiIcon !== 'object' || Array.isArray(uiIcon)) {
+    return undefined;
+  }
+
+  const files = (uiIcon as Record<string, unknown>).files;
+  if (!files || typeof files !== 'object' || Array.isArray(files)) {
+    return undefined;
+  }
+
+  const paths = Object.values(files).filter((path): path is string => typeof path === 'string');
+  const firstPath = paths.find((path) => UI_ICON_FIRST_IMAGE_PATTERN.test(path)) || paths[0];
+  return firstPath ? record.imageAssets[firstPath] : undefined;
+};
 
 export interface LocalThemePackageAssets {
   packageId: string;
@@ -371,6 +392,7 @@ export const themePackageImportService = {
         importedAt: existingRecord?.importedAt || now,
         updatedAt: now
       };
+      record.previewImageFilename ||= getThemePackageUiIconPreviewFallbackFilename(record);
       const localRecord: LocalThemePackageAssets = {
         packageId: manifest.package.id,
         version: manifest.package.version,
