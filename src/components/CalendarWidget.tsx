@@ -18,6 +18,7 @@
  * @updated 2026-09-27: Hides header stickers explicitly marked for expanded-calendar mode.
  * @updated 2026-09-27: Adds the configured low-opacity background surface to left-side themed header controls.
  * @updated 2026-09-27: Applies independently adjustable themed layer scale/opacity and synchronizes collapsed date text with toolbar color.
+ * @updated 2026-09-27: Keeps themed borders on right-side date controls while allowing independent left shortcut surfaces.
  * @updated 2026-09-27: Tightens the original timeline header controls and weekday/date rhythm.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -171,7 +172,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
                 <div
-                    className={`relative z-10 flex items-center justify-between px-4 py-2.5 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)] [&_button]:!text-[var(--timeline-header-toolbar-color)] [&_button:hover]:!bg-white/15 [&_button_svg]:!text-[var(--timeline-header-toolbar-color)]' : ''}`}
+                    className={`relative z-10 flex items-center justify-between px-4 py-2.5 ${headerThemeConfig ? 'border-b-0' : 'border-b border-stone-100'} ${toolbarForegroundColor ? '[&_button]:!text-[var(--timeline-header-toolbar-color)] [&_button:hover]:!bg-white/15 [&_button_svg]:!text-[var(--timeline-header-toolbar-color)]' : ''}`}
                     style={toolbarStyle}
                 >
                     {/* 左侧：控制按钮（同步、排序、统计） */}
@@ -180,7 +181,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                     </div>
 
                     {/* 右侧：Today和展开/收缩按钮 */}
-                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarButtonClassName}`}>
+                    <div className={`flex translate-y-[4px] items-center gap-1 ${toolbarButtonClassName} ${toolbarForegroundColor ? '[&_button]:!border-[var(--timeline-header-toolbar-color)]' : ''}`}>
                         {!staticMode && (
                             <>
                                 {!disableSelection && (
