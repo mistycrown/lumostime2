@@ -14,9 +14,6 @@
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
  * @updated 2026-09-25: Added persisted new sticker selector layout configuration.
  * @updated 2026-09-26: Rehydrates custom sticker state after appearance restoration.
- * @updated 2026-09-27: Added a persisted independent timeline header theme preference.
- * @updated 2026-09-27: Added persisted per-sticker offsets for the timeline header debugger.
- * @updated 2026-09-27: Migrates timeline-header adjustments to theme-scoped date-background scale and sticker position data.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -44,13 +41,6 @@ import {
     isTimelineStyleTheme,
     normalizeTimelineStyleConfigs
 } from '../services/timelineStyleService';
-import {
-    DEFAULT_TIMELINE_HEADER_THEME,
-    isTimelineHeaderThemeSelection,
-    normalizeTimelineHeaderThemeAdjustmentMap,
-    type TimelineHeaderThemeAdjustmentMap,
-    type TimelineHeaderThemeSelection
-} from '../components/TimelineHeaderDecorations';
 import {
     DEFAULT_TIMELINE_LAYOUT_MODE,
     isTimelineLayoutMode,
@@ -247,10 +237,6 @@ interface SettingsContextType {
 
     timelineStyleTheme: TimelineStyleTheme;
     setTimelineStyleTheme: React.Dispatch<React.SetStateAction<TimelineStyleTheme>>;
-    timelineHeaderTheme: TimelineHeaderThemeSelection;
-    setTimelineHeaderTheme: React.Dispatch<React.SetStateAction<TimelineHeaderThemeSelection>>;
-    timelineHeaderThemeAdjustments: TimelineHeaderThemeAdjustmentMap;
-    setTimelineHeaderThemeAdjustments: React.Dispatch<React.SetStateAction<TimelineHeaderThemeAdjustmentMap>>;
     timelineStyleConfigs: TimelineStyleConfigMap;
     setTimelineStyleConfigs: React.Dispatch<React.SetStateAction<TimelineStyleConfigMap>>;
     timelineStyleAdjusterOpen: boolean;
@@ -693,21 +679,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         return isTimelineStyleTheme(stored) ? stored : DEFAULT_TIMELINE_STYLE_THEME;
     });
 
-    const [timelineHeaderTheme, setTimelineHeaderTheme] = useState<TimelineHeaderThemeSelection>(() => {
-        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_THEME);
-        return isTimelineHeaderThemeSelection(stored) ? stored : DEFAULT_TIMELINE_HEADER_THEME;
-    });
-
-    const [timelineHeaderThemeAdjustments, setTimelineHeaderThemeAdjustments] = useState<TimelineHeaderThemeAdjustmentMap>(() => {
-        const stored = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_ADJUSTMENTS)
-            || localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_STICKER_OFFSETS);
-        try {
-            return stored ? normalizeTimelineHeaderThemeAdjustmentMap(JSON.parse(stored)) : {};
-        } catch {
-            return {};
-        }
-    });
-
     const [timelineStyleConfigs, setTimelineStyleConfigs] = useState<TimelineStyleConfigMap>(() => {
         const stored = localStorage.getItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS);
         if (!stored) return getDefaultTimelineStyleConfigs();
@@ -791,19 +762,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setTimelineStyleTheme(isTimelineStyleTheme(storedTimelineStyle)
                 ? storedTimelineStyle
                 : DEFAULT_TIMELINE_STYLE_THEME);
-            const storedTimelineHeaderTheme = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_THEME);
-            setTimelineHeaderTheme(isTimelineHeaderThemeSelection(storedTimelineHeaderTheme)
-                ? storedTimelineHeaderTheme
-                : DEFAULT_TIMELINE_HEADER_THEME);
-            const storedTimelineHeaderAdjustments = localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_ADJUSTMENTS)
-                || localStorage.getItem(THEME_KEYS.TIMELINE_HEADER_STICKER_OFFSETS);
-            try {
-                setTimelineHeaderThemeAdjustments(storedTimelineHeaderAdjustments
-                    ? normalizeTimelineHeaderThemeAdjustmentMap(JSON.parse(storedTimelineHeaderAdjustments))
-                    : {});
-            } catch {
-                setTimelineHeaderThemeAdjustments({});
-            }
             try {
                 setTimelineStyleConfigs(storedTimelineConfigs
                     ? normalizeTimelineStyleConfigs(JSON.parse(storedTimelineConfigs))
@@ -988,14 +946,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, timelineStyleTheme);
     }, [timelineStyleTheme]);
-
-    useEffect(() => {
-        localStorage.setItem(THEME_KEYS.TIMELINE_HEADER_THEME, timelineHeaderTheme);
-    }, [timelineHeaderTheme]);
-
-    useEffect(() => {
-        localStorage.setItem(THEME_KEYS.TIMELINE_HEADER_ADJUSTMENTS, JSON.stringify(timelineHeaderThemeAdjustments));
-    }, [timelineHeaderThemeAdjustments]);
 
     useEffect(() => {
         localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(timelineStyleConfigs));
@@ -1200,10 +1150,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAchievementBottleIconPack,
             timelineStyleTheme,
             setTimelineStyleTheme,
-            timelineHeaderTheme,
-            setTimelineHeaderTheme,
-            timelineHeaderThemeAdjustments,
-            setTimelineHeaderThemeAdjustments,
             timelineStyleConfigs,
             setTimelineStyleConfigs,
             timelineStyleAdjusterOpen,

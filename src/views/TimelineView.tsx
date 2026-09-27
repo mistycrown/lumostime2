@@ -33,18 +33,8 @@
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
  * @updated 2026-08-25: Rendered the More menu through a page-level portal so split-pane dividers cannot cover it.
  * @updated 2026-08-25: Rendered custom activity attributes below notes in the main timeline.
- * @updated 2026-09-27: Adds a live, save-on-demand debugger for individual timeline header stickers.
- * @updated 2026-09-27: Uses theme-scoped date-strip scaling and sticker adjustments in the layered timeline header renderer.
- * @updated 2026-09-27: Stabilizes saved header-theme adjustments so debugger previews cannot cause an update loop.
- * @updated 2026-09-27: Passes the saved per-theme toolbar foreground color into the calendar header.
- * @updated 2026-09-27: Passes all persisted header-layer size and opacity adjustments into the calendar renderer.
- * @updated 2026-09-27: Passes persisted X/Y offsets for all theme image layers into the calendar renderer.
- * @updated 2026-09-27: Applies the Little Prince shortcut button surface directly to each rendered quick action.
- * @updated 2026-09-27: Uses a translucent white shortcut surface so the starry header artwork remains visible.
- * @updated 2026-09-27: Reduces Little Prince shortcut circles to a compact 36px footprint.
- * @updated 2026-09-27: Further softens and compacts Little Prince shortcut surfaces.
  */
-import React, { useCallback, useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
@@ -77,8 +67,6 @@ import { GalleryView } from '../components/GalleryView';
 import { toCssColor } from '../utils/colorUtils';
 import { TimelineStyleRail } from '../components/TimelineStyleRail';
 import { TimelineStyleAdjuster } from '../components/TimelineStyleAdjuster';
-import { TimelineHeaderDecorationDebugger } from '../components/TimelineHeaderDecorationDebugger';
-import { getTimelineHeaderThemeAdjustments, type TimelineHeaderThemeAdjustments } from '../components/TimelineHeaderDecorations';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
 import { TIMELINE_QUICK_ACTION_OPTIONS, type TimelineQuickActionKey } from '../constants/timelineQuickActions';
 import { formatCompletedTodoLabel } from '../utils/todoHierarchyUtils';
@@ -278,8 +266,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const [timelineQuickActionsMenuPosition, setTimelineQuickActionsMenuPosition] = useState<{ top: number; left: number } | null>(null);
     const timelineQuickActionsButtonRef = useRef<HTMLButtonElement | null>(null);
     const [showTimePalDebugger, setShowTimePalDebugger] = useState(false);
-    const [showTimelineHeaderDecorationDebugger, setShowTimelineHeaderDecorationDebugger] = useState(false);
-    const [timelineHeaderThemePreview, setTimelineHeaderThemePreview] = useState<TimelineHeaderThemeAdjustments | null>(null);
     const {
         isGalleryViewOpen,
         setIsGalleryViewOpen,
@@ -297,9 +283,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     } = useNavigation();
     const {
         timelineStyleTheme,
-        timelineHeaderTheme,
-        timelineHeaderThemeAdjustments,
-        setTimelineHeaderThemeAdjustments,
         timelineStyleConfigs,
         timelineSortOrder,
         timelineQuickActions,
@@ -314,17 +297,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         setTimelineStyleAdjusterOpen
     } = useSettings();
     const timelineLayout = timelineLayoutMode;
-    const handleTimelineHeaderThemePreview = useCallback((adjustments: TimelineHeaderThemeAdjustments | null) => {
-        setTimelineHeaderThemePreview(adjustments);
-    }, []);
-    const savedTimelineHeaderThemeAdjustments = useMemo(() => (
-        timelineHeaderTheme === 'none'
-            ? null
-            : getTimelineHeaderThemeAdjustments(timelineHeaderThemeAdjustments, timelineHeaderTheme)
-    ), [timelineHeaderTheme, timelineHeaderThemeAdjustments]);
-    const activeTimelineHeaderThemeAdjustments = timelineHeaderTheme === 'none'
-        ? undefined
-        : timelineHeaderThemePreview || savedTimelineHeaderThemeAdjustments;
     const timelineEntityLogs = useMemo(() => logs.filter((log) => log.isPlanned !== true), [logs]);
     const calendarLogs = timelineLayout === 'timeline-todo' ? logs : timelineEntityLogs;
     const timelineDateString = getLocalDateStr(currentDate);
@@ -513,18 +485,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
         };
     }, []);
 
-    React.useEffect(() => {
-        (window as any).enableTimelineHeaderThemeDebug = () => {
-            if (timelineHeaderTheme !== 'none') {
-                setShowTimelineHeaderDecorationDebugger(true);
-            }
-        };
-
-        return () => {
-            delete (window as any).enableTimelineHeaderThemeDebug;
-        };
-    }, [timelineHeaderTheme]);
-
     const { openAIChat, unreadCount } = useAIChatWindow();
 
     // 计算时间线样式偏移量
@@ -619,9 +579,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const configuredQuickActions = timelineQuickActions
         .map((actionKey) => quickActionMap[actionKey])
         .filter(Boolean);
-    const timelineShortcutButtonClassName = timelineHeaderTheme === 'little-prince'
-        ? 'flex h-8 w-8 items-center justify-center rounded-full !bg-white/35 !p-0 text-stone-400 shadow-[0_1px_5px_rgba(85,65,55,0.07)] transition-colors hover:!bg-white/50 disabled:cursor-not-allowed disabled:opacity-60'
-        : 'rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:cursor-not-allowed disabled:opacity-60';
     const moreQuickActions = TIMELINE_QUICK_ACTION_OPTIONS
         .filter((option) => !timelineQuickActions.includes(option.key))
         .map((option) => ({ option, action: quickActionMap[option.key] }))
@@ -1492,20 +1449,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                     currentDate={currentDate}
                     onDateChange={handleCalendarDateChange}
                     logs={calendarLogs}
-                    headerTheme={timelineHeaderTheme === 'none' ? undefined : timelineHeaderTheme}
-                    headerStickerOffsets={activeTimelineHeaderThemeAdjustments?.stickerOffsets}
-                    headerStickerScales={activeTimelineHeaderThemeAdjustments?.stickerScales}
-                    headerStickerOpacities={activeTimelineHeaderThemeAdjustments?.stickerOpacities}
-                    headerTopBackgroundOffset={activeTimelineHeaderThemeAdjustments?.topBackgroundOffset}
-                    headerTopBackgroundScale={activeTimelineHeaderThemeAdjustments?.topBackgroundScale}
-                    headerTopBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.topBackgroundOpacity}
-                    headerDateBackgroundOffset={activeTimelineHeaderThemeAdjustments?.dateBackgroundOffset}
-                    headerDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.dateBackgroundScale}
-                    headerDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.dateBackgroundOpacity}
-                    headerSelectedDateBackgroundOffset={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundOffset}
-                    headerSelectedDateBackgroundScale={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundScale}
-                    headerSelectedDateBackgroundOpacity={activeTimelineHeaderThemeAdjustments?.selectedDateBackgroundOpacity}
-                    headerToolbarForegroundColor={activeTimelineHeaderThemeAdjustments?.toolbarForegroundColor}
                     isExpanded={isCalendarExpanded}
                     onExpandToggle={() => setIsCalendarExpanded(!isCalendarExpanded)}
                     galleryMode={timelineGalleryMode}
@@ -1517,7 +1460,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                     type="button"
                                     ref={timelineQuickActionsButtonRef}
                                     onClick={() => setIsTimelineQuickActionsMenuOpen((open) => !open)}
-                                    className={timelineShortcutButtonClassName}
+                                    className="rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
                                     title="更多"
                                     aria-label="更多快捷操作"
                                     aria-haspopup="menu"
@@ -1560,7 +1503,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                     key={action.label}
                                     onClick={(event) => action.onClick(event)}
                                     disabled={action.disabled}
-                                    className={timelineShortcutButtonClassName}
+                                    className="p-2 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                                     title={action.title}
                                 >
                                     {action.icon}
@@ -2619,22 +2562,6 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             {/* TimePal 调试器 */}
             {showTimePalDebugger && (
                 <TimePalDebugger onClose={() => setShowTimePalDebugger(false)} />
-            )}
-
-            {showTimelineHeaderDecorationDebugger && timelineHeaderTheme !== 'none' && savedTimelineHeaderThemeAdjustments && (
-                <TimelineHeaderDecorationDebugger
-                    theme={timelineHeaderTheme}
-                    savedAdjustments={savedTimelineHeaderThemeAdjustments}
-                    onPreview={handleTimelineHeaderThemePreview}
-                    onSave={(adjustments) => setTimelineHeaderThemeAdjustments((current) => ({
-                        ...current,
-                        [timelineHeaderTheme]: adjustments
-                    }))}
-                    onClose={() => {
-                        setTimelineHeaderThemePreview(null);
-                        setShowTimelineHeaderDecorationDebugger(false);
-                    }}
-                />
             )}
 
             {timelineStyleAdjusterOpen && timelineStyleTheme !== 'default' && (

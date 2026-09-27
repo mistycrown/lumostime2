@@ -6,15 +6,10 @@
  * @description 时间线样式选择器，用于投喂功能中的样式切换，并保留样式调节入口。
  *
  * @updated 2026-03-28: Restored the default style preview to a classic filled dot so the original timeline option remains visually recognizable in the compact grid.
- * @updated 2026-09-27: Added an independent persisted header-theme selector below the timeline rail styles.
- * @updated 2026-09-27: Adds a timeline-page entry for the per-sticker header debugger.
- * @updated 2026-09-27: Adds a Little Prince layered-header preview alongside the pink notebook theme.
- * @updated 2026-09-27: Uses the named Little Prince layer assets in the compact theme preview.
- * @updated 2026-09-27: Keeps the Little Prince date-paper preview at its natural aspect ratio.
  */
 
 import React, { useMemo } from 'react';
-import { Leaf, MapPin, Moon, Music4, PawPrint, Scissors, Settings, SlidersHorizontal } from 'lucide-react';
+import { Leaf, MapPin, Moon, Music4, PawPrint, Scissors, SlidersHorizontal } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { ToastType } from './Toast';
 import { CompactPreviewCardSelector } from './CompactPreviewCardSelector';
@@ -24,11 +19,6 @@ import {
   TimelineStyleTheme,
   getTimelineStyleOptions
 } from '../services/timelineStyleService';
-import {
-  TIMELINE_HEADER_THEME_OPTIONS,
-  type TimelineHeaderThemeOption,
-  type TimelineHeaderThemeSelection
-} from './TimelineHeaderDecorations';
 
 interface TimelinePreviewPreset {
   background: string;
@@ -99,49 +89,14 @@ const TimelinePreview: React.FC<{ option: TimelineStyleOption }> = ({ option }) 
   );
 };
 
-const TimelineHeaderPreview: React.FC<{ option: TimelineHeaderThemeOption }> = ({ option }) => {
-  if (option.value === 'none') {
-    return (
-      <div className="relative h-full w-full overflow-hidden bg-[#fdfcf9]">
-        <div className="absolute inset-x-0 top-0 h-8 border-b border-stone-100 bg-white" />
-        <div className="absolute left-3 top-3 flex gap-1"><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /><span className="h-1.5 w-1.5 rounded-full bg-stone-300" /></div>
-        <div className="absolute inset-x-3 bottom-3 h-7 rounded-lg border border-stone-100 bg-white" />
-      </div>
-    );
-  }
-
-  if (option.value === 'little-prince') {
-    return (
-      <div className="relative h-full w-full overflow-hidden bg-[#9db9de]">
-        <img src="/mdlo/prince/01_top_header_background.png" alt="" className="absolute inset-x-0 top-0 h-full w-full object-cover object-[center_38%] opacity-70" />
-        <div className="absolute left-3 top-3 flex gap-1"><span className="h-1.5 w-1.5 rounded-full bg-white/80" /><span className="h-1.5 w-1.5 rounded-full bg-white/80" /><span className="h-1.5 w-1.5 rounded-full bg-white/80" /></div>
-        <img src="/mdlo/prince/02_date_bar_background.png" alt="" className="absolute inset-x-2 bottom-2 h-8 w-[calc(100%-1rem)] object-cover object-center" />
-        <img src="/mdlo/prince/08_selected_date_card.png" alt="" className="absolute bottom-2 left-1/2 h-8 w-7 -translate-x-1/2 object-cover" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative h-full w-full overflow-hidden bg-[#fffaf8]">
-      <img src="/mdlo/pink/01_top_header_cloud_border.png" alt="" className="absolute inset-x-0 top-0 h-12 w-full object-cover" />
-      <img src="/mdlo/pink/02_peeking_cat.png" alt="" className="absolute right-7 top-1 z-10 w-10" />
-      <div className="absolute inset-x-3 bottom-3 h-8 rounded-lg border border-white/80 bg-white/85 shadow-sm" />
-      <img src="/mdlo/pink/03_pink_star_washi_tape.png" alt="" className="absolute bottom-7 left-2 z-10 w-9 -rotate-6" />
-    </div>
-  );
-};
-
 interface TimelineStyleSelectorProps {
   onToast: (type: ToastType, message: string) => void;
-  onOpenHeaderDebugger?: () => void;
 }
 
-export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ onToast, onOpenHeaderDebugger }) => {
+export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ onToast }) => {
   const {
     timelineStyleTheme,
     setTimelineStyleTheme,
-    timelineHeaderTheme,
-    setTimelineHeaderTheme,
     setTimelineStyleAdjusterOpen
   } = useSettings();
 
@@ -166,53 +121,26 @@ export const TimelineStyleSelector: React.FC<TimelineStyleSelectorProps> = ({ on
     onToast('success', `时间线样式已切换为「${styleOptions.find((option) => option.value === value)?.label || value}」`);
   };
 
-  const handleHeaderThemeSelect = (value: TimelineHeaderThemeSelection) => {
-    setTimelineHeaderTheme(value);
-    onToast('success', `顶部主题已切换为「${TIMELINE_HEADER_THEME_OPTIONS.find((option) => option.value === value)?.label || value}」`);
-  };
-
   return (
-    <div className="space-y-4">
-      <CompactPreviewCardSelector
-        title="时间线样式"
-        options={styleOptions}
-        selectedValue={timelineStyleTheme}
-        onSelect={handleSelect}
-        actionSlot={(
-          <button
-            type="button"
-            onClick={handleAdjust}
-            className={`timeline-style-adjust flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              canAdjust ? 'bg-stone-100 text-stone-700 hover:bg-stone-200' : 'bg-stone-50 text-stone-300'
-            }`}
-          >
-            <SlidersHorizontal size={14} />
-            <span>调节</span>
-          </button>
-        )}
-        renderPreview={(option) => <TimelinePreview option={option as TimelineStyleOption} />}
-        showLabels={false}
-      />
-      <CompactPreviewCardSelector
-        title="顶部主题"
-        options={TIMELINE_HEADER_THEME_OPTIONS}
-        selectedValue={timelineHeaderTheme}
-        onSelect={handleHeaderThemeSelect}
-        actionSlot={(
-          <button
-            type="button"
-            disabled={timelineHeaderTheme === 'none'}
-            onClick={onOpenHeaderDebugger}
-            className={`flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${timelineHeaderTheme === 'none' ? 'bg-stone-50 text-stone-300' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'}`}
-          >
-            <Settings size={14} />调试
-          </button>
-        )}
-        renderPreview={(option) => <TimelineHeaderPreview option={option as TimelineHeaderThemeOption} />}
-        minCardWidth={132}
-        maxCardWidth={188}
-        cardAspectRatio="16 / 9"
-      />
-    </div>
+    <CompactPreviewCardSelector
+      title="时间线样式"
+      options={styleOptions}
+      selectedValue={timelineStyleTheme}
+      onSelect={handleSelect}
+      actionSlot={(
+        <button
+          type="button"
+          onClick={handleAdjust}
+          className={`timeline-style-adjust flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            canAdjust ? 'bg-stone-100 text-stone-700 hover:bg-stone-200' : 'bg-stone-50 text-stone-300'
+          }`}
+        >
+          <SlidersHorizontal size={14} />
+          <span>调节</span>
+        </button>
+      )}
+      renderPreview={(option) => <TimelinePreview option={option as TimelineStyleOption} />}
+      showLabels={false}
+    />
   );
 };
