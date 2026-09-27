@@ -1045,7 +1045,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
 
       <div className="flex-shrink-0 flex h-full min-h-0 flex-col overflow-y-auto pt-6 pb-20 pl-0 pr-2 no-scrollbar z-0 transition-all duration-300 relative w-16 items-center">
         <div className="flex-1 w-full">
-          {timeSlots.map((slot, index) => {
+            {timeSlots.map((slot, index) => {
             const isSelected = selectedSlotIndex === index;
             return (
               <button

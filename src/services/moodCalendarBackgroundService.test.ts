@@ -93,8 +93,7 @@ describe('mood calendar background persistence', () => {
   it('exposes separate built-in assets for five-week and six-week calendars', () => {
     expect(moodCalendarBackgroundService.getBackgroundById('calendar-1')).toMatchObject({
       url: expect.stringContaining('/calendar/tuzi/5.png'),
-      sixWeekUrl: expect.stringContaining('/calendar/tuzi/6.png'),
-      heightScale: 1.2
+      sixWeekUrl: expect.stringContaining('/calendar/tuzi/6.png')
     });
   });
 

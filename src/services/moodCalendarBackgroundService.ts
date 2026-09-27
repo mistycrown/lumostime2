@@ -79,8 +79,6 @@ class MoodCalendarBackgroundService {
             offsetY: '0px',
             offsetX: '0px',
             scale: 1,
-            // 5.png 的透明上下留白较多，默认提高纵向主体高度以覆盖五周日历。
-            heightScale: 1.2,
             opacity: 1
         }
     ];
@@ -236,17 +234,33 @@ class MoodCalendarBackgroundService {
             sixWeekImageFilename,
             ...DEFAULT_SETTINGS
         };
-        this.saveCustomBackgrounds([...this.loadCustomBackgrounds(), background]);
+        this.saveCustomBackgrounds([...this.loadCustomBackgrounds('overflow'), background], 'overflow');
+        return background;
+    }
+
+    async addFillBackground(file: File, name?: string): Promise<MoodCalendarBackgroundOption> {
+        const imageFilename = await imageService.saveImage(file, 'theme');
+        const url = await imageService.getImageUrl(imageFilename);
+        const background: MoodCalendarBackgroundOption = {
+            id: `mood_calendar_fill_custom_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+            name: name?.trim() || file.name.replace(/\.[^/.]+$/, ''),
+            type: 'custom',
+            url,
+            thumbnail: url,
+            imageFilename
+        };
+        this.saveCustomBackgrounds([...this.loadCustomBackgrounds('fill'), background], 'fill');
         return background;
     }
 
     async deleteCustomBackground(backgroundId: string): Promise<boolean> {
-        const backgrounds = this.loadCustomBackgrounds();
+        const mode: MoodCalendarBackgroundMode = this.loadCustomBackgrounds('fill').some((item) => item.id === backgroundId) ? 'fill' : 'overflow';
+        const backgrounds = this.loadCustomBackgrounds(mode);
         const target = backgrounds.find((background) => background.id === backgroundId);
         if (!target) return false;
-        const wasCurrent = this.getCurrentBackground() === backgroundId;
+        const wasCurrent = this.getCurrentBackground(mode) === backgroundId;
 
-        this.saveCustomBackgrounds(backgrounds.filter((background) => background.id !== backgroundId));
+        this.saveCustomBackgrounds(backgrounds.filter((background) => background.id !== backgroundId), mode);
         if (target.imageFilename) {
             await imageService.deleteImage(target.imageFilename).catch(() => undefined);
         }
@@ -254,9 +268,11 @@ class MoodCalendarBackgroundService {
             await imageService.deleteImage(target.sixWeekImageFilename).catch(() => undefined);
         }
         if (wasCurrent) {
-            this.setCurrentBackground('none');
+            this.setCurrentBackground('none', mode);
         } else {
-            window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId: this.getCurrentBackground() } }));
+            window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, {
+                detail: { mode: this.getMode(), backgroundId: this.getCurrentBackground() }
+            }));
         }
         return true;
     }
