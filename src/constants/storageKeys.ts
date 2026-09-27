@@ -7,6 +7,7 @@
  * @updated 2026-08-06: Added the association selector column-count preference key.
  * @updated 2026-08-11: Added the last-seen cloud upload timestamp for dual-path sync decisions.
  * @updated 2026-09-26: Added imported theme package metadata storage for appearance sync.
+ * @updated 2026-09-27: Added the independent timeline header decoration theme key.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -47,6 +48,7 @@ export const THEME_KEYS = {
     CALENDAR_NUMBER_STYLE: 'lumostime_calendar_number_style',
     CALENDAR_LUNAR_DISPLAY: 'lumostime_calendar_lunar_display',
     TIMELINE_STYLE_THEME: 'lumostime_timeline_style_theme',
+    TIMELINE_HEADER_THEME: 'lumostime_timeline_header_theme',
     TIMELINE_STYLE_CONFIGS: 'lumostime_timeline_style_configs',
     TIMELINE_LAYOUT: 'lumostime_timeline_layout',
     TIMELINE_TODO_SIDEBAR_COLLAPSED: 'lumostime_timeline_todo_sidebar_collapsed',

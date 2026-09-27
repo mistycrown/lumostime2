@@ -4,11 +4,26 @@
  * @output Non-interactive visual layers for the timeline calendar header and week card.
  * @description Keeps timeline header artwork in declarative theme configuration so visual themes do not change calendar behavior.
  * @updated 2026-09-27: Added the configurable pink-notebook header decoration theme.
+ * @updated 2026-09-27: Added persisted selection metadata for the timeline style settings entry.
  */
 import React from 'react';
 
 export type TimelineHeaderTheme = 'pink-notebook';
+export type TimelineHeaderThemeSelection = 'none' | TimelineHeaderTheme;
 export type TimelineHeaderDecorationScope = 'header' | 'week-card';
+
+export interface TimelineHeaderThemeOption {
+  value: TimelineHeaderThemeSelection;
+  label: string;
+  description: string;
+}
+
+export const DEFAULT_TIMELINE_HEADER_THEME: TimelineHeaderThemeSelection = 'none';
+
+export const TIMELINE_HEADER_THEME_OPTIONS: TimelineHeaderThemeOption[] = [
+  { value: 'none', label: '原版', description: '保留简洁顶部' },
+  { value: 'pink-notebook', label: '粉色手账', description: '云朵、猫咪与贴纸' }
+];
 
 type TimelineHeaderDecorationAsset = {
   src: string;
@@ -76,6 +91,10 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
 
 export const getTimelineHeaderThemeConfig = (theme?: TimelineHeaderTheme): TimelineHeaderThemeConfig | undefined => (
   theme ? TIMELINE_HEADER_THEME_CONFIGS[theme] : undefined
+);
+
+export const isTimelineHeaderThemeSelection = (value: unknown): value is TimelineHeaderThemeSelection => (
+  value === 'none' || value === 'pink-notebook'
 );
 
 interface TimelineHeaderDecorationsProps {
