@@ -16,6 +16,7 @@
  * @updated 2026-09-27: Keeps the Little Prince illustration at sticker scale and hides it during expanded calendar browsing.
  * @updated 2026-09-27: Extends configured top backgrounds through expanded calendars and adds a subtle left-toolbar control surface.
  * @updated 2026-09-27: Adds persistent scale and opacity controls for every themed background and sticker layer.
+ * @updated 2026-09-27: Gives Little Prince left-toolbar shortcuts distinct white circular surfaces.
  */
 import React from 'react';
 
@@ -175,7 +176,7 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
     darkOpacityMultiplier: 0.5,
     toolbarForegroundColor: '#806861',
     toolbarButtonClassName: '[&_button]:!bg-white/90 [&_button]:!shadow-[0_2px_8px_rgba(85,65,55,0.16)]',
-    toolbarLeftButtonClassName: '[&_button]:!bg-white/24 [&_button]:!shadow-[0_1px_5px_rgba(255,255,255,0.2)]',
+    toolbarLeftButtonClassName: '[&_button]:!flex [&_button]:!h-10 [&_button]:!w-10 [&_button]:!items-center [&_button]:!justify-center [&_button]:!rounded-full [&_button]:!bg-white/82 [&_button]:!p-0 [&_button]:!shadow-[0_2px_8px_rgba(85,65,55,0.12)]',
     topBackground: {
       id: 'prince-top-background',
       kind: 'top-background',
