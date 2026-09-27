@@ -5,6 +5,7 @@
  * @pos Test (Theme Package Import)
  * @description Verifies same-ID overwrite and direct cleanup of package-owned assets.
  * @updated 2026-09-27: Covers UIIcon first-image preview fallback for theme cards.
+ * @updated 2026-09-27: Covers card-background group registration and cleanup for imported theme packages.
  */
 
 import JSZip from 'jszip';
@@ -64,6 +65,26 @@ const createUiIconPackage = async (): Promise<Blob> => {
   }));
   zip.file('assets/uiicon/01.webp', 'first-icon');
   zip.file('assets/uiicon/02.webp', 'second-icon');
+  return zip.generateAsync({ type: 'blob' });
+};
+
+const createCardBackgroundPackage = async (): Promise<Blob> => {
+  const zip = new JSZip();
+  zip.file('theme.json', JSON.stringify({
+    format: 'lumostime-theme-package',
+    schemaVersion: 2,
+    package: { id: 'card-theme', name: 'Card Theme', version: '1.0.0' },
+    resources: {
+      cardBackgroundGroups: [{
+        id: 'cards',
+        name: 'Theme Cards',
+        alignment: 'right-bottom',
+        files: ['assets/card-backgrounds/card.webp']
+      }]
+    },
+    apply: {}
+  }));
+  zip.file('assets/card-backgrounds/card.webp', 'card-background');
   return zip.generateAsync({ type: 'blob' });
 };
 
@@ -156,5 +177,26 @@ describe('themePackageImportService', () => {
     expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([
       { id: 'user-cards', name: 'User Cards', imageFilenames: ['user-card.webp'] }
     ]);
+  });
+
+  it('registers a package card-background group on import and removes it with its synchronized images', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+
+    const { themePackageImportService } = await import('./themePackageImportService');
+    await themePackageImportService.importPackage(await createCardBackgroundPackage());
+
+    expect(saveImage).toHaveBeenCalledWith(expect.any(Blob), 'theme');
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([{
+      id: 'theme:card-theme:card-background-cards',
+      name: 'Theme Cards',
+      imageFilenames: ['image-card-background.webp'],
+      alignment: 'right-bottom'
+    }]);
+
+    await expect(themePackageImportService.deletePackage('card-theme')).resolves.toBe(true);
+    expect(deleteImage).toHaveBeenCalledWith('image-card-background.webp');
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([]);
   });
 });

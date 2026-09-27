@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
  * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
  * @updated 2026-09-27: Resolves the first packaged UI icon from both declared and archived asset paths for theme-card previews.
+ * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -41,6 +42,47 @@ export interface ImportedThemePackageRecord {
 }
 
 const UI_ICON_FIRST_IMAGE_PATTERN = /(?:^|\/)01\.(?:bmp|gif|jpe?g|png|svg|webp)$/i;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const registerPackageCardBackgroundGroup = (record: ImportedThemePackageRecord): boolean => {
+  const cardBackgroundGroups = record.manifest.resources?.cardBackgroundGroups;
+  if (!Array.isArray(cardBackgroundGroups) || cardBackgroundGroups.length !== 1 || !isRecord(cardBackgroundGroups[0])) {
+    return false;
+  }
+
+  const group = cardBackgroundGroups[0];
+  const groupId = typeof group.id === 'string' ? group.id.trim() : '';
+  const files = Array.isArray(group.files) ? group.files : [];
+  const imageFilenames = files
+    .filter((file): file is string => typeof file === 'string')
+    .map((file) => record.imageAssets[file])
+    .filter((filename): filename is string => typeof filename === 'string' && filename.length > 0);
+  if (!groupId || imageFilenames.length === 0) return false;
+
+  const id = `theme:${record.id}:card-background-${groupId}`;
+  let existingGroups: Record<string, unknown>[] = [];
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CARD_BACKGROUND_GROUPS_KEY) || '[]');
+    if (Array.isArray(parsed)) existingGroups = parsed.filter(isRecord);
+  } catch { /* Preserve malformed user settings instead of replacing them. */ }
+
+  const alignment = group.alignment === 'right-top' || group.alignment === 'right-bottom'
+    ? group.alignment
+    : 'right';
+  localStorage.setItem(CARD_BACKGROUND_GROUPS_KEY, JSON.stringify([
+    ...existingGroups.filter((item) => item.id !== id),
+    {
+      id,
+      name: typeof group.name === 'string' && group.name.trim() ? group.name.trim() : record.name,
+      imageFilenames,
+      alignment
+    }
+  ]));
+  return true;
+};
 
 export const getThemePackageUiIconPreviewFallbackFilename = (
   record: ImportedThemePackageRecord
@@ -425,6 +467,8 @@ export const themePackageImportService = {
         await fontService.removeCustomFont(existingLocalRecord.fontId).catch(() => undefined);
       }
 
+      const registeredCardBackground = registerPackageCardBackgroundGroup(record);
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
           detail: { packageId: record.id, version: record.version }
@@ -433,8 +477,8 @@ export const themePackageImportService = {
           window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
           window.dispatchEvent(new Event('stickerSetsChanged'));
           window.dispatchEvent(new Event('imageListChanged'));
-          window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
         }
+        if (existingRecord || registeredCardBackground) window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
       }
 
       return {

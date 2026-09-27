@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Validates Memoir overflow/fill background mode and matching image shape.
  * @updated 2026-09-26: Validates explicit legacy/modern navigation modes for compatible theme packages.
  * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
+ * @updated 2026-09-27: Limits each version-two theme package to one card-background group.
  */
 
 import JSZip from 'jszip';
@@ -444,6 +445,13 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
       }
       ids.add(item.id);
       if (key === 'cardBackgroundGroups') {
+        if (value.length > 1) {
+          throw new ThemePackageValidationError(
+            'INVALID_CONFIGURATION',
+            'resources.cardBackgroundGroups 最多只能定义一个卡片背景组',
+            'resources.cardBackgroundGroups'
+          );
+        }
         if (!Array.isArray(item.files) || item.files.length === 0
           || item.files.some((file) => typeof file !== 'string')) {
           throw new ThemePackageValidationError(
