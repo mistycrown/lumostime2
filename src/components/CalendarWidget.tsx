@@ -20,6 +20,7 @@
  * @updated 2026-09-27: Applies independently adjustable themed layer scale/opacity and synchronizes collapsed date text with toolbar color.
  * @updated 2026-09-27: Keeps themed borders on right-side date controls while allowing independent left shortcut surfaces.
  * @updated 2026-09-27: Passes X/Y offsets for every themed image layer into the calendar renderer.
+ * @updated 2026-09-27: Synchronizes regular expanded-calendar text with the active themed toolbar foreground color.
  * @updated 2026-09-27: Tightens the original timeline header controls and weekday/date rhythm.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -322,15 +323,15 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         {viewMode === 'calendar' ? (
                             <>
                                 <div className="flex items-center justify-between mt-3 mb-4 px-2">
-                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronLeft size={20} /></button>
-                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors">
+                                    <button onClick={() => switchMonth(-1)} className="p-1 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronLeft size={20} /></button>
+                                    <button onClick={() => setViewMode('month_year')} className="font-bold text-stone-800 hover:bg-stone-100 px-2 py-1 rounded-lg transition-colors" style={dateTextStyle}>
                                         {currentDate.getFullYear()} . {currentDate.getMonth() + 1}
                                     </button>
-                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full"><ChevronRight size={20} /></button>
+                                    <button onClick={() => switchMonth(1)} className="p-1 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronRight size={20} /></button>
                                 </div>
                                 <div className="grid grid-cols-7 gap-y-2 place-items-center">
                                     {weekDaysShort.map(d => (
-                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase">{d}</span>
+                                        <span key={d} className="text-[10px] font-bold text-stone-300 uppercase" style={dateTextStyle}>{d}</span>
                                     ))}
                                     {getMonthDays().map((day, idx) => {
                                         if (!day) return <div key={idx} />;
@@ -445,7 +446,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                                 ? 'bg-stone-100 text-stone-600' 
                                                                 : 'bg-stone-50 text-stone-300'
                                                     } ${today && !selected ? 'border border-stone-300' : ''}`}
-                                                    style={selected ? { backgroundColor: 'var(--progress-bar-fill)' } : undefined}
+                                                    style={selected ? { backgroundColor: 'var(--progress-bar-fill)' } : dateTextStyle}
                                                 >
                                                     {day.getDate()}
                                                 </button>
@@ -546,7 +547,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                         ${bgClass} ${textClass}
                                         ${today && !selected && !staticMode ? 'border border-stone-300' : ''}
                                      `}
-                                                style={bgStyle}
+                                                style={dateTextStyle && textClass !== 'text-white'
+                                                    ? { ...bgStyle, color: toolbarForegroundColor }
+                                                    : bgStyle}
                                             >
                                                 {/* Custom Background/Content */}
                                                 {renderCustomDay && (
@@ -569,9 +572,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                             // Month/Year Picker Mode
                             <div className="flex flex-col h-[280px]">
                                 <div className="flex items-center justify-between mt-3 mb-0 px-4">
-                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronLeft size={24} /></button>
-                                    <span className="text-2xl font-bold text-stone-800">{currentDate.getFullYear()}</span>
-                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full"><ChevronRight size={24} /></button>
+                                    <button onClick={() => switchYear(-1)} className="p-2 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronLeft size={24} /></button>
+                                    <span className="text-2xl font-bold text-stone-800" style={dateTextStyle}>{currentDate.getFullYear()}</span>
+                                    <button onClick={() => switchYear(1)} className="p-2 hover:bg-stone-100 rounded-full" style={dateTextStyle}><ChevronRight size={24} /></button>
                                 </div>
                                 <div className="grid grid-cols-4 gap-4 flex-1 content-center px-4">
                                     {Array.from({ length: 12 }, (_, i) => i).map(m => (
@@ -584,7 +587,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                                     ? 'text-white shadow-md'
                                                     : 'bg-stone-50 text-stone-600 hover:bg-stone-100'}
                                       `}
-                                            style={currentDate.getMonth() === m ? { backgroundColor: 'var(--accent-color)' } : undefined}
+                                            style={currentDate.getMonth() === m
+                                                ? { backgroundColor: 'var(--accent-color)' }
+                                                : dateTextStyle}
                                         >
                                             {new Date(2000, m, 1).toLocaleString('zh-CN', { month: 'short' })}
                                         </button>
