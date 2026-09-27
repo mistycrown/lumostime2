@@ -5,6 +5,7 @@
  * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
  * @updated 2026-07-22: Added Memoir-specific text hooks so entry titles and body content remain readable in dark mode.
  * @updated 2026-09-12: Renders Routine Markdown checklists as visual rows in Memoir entries.
+ * @updated 2026-09-27: Applies configured card backgrounds to daily, weekly, and monthly summary cards.
  */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
@@ -18,6 +19,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { TimelineStyleRail } from './TimelineStyleRail';
 import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
 import { RoutineChecklistPreview } from './RoutineChecklistPreview';
+import { useCardBackground } from '../hooks/useCardBackground';
 
 import { ReactionPicker, ReactionList } from './ReactionComponents';
 
@@ -283,9 +285,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         }
     };
 
+    const cardBackground = useCardBackground(railIndex, isSummary);
+
     // Background style for summary cards
     const containerClasses = isSummary
-        ? "bg-paper-dark/60 rounded-xl p-5 border border-dashed border-gray-300 relative w-full"
+        ? `${cardBackground.active ? '' : 'bg-paper-dark/60'} rounded-xl p-5 border border-dashed border-gray-300 relative w-full`
         : "flex flex-col gap-1 w-full pl-[5px] min-w-0";
 
     const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.collectionNames?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
@@ -322,7 +326,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             )}
 
             {/* Content */}
-            <div className={containerClasses}>
+            <div className={containerClasses} style={cardBackground.active ? cardBackground.style : undefined}>
                 {/* Header info */}
                 <div className="flex items-baseline justify-between">
                     <div className="flex items-center gap-3 text-stone-400 text-[10px] font-sans tracking-wide">

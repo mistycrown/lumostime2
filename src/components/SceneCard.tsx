@@ -4,6 +4,7 @@
  * @updated 2026-05-11: Timer/todo cards now restore only manual flip storage and ignore legacy auto-flip booleans so out-of-slot logs cannot keep cards stuck on the back side.
  * @updated 2026-05-10: Split timer/todo back-side locking from manual flips so timeline-forced backs block swipe return without persisting that forced state.
  * @updated 2026-04-25: Replaced scene card borders with inset outlines so flipped cards keep their full stroke on mobile WebViews.
+ * @updated 2026-09-27: Hides scene-card outlines when a configured card background is active.
  * @updated 2026-05-05: Added parent-driven flip synchronization so scene timer/todo cards can react to widget-started sessions.
  * @updated 2026-09-26: Added synchronized image backgrounds to scene cards.
  */
@@ -32,8 +33,10 @@ const DEFAULT_COLORS = {
   stats: '#a8a8c5',      // 莫兰迪靛蓝
 };
 
-const getSceneCardSurfaceStyle = (borderColor: string): React.CSSProperties => ({
-  boxShadow: `inset 0 0 0 1px ${borderColor}, 0 1px 2px rgba(0, 0, 0, 0.06)`,
+export const getSceneCardSurfaceStyle = (borderColor: string, hasBackground = false): React.CSSProperties => ({
+  boxShadow: hasBackground
+    ? '0 1px 2px rgba(0, 0, 0, 0.06)'
+    : `inset 0 0 0 1px ${borderColor}, 0 1px 2px rgba(0, 0, 0, 0.06)`,
 });
 
 interface SceneCardProps {
@@ -482,7 +485,7 @@ const CardFront: React.FC<{
   return (
     <div 
       className={`rounded-2xl p-4 ${hasBackground ? '' : 'bg-white/90'} backdrop-blur-sm relative`}
-      style={{ ...getSceneCardSurfaceStyle(cardPresentation.frontBorderColor), ...(hasBackground ? backgroundStyle : {}) }}
+      style={{ ...getSceneCardSurfaceStyle(cardPresentation.frontBorderColor, hasBackground), ...(hasBackground ? backgroundStyle : {}) }}
     >
       {/* 右上角状态指示 */}
       <div className="absolute top-4 right-4">
@@ -633,7 +636,7 @@ const CardBack: React.FC<{
     <div 
       className={`rounded-2xl p-4 ${hasBackground ? '' : 'bg-white/90'} backdrop-blur-sm transition-opacity relative`}
       style={{ 
-        ...getSceneCardSurfaceStyle(cardPresentation.backBorderColor),
+        ...getSceneCardSurfaceStyle(cardPresentation.backBorderColor, hasBackground),
         ...(hasBackground ? backgroundStyle : {}),
         opacity: isSwiping ? Math.max(0.6, 1 - Math.abs(swipeProgress) * 0.5) : 1,
         cursor: isClickable ? 'pointer' : 'default'
