@@ -6,6 +6,7 @@
  * @description A versatile calendar component supporting animated expand/collapse, Week/Month modes, and Heatmap visualization (Duration or Focus).
  * @updated 2026-08-24: Allows timeline header menus to overflow the calendar container without clipping.
  * @updated 2026-08-09: Planned timeline blocks are excluded from calendar heatmap statistics.
+ * @updated 2026-09-27: Supports a non-interactive themed decoration layer for the timeline header and collapsed week card.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -15,6 +16,7 @@ import { Log } from '../types';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, X } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { getTimelineHeaderThemeConfig, TimelineHeaderDecorations, type TimelineHeaderTheme } from './TimelineHeaderDecorations';
 
 interface CalendarWidgetProps {
     currentDate: Date;
@@ -34,11 +36,14 @@ interface CalendarWidgetProps {
     galleryMode?: boolean; // 画廊模式：显示每天的第一张图片
     todos?: any[]; // 待办列表（用于获取 Cover Image）
     onDayClick?: (date: Date) => void; // 点击日期时的回调（用于跳转到时间轴）
+    headerTheme?: TimelineHeaderTheme;
 }
 
-export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick }) => {
+export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onDateChange, logs = [], isExpanded, onExpandToggle, extraHeaderControls, disableSelection, customScale, heatmapMode, staticMode, preventCollapse, onResetView, renderCustomDay, hideTopBar = false, galleryMode = false, todos = [], onDayClick, headerTheme }) => {
     const [viewMode, setViewMode] = useState<'calendar' | 'month_year'>('calendar');
     const countableLogs = useMemo(() => filterCountableLogs(logs), [logs]);
+    const headerThemeConfig = getTimelineHeaderThemeConfig(headerTheme);
+    const collapsedCalendarHeight = headerThemeConfig ? 85 : 75;
     const calendarAreaTransition = {
         duration: 0.18,
         ease: [0.22, 1, 0.36, 1] as const
@@ -127,13 +132,14 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
 
     return (
         <div className={hideTopBar
-            ? "z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
-            : "bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
+            ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
+            : "relative bg-white/80 backdrop-blur-md z-20 shadow-sm transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 border-b border-stone-200 pt-[var(--app-safe-area-top)]"
         }>
+            <TimelineHeaderDecorations theme={headerTheme} scope="header" />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (
-                <div className="px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
+                <div className="relative z-10 px-4 py-2.5 flex items-center justify-between border-b border-stone-100">
                     {/* 左侧：控制按钮（同步、排序、统计） */}
                     <div className="flex items-center gap-1">
                         {extraHeaderControls}
@@ -191,9 +197,9 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             {/* Calendar Area */}
             <motion.div
                 initial={false}
-                animate={{ height: isExpanded ? 'auto' : 75 }}
+                animate={{ height: isExpanded ? 'auto' : collapsedCalendarHeight }}
                 transition={calendarAreaTransition}
-                className="overflow-hidden relative"
+                className="overflow-hidden relative z-10"
             >
                 <AnimatePresence initial={false} mode="popLayout">
 
@@ -206,9 +212,10 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
                         transition={calendarAreaTransition}
-                        className="flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 h-[75px]"
-                        style={{ width: '100%' }}
+                        className={`relative flex justify-between items-center px-4 pb-1 md:justify-center md:gap-8 ${headerThemeConfig ? `mx-2 mt-2 h-[77px] ${headerThemeConfig.collapsedCardClassName}` : 'h-[75px]'}`}
+                        style={headerThemeConfig ? undefined : { width: '100%' }}
                     >
+                        <TimelineHeaderDecorations theme={headerTheme} scope="week-card" />
                         {getWeekDays().map((day, idx) => {
                             const selected = !disableSelection && isSameDay(day, currentDate);
                             const today = isToday(day);
@@ -222,7 +229,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
                                             onDayClick(day);
                                         }
                                     }}
-                                    className={`
+                                    className={`relative z-10
                                         w-12 h-14 rounded-xl transition-all duration-300 active:scale-95 relative group
                                         ${selected
                                             ? 'btn-template-filled'
