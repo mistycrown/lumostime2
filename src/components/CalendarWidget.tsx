@@ -15,6 +15,7 @@
  * @updated 2026-09-27: Keeps the themed right-side calendar control transparent so its foreground icon is not lost on a solid fill.
  * @updated 2026-09-27: Supports a theme-configured right-toolbar button surface for reference-matched header compositions.
  * @updated 2026-09-27: Limits themed toolbar button surfaces to the right-side Today and calendar controls.
+ * @updated 2026-09-27: Hides header stickers explicitly marked for expanded-calendar mode.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -151,7 +152,7 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({ currentDate, onD
             ? "relative z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0"
             : `relative ${headerThemeConfig?.containerClassName || 'bg-white/80 backdrop-blur-md'} z-20 transition-all duration-500 ease-in-out overflow-visible flex flex-col shrink-0 ${headerThemeConfig ? 'border-b-0 shadow-none' : 'border-b border-stone-200 shadow-sm'} pt-[var(--app-safe-area-top)]`
         }>
-            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} />
+            <TimelineHeaderDecorations theme={headerTheme} scope="header" stickerOffsets={headerStickerOffsets} isCalendarExpanded={isExpanded} />
 
             {/* Top Bar - 详情页面模式下隐藏 */}
             {!hideTopBar && (

@@ -13,6 +13,7 @@
  * @updated 2026-09-27: Aligned Little Prince toolbar and sticker defaults with the supplied full-width preview composition.
  * @updated 2026-09-27: Refined Little Prince sticker scale and edge placement to preserve the header's functional controls and date labels.
  * @updated 2026-09-27: Preserves the Little Prince date-paper artwork aspect ratio instead of stretching it into the date strip.
+ * @updated 2026-09-27: Keeps the Little Prince illustration at sticker scale and hides it during expanded calendar browsing.
  */
 import React from 'react';
 
@@ -51,6 +52,7 @@ type TimelineHeaderLayerAsset = {
 export type TimelineHeaderStickerAsset = TimelineHeaderLayerAsset & {
   kind: 'sticker';
   rotationDegrees?: number;
+  hideWhenCalendarExpanded?: boolean;
 };
 
 type TimelineHeaderBackgroundAsset = TimelineHeaderLayerAsset & {
@@ -204,8 +206,9 @@ export const TIMELINE_HEADER_THEME_CONFIGS: Record<TimelineHeaderTheme, Timeline
           kind: 'sticker',
           label: '小王子与玫瑰',
           src: `${PRINCE_ASSET_ROOT}/03_little_prince_planet_with_rose.png`,
-          className: 'pointer-events-none absolute right-28 -top-1 z-20 w-28 max-[380px]:w-24',
-          opacity: 0.95
+          className: 'pointer-events-none absolute right-28 top-1 z-[3] w-20 max-[380px]:w-[4.5rem]',
+          opacity: 0.9,
+          hideWhenCalendarExpanded: true
         }
       ],
       weekCard: [
@@ -327,6 +330,7 @@ interface TimelineHeaderDecorationsProps {
   scope: TimelineHeaderDecorationScope;
   stickerOffsets?: TimelineHeaderStickerOffsets;
   dateBackgroundScale?: TimelineHeaderDateBackgroundScale;
+  isCalendarExpanded?: boolean;
 }
 
 const getAssetStyle = (
@@ -344,14 +348,16 @@ export const TimelineHeaderDecorations: React.FC<TimelineHeaderDecorationsProps>
   theme,
   scope,
   stickerOffsets = {},
-  dateBackgroundScale = DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE
+  dateBackgroundScale = DEFAULT_TIMELINE_HEADER_DATE_BACKGROUND_SCALE,
+  isCalendarExpanded = false
 }) => {
   const config = getTimelineHeaderThemeConfig(theme);
 
   if (!config) return null;
 
   const background = scope === 'header' ? config.topBackground : config.dateBackground;
-  const stickers = scope === 'header' ? config.stickers.header : config.stickers.weekCard;
+  const stickers = (scope === 'header' ? config.stickers.header : config.stickers.weekCard)
+    .filter((asset) => !isCalendarExpanded || !asset.hideWhenCalendarExpanded);
 
   return (
     <>
