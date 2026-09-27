@@ -8,6 +8,7 @@
  * @updated 2026-04-25: Added a `min-h-0` guard on the main content shell so nested scene lists can keep scrolling on mobile WebViews.
  * @updated 2026-09-25: Applies the persisted transparent-navigation setting to supported top title bars while excluding Todo schedule mode.
  * @updated 2026-09-25: Marks transparent-title-bar layouts so page background masks can cover the full viewport without changing normal layout flow.
+ * @updated 2026-09-25: Limits transparent title bars to Tags/Scopes index pages and restores the opaque detail-page header.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -158,8 +159,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     const supportsTransparentTitleBar = currentView === AppView.RECORD
         || (currentView === AppView.TODO && !isTodoScheduleMode)
         || (currentView === AppView.REVIEW && !hasReviewSubpage)
-        || currentView === AppView.TAGS
-        || currentView === AppView.SCOPE;
+        || (currentView === AppView.TAGS && !selectedTagId && !selectedCategoryId)
+        || (currentView === AppView.SCOPE && !selectedScopeId);
     const shouldUseTransparentTitleBar = isTransparentNavigation && supportsTransparentTitleBar;
 
     return (
