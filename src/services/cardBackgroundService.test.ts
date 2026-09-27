@@ -2,6 +2,7 @@
  * @file cardBackgroundService.test.ts
  * @input Stored card background groups, settings, and uploaded image files
  * @output Regression coverage for persistence, carousel selection, alignment, and opacity
+ * @updated 2026-09-27: Verifies anchored backgrounds fill width without centered cropping.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -58,16 +59,25 @@ describe('card background settings', () => {
     expect(cardBackgroundService.getBackgroundAt(-1)).toEqual({ filename: 'two.webp', alignment: 'right-bottom' });
   });
 
-  it('maps alignments and clamps opacity for the image overlay', () => {
+  it('maps alignment-specific image sizing and clamps opacity for the image overlay', () => {
     cardBackgroundService.setOpacity(1.5);
     expect(localStorage.getItem(CARD_BACKGROUND_OPACITY_KEY)).toBe('1');
     expect(getCardBackgroundPosition('right')).toBe('right center');
     expect(getCardBackgroundPosition('right-top')).toBe('right top');
     expect(getCardBackgroundPosition('right-bottom')).toBe('right bottom');
 
-    const style = getCardBackgroundStyle('blob:preview', 'right-top', 0.25);
-    expect(style.backgroundPosition).toBe('right top, center');
-    expect(style.backgroundImage).toContain('rgba(255, 255, 255, 0.75)');
+    const topStyle = getCardBackgroundStyle('blob:preview', 'right-top', 0.25);
+    expect(topStyle.backgroundPosition).toBe('center, right top');
+    expect(topStyle.backgroundSize).toBe('cover, 100% auto');
+    expect(topStyle.backgroundImage).toContain('rgba(255, 255, 255, 0.75)');
+
+    const bottomStyle = getCardBackgroundStyle('blob:preview', 'right-bottom', 0.25);
+    expect(bottomStyle.backgroundPosition).toBe('center, right bottom');
+    expect(bottomStyle.backgroundSize).toBe('cover, 100% auto');
+
+    const centeredStyle = getCardBackgroundStyle('blob:preview', 'right', 0.25);
+    expect(centeredStyle.backgroundPosition).toBe('center, right center');
+    expect(centeredStyle.backgroundSize).toBe('cover, cover');
   });
 
   it('persists a group after saving every selected image', async () => {
