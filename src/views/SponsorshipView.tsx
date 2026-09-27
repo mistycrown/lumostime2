@@ -19,6 +19,7 @@
  * @updated 2026-09-27: Uses each theme's first UIIcon image as its scheme-card preview.
  * @updated 2026-09-27: Resolves imported UIIcon previews from archived assets and built-in theme IDs.
  * @updated 2026-09-27: Moved Memoir mood-calendar background settings from navigation to the style tab.
+ * @updated 2026-09-27: Wrapped Memoir mood-calendar background settings in the shared style-card treatment.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -1966,7 +1967,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                     <AchievementBottleIconPackSelector />
                                     <AchievementBottleStyleSelector />
                                     <CalendarNumberStyleSelector />
-                                    <div className="border-t border-stone-200 px-1 pt-5">
+                                    <div className="rounded-2xl bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
                                         <MoodCalendarBackgroundSelector
                                             onToast={onToast}
                                             onOpenDebugger={() => {
