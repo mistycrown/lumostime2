@@ -120,6 +120,23 @@ describe('themePackageImportService', () => {
     expect(getThemePackageUiIconPreviewFallbackFilename(record)).toBe('image-first-icon.webp');
   });
 
+  it('finds uiicon/01.webp in archived assets when a package omits a files mapping', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+
+    const { themePackageImportService, getThemePackageUiIconPreviewFallbackFilename } = await import('./themePackageImportService');
+    const { record } = await themePackageImportService.importPackage(await createUiIconPackage());
+    const legacyRecord = {
+      ...record,
+      manifest: {
+        ...record.manifest,
+        config: { uiIcon: { source: 'asset', themeId: 'fish-icons' } }
+      }
+    };
+
+    expect(getThemePackageUiIconPreviewFallbackFilename(legacyRecord)).toBe('image-first-icon.webp');
+  });
+
   it('deletes the package image assets without reference checks', async () => {
     vi.stubGlobal('localStorage', makeLocalStorage());
     vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });

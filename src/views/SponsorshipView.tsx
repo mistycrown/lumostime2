@@ -17,6 +17,7 @@
  * @updated 2026-09-26: Unifies theme cards and deletion, saves complete immutable snapshots, and removes preset editing.
  * @updated 2026-09-26: Added synchronized card-background group settings to the style tab.
  * @updated 2026-09-27: Uses each theme's first UIIcon image as its scheme-card preview.
+ * @updated 2026-09-27: Resolves imported UIIcon previews from archived assets and built-in theme IDs.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -1542,6 +1543,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             && typeof (uiIcon as Record<string, unknown>).themeId === 'string'
                                             ? String((uiIcon as Record<string, unknown>).themeId)
                                             : 'default';
+                                        const uiIconPreviewImageFilename = getThemePackageUiIconPreviewFallbackFilename(record);
                                         return (
                                             <ThemeSchemeCard
                                                 key={`package:${record.id}`}
@@ -1552,7 +1554,10 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 version={record.version}
                                                 colorScheme={colorScheme}
                                                 uiTheme={uiTheme}
-                                                uiIconPreviewImageFilename={getThemePackageUiIconPreviewFallbackFilename(record)}
+                                                uiIconPreviewImageFilename={uiIconPreviewImageFilename}
+                                                uiIconPreviewImageUrl={!uiIconPreviewImageFilename && uiTheme !== 'default'
+                                                    ? resolveAssetPath(`/uiicon/${uiTheme}/01.webp`)
+                                                    : undefined}
                                                 deletable
                                                 selected={currentPresetId === record.id || currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${record.id}`}
                                                 onApply={() => void applyImportedTheme(record.id)}

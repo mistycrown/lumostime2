@@ -7,7 +7,7 @@
  * @updated 2026-09-26: Added transactional image and local-font persistence for versioned theme packages.
  * @updated 2026-09-26: Preserves a package's local font when an update omits the font section.
  * @updated 2026-09-26: Replaces matching package IDs directly and removes package-owned resources on deletion.
- * @updated 2026-09-27: Exposes the first packaged UI icon for theme-card previews.
+ * @updated 2026-09-27: Resolves the first packaged UI icon from both declared and archived asset paths for theme-card previews.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -46,16 +46,15 @@ export const getThemePackageUiIconPreviewFallbackFilename = (
   record: ImportedThemePackageRecord
 ): string | undefined => {
   const uiIcon = record.manifest.config.uiIcon;
-  if (!uiIcon || typeof uiIcon !== 'object' || Array.isArray(uiIcon)) {
-    return undefined;
-  }
-
-  const files = (uiIcon as Record<string, unknown>).files;
-  if (!files || typeof files !== 'object' || Array.isArray(files)) {
-    return undefined;
-  }
-
-  const paths = Object.values(files).filter((path): path is string => typeof path === 'string');
+  const files = uiIcon && typeof uiIcon === 'object' && !Array.isArray(uiIcon)
+    ? (uiIcon as Record<string, unknown>).files
+    : undefined;
+  const declaredPaths = files && typeof files === 'object' && !Array.isArray(files)
+    ? Object.values(files).filter((path): path is string => typeof path === 'string')
+    : [];
+  const archivedUiIconPaths = Object.keys(record.imageAssets)
+    .filter((path) => /(?:^|\/)uiicon(?:\/|$)/i.test(path));
+  const paths = Array.from(new Set([...declaredPaths, ...archivedUiIconPaths]));
   const firstPath = paths.find((path) => UI_ICON_FIRST_IMAGE_PATTERN.test(path)) || paths[0];
   return firstPath ? record.imageAssets[firstPath] : undefined;
 };
