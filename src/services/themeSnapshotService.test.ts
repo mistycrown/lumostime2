@@ -23,18 +23,36 @@ vi.mock('./appearanceBackupService', () => ({
   appearanceBackupService: { buildBackupPayload: () => ({ version: 1, storage: {} }), applyBackupPayload }
 }));
 vi.mock('./timelineStyleService', () => ({ DEFAULT_TIMELINE_STYLE_CONFIGS: {} }));
-vi.mock('./fontService', () => ({ fontService: { setFont: vi.fn(() => ({ success: true })) } }));
+vi.mock('./fontService', () => ({ fontService: {
+  refreshCustomFonts: vi.fn(async () => []),
+  setFont: vi.fn(() => ({ success: true }))
+} }));
 vi.mock('./moodCalendarBackgroundService', () => ({
-  moodCalendarBackgroundService: { hydrateCustomBackgrounds: vi.fn(async () => undefined) }
+  moodCalendarBackgroundService: {
+    getBackgroundById: vi.fn(),
+    getCurrentBackground: vi.fn(() => 'none'),
+    hydrateCustomBackgrounds: vi.fn(async () => undefined),
+    setCurrentBackground: vi.fn()
+  }
 }));
 vi.mock('./navigationBackgroundService', () => ({ navigationBackgroundService: {
-  hydrateCustomBackgrounds: vi.fn(async () => undefined), setCurrentBackground: vi.fn(), setEnabled: vi.fn()
+  getBackgroundById: vi.fn(), getCurrentBackground: vi.fn(() => 'new-none'), hydrateCustomBackgrounds: vi.fn(async () => undefined),
+  isEnabled: vi.fn(() => false), setCurrentBackground: vi.fn(), setEnabled: vi.fn(), setTransparentNavigationEnabled: vi.fn()
 } }));
 vi.mock('./navigationIconService', () => ({
   NAVIGATION_ICON_CHANGE_EVENT: 'navigationIconChange',
-  navigationIconService: { hydrateCustomIcons: vi.fn(async () => undefined) }
+  navigationIconService: { getIconForSlot: vi.fn(), getSlots: vi.fn(() => []), hydrateCustomIcons: vi.fn(async () => undefined) }
 }));
-vi.mock('./imageService', () => ({ imageService: { getReferencedImageManifest: () => ({ content: [] }), deleteImage: vi.fn() } }));
+vi.mock('./backgroundService', () => ({ backgroundService: { getCurrentBackgroundOption: vi.fn(), setCurrentBackground: vi.fn() } }));
+vi.mock('./navigationDecorationService', () => ({ navigationDecorationService: {
+  getCurrentDecoration: vi.fn(() => 'default'), getDecorationById: vi.fn(), setCurrentDecoration: vi.fn()
+} }));
+vi.mock('./cardBackgroundService', () => ({ cardBackgroundService: { getCurrentGroup: vi.fn(), setCurrentGroup: vi.fn() } }));
+vi.mock('./imageService', () => ({ imageService: {
+  deleteImage: vi.fn(),
+  getImageUrl: vi.fn(async () => ''),
+  getReferencedImageManifest: () => ({ content: [] })
+} }));
 vi.mock('./settingsImageReferenceService', () => ({ getSettingsReferencedImages: () => new Set<string>() }));
 vi.mock('./uiIconService', () => ({ UI_ICON_CUSTOM_ASSETS_KEY: 'ui-icons', uiIconService: { registerCustomThemeAssets: vi.fn() } }));
 
@@ -51,6 +69,7 @@ describe('themeSettingsSnapshot', () => {
   afterEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
     applyBackupPayload.mockClear();
   });
 
@@ -98,5 +117,30 @@ describe('themeSettingsSnapshot', () => {
       version: 1,
       storage: { mood_calendar_fill_background: 'none' }
     });
+  });
+
+  it('restores transparent navigation and falls back when the selected card background is missing', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    const { cardBackgroundService } = await import('./cardBackgroundService');
+    const { imageService } = await import('./imageService');
+    const { navigationBackgroundService } = await import('./navigationBackgroundService');
+    vi.mocked(cardBackgroundService.getCurrentGroup).mockReturnValue({
+      id: 'missing-group',
+      name: 'Missing cards',
+      imageFilenames: ['missing-card.webp'],
+      alignment: 'right'
+    });
+    vi.mocked(imageService.getImageUrl).mockResolvedValue('');
+
+    const { applyThemeSettingsSnapshot } = await import('./themeSnapshotService');
+    const warnings = await applyThemeSettingsSnapshot({
+      version: 1,
+      storage: { navigation_transparent_enabled: 'true' }
+    });
+
+    expect(navigationBackgroundService.setTransparentNavigationEnabled).toHaveBeenCalledWith(true);
+    expect(cardBackgroundService.setCurrentGroup).toHaveBeenCalledWith(null);
+    expect(warnings).toContain('卡片背景缺少资源：missing-card.webp');
   });
 });

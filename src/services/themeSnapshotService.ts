@@ -7,9 +7,10 @@
  * @updated 2026-09-26: Added immutable full appearance snapshots for saved themes.
  * @updated 2026-09-26: Restores named custom achievement-bottle icon-pack records.
  * @updated 2026-09-28: Preserves independently imported resource catalogs when applying a saved theme snapshot.
+ * @updated 2026-09-28: Falls back from missing selected theme resources with user-facing warnings.
  */
 
-import { THEME_KEYS } from '../constants/storageKeys';
+import { THEME_KEYS, TIMEPAL_KEYS } from '../constants/storageKeys';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE } from './achievementBottleStyleService';
 import {
   DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK,
@@ -22,8 +23,12 @@ import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 import { navigationBackgroundService } from './navigationBackgroundService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { imageService } from './imageService';
+import { backgroundService } from './backgroundService';
+import { navigationDecorationService } from './navigationDecorationService';
+import { cardBackgroundService } from './cardBackgroundService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { UI_ICON_CUSTOM_ASSETS_KEY, uiIconService } from './uiIconService';
+import { extractCustomTimePalId } from '../constants/timePalConfig';
 
 const SNAPSHOT_EXTRA_KEYS = [
   'navigation_new_mode_enabled',
@@ -76,6 +81,105 @@ const getStoredObject = <T extends object>(key: string): T => {
   } catch {
     return {} as T;
   }
+};
+
+const getStoredArray = <T>(key: string): T[] => {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(value) ? value as T[] : [];
+  } catch {
+    return [];
+  }
+};
+
+const getMissingImageFilenames = async (filenames: Array<string | undefined>): Promise<string[]> => {
+  const unique = [...new Set(filenames.filter((filename): filename is string => Boolean(filename?.trim())))];
+  const results = await Promise.all(unique.map(async (filename) => ({
+    filename,
+    available: Boolean(await imageService.getImageUrl(filename).catch(() => ''))
+  })));
+  return results.filter((result) => !result.available).map((result) => result.filename);
+};
+
+const appendMissingResourceWarning = (warnings: string[], label: string, filenames: string[]): void => {
+  if (filenames.length > 0) warnings.push(`${label}缺少资源：${filenames.join('、')}`);
+};
+
+const validateActiveThemeResources = async (
+  activeUiTheme: string,
+  customUiThemes: Record<string, Record<string, string>>,
+  activeIconPack: string | null | undefined,
+  customIconPack: string[] | { name?: string; filenames?: string[] } | undefined
+): Promise<string[]> => {
+  const warnings: string[] = [];
+  const validate = async (label: string, filenames: Array<string | undefined>, fallback: () => void) => {
+    const missing = await getMissingImageFilenames(filenames);
+    if (missing.length === 0) return;
+    fallback();
+    appendMissingResourceWarning(warnings, label, missing);
+  };
+
+  const pageBackground = backgroundService.getCurrentBackgroundOption();
+  if (pageBackground?.imageFilename) {
+    await validate('页面背景', [pageBackground.imageFilename], () => backgroundService.setCurrentBackground('default'));
+  }
+
+  const decoration = navigationDecorationService.getDecorationById(navigationDecorationService.getCurrentDecoration());
+  if (decoration?.imageFilename) {
+    await validate('导航装饰', [decoration.imageFilename], () => navigationDecorationService.setCurrentDecoration('default'));
+  }
+
+  if (navigationBackgroundService.isEnabled()) {
+    const background = navigationBackgroundService.getBackgroundById(navigationBackgroundService.getCurrentBackground());
+    if (background?.imageFilename) {
+      await validate('导航背景', [background.imageFilename], () => navigationBackgroundService.setCurrentBackground('new-none'));
+    }
+  }
+
+  const iconFiles = navigationIconService.getSlots().map((slot) => navigationIconService.getIconForSlot(slot)?.imageFilename);
+  if (iconFiles.some(Boolean)) {
+    await validate('导航图标', iconFiles, () => {
+      navigationIconService.setMode('text');
+      navigationIconService.setShowLabelWithIcon(false);
+    });
+  }
+
+  const memoirBackground = moodCalendarBackgroundService.getBackgroundById(moodCalendarBackgroundService.getCurrentBackground());
+  if (memoirBackground?.imageFilename) {
+    await validate('Memoir 日历背景', [memoirBackground.imageFilename], () => moodCalendarBackgroundService.setCurrentBackground('none'));
+  }
+
+  const cardGroup = cardBackgroundService.getCurrentGroup();
+  if (cardGroup) {
+    await validate('卡片背景', cardGroup.imageFilenames, () => cardBackgroundService.setCurrentGroup(null));
+  }
+
+  const timePalId = extractCustomTimePalId(localStorage.getItem(TIMEPAL_KEYS.TYPE));
+  if (timePalId) {
+    const item = getStoredArray<{ id?: string; stageFilenames?: string[] }>(TIMEPAL_KEYS.CUSTOM_ITEMS)
+      .find((candidate) => candidate.id === timePalId);
+    if (!item) {
+      localStorage.setItem(TIMEPAL_KEYS.TYPE, 'none');
+      warnings.push(`时光小友缺少资源：${timePalId}`);
+    } else {
+      await validate('时光小友', item.stageFilenames || [], () => localStorage.setItem(TIMEPAL_KEYS.TYPE, 'none'));
+    }
+  }
+
+  const uiThemeAssets = customUiThemes[activeUiTheme];
+  if (uiThemeAssets) {
+    await validate('UI 图标主题', Object.values(uiThemeAssets), () => uiIconService.setTheme('default'));
+  }
+
+  const packFiles = Array.isArray(customIconPack) ? customIconPack : customIconPack?.filenames || [];
+  if (activeIconPack && packFiles.length > 0) {
+    await validate('成就瓶图标包', packFiles, () => localStorage.setItem(
+      THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK,
+      DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK
+    ));
+  }
+
+  return warnings;
 };
 
 const readSnapshotStorage = (): Record<string, string | null> => {
@@ -171,6 +275,7 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
   });
   appearanceBackupService.applyBackupPayload({ version: 1, storage: switchStorage });
 
+  await fontService.refreshCustomFonts().catch(() => undefined);
   if (currentFontId !== 'default') {
     const result = fontService.setFont(currentFontId);
     if (!result.success) warnings.push(`当前设备无法恢复此方案字体：${result.message}`);
@@ -200,9 +305,16 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
   } else {
     navigationBackgroundService.setEnabled(false);
   }
+  navigationBackgroundService.setTransparentNavigationEnabled(switchStorage.navigation_transparent_enabled === 'true');
   await navigationBackgroundService.hydrateCustomBackgrounds();
   await navigationIconService.hydrateCustomIcons();
   await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+  warnings.push(...await validateActiveThemeResources(
+    activeUiTheme,
+    customUiThemes,
+    activeIconPack,
+    customIconPack
+  ));
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
