@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Marks legacy presets and disables the modern navigation background when applying them.
  * @updated 2026-09-28: Applies optional preset-owned modern-navigation and Memoir calendar selections.
  * @updated 2026-09-28: Applies optional preset-owned card-background and font selections.
+ * @updated 2026-09-28: Preserves standalone Memoir background selections when applying legacy presets.
  */
 
 import { ThemePreset } from '../hooks/useCustomPresets';
@@ -69,6 +70,13 @@ export class ThemePresetService {
 
     static async applyMemoirCalendarBackground(background: string | undefined): Promise<void> {
         if (!background) return;
+
+        // Legacy presets only use `none`. Do not erase a background that the user
+        // imported independently; package-owned Memoir backgrounds are explicitly
+        // applied through themePackageApplicationService instead.
+        if (background === 'none' && !moodCalendarBackgroundService.getCurrentBackground().startsWith('theme:')) {
+            return;
+        }
 
         console.log('[ThemePresetService] apply Memoir calendar background:', background);
         moodCalendarBackgroundService.setCurrentBackground(background);
