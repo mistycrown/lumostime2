@@ -10,6 +10,7 @@
  * @updated 2026-09-26: Applies achievement-bottle and other appearance settings from their manifest sections.
  * @updated 2026-09-26: Applies nested navigation icons, live background opacity, and refreshes packaged stickers.
  * @updated 2026-09-28: Applies complete 01-96 numbered UIIcon directories from theme packages.
+ * @updated 2026-09-28: Scopes asset-based UIIcon IDs for retained-resource package copies.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -93,6 +94,11 @@ const getAssetFilename = (record: ImportedThemePackageRecord, path: unknown): st
 const getNamespacedId = (record: ImportedThemePackageRecord, suffix: string): string => (
   `theme:${record.id}:${suffix}`
 );
+
+const getPackageUiIconThemeId = (record: ImportedThemePackageRecord, configuredThemeId?: string): string => {
+  const themeId = configuredThemeId || record.id;
+  return record.sourcePackageId ? getNamespacedId(record, `uiicon-${themeId}`) : themeId;
+};
 
 const applyBackground = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
   const config = getConfigObject(record, 'background');
@@ -502,7 +508,10 @@ const applySettings = async (record: ImportedThemePackageRecord, warnings: strin
     uiIconService.setTheme(uiIcon.themeId as never);
   } else if (uiIcon?.source === 'asset') {
     const files = uiIcon.files;
-    const themeId = typeof uiIcon.themeId === 'string' ? uiIcon.themeId : record.id;
+    const themeId = getPackageUiIconThemeId(
+      record,
+      typeof uiIcon.themeId === 'string' ? uiIcon.themeId : undefined
+    );
     const numberedDirectory = typeof uiIcon.numberedDirectory === 'string'
       ? uiIcon.numberedDirectory.replace(/\/+$/, '')
       : '';

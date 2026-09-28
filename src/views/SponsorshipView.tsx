@@ -23,6 +23,7 @@
  * @updated 2026-09-27: Adds the timeline header sticker debugger entry to the style tab.
  * @updated 2026-09-28: Added strict 96-image UIIcon ZIP import with duplicate-name resolution.
  * @updated 2026-09-28: Gives legacy built-in presets explicit defaults for modern navigation and Memoir calendar styling.
+ * @updated 2026-09-28: Lets package-theme deletion retain user-selectable resources and resolves retained-resource reimports.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -501,6 +502,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     // Custom preset modals state
     const [isNameModalOpen, setIsNameModalOpen] = useState(false);
     const [pendingThemeDelete, setPendingThemeDelete] = useState<{ id: string; name: string; source: 'saved' | 'package' } | null>(null);
+    const [pendingPackageResourceDelete, setPendingPackageResourceDelete] = useState<{ id: string; name: string } | null>(null);
     const [isDeletingTheme, setIsDeletingTheme] = useState(false);
     
     // Tab 页状态
@@ -519,6 +521,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [isImportingUIIconZip, setIsImportingUIIconZip] = useState(false);
     const [isImportingThemePackage, setIsImportingThemePackage] = useState(false);
     const [pendingThemePackage, setPendingThemePackage] = useState<File | null>(null);
+    const [pendingRetainedThemePackage, setPendingRetainedThemePackage] = useState<{
+        file: File;
+        applyAfterImport: boolean;
+        packageName: string;
+    } | null>(null);
     const [importedThemePackages, setImportedThemePackages] = useState(() => themePackageImportService.getImportedPackages());
     const [customUIIconThemes, setCustomUIIconThemes] = useState(() => uiIconService.getCustomThemeEntries());
     const [pendingUIIconZipImport, setPendingUIIconZipImport] = useState<PendingUIIconZipImport | null>(null);
@@ -938,11 +945,15 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setPendingThemePackage(packageFile);
     };
 
-    const importThemePackage = async (packageFile: File, applyAfterImport: boolean) => {
+    const importThemePackage = async (
+        packageFile: File,
+        applyAfterImport: boolean,
+        retainedResourceResolution?: 'overwrite' | 'keep'
+    ) => {
         setPendingThemePackage(null);
         setIsImportingThemePackage(true);
         try {
-            const result = await themePackageImportService.importPackage(packageFile);
+            const result = await themePackageImportService.importPackage(packageFile, { retainedResourceResolution });
             const replacedActiveTheme = currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${result.record.id}`;
             setImportedThemePackages(themePackageImportService.getImportedPackages());
             if (applyAfterImport) {
@@ -962,7 +973,15 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             }
         } catch (error) {
             if (error instanceof ThemePackageImportError) {
-                onToast('error', error.message);
+                if (error.code === 'RETAINED_RESOURCES_CONFLICT') {
+                    setPendingRetainedThemePackage({
+                        file: packageFile,
+                        applyAfterImport,
+                        packageName: error.packageName || packageFile.name
+                    });
+                } else {
+                    onToast('error', error.message);
+                }
             } else {
                 console.error('[SponsorshipView] 导入主题包失败:', error);
                 onToast('error', error instanceof Error ? error.message : '主题包导入失败，请检查压缩包格式');
@@ -1009,9 +1028,11 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setCurrentPresetId('default');
     };
 
-    const confirmDeleteTheme = async () => {
-        if (!pendingThemeDelete || isDeletingTheme) return;
-        const target = pendingThemeDelete;
+    const deleteTheme = async (
+        target: { id: string; name: string; source: 'saved' | 'package' },
+        deletePackageResources = true
+    ) => {
+        if (isDeletingTheme) return;
         setIsDeletingTheme(true);
         try {
             const isActive = currentPresetId === target.id
@@ -1019,12 +1040,13 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             if (isActive) await applyDefaultTheme();
 
             if (target.source === 'package') {
-                await themePackageImportService.deletePackage(target.id);
+                await themePackageImportService.deletePackage(target.id, { deleteResources: deletePackageResources });
                 setImportedThemePackages(themePackageImportService.getImportedPackages());
             } else if (!deleteCustomPreset(target.id)) {
                 throw new Error('方案删除失败，请重试');
             }
             setPendingThemeDelete(null);
+            setPendingPackageResourceDelete(null);
             onToast('success', `方案「${target.name}」已删除`);
         } catch (error) {
             console.error('[SponsorshipView] 删除主题方案失败:', error);
@@ -1032,6 +1054,17 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         } finally {
             setIsDeletingTheme(false);
         }
+    };
+
+    const confirmDeleteTheme = async () => {
+        if (!pendingThemeDelete || isDeletingTheme) return;
+        const target = pendingThemeDelete;
+        if (target.source === 'package') {
+            setPendingThemeDelete(null);
+            setPendingPackageResourceDelete({ id: target.id, name: target.name });
+            return;
+        }
+        await deleteTheme(target);
     };
 
     const countStickerReferences = (imageFilename: string) => stickerReferenceCounts.get(imageFilename) || 0;
@@ -2261,15 +2294,50 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 description={pendingThemeDelete && (currentPresetId === pendingThemeDelete.id
                     || (pendingThemeDelete.source === 'package' && currentPresetId === `${PACKAGE_THEME_ID_PREFIX}${pendingThemeDelete.id}`))
                     ? pendingThemeDelete.source === 'package'
-                        ? `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。主题包图片、字体和贴纸也会一并删除。`
+                        ? `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。下一步可选择是否同时删除主题资源。`
                         : `确定删除「${pendingThemeDelete.name}」？当前正在使用此方案，删除前会切换到默认主题。`
                     : pendingThemeDelete?.source === 'package'
-                        ? `确定删除「${pendingThemeDelete.name}」？主题包图片、字体和贴纸也会一并删除。`
+                        ? `确定删除「${pendingThemeDelete.name}」？下一步可选择是否同时删除主题资源。`
                         : `确定删除「${pendingThemeDelete?.name || ''}」？`}
                 confirmText={isDeletingTheme ? '删除中…' : '删除'}
                 cancelText="取消"
                 type="danger"
             />
+
+            {pendingPackageResourceDelete && (
+                <div className="fixed inset-0 z-[101] flex items-center justify-center bg-black/30 p-4">
+                    <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                        <h3 className="text-base font-semibold text-stone-800">是否删除对应资源？</h3>
+                        <p className="mt-1 text-sm text-stone-500">保留后，图片、字体、贴纸等仍可在设置中继续使用；再次导入同一主题包时可选择覆盖或保留这些资源。</p>
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                type="button"
+                                disabled={isDeletingTheme}
+                                onClick={() => void deleteTheme({ ...pendingPackageResourceDelete, source: 'package' }, false)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                            >
+                                保留资源
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isDeletingTheme}
+                                onClick={() => void deleteTheme({ ...pendingPackageResourceDelete, source: 'package' }, true)}
+                                className="flex-1 rounded-md bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+                            >
+                                删除资源
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isDeletingTheme}
+                                onClick={() => setPendingPackageResourceDelete(null)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-500 hover:bg-stone-50 disabled:opacity-50"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {pendingUIIconZipImport && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
@@ -2339,6 +2407,46 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                 className="flex-1 rounded-md bg-stone-800 px-3 py-2 text-sm text-white"
                             >
                                 导入并应用
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {pendingRetainedThemePackage && (
+                <div className="fixed inset-0 z-[102] flex items-center justify-center bg-black/30 p-4">
+                    <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                        <h3 className="text-base font-semibold text-stone-800">检测到保留的主题资源</h3>
+                        <p className="mt-1 text-sm text-stone-500">“{pendingRetainedThemePackage.packageName}” 的旧资源仍在。覆盖会删除旧资源；保留旧资源会将本次导入作为独立副本。</p>
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const pending = pendingRetainedThemePackage;
+                                    setPendingRetainedThemePackage(null);
+                                    void importThemePackage(pending.file, pending.applyAfterImport, 'overwrite');
+                                }}
+                                className="flex-1 rounded-md bg-stone-800 px-3 py-2 text-sm text-white hover:bg-stone-700"
+                            >
+                                覆盖旧资源
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const pending = pendingRetainedThemePackage;
+                                    setPendingRetainedThemePackage(null);
+                                    void importThemePackage(pending.file, pending.applyAfterImport, 'keep');
+                                }}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                            >
+                                保留旧资源
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPendingRetainedThemePackage(null)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-500 hover:bg-stone-50"
+                            >
+                                取消
                             </button>
                         </div>
                     </div>
