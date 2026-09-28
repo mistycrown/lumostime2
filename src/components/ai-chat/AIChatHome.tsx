@@ -4,6 +4,7 @@
  * @output The AI assistant landing workspace with entry points into chat and assistant tools
  * @pos Component (AI Integration)
  * @description Presents an editorial AI workbench before the user enters a conversation.
+ * @updated 2026-09-28: Added a single-item recent conversation entry at the top of the AI homepage.
  * @updated 2026-09-21: Opens the homepage quick-input options from the bare plus action instead of directly adding a todo.
  * @updated 2026-09-20: Hide the homepage composer while a settings overlay is open so it does not remain visible beneath the settings page.
  * @updated 2026-09-20: Removed the composer separator line and kept compact spacing before the shortcut section.
@@ -281,6 +282,14 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
       <div className="h-full min-h-0 overflow-y-auto px-4 pb-32 pt-3 sm:px-8 sm:pb-36 sm:pt-4">
         <div className="mx-auto max-w-6xl">
           <main className="space-y-5">
+            <section className="pb-3">
+              <SectionHeading index="00" icon={History} title="最近对话" theme={theme} />
+              <div className="mt-2 divide-y" style={{ borderColor: theme.panelBorder }}>
+                {visibleSessions.slice(0, 1).map((session) => <button key={session.id} type="button" onClick={() => onOpenChat(session.id)} className="flex w-full items-center gap-2 py-2 text-left first:pt-1"><div className="h-6 w-6 shrink-0 overflow-hidden rounded-full" style={{ backgroundColor: theme.avatarBg }}><PersonaAvatar persona={getSessionPersona(session)} className="rounded-full" iconClassName="text-sm" /></div><span className="min-w-0 flex-1 truncate text-sm" style={{ color: theme.textPrimary }}>{session.title}</span><span className="shrink-0 text-[10px]" style={{ color: theme.textMuted }}>{formatConversationTime(session.updatedAt)}</span><ChevronRight size={14} className="shrink-0" style={{ color: theme.textFaint }} /></button>)}
+                {visibleSessions.length === 0 && <p className="py-2 text-sm" style={{ color: theme.textMuted }}>还没有对话记录</p>}
+              </div>
+            </section>
+
             <section>
               <SectionHeading
                 index="01"

@@ -2987,7 +2987,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           <AIBackfillChatMemoryOverlay
             assistantMemorySnapshot={assistantMemorySnapshot}
             assistantReminderSnapshot={assistantReminderSnapshot}
-            recentChatSession={sortedSessions[0]}
             assistantEditableMemoryComposerKey={assistantEditableMemoryComposerKey}
             assistantEditableMemoryDrafts={assistantEditableMemoryDrafts}
             assistantEditableMemoryDeleteTarget={assistantEditableMemoryDeleteTarget}
@@ -3005,10 +3004,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
             onCancelEditableMemoryDelete={() => setAssistantEditableMemoryDeleteTarget(null)}
             onConfirmEditableMemoryDelete={handleConfirmAssistantEditableMemoryDelete}
             onOpenReminderComposer={handleOpenAssistantReminderComposer}
-            onOpenRecentChat={(sessionId) => {
-              handleCloseAssistantMemoryViewer();
-              handleOpenChatView(sessionId);
-            }}
             onUpdateReminderDraft={updateAssistantReminderDraft}
             onCancelReminderComposer={handleCancelAssistantReminderComposer}
             onSaveReminder={handleSaveAssistantReminder}
