@@ -7,24 +7,28 @@
  */
 import React from 'react';
 import { Check } from 'lucide-react';
-import { resolveAssetPath } from '../utils/assetPath';
+import { getUIIconTypeByNumber, uiIconService } from '../services/uiIconService';
 
 interface UiThemeButtonProps {
     theme: string;
     currentTheme: string;
     onThemeChange: (theme: string) => void;
+    label?: string;
 }
 
 export const UiThemeButton: React.FC<UiThemeButtonProps> = ({
     theme,
     currentTheme,
-    onThemeChange
+    onThemeChange,
+    label
 }) => {
     const isSelected = currentTheme === theme;
     
     return (
         <button
             onClick={() => onThemeChange(theme)}
+            title={label || theme}
+            aria-label={`切换 UI 主题：${label || theme}`}
             className={`relative rounded-lg border-2 transition-all overflow-hidden ${
                 isSelected
                     ? 'border-stone-400 ring-2 ring-stone-200'
@@ -33,18 +37,24 @@ export const UiThemeButton: React.FC<UiThemeButtonProps> = ({
             style={{ aspectRatio: '4/5' }}
         >
             <div className="w-full h-full grid grid-cols-2 gap-0.5 p-1 bg-white">
-                {[1, 2, 3, 4].map((num) => (
+                {[1, 2, 3, 4].map((num) => {
+                    const iconType = getUIIconTypeByNumber(String(num).padStart(2, '0'));
+                    const paths = iconType
+                        ? uiIconService.getIconPathWithFallbackForTheme(theme, iconType)
+                        : { primary: '', fallback: '' };
+                    return (
                     <div key={num} className="bg-stone-50 rounded flex items-center justify-center">
                         <img
-                            src={resolveAssetPath(`/uiicon/${theme}/${String(num).padStart(2, '0')}.webp`)}
+                            src={paths.primary}
                             alt={`icon-${num}`}
                             className="w-full h-full object-contain p-0.5"
                             onError={(e) => {
-                                e.currentTarget.src = resolveAssetPath(`/uiicon/${theme}/${String(num).padStart(2, '0')}.png`);
+                                e.currentTarget.src = paths.fallback;
                             }}
                         />
                     </div>
-                ))}
+                    );
+                })}
             </div>
             {isSelected && (
                 <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">

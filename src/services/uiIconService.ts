@@ -257,6 +257,17 @@ const ICON_TYPE_BY_NUMBER = Object.entries(ICON_NUMBER_MAP).reduce<Record<string
 export const UI_ICON_THEMES = ['default', 'purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'old', 'paper', 'pencil'] as const;
 export type UIIconTheme = typeof UI_ICON_THEMES[number] | string;
 export const UI_ICON_CUSTOM_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
+export const UI_ICON_CUSTOM_THEME_NAMES_KEY = 'lumostime_ui_icon_custom_theme_names_v1';
+export const UI_ICON_CUSTOM_THEMES_CHANGED_EVENT = 'ui-icon-custom-themes-changed';
+
+export interface CustomUIIconThemeEntry {
+    id: string;
+    name: string;
+}
+
+export const getUIIconTypeByNumber = (number: string): UIIconType | null => (
+    ICON_TYPE_BY_NUMBER[number] || null
+);
 
 // 图标分组定义
 export const ICON_GROUPS = {
@@ -451,12 +462,56 @@ class UIIconService {
         }
     }
 
-    async registerCustomThemeAssets(theme: string, mapping: Record<string, string>): Promise<void> {
+    async registerCustomThemeAssets(theme: string, mapping: Record<string, string>, displayName?: string): Promise<void> {
         const stored = this.readStoredCustomThemeAssets();
         stored[theme] = { ...mapping };
         localStorage.setItem(UI_ICON_CUSTOM_ASSETS_KEY, JSON.stringify(stored));
+        if (displayName) {
+            const names = this.readCustomThemeNames();
+            names[theme] = displayName;
+            localStorage.setItem(UI_ICON_CUSTOM_THEME_NAMES_KEY, JSON.stringify(names));
+        }
         this.customThemeAssets = stored;
         await this.hydrateCustomThemeAssets();
+        window.dispatchEvent(new CustomEvent(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT));
+    }
+
+    getCustomThemeEntries(): CustomUIIconThemeEntry[] {
+        const stored = this.readStoredCustomThemeAssets();
+        const names = this.readCustomThemeNames();
+        return Object.entries(names)
+            .filter(([id]) => !!stored[id])
+            .map(([id, name]) => ({ id, name }))
+            .sort((first, second) => first.name.localeCompare(second.name, undefined, { numeric: true, sensitivity: 'base' }));
+    }
+
+    getStoredCustomThemeAssetFilenames(theme: string): string[] {
+        return Object.values(this.readStoredCustomThemeAssets()[theme] || {});
+    }
+
+    removeCustomThemeAssets(theme: string): void {
+        const stored = this.readStoredCustomThemeAssets();
+        delete stored[theme];
+        localStorage.setItem(UI_ICON_CUSTOM_ASSETS_KEY, JSON.stringify(stored));
+        const names = this.readCustomThemeNames();
+        delete names[theme];
+        localStorage.setItem(UI_ICON_CUSTOM_THEME_NAMES_KEY, JSON.stringify(names));
+        delete this.customThemeAssets[theme];
+        window.dispatchEvent(new CustomEvent(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT));
+    }
+
+    getIconPathForTheme(theme: UIIconTheme, iconType: UIIconType, format: 'png' | 'webp' = 'png'): string {
+        if (theme === 'default') return '';
+        const customPath = this.customThemeAssets[theme]?.[iconType];
+        if (customPath) return customPath;
+        const iconNumber = ICON_NUMBER_MAP[iconType];
+        return resolveAssetPath(`/uiicon/${theme}/${iconNumber}.${format}`);
+    }
+
+    getIconPathWithFallbackForTheme(theme: UIIconTheme, iconType: UIIconType): { primary: string; fallback: string } {
+        const primary = this.getIconPathForTheme(theme, iconType, 'webp');
+        const customPath = this.customThemeAssets[theme]?.[iconType];
+        return { primary, fallback: customPath || this.getIconPathForTheme(theme, iconType, 'png') };
     }
 
     private readStoredCustomThemeAssets(): Record<string, Record<string, string>> {
@@ -464,6 +519,16 @@ class UIIconService {
             const raw = localStorage.getItem(UI_ICON_CUSTOM_ASSETS_KEY);
             const parsed = raw ? JSON.parse(raw) : {};
             return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch {
+            return {};
+        }
+    }
+
+    private readCustomThemeNames(): Record<string, string> {
+        try {
+            const raw = localStorage.getItem(UI_ICON_CUSTOM_THEME_NAMES_KEY);
+            const parsed = raw ? JSON.parse(raw) : {};
+            return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
         } catch {
             return {};
         }
@@ -503,18 +568,7 @@ class UIIconService {
      * @returns 图标路径
      */
     getIconPath(iconType: UIIconType, format: 'png' | 'webp' = 'png'): string {
-        // 如果是默认主题，返回空字符串（使用原有的 Emoji 图标）
-        if (this.currentTheme === 'default') {
-            return '';
-        }
-
-        const customPath = this.customThemeAssets[this.currentTheme]?.[iconType];
-        if (customPath) {
-            return customPath;
-        }
-
-        const iconNumber = ICON_NUMBER_MAP[iconType];
-        return resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.${format}`);
+        return this.getIconPathForTheme(this.currentTheme, iconType, format);
     }
 
     /**
@@ -524,20 +578,7 @@ class UIIconService {
      * @returns { primary: string, fallback: string }
      */
     getIconPathWithFallback(iconType: UIIconType): { primary: string; fallback: string } {
-        if (this.currentTheme === 'default') {
-            return { primary: '', fallback: '' };
-        }
-
-        const customPath = this.customThemeAssets[this.currentTheme]?.[iconType];
-        if (customPath) {
-            return { primary: customPath, fallback: customPath };
-        }
-
-        const iconNumber = ICON_NUMBER_MAP[iconType];
-        return {
-            primary: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.webp`),
-            fallback: resolveAssetPath(`/uiicon/${this.currentTheme}/${iconNumber}.png`)
-        };
+        return this.getIconPathWithFallbackForTheme(this.currentTheme, iconType);
     }
 
     /**
