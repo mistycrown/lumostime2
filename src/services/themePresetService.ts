@@ -8,6 +8,7 @@
  * @updated 2026-03-28: Added achievement bottle icon-pack support so preset save/apply keeps bottle sprites in sync.
  * @updated 2026-09-26: Marks legacy presets and disables the modern navigation background when applying them.
  * @updated 2026-09-28: Applies optional preset-owned modern-navigation and Memoir calendar selections.
+ * @updated 2026-09-28: Applies optional preset-owned card-background and font selections.
  */
 
 import { ThemePreset } from '../hooks/useCustomPresets';
@@ -17,6 +18,8 @@ import { navigationDecorationService } from './navigationDecorationService';
 import { navigationBackgroundService } from './navigationBackgroundService';
 import { navigationIconService } from './navigationIconService';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
+import { cardBackgroundService } from './cardBackgroundService';
+import { fontService } from './fontService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE, type AchievementBottleStyle } from './achievementBottleStyleService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, type AchievementBottleIconPack } from './achievementBottleIconPackService';
 
@@ -69,6 +72,20 @@ export class ThemePresetService {
 
         console.log('[ThemePresetService] apply Memoir calendar background:', background);
         moodCalendarBackgroundService.setCurrentBackground(background);
+    }
+
+    static async applyCardBackground(groupId: string | null | undefined): Promise<void> {
+        if (groupId === undefined) return;
+
+        console.log('[ThemePresetService] apply card background:', groupId);
+        cardBackgroundService.setCurrentGroup(groupId);
+    }
+
+    static async applyFont(fontId: string | undefined): Promise<void> {
+        if (!fontId) return;
+
+        console.log('[ThemePresetService] apply font:', fontId);
+        fontService.setFont(fontId);
     }
 
     static async applyTimePal(timePal: string): Promise<void> {
@@ -164,6 +181,8 @@ export class ThemePresetService {
             await this.applyNavigation(preset.navigation);
             await this.applyModernNavigation(preset);
             await this.applyMemoirCalendarBackground(preset.memoirCalendarBackground);
+            await this.applyCardBackground(preset.cardBackgroundGroupId);
+            await this.applyFont(preset.fontId);
             await this.applyTimePal(preset.timePal);
             await this.applyAchievementBottleStyle(
                 preset.achievementBottleStyle || DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,

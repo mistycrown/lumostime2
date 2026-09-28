@@ -6,6 +6,7 @@
  * @description 自定义主题方案 Hook - 管理完整外观快照，支持新增、删除和名称验证
  * @updated 2026-09-26: Saves full appearance snapshots and removes editing operations.
  * @updated 2026-09-28: Adds optional modern-navigation and Memoir calendar selections for legacy built-in presets.
+ * @updated 2026-09-28: Adds optional card-background and font selections for legacy built-in presets.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -45,6 +46,8 @@ export interface ThemePreset {
     navigationMode?: 'legacy' | 'modern';
     modernNavigation?: ModernNavigationPreset;
     memoirCalendarBackground?: string;
+    cardBackgroundGroupId?: string | null;
+    fontId?: string;
     timePal: string;
     achievementBottleStyle?: AchievementBottleStyle;
     achievementBottleIconPack?: AchievementBottleIconPack;

@@ -400,7 +400,9 @@ const THEME_PRESETS: ThemePreset[] = ([
         iconMode: 'text',
         showLabelWithIcon: false
     },
-    memoirCalendarBackground: 'none'
+    memoirCalendarBackground: 'none',
+    cardBackgroundGroupId: null,
+    fontId: 'default'
 }));
 
 // UI 主题列表

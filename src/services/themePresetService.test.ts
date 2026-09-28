@@ -5,6 +5,7 @@
  * @pos Test (Theme Management)
  * @description Ensures a legacy preset explicitly restores newer appearance controls without deleting their asset catalogs.
  * @updated 2026-09-28: Added legacy preset modern-navigation and Memoir default coverage.
+ * @updated 2026-09-28: Covers card-background and font defaults owned by legacy presets.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -17,12 +18,16 @@ const navigationBackground = {
 };
 const navigationIcons = { setMode: vi.fn(), setShowLabelWithIcon: vi.fn() };
 const memoirCalendar = { setCurrentBackground: vi.fn() };
+const cardBackground = { setCurrentGroup: vi.fn() };
+const fonts = { setFont: vi.fn() };
 
 vi.mock('./backgroundService', () => ({ backgroundService: { setCurrentBackground: vi.fn(), applyBackgroundToElements: vi.fn() } }));
 vi.mock('./navigationDecorationService', () => ({ navigationDecorationService: { setCurrentDecoration: vi.fn() } }));
 vi.mock('./navigationBackgroundService', () => ({ navigationBackgroundService: navigationBackground }));
 vi.mock('./navigationIconService', () => ({ navigationIconService: navigationIcons }));
 vi.mock('./moodCalendarBackgroundService', () => ({ moodCalendarBackgroundService: memoirCalendar }));
+vi.mock('./cardBackgroundService', () => ({ cardBackgroundService: cardBackground }));
+vi.mock('./fontService', () => ({ fontService: fonts }));
 vi.mock('./achievementBottleStyleService', () => ({ DEFAULT_ACHIEVEMENT_BOTTLE_STYLE: 'default' }));
 vi.mock('./achievementBottleIconPackService', () => ({ DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK: 'star1' }));
 
@@ -55,7 +60,9 @@ describe('ThemePresetService', () => {
         iconMode: 'text',
         showLabelWithIcon: false
       },
-      memoirCalendarBackground: 'none'
+      memoirCalendarBackground: 'none',
+      cardBackgroundGroupId: null,
+      fontId: 'default'
     };
 
     const result = await ThemePresetService.applyThemePreset(
@@ -75,5 +82,7 @@ describe('ThemePresetService', () => {
     expect(navigationIcons.setMode).toHaveBeenCalledWith('text');
     expect(navigationIcons.setShowLabelWithIcon).toHaveBeenCalledWith(false);
     expect(memoirCalendar.setCurrentBackground).toHaveBeenCalledWith('none');
+    expect(cardBackground.setCurrentGroup).toHaveBeenCalledWith(null);
+    expect(fonts.setFont).toHaveBeenCalledWith('default');
   });
 });
