@@ -12,6 +12,7 @@
  * @updated 2026-07-21: Added dark-mode semantic hooks for the Memoir calendar, timeline, and date navigation rail.
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-09-25: Connects the Memoir title bar transparency to the navigation setting instead of forcing it on.
+ * @updated 2026-09-28: Mirrors the selected Memoir calendar texture on its quick navigation actions.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -145,7 +146,14 @@ export const JournalView: React.FC<JournalViewProps> = ({
     const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
     const [isScrolled, setIsScrolled] = useState(false); // 滚动状�?
     const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
+    const [memoirCalendarBackground, setMemoirCalendarBackground] = useState<{ url: string; opacity: number } | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null); // 滚动容器ref
+
+    const handleMemoirCalendarBackgroundChange = useCallback((background: { url: string; opacity: number } | null) => {
+        setMemoirCalendarBackground((current) => (
+            current?.url === background?.url && current?.opacity === background?.opacity ? current : background
+        ));
+    }, []);
 
     useEffect(() => {
         const handleTransparencyChange = (event: Event) => {
@@ -709,6 +717,18 @@ export const JournalView: React.FC<JournalViewProps> = ({
         onOpenWeeklyReview(start, end);
     };
 
+    const memoirQuickActionStyle = memoirCalendarBackground
+        ? {
+            backgroundImage: `linear-gradient(rgba(255, 255, 255, ${0.74 - memoirCalendarBackground.opacity * 0.24}), rgba(255, 255, 255, ${0.74 - memoirCalendarBackground.opacity * 0.24})), url(${memoirCalendarBackground.url})`,
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: '260%'
+        }
+        : undefined;
+    const memoirQuickActionClassName = memoirCalendarBackground
+        ? 'px-2.5 py-1 text-[10px] font-medium text-stone-600 hover:text-stone-900 hover:brightness-95 rounded-md transition-all'
+        : 'px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all';
+
     return (
         <div 
             className="memoir-view flex flex-col h-full relative isolate"
@@ -778,12 +798,12 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             </button>
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
 
-                            <div className="flex items-center gap-1 mb-1 shrink-0 bg-stone-100/60 p-1 rounded-lg border border-stone-100">
-                                <button onClick={openYesterday} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">昨日</button>
-                                <button onClick={openToday} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">今日</button>
+                            <div className={`flex items-center gap-1 mb-1 shrink-0 p-1 rounded-lg border ${memoirCalendarBackground ? 'border-white/55 bg-white/20 shadow-sm' : 'bg-stone-100/60 border-stone-100'}`}>
+                                <button onClick={openYesterday} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>昨日</button>
+                                <button onClick={openToday} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>今日</button>
                                 <div className="w-px h-3 bg-stone-300/40 mx-0.5"></div>
-                                <button onClick={openLastWeek} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">上周</button>
-                                <button onClick={openThisWeek} className="px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all">本周</button>
+                                <button onClick={openLastWeek} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>上周</button>
+                                <button onClick={openThisWeek} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>本周</button>
                             </div>
                         </div>
 
@@ -794,6 +814,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                                     year={selectedDate.getFullYear()}
                                     month={selectedDate.getMonth()}
                                     dailyReviews={dailyReviews}
+                                    onCalendarBackgroundChange={handleMemoirCalendarBackgroundChange}
                                     onUpdateMood={async (date, emoji) => {
                                         // 找到或创建对应日期的 DailyReview
                                         const existingReview = dailyReviews.find(r => r.date === date);

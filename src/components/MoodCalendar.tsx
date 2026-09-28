@@ -4,6 +4,7 @@
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
  * @updated 2026-09-27: Simplified Memoir calendar backgrounds to one clipped fill image.
  * @updated 2026-09-28: Centers the clipped Memoir calendar background image.
+ * @updated 2026-09-28: Shares the active calendar background with Memoir quick actions.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -24,6 +25,7 @@ interface MoodCalendarProps {
     onClearMood: (date: string) => void;
     onUpdateSummary?: (date: string, summary: string) => void; // 新增：更新一句话总结
     onOpenDailyReview?: (date: Date) => void;
+    onCalendarBackgroundChange?: (background: { url: string; opacity: number } | null) => void;
 }
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // 周一到周日
@@ -35,7 +37,8 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     onUpdateMood,
     onClearMood,
     onUpdateSummary,
-    onOpenDailyReview
+    onOpenDailyReview,
+    onCalendarBackgroundChange
 }) => {
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
@@ -121,6 +124,14 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     const selectedBackgroundUrl = selectedBackground?.url;
     const hasCalendarBackground = Boolean(selectedBackgroundUrl);
 
+    useEffect(() => {
+        const background = hasCalendarBackground && selectedBackgroundUrl
+            ? { url: selectedBackgroundUrl, opacity: backgroundSettings.opacity ?? 1 }
+            : null;
+        onCalendarBackgroundChange?.(background);
+        return () => onCalendarBackgroundChange?.(null);
+    }, [backgroundSettings.opacity, hasCalendarBackground, onCalendarBackgroundChange, selectedBackgroundUrl]);
+
     // 获取指定日期的心情 emoji/贴纸
     const getMoodForDate = (day: number): string | undefined => {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -160,9 +171,9 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
 
     return (
         <>
-            <div className={`memoir-mood-calendar relative overflow-visible ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
+            <div className={`memoir-mood-calendar relative overflow-visible rounded-[1.75rem] shadow-[0_14px_32px_rgba(68,56,43,0.12)] ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50'} p-6 mb-6`}>
                 {hasCalendarBackground && (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-lg"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[1.75rem]"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
                 )}
                 {/* Weekday Headers */}
                 <div className="relative z-10 grid grid-cols-7 mb-4">
