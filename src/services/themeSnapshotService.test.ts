@@ -3,10 +3,15 @@
  * @input Current theme settings in local storage
  * @output Regression coverage for complete saved-theme snapshots
  * @pos Test (Theme Management)
- * @description Ensures sticker selector preferences are captured with saved themes.
+ * @description Ensures saved-theme snapshots preserve independently imported resource catalogs while applying selections.
+ * @updated 2026-09-28: Covers Memoir background catalog preservation during theme switching.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const { applyBackupPayload } = vi.hoisted(() => ({
+  applyBackupPayload: vi.fn()
+}));
 
 vi.mock('./achievementBottleStyleService', () => ({ DEFAULT_ACHIEVEMENT_BOTTLE_STYLE: 'default' }));
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -15,7 +20,7 @@ vi.mock('./achievementBottleIconPackService', () => ({
 }));
 vi.mock('./appearanceBackupService', () => ({
   APPEARANCE_RESTORED_EVENT: 'appearanceRestored',
-  appearanceBackupService: { buildBackupPayload: () => ({ version: 1, storage: {} }), applyBackupPayload: vi.fn() }
+  appearanceBackupService: { buildBackupPayload: () => ({ version: 1, storage: {} }), applyBackupPayload }
 }));
 vi.mock('./timelineStyleService', () => ({ DEFAULT_TIMELINE_STYLE_CONFIGS: {} }));
 vi.mock('./fontService', () => ({ fontService: { setFont: vi.fn(() => ({ success: true })) } }));
@@ -42,10 +47,11 @@ const makeLocalStorage = () => {
   };
 };
 
-describe('captureThemeSettingsSnapshot', () => {
+describe('themeSettingsSnapshot', () => {
   afterEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();
+    applyBackupPayload.mockClear();
   });
 
   it('captures sticker selector default page and merged groups', async () => {
@@ -65,6 +71,32 @@ describe('captureThemeSettingsSnapshot', () => {
         enabled: true,
         groups: [{ id: 'theme:example:sticker-group-all', sourceSetIds: ['theme:example:sticker-set-one'] }]
       })
+    });
+  });
+
+  it('keeps a Memoir background imported after the snapshot was saved', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    const independentlyImportedBackgrounds = JSON.stringify([{
+      id: 'memoir-personal', imageFilename: 'personal-memoir.webp'
+    }]);
+    localStorage.setItem('mood_calendar_fill_background_custom_list', independentlyImportedBackgrounds);
+
+    const { applyThemeSettingsSnapshot } = await import('./themeSnapshotService');
+    await applyThemeSettingsSnapshot({
+      version: 1,
+      storage: {
+        mood_calendar_fill_background: 'none',
+        mood_calendar_fill_background_custom_list: JSON.stringify([{
+          id: 'theme-old', imageFilename: 'theme-old.webp'
+        }])
+      }
+    });
+
+    expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).toBe(independentlyImportedBackgrounds);
+    expect(applyBackupPayload).toHaveBeenCalledWith({
+      version: 1,
+      storage: { mood_calendar_fill_background: 'none' }
     });
   });
 });
