@@ -4,6 +4,7 @@
  * @output Full-screen assistant memory overlay for manual memory and reminder management
  * @pos Component Support (AI Integration)
  * @description Extracts the long-term-memory viewer out of AIBackfillChatModal so the modal can stay focused on orchestration while this overlay keeps its existing UI and event behavior.
+ * @updated 2026-09-28: Rendered editable memory lists newest-first without changing their persisted append order.
  * @updated 2026-07-22: Added a shared dark-theme hook for memory cards, inputs, and actions.
  * @updated 2026-05-15: Extracted the assistant memory overlay from AIBackfillChatModal.
  */
@@ -148,7 +149,7 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
 
           {(Object.keys(ASSISTANT_EDITABLE_MEMORY_SECTION_META) as AssistantEditableMemoryListKey[]).map((key) => {
             const sectionMeta = ASSISTANT_EDITABLE_MEMORY_SECTION_META[key];
-            const items = assistantMemorySnapshot[key];
+            const items = [...assistantMemorySnapshot[key]].reverse();
             const isComposerOpen = assistantEditableMemoryComposerKey === key;
 
             return (
