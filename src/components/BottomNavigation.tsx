@@ -24,6 +24,7 @@
  * @updated 2026-09-26: Restores the original text navigation layout for the no-background selection.
  * @updated 2026-09-26: Keeps the no-background navigation surface solid white regardless of transparency settings.
  * @updated 2026-09-26: Keeps title-bar transparency scoped to the top header, independent of legacy navigation surfaces.
+ * @updated 2026-09-28: Applies independently persisted vertical stretching to new navigation background images.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -83,6 +84,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         offsetY: '0px',
         offsetX: '0px',
         scale: 1,
+        verticalStretch: 1,
         opacity: 1
     });
     const [iconSelection, setIconSelection] = useState(() => navigationIconService.getSelection());
@@ -136,6 +138,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 offsetY: background?.offsetY || '0px',
                 offsetX: background?.offsetX || '0px',
                 scale: background?.scale || 1,
+                verticalStretch: background?.verticalStretch ?? 1,
                 opacity: background?.opacity ?? 1,
                 ...overrideSettings
             });
@@ -267,7 +270,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                                     width: `${Math.max(100, backgroundSettings.scale * 100)}%`,
                                     height: 'auto',
                                     opacity: backgroundSettings.opacity,
-                                    transform: `translateX(calc(-50% + ${backgroundSettings.offsetX})) translateY(${backgroundSettings.offsetY})`
+                                    transform: `translateX(calc(-50% + ${backgroundSettings.offsetX})) translateY(${backgroundSettings.offsetY}) scaleY(${backgroundSettings.verticalStretch})`,
+                                    transformOrigin: 'bottom center'
                                 }}
                             />
                         </div>
@@ -341,7 +345,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                     }}
                     previewEventName={NAVIGATION_BACKGROUND_PREVIEW_EVENT}
                     title="导航背景调整"
-                    resetSettings={{ offsetY: 13, offsetX: 0, scale: 115, opacity: 100 }}
+                    supportsVerticalStretch
+                    resetSettings={{ offsetY: 13, offsetX: 0, scale: 115, verticalStretch: 100, opacity: 100 }}
                 />
             )}
         </>

@@ -33,6 +33,7 @@ export interface NavigationDecorationOption {
     offsetY?: string; // 垂直偏移值，如 '0px', '-10px', '50%' 等
     offsetX?: string; // 水平位置（像素），如 '0px', '-20px', '50px' 等
     scale?: number;   // 缩放比例，默认 1 (100%)
+    verticalStretch?: number; // 纵向拉伸比例，默认 1 (100%)
     opacity?: number; // 透明度，默认 0.6
 }
 

@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-28: `NavigationDecorationDebugger.tsx` and `BottomNavigation.tsx` provide a persisted 10–300% vertical-stretch control for new navigation background images, while legacy navigation decorations remain unchanged.
+
 - Update 2026-09-28: `BackgroundSelector.tsx` lets main-background opacity span 0–100% and presents the corresponding slider endpoint.
 
 - Update 2026-09-27: `LazyViewRecoveryBoundary.tsx` refreshes the current tab once when a lazily loaded view hits Vite's stale optimized-dependency error, then renders its supplied fallback to prevent reload loops.
