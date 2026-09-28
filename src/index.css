@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Keep transparent index surfaces above the shared background image and use one reading overlay across the header and content. */
+/* Keep transparent index surfaces above the shared background image. */
 .transparent-title-bar-active .page-background-overlay {
   position: fixed;
   inset: 0;
