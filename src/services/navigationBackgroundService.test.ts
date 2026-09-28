@@ -3,6 +3,7 @@
  * @input Persisted navigation background IDs and custom background records
  * @output Regression coverage for removed built-in background fallback
  * @pos Test (UI Customization)
+ * @updated 2026-09-28: Covers persisted vertical stretch settings.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { navigationBackgroundService } from './navigationBackgroundService';
@@ -37,5 +38,17 @@ describe('navigation background service', () => {
     navigationBackgroundService.setCurrentBackground('theme:rabbit:navigation-background');
 
     expect(navigationBackgroundService.getCurrentBackground()).toBe('theme:rabbit:navigation-background');
+  });
+
+  it('defaults vertical stretching to 100% and persists a saved value', () => {
+    localStorage.setItem('navigation_new_background_custom_list', JSON.stringify([
+      { id: 'custom-background', name: 'Custom', type: 'custom', url: 'blob:custom' }
+    ]));
+
+    expect(navigationBackgroundService.getBackgroundById('custom-background')?.verticalStretch).toBe(1);
+
+    navigationBackgroundService.saveCustomSettings('custom-background', { verticalStretch: 1.25 });
+
+    expect(navigationBackgroundService.getBackgroundById('custom-background')?.verticalStretch).toBe(1.25);
   });
 });

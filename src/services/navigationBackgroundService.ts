@@ -8,6 +8,7 @@
  * @updated 2026-09-25: Added a persisted transparent-navigation toggle for the supported primary pages.
  * @updated 2026-09-26: Added a built-in no-background option that restores the default navigation surface.
  * @updated 2026-09-28: Removed the packaged background image and migrate its saved selection to no background.
+ * @updated 2026-09-28: Persists independent vertical stretching for new navigation backgrounds.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -17,6 +18,7 @@ export type NavigationBackgroundSettings = {
     offsetY?: string;
     offsetX?: string;
     scale?: number;
+    verticalStretch?: number;
     opacity?: number;
 };
 
@@ -127,7 +129,11 @@ class NavigationBackgroundService {
         const background = this.getAllBackgrounds().find((item) => item.id === id);
         if (!background) return undefined;
         const settings = this.getCustomSettings()[id];
-        return settings ? { ...background, ...settings } : background;
+        return {
+            ...background,
+            ...settings,
+            verticalStretch: settings?.verticalStretch ?? background.verticalStretch ?? 1
+        };
     }
 
     getCustomSettings(): Record<string, NavigationBackgroundSettings> {

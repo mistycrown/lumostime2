@@ -101,6 +101,8 @@ Update 2026-09-28: `backgroundService.ts` now accepts and persists main-backgrou
 
 Update 2026-04-20: `backgroundService.ts` now emits background snapshot events, preloads image switches, and avoids the old 500ms fallback polling loop; `statusBarService.ts` now caches per-image brightness analysis results.
 
+Update 2026-09-28: `navigationBackgroundService.ts` persists independent vertical-stretch settings for modern navigation background images.
+
 Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced log images into a user-defined Obsidian attachment folder during desktop exports.
 
 Update 2026-03-12: timeline styling for normal timeline records is managed by `timelineStyleService.ts`.

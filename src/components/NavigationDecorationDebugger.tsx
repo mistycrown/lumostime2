@@ -2,6 +2,7 @@
  * @file NavigationDecorationDebugger.tsx
  * @description 导航栏装饰调试工具 - 增强版 (支持缩放、透明度、位置调整)
  * @updated 2026-09-25: Added a service adapter so the same tuning controls can adjust new navigation backgrounds.
+ * @updated 2026-09-28: Adds optional vertical stretching for the new navigation background adapter.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,9 +10,9 @@ import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, X, Save, ZoomIn, Sun
 import { navigationDecorationService } from '../services/navigationDecorationService';
 
 export interface NavigationTuningService {
-    getAllDecorations: () => Array<{ id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; opacity?: number }>;
-    getDecorationById: (id: string) => { id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; opacity?: number } | undefined;
-    saveCustomSettings: (id: string, settings: { offsetY: string; offsetX: string; scale: number; opacity: number }) => void;
+    getAllDecorations: () => Array<{ id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; verticalStretch?: number; opacity?: number }>;
+    getDecorationById: (id: string) => { id: string; name: string; url: string; offsetY?: string; offsetX?: string; scale?: number; verticalStretch?: number; opacity?: number } | undefined;
+    saveCustomSettings: (id: string, settings: { offsetY: string; offsetX: string; scale: number; verticalStretch?: number; opacity: number }) => void;
     setCurrentDecoration: (id: string) => void;
 }
 
@@ -25,10 +26,12 @@ interface NavigationDecorationDebuggerProps {
     service?: NavigationTuningService;
     previewEventName?: string;
     title?: string;
+    supportsVerticalStretch?: boolean;
     resetSettings?: {
         offsetY: number;
         offsetX: number;
         scale: number;
+        verticalStretch?: number;
         opacity: number;
     };
 }
@@ -39,12 +42,14 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
     service = navigationDecorationService,
     previewEventName = 'navigationDecorationPreview',
     title = '样式调试',
+    supportsVerticalStretch = false,
     resetSettings = { offsetY: 0, offsetX: 0, scale: 100, opacity: 60 }
 }) => {
     // Current settings state
     const [offsetY, setOffsetY] = useState(0);
     const [offsetX, setOffsetX] = useState(0); // px default (改为像素)
     const [scale, setScale] = useState(100); // % default
+    const [verticalStretch, setVerticalStretch] = useState(100); // % default
     const [opacity, setOpacity] = useState(60); // % default (0.6 * 100)
 
     const [isSaved, setIsSaved] = useState(false);
@@ -85,6 +90,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
 
             // Scale & Opacity
             setScale((deco.scale || 1) * 100);
+            setVerticalStretch((deco.verticalStretch ?? 1) * 100);
             setOpacity((deco.opacity ?? 0.6) * 100);
         }
     }, [activeId]);
@@ -95,6 +101,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         const newOffsetY = `${offsetY}px`;
         const newOffsetX = `${offsetX}px`; // 改为像素
         const newScale = scale / 100;
+        const newVerticalStretch = verticalStretch / 100;
         const newOpacity = opacity / 100;
 
         // Note: We are NOT saving to localStorage yet, but we want to preview it.
@@ -117,12 +124,13 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
                     offsetY: newOffsetY,
                     offsetX: newOffsetX,
                     scale: newScale,
+                    ...(supportsVerticalStretch ? { verticalStretch: newVerticalStretch } : {}),
                     opacity: newOpacity
                 }
             }
         }));
 
-    }, [offsetY, offsetX, scale, opacity, activeId]);
+    }, [offsetY, offsetX, scale, verticalStretch, opacity, activeId, previewEventName, supportsVerticalStretch]);
 
 
     const handleSave = () => {
@@ -130,6 +138,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
             offsetY: `${offsetY}px`,
             offsetX: `${offsetX}px`, // 改为像素
             scale: scale / 100,
+            ...(supportsVerticalStretch ? { verticalStretch: verticalStretch / 100 } : {}),
             opacity: opacity / 100
         };
 
@@ -161,6 +170,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
         setOffsetY(resetSettings.offsetY);
         setOffsetX(resetSettings.offsetX); // 改为0px
         setScale(resetSettings.scale);
+        setVerticalStretch(resetSettings.verticalStretch ?? 100);
         setOpacity(resetSettings.opacity);
         
         // 清除保存的自定义设置
@@ -168,6 +178,7 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
             offsetY: `${resetSettings.offsetY}px`,
             offsetX: `${resetSettings.offsetX}px`,
             scale: resetSettings.scale / 100,
+            ...(supportsVerticalStretch ? { verticalStretch: (resetSettings.verticalStretch ?? 100) / 100 } : {}),
             opacity: resetSettings.opacity / 100
         });
     };
@@ -253,6 +264,21 @@ export const NavigationDecorationDebugger: React.FC<NavigationDecorationDebugger
                         <button onClick={() => setScale(v => Math.min(300, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
                     </div>
                 </div>
+
+                {supportsVerticalStretch && (
+                    <div className="space-y-2">
+                        <div className="flex justify-between text-[11px] text-stone-500 mb-1">
+                            <span className="flex items-center gap-1 font-medium"><Move size={11} className="rotate-90" /> 纵向拉伸</span>
+                            <span className="font-mono font-bold text-stone-700">{verticalStretch}%</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                            <button onClick={() => setVerticalStretch(v => Math.max(10, v - 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-5</button>
+                            <button onClick={() => setVerticalStretch(v => Math.max(10, v - 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">-1</button>
+                            <button onClick={() => setVerticalStretch(v => Math.min(300, v + 1))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+1</button>
+                            <button onClick={() => setVerticalStretch(v => Math.min(300, v + 5))} className="bg-stone-100 hover:bg-stone-200 rounded py-1.5 text-xs font-medium text-stone-600 transition-colors">+5</button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Opacity */}
                 <div className="space-y-2">
