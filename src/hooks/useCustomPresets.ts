@@ -5,6 +5,7 @@
  * @pos Hook (Data Manager)
  * @description 自定义主题方案 Hook - 管理完整外观快照，支持新增、删除和名称验证
  * @updated 2026-09-26: Saves full appearance snapshots and removes editing operations.
+ * @updated 2026-09-28: Adds optional modern-navigation and Memoir calendar selections for legacy built-in presets.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -13,6 +14,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import type { AchievementBottleStyle } from '../services/achievementBottleStyleService';
 import type { AchievementBottleIconPack } from '../services/achievementBottleIconPackService';
+import type { NavigationIconMode } from '../services/navigationIconService';
 import {
     captureThemeSettingsSnapshot,
     deleteUnusedSnapshotImages,
@@ -22,6 +24,14 @@ import {
 /** @updated 2026-09-26: Stores full immutable appearance snapshots for newly saved themes. */
 
 // Theme preset interface
+export interface ModernNavigationPreset {
+    enabled: boolean;
+    background: string;
+    transparent: boolean;
+    iconMode: NavigationIconMode;
+    showLabelWithIcon: boolean;
+}
+
 export interface ThemePreset {
     id: string;
     name: string;
@@ -33,6 +43,8 @@ export interface ThemePreset {
     background: string;
     navigation: string;
     navigationMode?: 'legacy' | 'modern';
+    modernNavigation?: ModernNavigationPreset;
+    memoirCalendarBackground?: string;
     timePal: string;
     achievementBottleStyle?: AchievementBottleStyle;
     achievementBottleIconPack?: AchievementBottleIconPack;
