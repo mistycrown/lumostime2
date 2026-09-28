@@ -5,6 +5,7 @@
  * @pos Service (Custom Sticker Import)
  * @description Reads sticker ZIP archives in the browser and converts direct parent folders into importable sticker groups.
  * @updated 2026-09-25: Added ZIP sticker group parsing with deterministic ordering and 16-image truncation.
+ * @updated 2026-09-28: Imports root-level images as a group named after the ZIP file.
  */
 import JSZip from 'jszip';
 
@@ -54,9 +55,14 @@ const compareArchivePaths = (first: string, second: string): number => (
   first.localeCompare(second, undefined, { numeric: true, sensitivity: 'base' })
 );
 
+const getRootGroupName = (source: Blob | File): string => {
+  const sourceName = 'name' in source && typeof source.name === 'string' ? source.name : '';
+  return sourceName.replace(/\.zip$/i, '').trim() || '贴纸';
+};
+
 /**
  * Parse an archive into groups keyed by each image's direct parent folder.
- * Images without a parent folder and non-image files are intentionally ignored.
+ * Root-level images form one group named after the ZIP file; non-image files are ignored.
  */
 export const parseCustomStickerZip = async (source: Blob | File): Promise<ParsedStickerZipGroup[]> => {
   const zip = await JSZip.loadAsync(await source.arrayBuffer());
@@ -72,7 +78,7 @@ export const parseCustomStickerZip = async (source: Blob | File): Promise<Parsed
 
     const archivePath = entry.name.replace(/\\/g, '/');
     const pathSegments = archivePath.split('/').filter(Boolean);
-    if (pathSegments.length < 2 || pathSegments.includes('__MACOSX')) {
+    if (pathSegments.length === 0 || pathSegments.includes('__MACOSX')) {
       return;
     }
 
@@ -81,8 +87,8 @@ export const parseCustomStickerZip = async (source: Blob | File): Promise<Parsed
       return;
     }
 
-    const folderPath = pathSegments.slice(0, -1).join('/');
-    const folderName = pathSegments[pathSegments.length - 2];
+    const folderPath = pathSegments.length === 1 ? '__root__' : pathSegments.slice(0, -1).join('/');
+    const folderName = pathSegments.length === 1 ? getRootGroupName(source) : pathSegments[pathSegments.length - 2];
     const folder = entriesByFolder.get(folderPath) || { name: folderName, entries: [] };
     folder.entries.push({ archivePath, entry, mimeType });
     entriesByFolder.set(folderPath, folder);

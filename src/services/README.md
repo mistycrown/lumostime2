@@ -141,7 +141,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 - `webdavService.ts`: [Active] - WebDAV client implementation supporting Web (Proxy) and Native (Cordova HTTP) environments. Automatically converts Base64 images to ArrayBuffer for proper upload.
 
 - `achievementBottleIconPackService.ts`: [Active] - Stores achievement bottle icon-pack options, dynamic discovery, and stable WebP preview paths for sponsorship settings, preset persistence, and bottle rendering.
-- `customStickerZipService.ts`: Parses folder-based sticker ZIP archives, filters image files, sorts entries deterministically, and caps each imported group at 16 images.
+- `customStickerZipService.ts`: Parses folder-based and root-level sticker ZIP archives, filters image files, sorts entries deterministically, and caps each imported group at 16 images.
 - `uiIconZipService.ts`: Parses UI icon ZIP archives and requires exactly one numbered PNG or WebP image for every icon from `01` through `96`.
 
 ## Recently Added (2026-02)
