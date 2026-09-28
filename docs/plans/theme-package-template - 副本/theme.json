@@ -2,59 +2,59 @@
   "format": "lumostime-theme-package",
   "schemaVersion": 2,
   "package": {
-    "id": "test-theme",
-    "name": "测试",
+    "id": "rabbit",
+    "name": "兔子云朵",
     "version": "1.0.0",
-    "description": "测试主题包",
+    "description": "一套以兔子与云朵为灵感的柔和主题",
     "preview": "assets/background/main.png"
   },
   "resources": {
     "backgrounds": [
-      { "id": "main", "file": "assets/background/main.png", "fit": "cover", "position": "center" }
+      { "id": "rabbit-clouds", "file": "assets/background/main.png", "fit": "cover", "position": "center" }
     ],
     "stickers": [
-      { "id": "tuzi", "name": "兔子贴纸", "cover": "assets/stickers/tuzi/01.png", "items": [
-        { "id": "tuzi-01", "name": "贴纸 01", "file": "assets/stickers/tuzi/01.png" },
-        { "id": "tuzi-02", "name": "贴纸 02", "file": "assets/stickers/tuzi/02.png" },
-        { "id": "tuzi-03", "name": "贴纸 03", "file": "assets/stickers/tuzi/03.png" },
-        { "id": "tuzi-04", "name": "贴纸 04", "file": "assets/stickers/tuzi/04.png" },
-        { "id": "tuzi-05", "name": "贴纸 05", "file": "assets/stickers/tuzi/05.png" },
-        { "id": "tuzi-06", "name": "贴纸 06", "file": "assets/stickers/tuzi/06.png" },
-        { "id": "tuzi-07", "name": "贴纸 07", "file": "assets/stickers/tuzi/07.png" },
-        { "id": "tuzi-08", "name": "贴纸 08", "file": "assets/stickers/tuzi/08.png" },
-        { "id": "tuzi-09", "name": "贴纸 09", "file": "assets/stickers/tuzi/09.png" },
-        { "id": "tuzi-10", "name": "贴纸 10", "file": "assets/stickers/tuzi/10.png" },
-        { "id": "tuzi-11", "name": "贴纸 11", "file": "assets/stickers/tuzi/11.png" },
-        { "id": "tuzi-12", "name": "贴纸 12", "file": "assets/stickers/tuzi/12.png" },
-        { "id": "tuzi-13", "name": "贴纸 13", "file": "assets/stickers/tuzi/13.png" },
-        { "id": "tuzi-14", "name": "贴纸 14", "file": "assets/stickers/tuzi/14.png" },
-        { "id": "tuzi-15", "name": "贴纸 15", "file": "assets/stickers/tuzi/15.png" },
-        { "id": "tuzi-16", "name": "贴纸 16", "file": "assets/stickers/tuzi/16.png" }
+      { "id": "rabbit-stickers", "name": "兔子贴纸", "cover": "assets/stickers/tuzi/01.png", "items": [
+        { "id": "rabbit-sticker-01", "name": "兔子贴纸 01", "file": "assets/stickers/tuzi/01.png" },
+        { "id": "rabbit-sticker-02", "name": "兔子贴纸 02", "file": "assets/stickers/tuzi/02.png" },
+        { "id": "rabbit-sticker-03", "name": "兔子贴纸 03", "file": "assets/stickers/tuzi/03.png" },
+        { "id": "rabbit-sticker-04", "name": "兔子贴纸 04", "file": "assets/stickers/tuzi/04.png" },
+        { "id": "rabbit-sticker-05", "name": "兔子贴纸 05", "file": "assets/stickers/tuzi/05.png" },
+        { "id": "rabbit-sticker-06", "name": "兔子贴纸 06", "file": "assets/stickers/tuzi/06.png" },
+        { "id": "rabbit-sticker-07", "name": "兔子贴纸 07", "file": "assets/stickers/tuzi/07.png" },
+        { "id": "rabbit-sticker-08", "name": "兔子贴纸 08", "file": "assets/stickers/tuzi/08.png" },
+        { "id": "rabbit-sticker-09", "name": "兔子贴纸 09", "file": "assets/stickers/tuzi/09.png" },
+        { "id": "rabbit-sticker-10", "name": "兔子贴纸 10", "file": "assets/stickers/tuzi/10.png" },
+        { "id": "rabbit-sticker-11", "name": "兔子贴纸 11", "file": "assets/stickers/tuzi/11.png" },
+        { "id": "rabbit-sticker-12", "name": "兔子贴纸 12", "file": "assets/stickers/tuzi/12.png" },
+        { "id": "rabbit-sticker-13", "name": "兔子贴纸 13", "file": "assets/stickers/tuzi/13.png" },
+        { "id": "rabbit-sticker-14", "name": "兔子贴纸 14", "file": "assets/stickers/tuzi/14.png" },
+        { "id": "rabbit-sticker-15", "name": "兔子贴纸 15", "file": "assets/stickers/tuzi/15.png" },
+        { "id": "rabbit-sticker-16", "name": "兔子贴纸 16", "file": "assets/stickers/tuzi/16.png" }
       ] },
-      { "id": "tuzi2", "name": "兔子贴纸二", "cover": "assets/stickers/tuzi2/01.png", "items": [
-        { "id": "tuzi2-01", "name": "贴纸 01", "file": "assets/stickers/tuzi2/01.png" },
-        { "id": "tuzi2-02", "name": "贴纸 02", "file": "assets/stickers/tuzi2/02.png" },
-        { "id": "tuzi2-03", "name": "贴纸 03", "file": "assets/stickers/tuzi2/03.png" },
-        { "id": "tuzi2-04", "name": "贴纸 04", "file": "assets/stickers/tuzi2/04.png" },
-        { "id": "tuzi2-05", "name": "贴纸 05", "file": "assets/stickers/tuzi2/05.png" },
-        { "id": "tuzi2-06", "name": "贴纸 06", "file": "assets/stickers/tuzi2/06.png" },
-        { "id": "tuzi2-07", "name": "贴纸 07", "file": "assets/stickers/tuzi2/07.png" },
-        { "id": "tuzi2-08", "name": "贴纸 08", "file": "assets/stickers/tuzi2/08.png" },
-        { "id": "tuzi2-09", "name": "贴纸 09", "file": "assets/stickers/tuzi2/09.png" },
-        { "id": "tuzi2-10", "name": "贴纸 10", "file": "assets/stickers/tuzi2/10.png" },
-        { "id": "tuzi2-11", "name": "贴纸 11", "file": "assets/stickers/tuzi2/11.png" },
-        { "id": "tuzi2-12", "name": "贴纸 12", "file": "assets/stickers/tuzi2/12.png" },
-        { "id": "tuzi2-13", "name": "贴纸 13", "file": "assets/stickers/tuzi2/13.png" },
-        { "id": "tuzi2-14", "name": "贴纸 14", "file": "assets/stickers/tuzi2/14.png" },
-        { "id": "tuzi2-15", "name": "贴纸 15", "file": "assets/stickers/tuzi2/15.png" },
-        { "id": "tuzi2-16", "name": "贴纸 16", "file": "assets/stickers/tuzi2/16.png" }
+      { "id": "rabbit-stickers-2", "name": "兔子贴纸 II", "cover": "assets/stickers/tuzi2/01.png", "items": [
+        { "id": "rabbit-sticker-2-01", "name": "兔子贴纸 II-01", "file": "assets/stickers/tuzi2/01.png" },
+        { "id": "rabbit-sticker-2-02", "name": "兔子贴纸 II-02", "file": "assets/stickers/tuzi2/02.png" },
+        { "id": "rabbit-sticker-2-03", "name": "兔子贴纸 II-03", "file": "assets/stickers/tuzi2/03.png" },
+        { "id": "rabbit-sticker-2-04", "name": "兔子贴纸 II-04", "file": "assets/stickers/tuzi2/04.png" },
+        { "id": "rabbit-sticker-2-05", "name": "兔子贴纸 II-05", "file": "assets/stickers/tuzi2/05.png" },
+        { "id": "rabbit-sticker-2-06", "name": "兔子贴纸 II-06", "file": "assets/stickers/tuzi2/06.png" },
+        { "id": "rabbit-sticker-2-07", "name": "兔子贴纸 II-07", "file": "assets/stickers/tuzi2/07.png" },
+        { "id": "rabbit-sticker-2-08", "name": "兔子贴纸 II-08", "file": "assets/stickers/tuzi2/08.png" },
+        { "id": "rabbit-sticker-2-09", "name": "兔子贴纸 II-09", "file": "assets/stickers/tuzi2/09.png" },
+        { "id": "rabbit-sticker-2-10", "name": "兔子贴纸 II-10", "file": "assets/stickers/tuzi2/10.png" },
+        { "id": "rabbit-sticker-2-11", "name": "兔子贴纸 II-11", "file": "assets/stickers/tuzi2/11.png" },
+        { "id": "rabbit-sticker-2-12", "name": "兔子贴纸 II-12", "file": "assets/stickers/tuzi2/12.png" },
+        { "id": "rabbit-sticker-2-13", "name": "兔子贴纸 II-13", "file": "assets/stickers/tuzi2/13.png" },
+        { "id": "rabbit-sticker-2-14", "name": "兔子贴纸 II-14", "file": "assets/stickers/tuzi2/14.png" },
+        { "id": "rabbit-sticker-2-15", "name": "兔子贴纸 II-15", "file": "assets/stickers/tuzi2/15.png" },
+        { "id": "rabbit-sticker-2-16", "name": "兔子贴纸 II-16", "file": "assets/stickers/tuzi2/16.png" }
       ] }
     ],
     "navigationBackgrounds": [
-      { "id": "main", "file": "assets/navigation/background.png", "position": "center", "opacity": 1 }
+      { "id": "rabbit-navigation", "file": "assets/navigation/1.webp", "position": "center", "opacity": 1 }
     ],
     "navigationIcons": [
-      { "id": "main", "files": {
+      { "id": "rabbit-navigation-icons", "files": {
         "record": "assets/navigation/icons/record.png",
         "todo": "assets/navigation/icons/todo.png",
         "timeline": "assets/navigation/icons/timeline.png",
@@ -63,52 +63,39 @@
       } }
     ],
     "timePal": [
-      { "id": "test-companion", "name": "测试时间小友", "stages": {
-        "1": "assets/timepal/test-companion/stage-1.png",
-        "2": "assets/timepal/test-companion/stage-2.png",
-        "3": "assets/timepal/test-companion/stage-3.png",
-        "4": "assets/timepal/test-companion/stage-4.png",
-        "5": "assets/timepal/test-companion/stage-5.png"
+      { "id": "rabbit-companion", "name": "兔子小友", "stages": {
+        "1": "assets/timepal/rabbit-companion/stage-1.png",
+        "2": "assets/timepal/rabbit-companion/stage-2.png",
+        "3": "assets/timepal/rabbit-companion/stage-3.png",
+        "4": "assets/timepal/rabbit-companion/stage-4.png",
+        "5": "assets/timepal/rabbit-companion/stage-5.png"
       } }
     ],
-    "fonts": [
-      { "id": "test-font", "file": "assets/fonts/test-font.woff2", "displayName": "文泉驿点阵宋 13px", "familyName": "LumoThemeTestFont", "format": "woff2" }
-    ],
-    "achievementBottleIconPacks": [
-      { "id": "test-bottle", "name": "Test Bottle", "frames": [
-        "assets/achievement-bottle/test-bottle/01.webp", "assets/achievement-bottle/test-bottle/02.webp",
-        "assets/achievement-bottle/test-bottle/03.webp", "assets/achievement-bottle/test-bottle/04.webp",
-        "assets/achievement-bottle/test-bottle/05.webp", "assets/achievement-bottle/test-bottle/06.webp",
-        "assets/achievement-bottle/test-bottle/07.webp", "assets/achievement-bottle/test-bottle/08.webp",
-        "assets/achievement-bottle/test-bottle/09.webp", "assets/achievement-bottle/test-bottle/10.webp",
-        "assets/achievement-bottle/test-bottle/11.webp", "assets/achievement-bottle/test-bottle/12.webp",
-        "assets/achievement-bottle/test-bottle/13.webp", "assets/achievement-bottle/test-bottle/14.webp",
-        "assets/achievement-bottle/test-bottle/15.webp", "assets/achievement-bottle/test-bottle/16.webp",
-        "assets/achievement-bottle/test-bottle/17.webp", "assets/achievement-bottle/test-bottle/18.webp"
-      ] }
-    ],
     "memoirCalendarBackgrounds": [
-      { "id": "main", "image": "assets/memoir-calendar/background.png" }
+      { "id": "rabbit-memoir", "image": "assets/memoir-calendar/1.webp" }
     ],
     "cardBackgroundGroups": [
-      { "id": "test-cards", "name": "测试卡片背景", "alignment": "right-bottom", "files": ["assets/background/main.png"] }
+      { "id": "rabbit-cards", "name": "兔子云朵卡片背景", "alignment": "right-bottom", "files": [
+        "assets/card-backgrounds/1.webp",
+        "assets/card-backgrounds/2.webp",
+        "assets/card-backgrounds/3.webp",
+        "assets/card-backgrounds/4.webp"
+      ] }
     ]
   },
   "apply": {
-    "background": { "resourceId": "main", "opacity": 0.3 },
+    "background": { "resourceId": "rabbit-clouds", "opacity": 0.3 },
     "color": { "schemeId": "morandi-purple" },
     "uiIcon": { "source": "builtin", "themeId": "pencil" },
     "timeline": { "themeId": "celestial" },
     "stickers": {
-      "defaultPage": "tuzi",
+      "defaultPage": "rabbit-stickers",
       "enabled": true,
-      "groups": [{ "id": "all-stickers", "name": "全部贴纸", "sourceSetIds": ["tuzi", "tuzi2"] }]
+      "groups": [{ "id": "rabbit-sticker-collection", "name": "兔子云朵贴纸", "sourceSetIds": ["rabbit-stickers", "rabbit-stickers-2"] }]
     },
-    "navigation": { "mode": "modern", "backgroundId": "main", "iconsId": "main" },
-    "timePal": { "selected": "test-companion" },
-    "font": { "resourceId": "test-font" },
-    "achievementBottle": { "iconPackId": "test-bottle", "style": { "id": "blushBloom" } },
-    "memoirCalendar": { "backgroundId": "main" },
-    "cardBackground": { "groupId": "test-cards", "opacity": 0.3 }
+    "navigation": { "mode": "modern", "backgroundId": "rabbit-navigation", "iconsId": "rabbit-navigation-icons" },
+    "timePal": { "selected": "rabbit-companion" },
+    "memoirCalendar": { "backgroundId": "rabbit-memoir" },
+    "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.3 }
   }
 }

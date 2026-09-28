@@ -1,13 +1,27 @@
-# 测试主题包
+# 兔子云朵主题包
 
-本目录是已填入资源的 schemaVersion 2 示例，名称为“测试”。导入资源在 `resources` 中定义，主题选择写在 `apply` 中。UIIcon 使用应用内置 pencil 系列，因此只配置其 ID，不重复导入应用资源。
+版本：1.0.0
 
-主题包含背景、莫兰迪紫、两组贴纸并合并成一个选择器大组、新版导航背景及图标、五阶段时间小友、本机字体、成就瓶自定义帧、第四种瓶身样式、第三种时间线样式、Memoir 单图填充背景和卡片背景组。整体背景透明度为 30%，卡片背景透明度为 30%。
+“兔子云朵”是一套以兔子、云朵和柔和紫色为主题的 LumoTime 主题包，包含：
 
-## 打包
+- 整体背景与莫兰迪紫配色
+- 两套兔子贴纸（共 32 张）
+- 新版导航背景与五枚导航图标
+- 五阶段兔子时间小友
+- Memoir 日历背景和四张卡片背景
+- 内置 Pencil UIIcon 与 Celestial 时间线样式
 
-只将根目录 `theme.json` 和 `assets/` 压缩为 ZIP，不能再套一层目录，也不要将 README 放入 ZIP。解压后根目录应直接看到 `theme.json` 和 `assets/`。空目录中的 `.gitkeep` 会被忽略。
+本包不包含字体和成就瓶图标；导入时会保留用户当前的这两项选择。
 
-内置资源只在 `apply` 选择 ID，不要添加到 `resources`。更完整字段约定见[主题包格式规范](../2026-09-26-theme-package-design.md)。
+## 发布文件
 
-Memoir 日历背景只支持一张图片：在 `memoirCalendarBackgrounds` 中使用 `image` 指向资源路径。不要添加 `mode`、`fiveWeek` 或 `sixWeek` 字段。
+发布 `rabbit-clouds-theme-v1.0.0.zip`。压缩包解压后的根目录必须直接包含：
+
+```text
+theme.json
+assets/
+```
+
+README、模板目录和 `.gitkeep` 均不应包含在发布 ZIP 中。主题采用 schemaVersion 2；资源路径均位于 `assets/` 下并使用 `/`。
+
+相同 `package.id`（`rabbit`）再次导入会覆盖旧版本，因此后续更新请保持此 ID 不变，只提升 `package.version`。
