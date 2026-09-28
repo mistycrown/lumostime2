@@ -4,7 +4,7 @@
  * @output Persisted card background settings, image references, and change events
  * @pos Service (UI Customization)
  * @description Stores card background groups independently and saves uploaded images in the synchronized theme image group.
- * @updated 2026-09-27: Uses width-filling top and bottom alignment for anchored card backgrounds.
+ * @updated 2026-09-28: Adds a shared subtle shadow whenever a custom card background is active.
  */
 import { imageService } from './imageService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
@@ -70,7 +70,8 @@ export const getCardBackgroundStyle = (
     backgroundPosition: `center, ${getCardBackgroundPosition(alignment)}`,
     backgroundSize: `cover, ${getCardBackgroundImageSize(alignment)}`,
     backgroundRepeat: 'no-repeat, no-repeat',
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.07)'
   };
 };
 
