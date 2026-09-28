@@ -6,6 +6,7 @@
  * @description Ensures a legacy preset explicitly restores newer appearance controls without deleting their asset catalogs.
  * @updated 2026-09-28: Added legacy preset modern-navigation and Memoir default coverage.
  * @updated 2026-09-28: Covers card-background and font defaults owned by legacy presets.
+ * @updated 2026-09-28: Covers preserving an independently selected Memoir background across legacy preset switches.
  */
 
 import { describe, expect, it, vi } from 'vitest';
@@ -17,7 +18,7 @@ const navigationBackground = {
   setTransparentNavigationEnabled: vi.fn()
 };
 const navigationIcons = { setMode: vi.fn(), setShowLabelWithIcon: vi.fn() };
-const memoirCalendar = { setCurrentBackground: vi.fn() };
+const memoirCalendar = { getCurrentBackground: vi.fn(() => 'memoir-personal'), setCurrentBackground: vi.fn() };
 const cardBackground = { setCurrentGroup: vi.fn() };
 const fonts = { setFont: vi.fn() };
 
@@ -32,7 +33,7 @@ vi.mock('./achievementBottleStyleService', () => ({ DEFAULT_ACHIEVEMENT_BOTTLE_S
 vi.mock('./achievementBottleIconPackService', () => ({ DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK: 'star1' }));
 
 describe('ThemePresetService', () => {
-  it('applies legacy preset-owned defaults for modern navigation and Memoir calendar', async () => {
+  it('applies legacy preset-owned defaults without clearing an independently selected Memoir background', async () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
@@ -81,8 +82,24 @@ describe('ThemePresetService', () => {
     expect(navigationBackground.setEnabled).toHaveBeenLastCalledWith(false);
     expect(navigationIcons.setMode).toHaveBeenCalledWith('text');
     expect(navigationIcons.setShowLabelWithIcon).toHaveBeenCalledWith(false);
-    expect(memoirCalendar.setCurrentBackground).toHaveBeenCalledWith('none');
+    expect(memoirCalendar.setCurrentBackground).not.toHaveBeenCalled();
     expect(cardBackground.setCurrentGroup).toHaveBeenCalledWith(null);
     expect(fonts.setFont).toHaveBeenCalledWith('default');
+  });
+
+  it('clears a Memoir background owned by the outgoing theme package', async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key)
+    });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    memoirCalendar.getCurrentBackground.mockReturnValueOnce('theme:rabbits:memoir-calendar');
+    const { ThemePresetService } = await import('./themePresetService');
+
+    await ThemePresetService.applyMemoirCalendarBackground('none');
+
+    expect(memoirCalendar.setCurrentBackground).toHaveBeenCalledWith('none');
   });
 });

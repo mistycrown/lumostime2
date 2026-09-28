@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Restores named custom achievement-bottle icon-pack records.
  * @updated 2026-09-28: Preserves independently imported resource catalogs when applying a saved theme snapshot.
  * @updated 2026-09-28: Falls back from missing selected theme resources with user-facing warnings.
+ * @updated 2026-09-28: Keeps an independently selected Memoir background active across ordinary theme switches.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS } from '../constants/storageKeys';
@@ -61,6 +62,7 @@ const SNAPSHOT_RESOURCE_CATALOG_KEYS = new Set<string>([
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
   'mood_calendar_background_settings',
+  'mood_calendar_fill_background',
   'mood_calendar_fill_background_custom_list',
   'lumostime_timepal_custom_items',
   'lumostime_custom_sticker_sets_v2',
@@ -328,7 +330,9 @@ export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot
 export const applyDefaultThemeSupplement = async (): Promise<void> => {
   navigationBackgroundService.setEnabled(false);
   navigationIconService.setMode('text');
-  moodCalendarBackgroundService.setCurrentBackground('none');
+  if (moodCalendarBackgroundService.getCurrentBackground().startsWith('theme:')) {
+    moodCalendarBackgroundService.setCurrentBackground('none');
+  }
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_STYLE, DEFAULT_ACHIEVEMENT_BOTTLE_STYLE);
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, 'default');

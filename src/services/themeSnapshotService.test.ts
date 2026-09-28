@@ -5,6 +5,7 @@
  * @pos Test (Theme Management)
  * @description Ensures saved-theme snapshots preserve independently imported resource catalogs while applying selections.
  * @updated 2026-09-28: Covers Memoir background catalog preservation during theme switching.
+ * @updated 2026-09-28: Keeps the selected standalone Memoir background across ordinary theme switches.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -41,7 +42,7 @@ vi.mock('./navigationBackgroundService', () => ({ navigationBackgroundService: {
 } }));
 vi.mock('./navigationIconService', () => ({
   NAVIGATION_ICON_CHANGE_EVENT: 'navigationIconChange',
-  navigationIconService: { getIconForSlot: vi.fn(), getSlots: vi.fn(() => []), hydrateCustomIcons: vi.fn(async () => undefined) }
+  navigationIconService: { getIconForSlot: vi.fn(), getSlots: vi.fn(() => []), hydrateCustomIcons: vi.fn(async () => undefined), setMode: vi.fn() }
 }));
 vi.mock('./backgroundService', () => ({ backgroundService: { getCurrentBackgroundOption: vi.fn(), setCurrentBackground: vi.fn() } }));
 vi.mock('./navigationDecorationService', () => ({ navigationDecorationService: {
@@ -100,6 +101,7 @@ describe('themeSettingsSnapshot', () => {
       id: 'memoir-personal', imageFilename: 'personal-memoir.webp'
     }]);
     localStorage.setItem('mood_calendar_fill_background_custom_list', independentlyImportedBackgrounds);
+    localStorage.setItem('mood_calendar_fill_background', 'memoir-personal');
 
     const { applyThemeSettingsSnapshot } = await import('./themeSnapshotService');
     await applyThemeSettingsSnapshot({
@@ -113,10 +115,23 @@ describe('themeSettingsSnapshot', () => {
     });
 
     expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).toBe(independentlyImportedBackgrounds);
+    expect(localStorage.getItem('mood_calendar_fill_background')).toBe('memoir-personal');
     expect(applyBackupPayload).toHaveBeenCalledWith({
       version: 1,
-      storage: { mood_calendar_fill_background: 'none' }
+      storage: {}
     });
+  });
+
+  it('keeps a standalone Memoir background when switching to the default theme', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    const { moodCalendarBackgroundService } = await import('./moodCalendarBackgroundService');
+    vi.mocked(moodCalendarBackgroundService.getCurrentBackground).mockReturnValue('memoir-personal');
+
+    const { applyDefaultThemeSupplement } = await import('./themeSnapshotService');
+    await applyDefaultThemeSupplement();
+
+    expect(moodCalendarBackgroundService.setCurrentBackground).not.toHaveBeenCalled();
   });
 
   it('restores transparent navigation and falls back when the selected card background is missing', async () => {

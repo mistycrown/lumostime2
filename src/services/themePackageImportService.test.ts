@@ -7,6 +7,7 @@
  * @updated 2026-09-27: Covers UIIcon first-image preview fallback for theme cards.
  * @updated 2026-09-27: Covers card-background group registration and cleanup for imported theme packages.
  * @updated 2026-09-27: Keeps stable theme sticker IDs and historical mood references readable across package-version replacements.
+ * @updated 2026-09-28: Prevents package cleanup from deleting images still used by standalone settings.
  */
 
 import JSZip from 'jszip';
@@ -19,7 +20,8 @@ const {
   removeCustomFont,
   setFont,
   loadReviewEntriesSnapshot,
-  saveDailyReviews
+  saveDailyReviews,
+  getSettingsReferencedImages
 } = vi.hoisted(() => ({
   saveImage: vi.fn(async () => `image-${Math.random()}.webp`),
   deleteImage: vi.fn(async () => undefined),
@@ -29,12 +31,21 @@ const {
   loadReviewEntriesSnapshot: vi.fn(async () => ({
     dailyReviews: [], weeklyReviews: [], monthlyReviews: [], onThisDayEntries: []
   })),
-  saveDailyReviews: vi.fn(async () => undefined)
+  saveDailyReviews: vi.fn(async () => undefined),
+  getSettingsReferencedImages: vi.fn(() => new Set<string>())
 }));
 
 vi.mock('./imageService', () => ({
-  imageService: { saveImage, deleteImage, removeFromReferencedList: vi.fn(), deleteImageLocalOnly: vi.fn() }
+  imageService: {
+    saveImage,
+    deleteImage,
+    removeFromReferencedList: vi.fn(),
+    deleteImageLocalOnly: vi.fn(),
+    getReferencedImageManifest: vi.fn(() => ({ content: [] }))
+  }
 }));
+
+vi.mock('./settingsImageReferenceService', () => ({ getSettingsReferencedImages }));
 
 vi.mock('./fontService', () => ({
   fontService: { addCustomFont, removeCustomFont, setFont }
@@ -144,6 +155,8 @@ describe('themePackageImportService', () => {
     removeCustomFont.mockClear();
     loadReviewEntriesSnapshot.mockClear();
     saveDailyReviews.mockClear();
+    getSettingsReferencedImages.mockReset();
+    getSettingsReferencedImages.mockReturnValue(new Set<string>());
   });
 
   it('overwrites an existing package ID and removes its old image assets', async () => {
@@ -197,7 +210,7 @@ describe('themePackageImportService', () => {
     expect(getThemePackageUiIconPreviewFallbackFilename(legacyRecord)).toBe('image-first-icon.webp');
   });
 
-  it('deletes the package image assets without reference checks', async () => {
+  it('deletes package image assets that have no remaining references', async () => {
     vi.stubGlobal('localStorage', makeLocalStorage());
     vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
     saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
@@ -216,6 +229,21 @@ describe('themePackageImportService', () => {
     expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([
       { id: 'user-cards', name: 'User Cards', imageFilenames: ['user-card.webp'] }
     ]);
+  });
+
+  it('keeps a package image that is still referenced by a standalone Memoir background', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+
+    const { themePackageImportService } = await import('./themePackageImportService');
+    await themePackageImportService.importPackage(await createPackage('shared-image', 'Shared Image', '1.0.0'));
+    getSettingsReferencedImages.mockReturnValue(new Set(['image-image-1.0.0.webp']));
+    deleteImage.mockClear();
+
+    await expect(themePackageImportService.deletePackage('shared-image')).resolves.toBe(true);
+
+    expect(deleteImage).not.toHaveBeenCalledWith('image-image-1.0.0.webp');
   });
 
   it('registers a package card-background group on import and removes it with its synchronized images', async () => {

@@ -10,12 +10,14 @@
  * @updated 2026-09-27: Resolves the first packaged UI icon from both declared and archived asset paths for theme-card previews.
  * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
  * @updated 2026-09-27: Migrates stable theme sticker IDs to replacement image filenames during package updates.
+ * @updated 2026-09-28: Retains package images that remain referenced by independent user settings during deletion or replacement.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK } from './achievementBottleIconPackService';
 import { fontService } from './fontService';
 import { imageService } from './imageService';
+import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import {
   parseThemePackage,
   type ThemePackageManifest
@@ -204,6 +206,17 @@ const rollbackSavedImages = async (filenames: string[]): Promise<void> => {
     imageService.removeFromReferencedList(filename);
     await imageService.deleteImageLocalOnly(filename).catch(() => undefined);
     await imageService.deleteImageLocalOnly(`thumb_${filename}`).catch(() => undefined);
+  }
+};
+
+const deleteUnreferencedPackageImages = async (filenames: string[]): Promise<void> => {
+  const retained = new Set([
+    ...getSettingsReferencedImages(),
+    ...imageService.getReferencedImageManifest().content
+  ]);
+  for (const filename of new Set(filenames)) {
+    if (retained.has(filename) || retained.has(`thumb_${filename}`)) continue;
+    await imageService.deleteImage(filename).catch(() => undefined);
   }
 };
 
@@ -497,10 +510,7 @@ export const themePackageImportService = {
       await fontService.removeCustomFont(deletedLocalAssets.fontId).catch(() => undefined);
     }
 
-    const filenames = Array.from(new Set(Object.values(record.imageAssets)));
-    for (const filename of filenames) {
-      await imageService.deleteImage(filename).catch(() => undefined);
-    }
+    await deleteUnreferencedPackageImages(Object.values(record.imageAssets));
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
@@ -601,9 +611,7 @@ export const themePackageImportService = {
       if (existingRecord) {
         migratedMoodReferences = await migratePackageStickers(existingRecord, record);
         removePackageDerivedState(existingRecord, { preserveStickers: true });
-        for (const filename of new Set(Object.values(existingRecord.imageAssets))) {
-          await imageService.deleteImage(filename).catch(() => undefined);
-        }
+        await deleteUnreferencedPackageImages(Object.values(existingRecord.imageAssets));
       }
 
       if (existingLocalRecord?.fontId && existingLocalRecord.fontId !== localRecord.fontId) {
