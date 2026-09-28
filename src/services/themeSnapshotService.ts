@@ -6,6 +6,7 @@
  * @description Captures and restores the full set of theme-managed settings while leaving user data and theme catalog metadata untouched.
  * @updated 2026-09-26: Added immutable full appearance snapshots for saved themes.
  * @updated 2026-09-26: Restores named custom achievement-bottle icon-pack records.
+ * @updated 2026-09-28: Preserves independently imported resource catalogs when applying a saved theme snapshot.
  */
 
 import { THEME_KEYS } from '../constants/storageKeys';
@@ -41,6 +42,28 @@ const SNAPSHOT_EXCLUDED_KEYS = new Set<string>([
   THEME_KEYS.IMPORTED_THEME_PACKAGES
 ]);
 
+// These catalogs are user-owned libraries, not a theme's selected appearance. A
+// saved snapshot may retain them for backup and later image-reference cleanup,
+// but applying that snapshot must never replace resources imported afterwards.
+const SNAPSHOT_RESOURCE_CATALOG_KEYS = new Set<string>([
+  THEME_KEYS.CUSTOM_COLOR_GROUP,
+  UI_ICON_CUSTOM_ASSETS_KEY,
+  'lumos_custom_backgrounds',
+  'navigation_decoration_custom_list',
+  'navigation_decoration_custom_settings',
+  'navigation_new_background_custom_list',
+  'navigation_new_background_settings',
+  'navigation_icon_custom_list_v1',
+  'navigation_icon_schemes_v1',
+  'mood_calendar_background_settings',
+  'mood_calendar_fill_background_custom_list',
+  'lumostime_timepal_custom_items',
+  'lumostime_custom_sticker_sets_v2',
+  'lumostime_custom_stickers_v2',
+  'lumostime_achievement_bottle_custom_icon_packs_v1',
+  'lumostime_card_background_groups_v1'
+]);
+
 export interface ThemeSettingsSnapshot {
   version: 1;
   storage: Record<string, string | null>;
@@ -70,6 +93,12 @@ export const captureThemeSettingsSnapshot = (): ThemeSettingsSnapshot => ({
   version: 1,
   storage: readSnapshotStorage()
 });
+
+const getThemeSwitchStorage = (snapshot: ThemeSettingsSnapshot): Record<string, string | null> => (
+  Object.fromEntries(
+    Object.entries(snapshot.storage).filter(([key]) => !SNAPSHOT_RESOURCE_CATALOG_KEYS.has(key))
+  )
+);
 
 export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot | undefined): string[] => {
   const values = snapshot?.storage || {};
@@ -131,15 +160,16 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
 
 export const applyThemeSettingsSnapshot = async (snapshot: ThemeSettingsSnapshot): Promise<string[]> => {
   const warnings: string[] = [];
-  const currentFontId = snapshot.storage.lumostime_font_family || 'default';
+  const switchStorage = getThemeSwitchStorage(snapshot);
+  const currentFontId = switchStorage.lumostime_font_family || 'default';
 
   SNAPSHOT_EXTRA_KEYS.forEach((key) => {
-    if (!Object.prototype.hasOwnProperty.call(snapshot.storage, key)) return;
-    const value = snapshot.storage[key];
+    if (!Object.prototype.hasOwnProperty.call(switchStorage, key)) return;
+    const value = switchStorage[key];
     if (typeof value === 'string') localStorage.setItem(key, value);
     else localStorage.removeItem(key);
   });
-  appearanceBackupService.applyBackupPayload({ version: 1, storage: snapshot.storage });
+  appearanceBackupService.applyBackupPayload({ version: 1, storage: switchStorage });
 
   if (currentFontId !== 'default') {
     const result = fontService.setFont(currentFontId);
