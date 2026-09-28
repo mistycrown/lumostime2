@@ -1,17 +1,18 @@
 /**
  * @file navigationIconService.ts
- * @input Built-in navigation icon packs, uploaded icon images, and saved schemes
+ * @input Uploaded and theme-package navigation icon images and saved schemes
  * @output Persisted navigation icon scheme selection and icon URLs
  * @pos Service (UI Customization)
- * @description Manages text, built-in, and user-created image schemes for the five navigation slots.
+ * @description Manages text and user-created image schemes for the five navigation slots.
  * @updated 2026-09-25: Added multiple editable custom schemes with legacy selection migration.
  * @updated 2026-09-26: Added persisted opt-in labels below image navigation icons.
+ * @updated 2026-09-28: Removed the packaged pink icon set and migrate its saved selection to text.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
 
 export type NavigationIconSlot = 'record' | 'todo' | 'timeline' | 'review' | 'index';
-export type NavigationIconMode = 'text' | 'pink' | 'custom';
+export type NavigationIconMode = 'text' | 'custom';
 
 export interface NavigationIconOption {
     id: string;
@@ -47,19 +48,11 @@ export const getNavigationIconFallbackUrl = (url: string): string => (
 );
 
 class NavigationIconService {
-    private readonly builtIn: NavigationIconOption[] = [1, 2, 3, 4, 5].map((number) => ({
-        id: `pink-${number}`,
-        name: String(number),
-        type: 'preset' as const,
-        url: resolveAssetPath(`/dchhicon/pink/${number}.webp`)
-    }));
-
     constructor() {
         void this.hydrateCustomIcons();
     }
 
     getSlots(): NavigationIconSlot[] { return NAVIGATION_SLOTS; }
-    getBuiltInIcons(): NavigationIconOption[] { return this.builtIn; }
 
     private loadCustomIcons(): NavigationIconOption[] {
         if (typeof localStorage === 'undefined') return [];
@@ -123,7 +116,7 @@ class NavigationIconService {
 
     getSelection(): NavigationIconSelection {
         const stored = this.readStoredSelection();
-        let mode = stored.mode === 'pink' || stored.mode === 'custom' || stored.mode === 'text' ? stored.mode : 'text';
+        let mode = stored.mode === 'custom' || stored.mode === 'text' ? stored.mode : 'text';
         const schemes = this.getCustomSchemes();
         const schemeId = mode === 'custom'
             ? (typeof stored.schemeId === 'string' && schemes.some((scheme) => scheme.id === stored.schemeId) ? stored.schemeId : schemes[0]?.id)
@@ -210,7 +203,6 @@ class NavigationIconService {
     getIconForSlot(slot: NavigationIconSlot): NavigationIconOption | undefined {
         const selection = this.getSelection();
         if (selection.mode === 'text') return undefined;
-        if (selection.mode === 'pink') return this.builtIn[NAVIGATION_SLOTS.indexOf(slot)];
         return this.getCustomIcons().find((icon) => icon.id === selection.customMapping[slot]);
     }
 

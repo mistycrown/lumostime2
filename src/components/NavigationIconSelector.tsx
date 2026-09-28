@@ -229,14 +229,6 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                         <span className="flex aspect-square h-10 items-center justify-center font-serif text-lg">Aa</span><span>文字</span>
                         {selection.mode === 'text' && <Check size={13} className="absolute right-1.5 top-1.5" />}
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => selectMode('pink')}
-                        className={`relative flex w-full max-w-24 justify-self-start aspect-square flex-col items-center justify-center gap-1 rounded-xl border px-2 text-xs transition-colors ${selection.mode === 'pink' ? 'border-stone-700 bg-stone-50 text-stone-800' : 'border-stone-200 text-stone-500 hover:border-stone-400'}`}
-                    >
-                        {renderIcon(navigationIconService.getBuiltInIcons()[0], '粉色图标', 'aspect-square h-10 w-10 object-contain')}<span>粉色</span>
-                        {selection.mode === 'pink' && <Check size={13} className="absolute right-1.5 top-1.5" />}
-                    </button>
                     {schemes.map((scheme) => {
                         const isActive = selection.mode === 'custom' && selection.schemeId === scheme.id;
                         return (

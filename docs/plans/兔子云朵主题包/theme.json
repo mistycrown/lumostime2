@@ -4,7 +4,7 @@
   "package": {
     "id": "rabbit",
     "name": "兔子云朵",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "一套以兔子与云朵为灵感的柔和主题",
     "preview": "assets/background/main.png"
   },
@@ -51,7 +51,7 @@
       ] }
     ],
     "navigationBackgrounds": [
-      { "id": "rabbit-navigation", "file": "assets/navigation/1.webp", "position": "center", "opacity": 1 }
+      { "id": "rabbit-navigation", "file": "assets/navigation/1.webp", "position": "center", "opacity": 0.8 }
     ],
     "navigationIcons": [
       { "id": "rabbit-navigation-icons", "files": {
@@ -71,8 +71,11 @@
         "5": "assets/timepal/rabbit-companion/stage-5.png"
       } }
     ],
+    "fonts": [
+      { "id": "rabbit-bear-diary", "file": "assets/fonts/rabbit-bear-diary.ttf", "displayName": "乐米小熊日记体", "familyName": "LumoRabbitCloud", "format": "ttf" }
+    ],
     "memoirCalendarBackgrounds": [
-      { "id": "rabbit-memoir", "image": "assets/memoir-calendar/1.webp" }
+      { "id": "rabbit-memoir", "image": "assets/memoir-calendar/1.webp", "settings": { "opacity": 0.7 } }
     ],
     "cardBackgroundGroups": [
       { "id": "rabbit-cards", "name": "兔子云朵卡片背景", "alignment": "right-bottom", "files": [
@@ -85,8 +88,8 @@
   },
   "apply": {
     "background": { "resourceId": "rabbit-clouds", "opacity": 0.3 },
-    "color": { "schemeId": "morandi-purple" },
-    "uiIcon": { "source": "builtin", "themeId": "pencil" },
+    "color": { "schemeId": "morandi-pink" },
+    "uiIcon": { "source": "builtin", "themeId": "cat" },
     "timeline": { "themeId": "celestial" },
     "stickers": {
       "defaultPage": "rabbit-stickers",
@@ -95,6 +98,8 @@
     },
     "navigation": { "mode": "modern", "backgroundId": "rabbit-navigation", "iconsId": "rabbit-navigation-icons" },
     "timePal": { "selected": "rabbit-companion" },
+    "font": { "resourceId": "rabbit-bear-diary" },
+    "achievementBottle": { "iconPackId": "candy", "style": { "id": "blushBloom" } },
     "memoirCalendar": { "backgroundId": "rabbit-memoir" },
     "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.3 }
   }
