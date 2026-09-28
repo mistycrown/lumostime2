@@ -7,6 +7,7 @@
  *
  * @updated 2026-03-28: Added achievement bottle icon-pack support so preset save/apply keeps bottle sprites in sync.
  * @updated 2026-09-26: Marks legacy presets and disables the modern navigation background when applying them.
+ * @updated 2026-09-28: Applies optional preset-owned modern-navigation and Memoir calendar selections.
  */
 
 import { ThemePreset } from '../hooks/useCustomPresets';
@@ -14,6 +15,8 @@ import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { navigationBackgroundService } from './navigationBackgroundService';
+import { navigationIconService } from './navigationIconService';
+import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_STYLE, type AchievementBottleStyle } from './achievementBottleStyleService';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK, type AchievementBottleIconPack } from './achievementBottleIconPackService';
 
@@ -47,6 +50,25 @@ export class ThemePresetService {
         console.log('[ThemePresetService] apply navigation decoration:', navigation);
         navigationBackgroundService.setEnabled(false);
         navigationDecorationService.setCurrentDecoration(navigation);
+    }
+
+    static async applyModernNavigation(preset: ThemePreset): Promise<void> {
+        const navigation = preset.modernNavigation;
+        if (!navigation) return;
+
+        console.log('[ThemePresetService] apply modern navigation:', navigation);
+        navigationBackgroundService.setCurrentBackground(navigation.background);
+        navigationBackgroundService.setTransparentNavigationEnabled(navigation.transparent);
+        navigationIconService.setMode(navigation.iconMode);
+        navigationIconService.setShowLabelWithIcon(navigation.showLabelWithIcon);
+        navigationBackgroundService.setEnabled(navigation.enabled);
+    }
+
+    static async applyMemoirCalendarBackground(background: string | undefined): Promise<void> {
+        if (!background) return;
+
+        console.log('[ThemePresetService] apply Memoir calendar background:', background);
+        moodCalendarBackgroundService.setCurrentBackground(background);
     }
 
     static async applyTimePal(timePal: string): Promise<void> {
@@ -140,6 +162,8 @@ export class ThemePresetService {
             await this.applyColorScheme(preset.colorScheme, setColorScheme);
             await this.applyBackground(preset.background);
             await this.applyNavigation(preset.navigation);
+            await this.applyModernNavigation(preset);
+            await this.applyMemoirCalendarBackground(preset.memoirCalendarBackground);
             await this.applyTimePal(preset.timePal);
             await this.applyAchievementBottleStyle(
                 preset.achievementBottleStyle || DEFAULT_ACHIEVEMENT_BOTTLE_STYLE,

@@ -22,6 +22,7 @@
  * @updated 2026-09-27: Wrapped Memoir mood-calendar background settings in the shared style-card treatment.
  * @updated 2026-09-27: Adds the timeline header sticker debugger entry to the style tab.
  * @updated 2026-09-28: Added strict 96-image UIIcon ZIP import with duplicate-name resolution.
+ * @updated 2026-09-28: Gives legacy built-in presets explicit defaults for modern navigation and Memoir calendar styling.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -389,7 +390,18 @@ const THEME_PRESETS: ThemePreset[] = ([
         navigation: 'pencil',
         timePal: 'dog2'
     }
-] as ThemePreset[]).map((preset) => ({ ...preset, navigationMode: 'legacy' }));
+] as ThemePreset[]).map((preset) => ({
+    ...preset,
+    navigationMode: 'legacy',
+    modernNavigation: {
+        enabled: false,
+        background: 'new-default',
+        transparent: false,
+        iconMode: 'text',
+        showLabelWithIcon: false
+    },
+    memoirCalendarBackground: 'none'
+}));
 
 // UI 主题列表
 const UI_THEMES = ['purple', 'color', 'prince', 'cat', 'forest', 'plant', 'water', 'knit', 'paper', 'pencil', 'old'];
