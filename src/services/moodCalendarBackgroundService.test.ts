@@ -1,10 +1,19 @@
 /**
  * @file moodCalendarBackgroundService.test.ts
  * @input Persisted single-image Memoir calendar backgrounds
- * @output Regression coverage for selection, opacity, and removal
+ * @output Regression coverage for selection, opacity, removal, and blob URL rehydration
  * @pos Test (UI Customization)
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const imageServiceMocks = vi.hoisted(() => ({
+  deleteImage: vi.fn(),
+  getImageUrl: vi.fn(),
+  saveImage: vi.fn()
+}));
+
+vi.mock('./imageService', () => ({ imageService: imageServiceMocks }));
+
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 
 const createLocalStorageMock = () => {
@@ -21,6 +30,7 @@ describe('mood calendar background persistence', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', createLocalStorageMock());
     vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -52,6 +62,34 @@ describe('mood calendar background persistence', () => {
     moodCalendarBackgroundService.saveCustomSettings('single-image', { opacity: 0.45 });
 
     expect(moodCalendarBackgroundService.getBackgroundById('single-image')?.opacity).toBe(0.45);
+  });
+
+  it('never exposes an expired persisted blob URL before rehydration', () => {
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
+      { id: 'single-image', name: 'Single image', type: 'custom', url: 'blob:expired', thumbnail: 'blob:expired', imageFilename: 'single.png' }
+    ]));
+
+    expect(moodCalendarBackgroundService.getBackgroundById('single-image')).toMatchObject({
+      id: 'single-image',
+      url: '',
+      thumbnail: ''
+    });
+  });
+
+  it('keeps a rehydrated blob URL in memory instead of persisting it', async () => {
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
+      { id: 'single-image', name: 'Single image', type: 'custom', url: 'blob:expired', thumbnail: 'blob:expired', imageFilename: 'single.png' }
+    ]));
+    imageServiceMocks.getImageUrl.mockResolvedValue('blob:fresh');
+
+    await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+
+    expect(moodCalendarBackgroundService.getBackgroundById('single-image')).toMatchObject({
+      id: 'single-image',
+      url: 'blob:fresh',
+      thumbnail: 'blob:fresh'
+    });
+    expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).not.toContain('blob:fresh');
   });
 
   it('falls back to no background after deleting the selected custom image', async () => {
