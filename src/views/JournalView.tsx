@@ -13,6 +13,7 @@
  * @updated 2026-07-22: Preserved custom background images behind a readable dark-mode page overlay.
  * @updated 2026-09-25: Connects the Memoir title bar transparency to the navigation setting instead of forcing it on.
  * @updated 2026-09-28: Mirrors the selected Memoir calendar texture on its quick navigation actions.
+ * @updated 2026-09-28: Reduces the Memoir quick-action white overlay so its texture remains visible.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -719,7 +720,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
 
     const memoirQuickActionStyle = memoirCalendarBackground
         ? {
-            backgroundImage: `linear-gradient(rgba(255, 255, 255, ${0.74 - memoirCalendarBackground.opacity * 0.24}), rgba(255, 255, 255, ${0.74 - memoirCalendarBackground.opacity * 0.24})), url(${memoirCalendarBackground.url})`,
+            backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.25)), url(${memoirCalendarBackground.url})`,
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
             backgroundSize: '260%'
@@ -798,7 +799,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
                             </button>
                             <div className="h-px bg-stone-200 flex-1 mb-3"></div>
 
-                            <div className={`flex items-center gap-1 mb-1 shrink-0 p-1 rounded-lg border ${memoirCalendarBackground ? 'border-white/55 bg-white/20 shadow-sm' : 'bg-stone-100/60 border-stone-100'}`}>
+                            <div className={`flex items-center gap-1 mb-1 shrink-0 p-1 rounded-lg border ${memoirCalendarBackground ? 'border-white/35 bg-white/[0.08] shadow-sm' : 'bg-stone-100/60 border-stone-100'}`}>
                                 <button onClick={openYesterday} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>昨日</button>
                                 <button onClick={openToday} className={memoirQuickActionClassName} style={memoirQuickActionStyle}>今日</button>
                                 <div className="w-px h-3 bg-stone-300/40 mx-0.5"></div>
