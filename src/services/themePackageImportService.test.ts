@@ -8,6 +8,7 @@
  * @updated 2026-09-27: Covers card-background group registration and cleanup for imported theme packages.
  * @updated 2026-09-27: Keeps stable theme sticker IDs and historical mood references readable across package-version replacements.
  * @updated 2026-09-28: Prevents package cleanup from deleting images still used by standalone settings.
+ * @updated 2026-09-28: Covers retaining package resources and resolving later same-package imports.
  */
 
 import JSZip from 'jszip';
@@ -265,6 +266,44 @@ describe('themePackageImportService', () => {
     await expect(themePackageImportService.deletePackage('card-theme')).resolves.toBe(true);
     expect(deleteImage).toHaveBeenCalledWith('image-card-background.webp');
     expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toEqual([]);
+  });
+
+  it('retains selectable package resources and resolves a later same-package import', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+
+    const { themePackageImportService } = await import('./themePackageImportService');
+    await themePackageImportService.importPackage(await createCardBackgroundPackage());
+    deleteImage.mockClear();
+
+    await expect(themePackageImportService.deletePackage('card-theme', { deleteResources: false })).resolves.toBe(true);
+    expect(themePackageImportService.getImportedPackages()).toEqual([]);
+    expect(themePackageImportService.getRetainedResources('card-theme')).toHaveLength(1);
+    expect(deleteImage).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toMatchObject([{
+      id: 'theme:card-theme:card-background-cards'
+    }]);
+
+    await expect(themePackageImportService.importPackage(await createCardBackgroundPackage()))
+      .rejects.toMatchObject({ code: 'RETAINED_RESOURCES_CONFLICT' });
+
+    const kept = await themePackageImportService.importPackage(
+      await createCardBackgroundPackage(),
+      { retainedResourceResolution: 'keep' }
+    );
+    expect(kept.record.id).not.toBe('card-theme');
+    expect(kept.record.sourcePackageId).toBe('card-theme');
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toHaveLength(2);
+
+    deleteImage.mockClear();
+    await themePackageImportService.importPackage(
+      await createCardBackgroundPackage(),
+      { retainedResourceResolution: 'overwrite' }
+    );
+    expect(themePackageImportService.getRetainedResources('card-theme')).toEqual([]);
+    expect(deleteImage).toHaveBeenCalledWith('image-card-background.webp');
+    expect(JSON.parse(localStorage.getItem('lumostime_card_background_groups_v1') || '[]')).toHaveLength(2);
   });
 
   it('keeps stable theme sticker IDs and updates their image filenames when replacing a package', async () => {

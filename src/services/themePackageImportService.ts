@@ -11,6 +11,7 @@
  * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
  * @updated 2026-09-27: Migrates stable theme sticker IDs to replacement image filenames during package updates.
  * @updated 2026-09-28: Retains package images that remain referenced by independent user settings during deletion or replacement.
+ * @updated 2026-09-28: Supports retaining package resources after deleting a theme and resolving same-package reimports.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
@@ -27,6 +28,7 @@ import { CARD_BACKGROUND_CHANGED_EVENT, CARD_BACKGROUND_CURRENT_KEY, CARD_BACKGR
 import { dataRepository, REVIEW_ENTRIES_UPDATED_EVENT } from '../repositories/dataRepository';
 
 const LOCAL_THEME_PACKAGE_ASSETS_KEY = 'lumostime_theme_package_local_assets_v1';
+const RETAINED_THEME_PACKAGE_RESOURCES_KEY = 'lumostime_retained_theme_package_resources_v1';
 const THEME_PACKAGE_IMPORTED_EVENT = 'lumostime:theme-package-imported';
 const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
@@ -38,6 +40,8 @@ const FONT_EXTENSIONS = new Set(['woff', 'woff2', 'ttf', 'otf']);
 
 export interface ImportedThemePackageRecord {
   id: string;
+  /** Original manifest package ID when this is a separately imported copy. */
+  sourcePackageId?: string;
   name: string;
   version: string;
   author?: string;
@@ -115,6 +119,23 @@ export interface LocalThemePackageAssets {
   fontId?: string;
 }
 
+export interface RetainedThemePackageResources {
+  sourcePackageId: string;
+  record: ImportedThemePackageRecord;
+  localAssets?: LocalThemePackageAssets;
+  retainedAt: number;
+}
+
+export type ThemePackageResourceResolution = 'overwrite' | 'keep';
+
+export interface ThemePackageImportOptions {
+  retainedResourceResolution?: ThemePackageResourceResolution;
+}
+
+export interface ThemePackageDeleteOptions {
+  deleteResources?: boolean;
+}
+
 export interface ThemePackageImportResult {
   record: ImportedThemePackageRecord;
   localAssets: LocalThemePackageAssets;
@@ -124,15 +145,21 @@ export interface ThemePackageImportResult {
 export type ThemePackageImportErrorCode =
   | 'DUPLICATE_NAME'
   | 'FONT_IMPORT_FAILED'
-  | 'PERSISTENCE_FAILED';
+  | 'PERSISTENCE_FAILED'
+  | 'RETAINED_RESOURCES_CONFLICT';
 
 export class ThemePackageImportError extends Error {
   readonly code: ThemePackageImportErrorCode;
 
-  constructor(code: ThemePackageImportErrorCode, message: string) {
+  readonly packageId?: string;
+  readonly packageName?: string;
+
+  constructor(code: ThemePackageImportErrorCode, message: string, packageInfo?: { packageId: string; packageName: string }) {
     super(message);
     this.name = 'ThemePackageImportError';
     this.code = code;
+    this.packageId = packageInfo?.packageId;
+    this.packageName = packageInfo?.packageName;
   }
 }
 
@@ -161,6 +188,44 @@ const readLocalThemePackageAssets = (): LocalThemePackageAssets[] => {
 
 const writeLocalThemePackageAssets = (records: LocalThemePackageAssets[]): void => {
   localStorage.setItem(LOCAL_THEME_PACKAGE_ASSETS_KEY, JSON.stringify(records));
+};
+
+const readRetainedThemePackageResources = (): RetainedThemePackageResources[] => {
+  try {
+    const raw = localStorage.getItem(RETAINED_THEME_PACKAGE_RESOURCES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((item): item is RetainedThemePackageResources => (
+      isRecord(item)
+      && typeof item.sourcePackageId === 'string'
+      && isRecord(item.record)
+      && typeof item.record.id === 'string'
+    )) : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeRetainedThemePackageResources = (records: RetainedThemePackageResources[]): void => {
+  localStorage.setItem(RETAINED_THEME_PACKAGE_RESOURCES_KEY, JSON.stringify(records));
+};
+
+const getSourcePackageId = (record: ImportedThemePackageRecord): string => record.sourcePackageId || record.id;
+
+const getPackageUiIconThemeId = (record: ImportedThemePackageRecord, configuredThemeId?: string): string => {
+  const themeId = configuredThemeId || record.id;
+  return record.sourcePackageId ? `theme:${record.id}:uiicon-${themeId}` : themeId;
+};
+
+const createRetainedCopyId = (sourcePackageId: string, records: ImportedThemePackageRecord[]): string => {
+  const seed = Date.now().toString(36);
+  let sequence = 0;
+  let candidate = `${sourcePackageId}--${seed}`;
+  const usedIds = new Set(records.map((record) => record.id));
+  while (usedIds.has(candidate)) {
+    sequence += 1;
+    candidate = `${sourcePackageId}--${seed}-${sequence}`;
+  }
+  return candidate;
 };
 
 const parseVersion = (version: string): [number, number, number] => {
@@ -424,10 +489,13 @@ const removePackageDerivedState = (
   } catch { /* Preserve malformed user data for manual recovery. */ }
 
   const uiIconConfig = record.manifest.config.uiIcon;
-  const uiIconThemeId = uiIconConfig && typeof uiIconConfig === 'object' && !Array.isArray(uiIconConfig)
-    && typeof (uiIconConfig as Record<string, unknown>).themeId === 'string'
-    ? String((uiIconConfig as Record<string, unknown>).themeId)
-    : record.id;
+  const uiIconThemeId = getPackageUiIconThemeId(
+    record,
+    uiIconConfig && typeof uiIconConfig === 'object' && !Array.isArray(uiIconConfig)
+      && typeof (uiIconConfig as Record<string, unknown>).themeId === 'string'
+      ? String((uiIconConfig as Record<string, unknown>).themeId)
+      : undefined
+  );
   if (localStorage.getItem(THEME_KEYS.UI_ICON_THEME) === uiIconThemeId) {
     localStorage.setItem(THEME_KEYS.UI_ICON_THEME, 'default');
   }
@@ -440,7 +508,10 @@ const removePackageDerivedState = (
   if (uiIcon && typeof uiIcon === 'object' && !Array.isArray(uiIcon)) {
     const uiIconConfig = uiIcon as Record<string, unknown>;
     if (uiIconConfig.source === 'asset') {
-      removeObjectKey('lumostime_ui_icon_custom_assets_v1', typeof uiIconConfig.themeId === 'string' ? uiIconConfig.themeId : record.id);
+      removeObjectKey(
+        'lumostime_ui_icon_custom_assets_v1',
+        getPackageUiIconThemeId(record, typeof uiIconConfig.themeId === 'string' ? uiIconConfig.themeId : undefined)
+      );
     }
   }
 
@@ -481,6 +552,21 @@ const removePackageDerivedState = (
   if (currentTimePal.includes(prefix)) localStorage.setItem(TIMEPAL_KEYS.TYPE, 'none');
 };
 
+const deletePackageResources = async (
+  record: ImportedThemePackageRecord,
+  localAssets?: LocalThemePackageAssets
+): Promise<void> => {
+  removePackageDerivedState(record);
+
+  const currentFontId = localStorage.getItem('lumostime_font_family');
+  if (localAssets?.fontId) {
+    if (localAssets.fontId === currentFontId) fontService.setFont('default');
+    await fontService.removeCustomFont(localAssets.fontId).catch(() => undefined);
+  }
+
+  await deleteUnreferencedPackageImages(Object.values(record.imageAssets));
+};
+
 export const themePackageImportService = {
   getImportedPackages(): ImportedThemePackageRecord[] {
     return readImportedThemePackages();
@@ -490,7 +576,11 @@ export const themePackageImportService = {
     return readLocalThemePackageAssets().find((item) => item.packageId === packageId);
   },
 
-  async deletePackage(packageId: string): Promise<boolean> {
+  getRetainedResources(sourcePackageId: string): RetainedThemePackageResources[] {
+    return readRetainedThemePackageResources().filter((item) => item.sourcePackageId === sourcePackageId);
+  },
+
+  async deletePackage(packageId: string, options: ThemePackageDeleteOptions = {}): Promise<boolean> {
     const packages = readImportedThemePackages();
     const record = packages.find((item) => item.id === packageId);
     if (!record) return false;
@@ -502,19 +592,28 @@ export const themePackageImportService = {
     const localAssets = readLocalThemePackageAssets();
     const deletedLocalAssets = localAssets.find((item) => item.packageId === packageId);
     writeLocalThemePackageAssets(localAssets.filter((item) => item.packageId !== packageId));
-    removePackageDerivedState(record);
-
-    const currentFontId = localStorage.getItem('lumostime_font_family');
-    if (deletedLocalAssets?.fontId) {
-      if (deletedLocalAssets.fontId === currentFontId) fontService.setFont('default');
-      await fontService.removeCustomFont(deletedLocalAssets.fontId).catch(() => undefined);
+    const deleteResources = options.deleteResources !== false;
+    if (deleteResources) {
+      await deletePackageResources(record, deletedLocalAssets);
+    } else {
+      const retained = readRetainedThemePackageResources();
+      writeRetainedThemePackageResources([
+        ...retained,
+        {
+          sourcePackageId: getSourcePackageId(record),
+          record,
+          localAssets: deletedLocalAssets,
+          retainedAt: Date.now()
+        }
+      ]);
+      if (localStorage.getItem(THEME_KEYS.CURRENT_PRESET) === `package:${record.id}`) {
+        localStorage.setItem(THEME_KEYS.CURRENT_PRESET, 'default');
+      }
     }
-
-    await deleteUnreferencedPackageImages(Object.values(record.imageAssets));
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
-        detail: { packageId, deleted: true }
+        detail: { packageId, deleted: true, resourcesDeleted: deleteResources }
       }));
       window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
       window.dispatchEvent(new Event('stickerSetsChanged'));
@@ -525,23 +624,38 @@ export const themePackageImportService = {
     return true;
   },
 
-  async importPackage(source: Blob | File): Promise<ThemePackageImportResult> {
+  async importPackage(source: Blob | File, options: ThemePackageImportOptions = {}): Promise<ThemePackageImportResult> {
     const parsedPackage = await parseThemePackage(source);
     const { manifest, assets } = parsedPackage;
     const existingPackages = readImportedThemePackages();
-    const existingRecord = existingPackages.find((record) => record.id === manifest.package.id);
+    const sourcePackageId = manifest.package.id;
+    const retainedResources = readRetainedThemePackageResources()
+      .filter((item) => item.sourcePackageId === sourcePackageId);
+    if (retainedResources.length > 0 && !options.retainedResourceResolution) {
+      throw new ThemePackageImportError(
+        'RETAINED_RESOURCES_CONFLICT',
+        `“${manifest.package.name.trim()}” 的旧主题资源仍保留在本机。请选择覆盖旧资源或保留旧资源。`,
+        { packageId: sourcePackageId, packageName: manifest.package.name.trim() }
+      );
+    }
+    const recordId = options.retainedResourceResolution === 'keep' && retainedResources.length > 0
+      ? createRetainedCopyId(sourcePackageId, existingPackages)
+      : sourcePackageId;
+    const existingRecord = existingPackages.find((record) => record.id === recordId);
     const conflictingName = existingPackages.find((record) => (
-      record.id !== manifest.package.id
+      record.id !== recordId
+      && getSourcePackageId(record) !== sourcePackageId
       && record.name.trim().toLocaleLowerCase() === manifest.package.name.trim().toLocaleLowerCase()
     ));
     if (conflictingName) {
       throw new ThemePackageImportError('DUPLICATE_NAME', `已有同名主题「${conflictingName.name}」，请使用原主题包 ID 覆盖它`);
     }
     const existingLocalAssets = readLocalThemePackageAssets();
-    const existingLocalRecord = existingLocalAssets.find((record) => record.packageId === manifest.package.id);
+    const existingLocalRecord = existingLocalAssets.find((record) => record.packageId === recordId);
 
     const previousPackagesRaw = localStorage.getItem(THEME_KEYS.IMPORTED_THEME_PACKAGES);
     const previousLocalAssetsRaw = localStorage.getItem(LOCAL_THEME_PACKAGE_ASSETS_KEY);
+    const previousRetainedResourcesRaw = localStorage.getItem(RETAINED_THEME_PACKAGE_RESOURCES_KEY);
     const savedImageFilenames: string[] = [];
     const imageAssets: Record<string, string> = {};
     let importedFontId: string | undefined;
@@ -574,7 +688,8 @@ export const themePackageImportService = {
 
       const now = Date.now();
       const record: ImportedThemePackageRecord = {
-        id: manifest.package.id,
+        id: recordId,
+        ...(recordId !== sourcePackageId ? { sourcePackageId } : {}),
         name: manifest.package.name.trim(),
         version: manifest.package.version,
         author: manifest.package.author,
@@ -588,7 +703,7 @@ export const themePackageImportService = {
         updatedAt: now
       };
       const localRecord: LocalThemePackageAssets = {
-        packageId: manifest.package.id,
+        packageId: recordId,
         version: manifest.package.version,
         fontId: importedFontId
       };
@@ -619,6 +734,15 @@ export const themePackageImportService = {
           fontService.setFont('default');
         }
         await fontService.removeCustomFont(existingLocalRecord.fontId).catch(() => undefined);
+      }
+
+      if (options.retainedResourceResolution === 'overwrite' && retainedResources.length > 0) {
+        writeRetainedThemePackageResources(readRetainedThemePackageResources().filter((item) => (
+          item.sourcePackageId !== sourcePackageId
+        )));
+        for (const retained of retainedResources) {
+          await deletePackageResources(retained.record, retained.localAssets);
+        }
       }
 
       const registeredCardBackground = registerPackageCardBackgroundGroup(record);
@@ -660,10 +784,17 @@ export const themePackageImportService = {
         localStorage.setItem(LOCAL_THEME_PACKAGE_ASSETS_KEY, previousLocalAssetsRaw);
       }
 
+      if (previousRetainedResourcesRaw === null) {
+        localStorage.removeItem(RETAINED_THEME_PACKAGE_RESOURCES_KEY);
+      } else {
+        localStorage.setItem(RETAINED_THEME_PACKAGE_RESOURCES_KEY, previousRetainedResourcesRaw);
+      }
+
       throw error;
     }
   }
 };
 
 export const THEME_PACKAGE_LOCAL_ASSETS_STORAGE_KEY = LOCAL_THEME_PACKAGE_ASSETS_KEY;
+export const RETAINED_THEME_PACKAGE_RESOURCES_STORAGE_KEY = RETAINED_THEME_PACKAGE_RESOURCES_KEY;
 export const THEME_PACKAGE_CHANGE_EVENT = THEME_PACKAGE_IMPORTED_EVENT;
