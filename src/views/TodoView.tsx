@@ -2585,7 +2585,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   return (
     <div 
-      className="flex h-full min-h-0 min-w-0 relative isolate pb-[calc(3rem+env(safe-area-inset-bottom))] md:pb-16"
+      className="flex h-full min-h-0 min-w-0 relative isolate"
       style={{
         backgroundColor: hasBackground ? 'transparent' : '#faf9f6'
       }}
