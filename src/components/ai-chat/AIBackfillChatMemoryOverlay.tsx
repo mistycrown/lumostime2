@@ -4,12 +4,12 @@
  * @output Full-screen assistant memory overlay for manual memory and reminder management
  * @pos Component Support (AI Integration)
  * @description Extracts the long-term-memory viewer out of AIBackfillChatModal so the modal can stay focused on orchestration while this overlay keeps its existing UI and event behavior.
- * @updated 2026-09-28: Rendered editable memory lists newest-first without changing their persisted append order.
+ * @updated 2026-09-28: Rendered editable memory lists newest-first and added a direct link to the most recent conversation.
  * @updated 2026-07-22: Added a shared dark-theme hook for memory cards, inputs, and actions.
  * @updated 2026-05-15: Extracted the assistant memory overlay from AIBackfillChatModal.
  */
 import React from 'react';
-import { Check, Plus, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, MessageCircle, Plus, Trash2, X } from 'lucide-react';
 import type {
   AssistantEditableMemoryListKey,
   AssistantMemory,
@@ -22,6 +22,7 @@ import {
   type AssistantReminderDeleteTarget,
   type AssistantReminderDrafts
 } from './AIBackfillChatShared';
+import type { AIChatSession } from './AIBackfillChatShared';
 
 interface AIChatMemoryOverlayTheme {
   activeBg: string;
@@ -41,6 +42,7 @@ interface AIChatMemoryOverlayTheme {
 interface AIBackfillChatMemoryOverlayProps {
   assistantMemorySnapshot: AssistantMemory;
   assistantReminderSnapshot: AssistantReminder[];
+  recentChatSession?: AIChatSession;
   assistantEditableMemoryComposerKey: AssistantEditableMemoryListKey | null;
   assistantEditableMemoryDrafts: Record<AssistantEditableMemoryListKey, string>;
   assistantEditableMemoryDeleteTarget: AssistantEditableMemoryDeleteTarget | null;
@@ -58,6 +60,7 @@ interface AIBackfillChatMemoryOverlayProps {
   onCancelEditableMemoryDelete: () => void;
   onConfirmEditableMemoryDelete: (key: AssistantEditableMemoryListKey, value: string) => void;
   onOpenReminderComposer: () => void;
+  onOpenRecentChat: (sessionId: string) => void;
   onUpdateReminderDraft: (key: keyof AssistantReminderDrafts, value: string) => void;
   onCancelReminderComposer: () => void;
   onSaveReminder: () => void;
@@ -69,6 +72,7 @@ interface AIBackfillChatMemoryOverlayProps {
 export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayProps> = ({
   assistantMemorySnapshot,
   assistantReminderSnapshot,
+  recentChatSession,
   assistantEditableMemoryComposerKey,
   assistantEditableMemoryDrafts,
   assistantEditableMemoryDeleteTarget,
@@ -86,6 +90,7 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
   onCancelEditableMemoryDelete,
   onConfirmEditableMemoryDelete,
   onOpenReminderComposer,
+  onOpenRecentChat,
   onUpdateReminderDraft,
   onCancelReminderComposer,
   onSaveReminder,
@@ -128,6 +133,33 @@ export const AIBackfillChatMemoryOverlay: React.FC<AIBackfillChatMemoryOverlayPr
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         <div className="mx-auto max-w-4xl space-y-4">
+          {recentChatSession && (
+            <button
+              type="button"
+              onClick={() => onOpenRecentChat(recentChatSession.id)}
+              className="flex w-full items-center gap-3 rounded-[0.95rem] border p-4 text-left transition-colors hover:bg-white"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-color) 16%, #e5e7eb)',
+                backgroundColor: 'color-mix(in srgb, var(--accent-color) 4%, white)'
+              }}
+            >
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.75rem]"
+                style={{
+                  backgroundColor: theme.panelBg,
+                  color: theme.textSecondary
+                }}
+              >
+                <MessageCircle size={17} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-medium" style={{ color: theme.textMuted }}>最近对话</span>
+                <span className="mt-1 block truncate font-serif text-base" style={{ color: theme.textPrimary }}>{recentChatSession.title}</span>
+              </span>
+              <ChevronRight size={18} className="shrink-0" style={{ color: theme.textMuted }} />
+            </button>
+          )}
+
           <div
             className="rounded-[0.95rem] border border-[#e5e7eb] bg-[rgba(255,255,255,0.96)] p-4"
             style={{
