@@ -3,6 +3,7 @@
  * @description 心情日历组件 - 显示当月每日的心情 emoji/贴纸（基于 monomood 设计）
  * @updated 2026-07-21: Added semantic class hooks for Memoir dark-mode calendar colors.
  * @updated 2026-09-27: Simplified Memoir calendar backgrounds to one clipped fill image.
+ * @updated 2026-09-28: Centers the clipped Memoir calendar background image.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -161,7 +162,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         <>
             <div className={`memoir-mood-calendar relative overflow-visible ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50 shadow-sm rounded-2xl'} p-6 mb-6`}>
                 {hasCalendarBackground && (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-lg"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-right-bottom" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-lg"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
                 )}
                 {/* Weekday Headers */}
                 <div className="relative z-10 grid grid-cols-7 mb-4">
