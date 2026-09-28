@@ -18,6 +18,7 @@
  * @updated 2026-09-20: Prevented Base64 image URLs from being persisted in localStorage and added runtime hydration for native file-backed backgrounds.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom backgrounds.
  * @updated 2026-04-20: Added event-driven background subscriptions, image preloading, and lighter reapply scheduling to reduce mobile jank and white flashes.
+ * @updated 2026-09-28: Allows persisted main-background opacity through 100%.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -634,7 +635,7 @@ class BackgroundService {
      */
     setBackgroundOpacity(opacity: number): void {
         // 缁绢収鍠曠换姘舵焻韫囨梹顫栭幖杈剧畱濠€?-0.4濞戞柨顑夊Λ?
-        const clampedOpacity = Math.max(0, Math.min(0.4, opacity));
+        const clampedOpacity = Math.max(0, Math.min(1, opacity));
         const currentOpacity = this.getBackgroundOpacity();
 
         if (Math.abs(currentOpacity - clampedOpacity) < 0.001) {

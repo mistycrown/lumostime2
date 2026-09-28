@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-28: `BackgroundSelector.tsx` lets main-background opacity span 0–100% and presents the corresponding slider endpoint.
+
 - Update 2026-09-27: `LazyViewRecoveryBoundary.tsx` refreshes the current tab once when a lazily loaded view hits Vite's stale optimized-dependency error, then renders its supplied fallback to prevent reload loops.
 
 - Update 2026-09-26: `CardBackgroundSelector.tsx` adds multi-image card-background groups, alignment, deletion, and opacity controls to the sponsorship style tab; `useCardBackground.ts` resolves stable carousel backgrounds for supported card views.

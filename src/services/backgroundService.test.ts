@@ -4,10 +4,11 @@
  * @output Regression coverage for localStorage-safe background persistence
  * @description Verifies that image bytes are never serialized into the background metadata record.
  * @updated 2026-09-20: Added coverage for Base64 and image-backed background sanitization.
+ * @updated 2026-09-28: Covers full-range main-background opacity persistence and clamping.
  */
 
 import { describe, expect, it } from 'vitest';
-import { sanitizeBackgroundForStorage } from './backgroundService';
+import { backgroundService, sanitizeBackgroundForStorage } from './backgroundService';
 
 describe('sanitizeBackgroundForStorage', () => {
   it('removes runtime URLs when an image reference is available', () => {
@@ -49,5 +50,33 @@ describe('sanitizeBackgroundForStorage', () => {
 
     expect(result.url).toContain('capacitor://');
     expect(result.thumbnail).toContain('capacitor://');
+  });
+});
+
+describe('background opacity', () => {
+  it('persists the full 0–100% range and clamps invalid values', () => {
+    const values = new Map<string, string>();
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+        clear: () => values.clear(),
+      },
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { getElementById: () => null },
+    });
+
+    backgroundService.setBackgroundOpacity(1);
+    expect(backgroundService.getBackgroundOpacity()).toBe(1);
+
+    backgroundService.setBackgroundOpacity(1.5);
+    expect(backgroundService.getBackgroundOpacity()).toBe(1);
+
+    backgroundService.setBackgroundOpacity(-0.2);
+    expect(backgroundService.getBackgroundOpacity()).toBe(0);
   });
 });
