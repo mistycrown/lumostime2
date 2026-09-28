@@ -97,6 +97,8 @@ Update 2026-04-22: `aiService.ts` now exposes lightweight AI intent classificati
 Update 2026-04-22: `aiService.ts` now also exposes single-turn backfill tool planning, debug-oriented request/response capture, abort-signal plumbing, and per-tool-call date planning with latest-log/todo-hierarchy context for the AI backfill dialog.
 Update 2026-04-22: `aiService.ts` now accepts persona guidance and optional cached conversation history for unified AI sessions, and aligns OpenAI/Gemini request construction so quick-context and persona settings affect chat, add-log, and add-todo flows consistently.
 
+Update 2026-09-28: `backgroundService.ts` now accepts and persists main-background opacity through 100%.
+
 Update 2026-04-20: `backgroundService.ts` now emits background snapshot events, preloads image switches, and avoids the old 500ms fallback polling loop; `statusBarService.ts` now caches per-image brightness analysis results.
 
 Update 2026-04-09: `obsidianExportService.ts` now supports copying referenced log images into a user-defined Obsidian attachment folder during desktop exports.

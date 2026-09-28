@@ -4,6 +4,7 @@
  * @output Toast Messages (onToast), Background Selection (onBackgroundChange or backgroundService)
  * @pos Component (Selector)
  * @updated 2026-09-20: Refreshes previews when asynchronously hydrated image-backed backgrounds become available.
+ * @updated 2026-09-28: Extends main-background opacity control to the full 0–100% range.
  * @description 背景图片选择组件 - 支持预设背景、自定义上传、透明度调节
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -271,18 +272,18 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
                     <input
                         type="range"
                         min="0"
-                        max="0.4"
+                        max="1"
                         step="0.02"
                         value={backgroundOpacity}
                         onChange={handleOpacityChange}
                         className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer slider"
                         style={{
-                            background: `linear-gradient(to right, #57534e 0%, #57534e ${(backgroundOpacity / 0.4) * 100}%, #e7e5e4 ${(backgroundOpacity / 0.4) * 100}%, #e7e5e4 100%)`
+                            background: `linear-gradient(to right, #57534e 0%, #57534e ${backgroundOpacity * 100}%, #e7e5e4 ${backgroundOpacity * 100}%, #e7e5e4 100%)`
                         }}
                     />
                     <div className="flex justify-between text-xs text-stone-400 mt-1">
                         <span>0%</span>
-                        <span>40%</span>
+                        <span>100%</span>
                     </div>
                 </div>
             )}
