@@ -21,6 +21,7 @@
  * @updated 2026-09-27: Moved Memoir mood-calendar background settings from navigation to the style tab.
  * @updated 2026-09-27: Wrapped Memoir mood-calendar background settings in the shared style-card treatment.
  * @updated 2026-09-27: Adds the timeline header sticker debugger entry to the style tab.
+ * @updated 2026-09-28: Added strict 96-image UIIcon ZIP import with duplicate-name resolution.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -59,6 +60,13 @@ import { StickerSetEditModal } from '../components/StickerSetEditModal';
 import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { parseCustomStickerZip } from '../services/customStickerZipService';
+import { parseUIIconZip, type ParsedUIIconZip } from '../services/uiIconZipService';
+import {
+    getUIIconTypeByNumber,
+    uiIconService,
+    UI_ICON_CUSTOM_THEMES_CHANGED_EVENT,
+    type CustomUIIconThemeEntry
+} from '../services/uiIconService';
 import {
     themePackageImportService,
     ThemePackageImportError,
@@ -98,6 +106,12 @@ type StickerDeleteTarget =
         referenceCount: number;
     }
     | null;
+
+interface PendingUIIconZipImport {
+    name: string;
+    parsed: ParsedUIIconZip;
+    existingTheme: CustomUIIconThemeEntry;
+}
 
 interface ThemeCardEntry {
     id: string;
@@ -488,10 +502,14 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
     const [isClearCodeConfirmOpen, setIsClearCodeConfirmOpen] = useState(false);
     const [isImportingStickerZip, setIsImportingStickerZip] = useState(false);
+    const [isImportingUIIconZip, setIsImportingUIIconZip] = useState(false);
     const [isImportingThemePackage, setIsImportingThemePackage] = useState(false);
     const [pendingThemePackage, setPendingThemePackage] = useState<File | null>(null);
     const [importedThemePackages, setImportedThemePackages] = useState(() => themePackageImportService.getImportedPackages());
+    const [customUIIconThemes, setCustomUIIconThemes] = useState(() => uiIconService.getCustomThemeEntries());
+    const [pendingUIIconZipImport, setPendingUIIconZipImport] = useState<PendingUIIconZipImport | null>(null);
     const stickerZipInputRef = useRef<HTMLInputElement>(null);
+    const uiIconZipInputRef = useRef<HTMLInputElement>(null);
     const themePackageInputRef = useRef<HTMLInputElement>(null);
 
     // 用户统计数据
@@ -647,6 +665,83 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         }
     };
 
+    const getUIIconZipThemeName = (filename: string): string => (
+        filename.replace(/\.zip$/i, '').trim() || '自定义 UI 图标'
+    );
+
+    const getUniqueUIIconThemeName = (baseName: string): string => {
+        const usedNames = new Set(customUIIconThemes.map((theme) => theme.name));
+        if (!usedNames.has(baseName)) return baseName;
+
+        let suffix = 2;
+        let candidate = `${baseName} (${suffix})`;
+        while (usedNames.has(candidate)) {
+            suffix += 1;
+            candidate = `${baseName} (${suffix})`;
+        }
+        return candidate;
+    };
+
+    const importUIIconZip = async (
+        name: string,
+        parsed: ParsedUIIconZip,
+        existingTheme?: CustomUIIconThemeEntry
+    ): Promise<void> => {
+        setIsImportingUIIconZip(true);
+        const savedFilenames: string[] = [];
+        try {
+            const themeName = existingTheme ? name : getUniqueUIIconThemeName(name);
+            const themeId = existingTheme?.id || `custom-uiicon:${themeName}`;
+            const previousFilenames = existingTheme
+                ? uiIconService.getStoredCustomThemeAssetFilenames(themeId)
+                : [];
+            const mapping: Record<string, string> = {};
+
+            for (const image of parsed.images) {
+                const iconType = getUIIconTypeByNumber(image.number);
+                if (!iconType) throw new Error(`无法识别图标编号：${image.number}`);
+                const filename = await imageService.saveImage(image.blob, 'theme');
+                savedFilenames.push(filename);
+                mapping[iconType] = filename;
+            }
+
+            await uiIconService.registerCustomThemeAssets(themeId, mapping, themeName);
+            await Promise.allSettled(previousFilenames.map((filename) => imageService.deleteImage(filename)));
+            setUiIconTheme(themeId);
+            uiIconService.setTheme(themeId);
+            onToast('success', `UI 图标主题「${themeName}」已导入`);
+        } catch (error) {
+            await Promise.allSettled(savedFilenames.map((filename) => imageService.deleteImage(filename)));
+            console.error('[SponsorshipView] 导入 UI 图标压缩包失败:', error);
+            onToast('error', error instanceof Error ? error.message : 'UI 图标压缩包导入失败');
+        } finally {
+            setIsImportingUIIconZip(false);
+        }
+    };
+
+    const handleUIIconZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const zipFile = event.target.files?.[0];
+        event.target.value = '';
+        if (!zipFile) return;
+
+        setIsImportingUIIconZip(true);
+        try {
+            const parsed = await parseUIIconZip(zipFile);
+            const name = getUIIconZipThemeName(zipFile.name);
+            const existingTheme = customUIIconThemes.find((theme) => theme.name === name);
+            if (existingTheme) {
+                setPendingUIIconZipImport({ name, parsed, existingTheme });
+                return;
+            }
+            await importUIIconZip(name, parsed);
+        } catch (error) {
+            console.error('[SponsorshipView] 读取 UI 图标压缩包失败:', error);
+            onToast('error', error instanceof Error ? error.message : 'UI 图标压缩包读取失败');
+        } finally {
+            setIsImportingUIIconZip(false);
+        }
+    };
+
     useEffect(() => {
         const checkVerification = async () => {
             const result = await redemptionService.isVerified();
@@ -679,6 +774,12 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
         window.addEventListener(THEME_PACKAGE_CHANGE_EVENT, refreshImportedThemePackages);
         return () => window.removeEventListener(THEME_PACKAGE_CHANGE_EVENT, refreshImportedThemePackages);
+    }, []);
+
+    useEffect(() => {
+        const refreshCustomUIIconThemes = () => setCustomUIIconThemes(uiIconService.getCustomThemeEntries());
+        window.addEventListener(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT, refreshCustomUIIconThemes);
+        return () => window.removeEventListener(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT, refreshCustomUIIconThemes);
     }, []);
 
     // 加载用户统计数据
@@ -1687,6 +1788,35 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     onThemeChange={handleUiIconThemeChange}
                                                 />
                                             ))}
+                                            {customUIIconThemes.map((theme) => (
+                                                <UiThemeButton
+                                                    key={theme.id}
+                                                    theme={theme.id}
+                                                    label={theme.name}
+                                                    currentTheme={uiIconTheme}
+                                                    onThemeChange={handleUiIconThemeChange}
+                                                />
+                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={() => uiIconZipInputRef.current?.click()}
+                                                disabled={isImportingUIIconZip}
+                                                className="relative rounded-lg border-2 border-dashed border-stone-200 overflow-hidden bg-white transition-all hover:border-stone-300 disabled:cursor-wait disabled:opacity-60"
+                                                style={{ aspectRatio: '4/5' }}
+                                                aria-label="从压缩包导入 UI 图标主题"
+                                            >
+                                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-stone-400">
+                                                    <Upload size={20} />
+                                                    <span className="text-[10px] font-medium text-stone-500">{isImportingUIIconZip ? '导入中' : '压缩包'}</span>
+                                                </div>
+                                            </button>
+                                            <input
+                                                ref={uiIconZipInputRef}
+                                                type="file"
+                                                accept=".zip,application/zip,application/x-zip-compressed"
+                                                className="hidden"
+                                                onChange={(event) => void handleUIIconZipChange(event)}
+                                            />
                                         </div>
                                     </div>
 
@@ -2126,6 +2256,46 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 cancelText="取消"
                 type="danger"
             />
+
+            {pendingUIIconZipImport && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">
+                    <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+                        <h3 className="text-base font-semibold text-stone-800">UI 图标主题已存在</h3>
+                        <p className="mt-1 text-sm text-stone-500">“{pendingUIIconZipImport.name}”已存在。请选择导入方式。</p>
+                        <div className="mt-5 flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const pending = pendingUIIconZipImport;
+                                    setPendingUIIconZipImport(null);
+                                    void importUIIconZip(pending.name, pending.parsed, pending.existingTheme);
+                                }}
+                                className="flex-1 rounded-md bg-stone-800 px-3 py-2 text-sm text-white hover:bg-stone-700"
+                            >
+                                覆盖
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const pending = pendingUIIconZipImport;
+                                    setPendingUIIconZipImport(null);
+                                    void importUIIconZip(getUniqueUIIconThemeName(pending.name), pending.parsed);
+                                }}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                            >
+                                追加
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPendingUIIconZipImport(null)}
+                                className="flex-1 rounded-md border border-stone-200 px-3 py-2 text-sm text-stone-500 hover:bg-stone-50"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {pendingThemePackage && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 p-4">

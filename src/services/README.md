@@ -142,6 +142,7 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 
 - `achievementBottleIconPackService.ts`: [Active] - Stores achievement bottle icon-pack options, dynamic discovery, and stable WebP preview paths for sponsorship settings, preset persistence, and bottle rendering.
 - `customStickerZipService.ts`: Parses folder-based sticker ZIP archives, filters image files, sorts entries deterministically, and caps each imported group at 16 images.
+- `uiIconZipService.ts`: Parses UI icon ZIP archives and requires exactly one numbered PNG or WebP image for every icon from `01` through `96`.
 
 ## Recently Added (2026-02)
 - `themePresetService.ts`: 新增 - 主题预设应用服务，将复杂的主题切换逻辑拆分为多个独立方法
