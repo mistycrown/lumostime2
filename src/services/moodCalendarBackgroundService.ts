@@ -4,7 +4,7 @@
  * @output Current background, persisted opacity, and refresh events
  * @pos Service (UI Customization)
  * @description Stores a single fill image for each Memoir mood-calendar background.
- * @updated 2026-09-27: Removed paired overflow backgrounds; Memoir now uses one clipped fill image.
+ * @updated 2026-09-28: Keeps temporary blob URLs in memory and rehydrates them from the image library.
  */
 import { imageService } from './imageService';
 
@@ -38,6 +38,8 @@ const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined)
 });
 
 class MoodCalendarBackgroundService {
+    private readonly runtimeImageUrls = new Map<string, string>();
+
     getCurrentBackground(): string {
         const current = localStorage.getItem(MOOD_CALENDAR_BACKGROUND_CURRENT_KEY);
         return this.getAllBackgrounds().some((background) => background.id === current)
@@ -59,14 +61,37 @@ class MoodCalendarBackgroundService {
         try {
             const stored = localStorage.getItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY);
             const parsed = stored ? JSON.parse(stored) : [];
-            return Array.isArray(parsed) ? parsed : [];
+            if (!Array.isArray(parsed)) return [];
+
+            return parsed.map((background) => {
+                const runtimeUrl = this.runtimeImageUrls.get(background.id);
+                const url = runtimeUrl || (this.isBlobUrl(background.url) ? '' : background.url);
+                const thumbnail = runtimeUrl || (this.isBlobUrl(background.thumbnail) ? '' : background.thumbnail);
+                return { ...background, url, thumbnail };
+            });
         } catch {
             return [];
         }
     }
 
     private saveCustomBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
-        localStorage.setItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, JSON.stringify(backgrounds));
+        const persisted = backgrounds.map((background) => {
+            if (this.isBlobUrl(background.url)) this.runtimeImageUrls.set(background.id, background.url);
+            if (this.isBlobUrl(background.thumbnail) && !this.runtimeImageUrls.has(background.id)) {
+                this.runtimeImageUrls.set(background.id, background.thumbnail);
+            }
+
+            return {
+                ...background,
+                url: this.isBlobUrl(background.url) ? '' : background.url,
+                thumbnail: this.isBlobUrl(background.thumbnail) ? '' : background.thumbnail
+            };
+        });
+        localStorage.setItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, JSON.stringify(persisted));
+    }
+
+    private isBlobUrl(value: unknown): value is string {
+        return typeof value === 'string' && value.startsWith('blob:');
     }
 
     async hydrateCustomBackgrounds(): Promise<void> {
@@ -74,7 +99,7 @@ class MoodCalendarBackgroundService {
         let changed = false;
         const hydrated = await Promise.all(backgrounds.map(async (background) => {
             if (!background.imageFilename) return background;
-            const url = await imageService.getImageUrl(background.imageFilename);
+            const url = await imageService.getImageUrl(background.imageFilename).catch(() => '');
             if (!url || url === background.url) return background;
             changed = true;
             return { ...background, url, thumbnail: url };
@@ -139,6 +164,7 @@ class MoodCalendarBackgroundService {
         if (!target) return false;
         const wasCurrent = this.getCurrentBackground() === backgroundId;
 
+        this.runtimeImageUrls.delete(backgroundId);
         this.saveCustomBackgrounds(backgrounds.filter((background) => background.id !== backgroundId));
         if (target.imageFilename) await imageService.deleteImage(target.imageFilename).catch(() => undefined);
         if (wasCurrent) this.setCurrentBackground('none');

@@ -4,7 +4,7 @@
  * @output Single-image background selection, upload, delete, and opacity controls
  * @pos Component (Sponsorship Personalization)
  * @description Manages one clipped fill image for each Memoir mood-calendar background.
- * @updated 2026-09-27: Removed paired overflow background selection and upload.
+ * @updated 2026-09-28: Reuses one revocable preview URL instead of allocating blob URLs during render.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -23,6 +23,7 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
     const [isUploading, setIsUploading] = useState(false);
     const [backgroundName, setBackgroundName] = useState('');
     const [file, setFile] = useState<File | null>(null);
+    const [filePreviewUrl, setFilePreviewUrl] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const selectedOpacity = moodCalendarBackgroundService.getBackgroundById(currentId)?.opacity ?? 1;
 
@@ -33,8 +34,20 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
 
     useEffect(() => {
         window.addEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, reload);
+        void moodCalendarBackgroundService.hydrateCustomBackgrounds();
         return () => window.removeEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, reload);
     }, []);
+
+    useEffect(() => {
+        if (!file) {
+            setFilePreviewUrl('');
+            return;
+        }
+
+        const url = URL.createObjectURL(file);
+        setFilePreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [file]);
 
     const openAddModal = () => {
         setBackgroundName('');
@@ -103,7 +116,7 @@ export const MoodCalendarBackgroundSelector: React.FC<MoodCalendarBackgroundSele
                     <div className="mt-4 border-t border-stone-100 pt-4">
                         <span className="text-xs text-stone-600">背景图片</span>
                         <button type="button" onClick={() => fileInputRef.current?.click()} className={`relative mt-1.5 flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-xl border bg-white transition-colors ${file ? 'border-stone-300' : 'border-dashed border-stone-300'}`} aria-label="上传背景图片">
-                            {file ? <img src={URL.createObjectURL(file)} alt={file.name} className="h-full w-full object-contain" /> : <span className="flex flex-col items-center gap-1 text-stone-400"><Upload size={17} /><span className="text-[10px]">上传</span></span>}
+                            {file && filePreviewUrl ? <img src={filePreviewUrl} alt={file.name} className="h-full w-full object-contain" /> : <span className="flex flex-col items-center gap-1 text-stone-400"><Upload size={17} /><span className="text-[10px]">上传</span></span>}
                         </button>
                         {file && <span className="mt-1.5 block max-w-full truncate text-[10px] text-stone-400">{file.name}</span>}
                     </div>
