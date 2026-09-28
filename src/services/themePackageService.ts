@@ -10,6 +10,7 @@
  * @updated 2026-09-26: Validates explicit legacy/modern navigation modes for compatible theme packages.
  * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
  * @updated 2026-09-27: Limits each version-two theme package to one card-background group.
+ * @updated 2026-09-28: Validates complete numbered UIIcon directories in theme packages.
  */
 
 import JSZip from 'jszip';
@@ -54,6 +55,8 @@ const ASSET_MIME_TYPES: Record<string, string> = {
   ttf: 'font/ttf',
   otf: 'font/otf'
 };
+
+const REQUIRED_UI_ICON_NUMBERS = Array.from({ length: 96 }, (_, index) => String(index + 1).padStart(2, '0'));
 
 export interface ThemePackageMetadata {
   id: string;
@@ -131,7 +134,9 @@ const collectAssetReferences = (value: unknown, path = 'config', references = ne
 
   if (value && typeof value === 'object') {
     Object.entries(value).forEach(([key, item]) => {
-      collectAssetReferences(item, `${path}.${key}`, references);
+      if (key !== 'numberedDirectory') {
+        collectAssetReferences(item, `${path}.${key}`, references);
+      }
     });
   }
 
@@ -437,6 +442,14 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
         throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path}.id 重复：${item.id}`, `${path}.id`);
       }
       ids.add(item.id);
+      if (key === 'uiIcons' && item.numberedDirectory !== undefined
+        && (typeof item.numberedDirectory !== 'string' || !isAssetPath(item.numberedDirectory))) {
+        throw new ThemePackageValidationError(
+          'INVALID_CONFIGURATION',
+          `${path}.numberedDirectory 必须是 assets/ 下的资源目录`,
+          `${path}.numberedDirectory`
+        );
+      }
       if (key === 'cardBackgroundGroups') {
         if (value.length > 1) {
           throw new ThemePackageValidationError(
@@ -531,6 +544,45 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
   }
 }
 
+const validateNumberedUIIconDirectory = (manifest: ThemePackageManifest, assets: Map<string, Blob>): void => {
+  const uiIcon = manifest.config.uiIcon;
+  if (!isRecord(uiIcon) || uiIcon.source !== 'asset' || typeof uiIcon.numberedDirectory !== 'string') return;
+
+  const directory = uiIcon.numberedDirectory.replace(/\/+$/, '');
+  const directoryPrefix = `${directory}/`;
+  const iconFiles = Array.from(assets.keys()).filter((path) => path.startsWith(directoryPrefix));
+  const iconNumbers = new Map<string, string>();
+
+  for (const path of iconFiles) {
+    const filename = path.slice(directoryPrefix.length);
+    const match = filename.match(/^(\d{2})\.(png|webp)$/i);
+    if (!match || !REQUIRED_UI_ICON_NUMBERS.includes(match[1])) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        `UIIcon 目录只能包含 01 至 96 编号的 PNG 或 WebP 图片：${path}`,
+        'config.uiIcon.numberedDirectory'
+      );
+    }
+    if (iconNumbers.has(match[1])) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        `UIIcon 编号 ${match[1]} 存在重复图片`,
+        'config.uiIcon.numberedDirectory'
+      );
+    }
+    iconNumbers.set(match[1], path);
+  }
+
+  const missingNumbers = REQUIRED_UI_ICON_NUMBERS.filter((number) => !iconNumbers.has(number));
+  if (missingNumbers.length > 0) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      `UIIcon 资源必须包含 01 至 96 共 96 张编号图片，缺少：${missingNumbers.join('、')}`,
+      'config.uiIcon.numberedDirectory'
+    );
+  }
+};
+
 export const parseThemePackage = async (source: Blob | File): Promise<ParsedThemePackage> => {
   if (source.size > MAX_PACKAGE_BYTES) {
     throw new ThemePackageValidationError('INVALID_ZIP', '主题压缩包不能超过 100 MB');
@@ -614,6 +666,8 @@ export const parseThemePackage = async (source: Blob | File): Promise<ParsedThem
       throw new ThemePackageValidationError('MISSING_ASSET', `找不到资源：${assetPath}`, configPath);
     }
   }
+
+  validateNumberedUIIconDirectory(manifest, assets);
 
   return { manifest, assets };
 };

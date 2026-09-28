@@ -5,6 +5,7 @@
  * @pos Test (Theme Package Import)
  * @description Verifies achievement-bottle configuration is applied without a synthetic config.settings section.
  * @updated 2026-09-26: Covers custom icon-pack, sticker, and navigation icon application.
+ * @updated 2026-09-28: Covers complete numbered UIIcon directory application.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -114,6 +115,43 @@ describe('applyImportedThemePackage', () => {
       ['theme-frame-01.webp'],
       'Test Bottle'
     );
+  });
+
+  it('applies a complete numbered UIIcon directory to all icon slots', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    const imageAssets = Object.fromEntries(Array.from({ length: 96 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0');
+      return [`assets/uiicon/${number}.webp`, `theme-${number}.webp`];
+    }));
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    const result = await applyImportedThemePackage({
+      id: 'numbered-icons',
+      name: 'Numbered Icons',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'numbered-icons', name: 'Numbered Icons', version: '1.0.0' },
+        config: { uiIcon: { source: 'asset', themeId: 'numbered-icons', numberedDirectory: 'assets/uiicon' } }
+      },
+      imageAssets,
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(result.appliedSections).toContain('settings');
+    expect(values.get('lumostime_ui_icon_theme')).toBe('numbered-icons');
+    const storedAssets = JSON.parse(values.get('lumostime_ui_icon_custom_assets_v1') || '{}');
+    expect(Object.keys(storedAssets['numbered-icons'])).toHaveLength(96);
+    expect(storedAssets['numbered-icons'].sync).toBe('theme-01.webp');
+    expect(storedAssets['numbered-icons'].delivery).toBe('theme-96.webp');
   });
 
   it('applies nested navigation icons and refreshes custom sticker state', async () => {

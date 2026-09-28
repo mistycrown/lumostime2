@@ -45,6 +45,46 @@ const baseManifest = {
 };
 
 describe('parseThemePackage', () => {
+  it('accepts a complete numbered UIIcon directory', async () => {
+    const iconFiles = Object.fromEntries(Array.from({ length: 96 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0');
+      return [`assets/uiicon/${number}.${index % 2 === 0 ? 'webp' : 'png'}`, number];
+    }));
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'complete-icons', name: 'Complete Icons', version: '1.0.0' },
+      resources: { uiIcons: [{ id: 'complete', numberedDirectory: 'assets/uiicon' }] },
+      apply: { uiIcon: { resourceId: 'complete' } }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest, iconFiles));
+    expect(result.assets).toHaveLength(96);
+    expect(result.manifest.config.uiIcon).toMatchObject({
+      source: 'asset',
+      numberedDirectory: 'assets/uiicon'
+    });
+  });
+
+  it('rejects incomplete numbered UIIcon directories', async () => {
+    const iconFiles = Object.fromEntries(Array.from({ length: 95 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0');
+      return [`assets/uiicon/${number}.webp`, number];
+    }));
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'incomplete-icons', name: 'Incomplete Icons', version: '1.0.0' },
+      resources: { uiIcons: [{ id: 'incomplete', numberedDirectory: 'assets/uiicon' }] },
+      apply: { uiIcon: { resourceId: 'incomplete' } }
+    };
+
+    await expect(parseThemePackage(await createZip(manifest, iconFiles))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'config.uiIcon.numberedDirectory'
+    });
+  });
+
   it('parses a minimal package and returns referenced assets', async () => {
     const result = await parseThemePackage(await createZip(baseManifest, {
       'assets/preview.webp': 'preview',

@@ -25,6 +25,10 @@ assets/
   card-backgrounds/
 ```
 
+## 完整 UI 图标
+
+模板默认启用一套完整 UI 图标。请在 `assets/uiicon/` 放入 `01` 至 `96` 的 PNG 或 WebP 图片，每个编号只能有一张；可混用 PNG 与 WebP。主题包导入会检查 96 张图片齐全且无重复，随后按编号映射到应用的全部 UI 图标槽位。若不需要自定义 UI 图标，可同时删除 `resources.uiIcons` 和 `apply.uiIcon`。
+
 复制本文件夹后，可按主题需要创建资源子目录；空目录和 `.gitkeep` 不会作为资源导入。
 
 ## 卡片背景

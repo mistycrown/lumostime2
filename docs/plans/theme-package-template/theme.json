@@ -9,7 +9,15 @@
     "description": "主题简介"
   },
   "resources": {
+    "uiIcons": [
+      {
+        "id": "my-ui-icons",
+        "numberedDirectory": "assets/uiicon"
+      }
+    ],
     "cardBackgroundGroups": []
   },
-  "apply": {}
+  "apply": {
+    "uiIcon": { "resourceId": "my-ui-icons" }
+  }
 }

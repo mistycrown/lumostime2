@@ -9,6 +9,7 @@
  * @updated 2026-09-27: Applies a single-image Memoir calendar background from theme packages.
  * @updated 2026-09-26: Applies achievement-bottle and other appearance settings from their manifest sections.
  * @updated 2026-09-26: Applies nested navigation icons, live background opacity, and refreshes packaged stickers.
+ * @updated 2026-09-28: Applies complete 01-96 numbered UIIcon directories from theme packages.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -25,7 +26,7 @@ import { navigationBackgroundService } from './navigationBackgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { themePackageImportService, type ImportedThemePackageRecord } from './themePackageImportService';
-import { uiIconService } from './uiIconService';
+import { getUIIconTypeByNumber, uiIconService } from './uiIconService';
 import { normalizeCustomStickerState } from './customStickerAssetService';
 import type { CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { CUSTOM_TIMEPAL_PREFIX } from '../constants/timePalConfig';
@@ -502,7 +503,26 @@ const applySettings = async (record: ImportedThemePackageRecord, warnings: strin
   } else if (uiIcon?.source === 'asset') {
     const files = uiIcon.files;
     const themeId = typeof uiIcon.themeId === 'string' ? uiIcon.themeId : record.id;
-    if (!files || typeof files !== 'object' || Array.isArray(files)) {
+    const numberedDirectory = typeof uiIcon.numberedDirectory === 'string'
+      ? uiIcon.numberedDirectory.replace(/\/+$/, '')
+      : '';
+    if (numberedDirectory) {
+      const mapping: Record<string, string> = {};
+      for (let index = 1; index <= 96; index += 1) {
+        const number = String(index).padStart(2, '0');
+        const iconType = getUIIconTypeByNumber(number);
+        const imageFilename = record.imageAssets[`${numberedDirectory}/${number}.png`]
+          || record.imageAssets[`${numberedDirectory}/${number}.webp`];
+        if (iconType && imageFilename) mapping[iconType] = imageFilename;
+      }
+      if (Object.keys(mapping).length !== 96) {
+        warnings.push('主题包自定义 UIIcon 缺少完整的 96 张编号图片');
+      } else {
+        await uiIconService.registerCustomThemeAssets(themeId, mapping);
+        localStorage.setItem(THEME_KEYS.UI_ICON_THEME, themeId);
+        uiIconService.setTheme(themeId as never);
+      }
+    } else if (!files || typeof files !== 'object' || Array.isArray(files)) {
       warnings.push('主题包自定义 UIIcon 缺少 files 配置');
     } else {
       const mapping: Record<string, string> = {};
@@ -605,7 +625,7 @@ export const applyImportedThemePackage = async (
     ['settings', async () => applySettings(record, warnings)]
   ];
 
-  const hasSettingsConfiguration = ['color', 'font', 'achievementBottle', 'timeline']
+  const hasSettingsConfiguration = ['color', 'uiIcon', 'font', 'achievementBottle', 'timeline']
     .some((key) => record.manifest.config[key] !== undefined);
   for (const [section, task] of sectionTasks) {
     const navigationConfig = getConfigObject(record, 'navigation');
