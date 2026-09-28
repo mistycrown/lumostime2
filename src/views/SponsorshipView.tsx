@@ -395,7 +395,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     navigationMode: 'legacy',
     modernNavigation: {
         enabled: false,
-        background: 'new-default',
+        background: 'new-none',
         transparent: false,
         iconMode: 'text',
         showLabelWithIcon: false

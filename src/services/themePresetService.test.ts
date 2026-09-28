@@ -55,7 +55,7 @@ describe('ThemePresetService', () => {
       navigationMode: 'legacy',
       modernNavigation: {
         enabled: false,
-        background: 'new-default',
+        background: 'new-none',
         transparent: false,
         iconMode: 'text',
         showLabelWithIcon: false
@@ -76,7 +76,7 @@ describe('ThemePresetService', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(navigationBackground.setCurrentBackground).toHaveBeenCalledWith('new-default');
+    expect(navigationBackground.setCurrentBackground).toHaveBeenCalledWith('new-none');
     expect(navigationBackground.setTransparentNavigationEnabled).toHaveBeenCalledWith(false);
     expect(navigationBackground.setEnabled).toHaveBeenLastCalledWith(false);
     expect(navigationIcons.setMode).toHaveBeenCalledWith('text');

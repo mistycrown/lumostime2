@@ -1,12 +1,13 @@
 /**
  * @file navigationBackgroundService.ts
- * @input Built-in navigation background assets and uploaded image files
+ * @input Uploaded and theme-package navigation background image files
  * @output New navigation background selection, persistence, and adjustment events
  * @pos Service (UI Customization)
  * @description Keeps the new navigation-background mode isolated from the legacy foreground decoration mode.
  * @updated 2026-09-25: Registers uploaded navigation backgrounds in the theme image manifest group.
  * @updated 2026-09-25: Added a persisted transparent-navigation toggle for the supported primary pages.
  * @updated 2026-09-26: Added a built-in no-background option that restores the default navigation surface.
+ * @updated 2026-09-28: Removed the packaged background image and migrate its saved selection to no background.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -38,16 +39,6 @@ class NavigationBackgroundService {
             type: 'preset',
             url: ''
         },
-        {
-            id: 'new-default',
-            name: '1',
-            type: 'preset',
-            url: '/dchhnew/1.webp',
-            offsetY: '13px',
-            offsetX: '0px',
-            scale: 1.15,
-            opacity: 1
-        }
     ];
 
     constructor() {
@@ -73,12 +64,19 @@ class NavigationBackgroundService {
     }
 
     getCurrentBackground(): string {
-        return localStorage.getItem(CURRENT_KEY) || 'new-default';
+        const currentId = localStorage.getItem(CURRENT_KEY) || 'new-none';
+        if (currentId === 'new-default' || !this.getAllBackgrounds().some((background) => background.id === currentId)) {
+            return 'new-none';
+        }
+        return currentId;
     }
 
     setCurrentBackground(backgroundId: string): void {
-        localStorage.setItem(CURRENT_KEY, backgroundId);
-        window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId } }));
+        const resolvedId = this.getAllBackgrounds().some((background) => background.id === backgroundId)
+            ? backgroundId
+            : 'new-none';
+        localStorage.setItem(CURRENT_KEY, resolvedId);
+        window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId: resolvedId } }));
     }
 
     private loadCustomBackgrounds(): NavigationDecorationOption[] {
@@ -177,7 +175,7 @@ class NavigationBackgroundService {
             await imageService.deleteImage(target.imageFilename).catch(() => undefined);
         }
         if (this.getCurrentBackground() === backgroundId) {
-            this.setCurrentBackground('new-default');
+            this.setCurrentBackground('new-none');
         }
         return true;
     }

@@ -1,3 +1,10 @@
+/**
+ * @file navigationIconService.test.ts
+ * @input Persisted and user-created navigation icon schemes
+ * @output Regression coverage for icon-scheme persistence and legacy fallback
+ * @pos Test (UI Customization)
+ * @updated 2026-09-28: Covers migration from the removed built-in pink icon mode.
+ */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   NAVIGATION_ICON_SCHEMES_KEY,
@@ -78,5 +85,11 @@ describe('navigationIconService custom schemes', () => {
     expect(JSON.parse(localStorage.getItem('navigation_icon_selection_v1') || '{}')).toMatchObject({
       showLabelWithIcon: true
     });
+  });
+
+  it('falls back to text for the removed built-in pink icon mode', () => {
+    localStorage.setItem('navigation_icon_selection_v1', JSON.stringify({ mode: 'pink' }));
+
+    expect(navigationIconService.getSelection()).toMatchObject({ mode: 'text' });
   });
 });
