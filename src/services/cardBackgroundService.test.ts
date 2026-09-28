@@ -2,7 +2,7 @@
  * @file cardBackgroundService.test.ts
  * @input Stored card background groups, settings, and uploaded image files
  * @output Regression coverage for persistence, carousel selection, alignment, and opacity
- * @updated 2026-09-27: Verifies anchored backgrounds fill width without centered cropping.
+ * @updated 2026-09-28: Verifies active backgrounds share a subtle surface shadow.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -70,6 +70,7 @@ describe('card background settings', () => {
     expect(topStyle.backgroundPosition).toBe('center, right top');
     expect(topStyle.backgroundSize).toBe('cover, 100% auto');
     expect(topStyle.backgroundImage).toContain('rgba(255, 255, 255, 0.75)');
+    expect(topStyle.boxShadow).toBe('0 2px 8px rgba(0, 0, 0, 0.07)');
 
     const bottomStyle = getCardBackgroundStyle('blob:preview', 'right-bottom', 0.25);
     expect(bottomStyle.backgroundPosition).toBe('center, right bottom');
