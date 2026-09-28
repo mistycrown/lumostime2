@@ -12,10 +12,11 @@
  * @updated 2026-09-26: Syncs custom achievement-bottle image mappings without uploading their binary data directly.
  * @updated 2026-09-26: Includes independent Memoir calendar background modes in appearance backup and restore.
  * @updated 2026-09-26: Includes custom card background groups, selection, opacity, and image references.
+ * @updated 2026-09-28: Includes transparent navigation, chart palettes, and custom UI-icon theme names.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
-import { UI_ICON_CUSTOM_ASSETS_KEY, uiIconService } from './uiIconService';
+import { UI_ICON_CUSTOM_ASSETS_KEY, UI_ICON_CUSTOM_THEME_NAMES_KEY, uiIconService } from './uiIconService';
 import { colorSchemeService } from './colorSchemeService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
@@ -34,8 +35,10 @@ const APPEARANCE_STORAGE_KEYS = [
   THEME_KEYS.CURRENT_PRESET,
   THEME_KEYS.UI_ICON_THEME,
   UI_ICON_CUSTOM_ASSETS_KEY,
+  UI_ICON_CUSTOM_THEME_NAMES_KEY,
   THEME_KEYS.COLOR_SCHEME,
   THEME_KEYS.CUSTOM_COLOR_GROUP,
+  THEME_KEYS.CUSTOM_CHART_PALETTE_SEQUENCES,
   THEME_KEYS.CURRENT_BACKGROUND,
   'lumos_background_opacity',
   THEME_KEYS.NAVIGATION_DECORATION,
@@ -44,6 +47,7 @@ const APPEARANCE_STORAGE_KEYS = [
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
+  'navigation_transparent_enabled',
   'mood_calendar_background_settings',
   'mood_calendar_fill_background',
   'mood_calendar_fill_background_custom_list',
