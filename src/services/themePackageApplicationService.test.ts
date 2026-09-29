@@ -6,6 +6,7 @@
  * @description Verifies achievement-bottle configuration is applied without a synthetic config.settings section.
  * @updated 2026-09-26: Covers custom icon-pack, sticker, and navigation icon application.
  * @updated 2026-09-28: Covers complete numbered UIIcon directory application.
+ * @updated 2026-09-29: Covers packaged navigation stretching and text-only icon mode.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -219,6 +220,48 @@ describe('applyImportedThemePackage', () => {
     expect(result.appliedSections).toContain('stickers');
     expect(customStickerSets).toHaveLength(1);
     expect(customStickers).toMatchObject([{ setId: 'theme:asset-theme:sticker-set-stickers', imageFilename: 'theme-sticker.png' }]);
+  });
+
+  it('preserves vertical stretching for an imported navigation background', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'stretched-navigation',
+      name: 'Stretched Navigation',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 1,
+        package: { id: 'stretched-navigation', name: 'Stretched Navigation', version: '1.0.0' },
+        config: {
+          navigation: {
+            mode: 'modern',
+            iconMode: 'text',
+            background: {
+              source: 'asset',
+              file: 'assets/navigation/main.webp',
+              verticalStretch: 1.15
+            }
+          }
+        }
+      },
+      imageAssets: { 'assets/navigation/main.webp': 'theme-navigation.webp' },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    const backgrounds = JSON.parse(values.get('navigation_new_background_custom_list') || '[]');
+    const settings = JSON.parse(values.get('navigation_new_background_settings') || '{}');
+    const iconSelection = JSON.parse(values.get('navigation_icon_selection_v1') || '{}');
+    expect(backgrounds).toMatchObject([{ verticalStretch: 1.15 }]);
+    expect(settings['theme:stretched-navigation:navigation-background']).toMatchObject({ verticalStretch: 1.15 });
+    expect(iconSelection).toMatchObject({ mode: 'text', customMapping: {}, showLabelWithIcon: false });
   });
 
   it('sets the imported sticker default page and merges package sets into one selector group', async () => {

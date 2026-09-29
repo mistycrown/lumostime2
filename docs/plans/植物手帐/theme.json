@@ -1,0 +1,127 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 2,
+  "package": {
+    "id": "plant-journal",
+    "name": "植物手帐",
+    "version": "1.0.0",
+    "description": "一套以植物、纸感贴纸与莫兰迪绿为灵感的手帐主题",
+    "preview": "assets/background/main.webp"
+  },
+  "resources": {
+    "backgrounds": [
+      {
+        "id": "plant-journal-background",
+        "file": "assets/background/main.webp",
+        "fit": "cover",
+        "position": "center"
+      }
+    ],
+    "stickers": [
+      {
+        "id": "plant-journal-postage",
+        "name": "植物邮票贴纸",
+        "cover": "assets/stickers/postage/01.webp",
+        "items": [
+          { "id": "plant-journal-postage-01", "name": "植物邮票 01", "file": "assets/stickers/postage/01.webp" },
+          { "id": "plant-journal-postage-02", "name": "植物邮票 02", "file": "assets/stickers/postage/02.webp" },
+          { "id": "plant-journal-postage-03", "name": "植物邮票 03", "file": "assets/stickers/postage/03.webp" },
+          { "id": "plant-journal-postage-04", "name": "植物邮票 04", "file": "assets/stickers/postage/04.webp" },
+          { "id": "plant-journal-postage-05", "name": "植物邮票 05", "file": "assets/stickers/postage/05.webp" },
+          { "id": "plant-journal-postage-06", "name": "植物邮票 06", "file": "assets/stickers/postage/06.webp" },
+          { "id": "plant-journal-postage-07", "name": "植物邮票 07", "file": "assets/stickers/postage/07.webp" },
+          { "id": "plant-journal-postage-08", "name": "植物邮票 08", "file": "assets/stickers/postage/08.webp" },
+          { "id": "plant-journal-postage-09", "name": "植物邮票 09", "file": "assets/stickers/postage/09.webp" },
+          { "id": "plant-journal-postage-10", "name": "植物邮票 10", "file": "assets/stickers/postage/10.webp" },
+          { "id": "plant-journal-postage-11", "name": "植物邮票 11", "file": "assets/stickers/postage/11.webp" },
+          { "id": "plant-journal-postage-12", "name": "植物邮票 12", "file": "assets/stickers/postage/12.webp" },
+          { "id": "plant-journal-postage-13", "name": "植物邮票 13", "file": "assets/stickers/postage/13.webp" },
+          { "id": "plant-journal-postage-14", "name": "植物邮票 14", "file": "assets/stickers/postage/14.webp" },
+          { "id": "plant-journal-postage-15", "name": "植物邮票 15", "file": "assets/stickers/postage/15.webp" },
+          { "id": "plant-journal-postage-16", "name": "植物邮票 16", "file": "assets/stickers/postage/16.webp" }
+        ]
+      },
+      {
+        "id": "plant-journal-postage-cropped",
+        "name": "植物邮票贴纸 II",
+        "cover": "assets/stickers/postage-cropped/01.webp",
+        "items": [
+          { "id": "plant-journal-postage-cropped-01", "name": "植物邮票 II 01", "file": "assets/stickers/postage-cropped/01.webp" },
+          { "id": "plant-journal-postage-cropped-02", "name": "植物邮票 II 02", "file": "assets/stickers/postage-cropped/02.webp" },
+          { "id": "plant-journal-postage-cropped-03", "name": "植物邮票 II 03", "file": "assets/stickers/postage-cropped/03.webp" },
+          { "id": "plant-journal-postage-cropped-04", "name": "植物邮票 II 04", "file": "assets/stickers/postage-cropped/04.webp" },
+          { "id": "plant-journal-postage-cropped-05", "name": "植物邮票 II 05", "file": "assets/stickers/postage-cropped/05.webp" },
+          { "id": "plant-journal-postage-cropped-06", "name": "植物邮票 II 06", "file": "assets/stickers/postage-cropped/06.webp" },
+          { "id": "plant-journal-postage-cropped-07", "name": "植物邮票 II 07", "file": "assets/stickers/postage-cropped/07.webp" },
+          { "id": "plant-journal-postage-cropped-08", "name": "植物邮票 II 08", "file": "assets/stickers/postage-cropped/08.webp" },
+          { "id": "plant-journal-postage-cropped-09", "name": "植物邮票 II 09", "file": "assets/stickers/postage-cropped/09.webp" },
+          { "id": "plant-journal-postage-cropped-10", "name": "植物邮票 II 10", "file": "assets/stickers/postage-cropped/10.webp" },
+          { "id": "plant-journal-postage-cropped-11", "name": "植物邮票 II 11", "file": "assets/stickers/postage-cropped/11.webp" },
+          { "id": "plant-journal-postage-cropped-12", "name": "植物邮票 II 12", "file": "assets/stickers/postage-cropped/12.webp" },
+          { "id": "plant-journal-postage-cropped-13", "name": "植物邮票 II 13", "file": "assets/stickers/postage-cropped/13.webp" },
+          { "id": "plant-journal-postage-cropped-14", "name": "植物邮票 II 14", "file": "assets/stickers/postage-cropped/14.webp" },
+          { "id": "plant-journal-postage-cropped-15", "name": "植物邮票 II 15", "file": "assets/stickers/postage-cropped/15.webp" },
+          { "id": "plant-journal-postage-cropped-16", "name": "植物邮票 II 16", "file": "assets/stickers/postage-cropped/16.webp" }
+        ]
+      }
+    ],
+    "navigationBackgrounds": [
+      {
+        "id": "plant-journal-navigation",
+        "file": "assets/navigation/main.webp",
+        "position": "center",
+        "verticalStretch": 1.15
+      }
+    ],
+    "memoirCalendarBackgrounds": [
+      {
+        "id": "plant-journal-memoir",
+        "image": "assets/memoir-calendar/main.webp",
+        "settings": { "opacity": 0.9 }
+      }
+    ],
+    "cardBackgroundGroups": [
+      {
+        "id": "plant-journal-cards",
+        "name": "植物手帐卡片背景",
+        "alignment": "right-bottom",
+        "files": [
+          "assets/card-backgrounds/01.webp",
+          "assets/card-backgrounds/02.webp",
+          "assets/card-backgrounds/03.webp",
+          "assets/card-backgrounds/04.webp",
+          "assets/card-backgrounds/05.webp",
+          "assets/card-backgrounds/06.webp"
+        ]
+      }
+    ],
+    "floatingButtonBackgrounds": [
+      {
+        "id": "plant-journal-floating-button",
+        "image": "assets/floating-button-backgrounds/main.webp"
+      }
+    ]
+  },
+  "apply": {
+    "background": { "resourceId": "plant-journal-background", "opacity": 0.92 },
+    "color": { "schemeId": "morandi-green" },
+    "uiIcon": { "source": "builtin", "themeId": "pencil" },
+    "navigation": { "mode": "modern", "backgroundId": "plant-journal-navigation", "iconMode": "text" },
+    "stickers": {
+      "defaultPage": "plant-journal-postage",
+      "enabled": true,
+      "groups": [
+        {
+          "id": "plant-journal-stickers",
+          "name": "植物手帐贴纸",
+          "sourceSetIds": ["plant-journal-postage", "plant-journal-postage-cropped"]
+        }
+      ]
+    },
+    "font": { "source": "builtin", "fontId": "ding-lie-song" },
+    "achievementBottle": { "iconPackId": "candy", "style": { "id": "mintHaze" } },
+    "timeline": { "themeId": "vine" },
+    "memoirCalendar": { "backgroundId": "plant-journal-memoir" },
+    "floatingButtonBackground": { "resourceId": "plant-journal-floating-button", "scale": 100 }
+  }
+}

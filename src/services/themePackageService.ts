@@ -11,6 +11,7 @@
  * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
  * @updated 2026-09-27: Limits each version-two theme package to one card-background group.
  * @updated 2026-09-28: Validates complete numbered UIIcon directories in theme packages.
+ * @updated 2026-09-29: Adapts text-only navigation icon mode from schema-version-two packages.
  * @updated 2026-09-29: Validates image-backed global floating-button backgrounds in schema-v2 packages.
  */
 
@@ -207,7 +208,10 @@ const adaptResourcesAndApply = (
 
   const navigationApply = applyRecord('navigation');
   if (Object.keys(navigationApply).length) {
-    const navigation: Record<string, unknown> = { mode: navigationApply.mode };
+    const navigation: Record<string, unknown> = {
+      mode: navigationApply.mode,
+      ...(navigationApply.iconMode === 'text' ? { iconMode: 'text' } : {})
+    };
     const navBackground = findById(resources.navigationBackgrounds, navigationApply.backgroundId);
     if (navBackground) navigation.background = navBackground;
     const navIcons = findById(resources.navigationIcons, navigationApply.iconsId);
@@ -338,6 +342,13 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
         'INVALID_CONFIGURATION',
         'navigation.mode 只支持 legacy 或 modern',
         'config.navigation.mode'
+      );
+    }
+    if (navigationRecord.iconMode !== undefined && navigationRecord.iconMode !== 'text') {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'navigation.iconMode 只支持 text',
+        'config.navigation.iconMode'
       );
     }
     if (navigationRecord.mode === 'legacy'
