@@ -14,6 +14,7 @@
  * @updated 2026-09-29: Adapts text-only navigation icon mode from schema-version-two packages.
  * @updated 2026-09-29: Validates image-backed global floating-button backgrounds in schema-v2 packages.
  * @updated 2026-09-29: Supports explicitly clearing the current floating-button background.
+ * @updated 2026-09-29: Adapts packaged transparent title-bar preferences.
  */
 
 import JSZip from 'jszip';
@@ -211,7 +212,10 @@ const adaptResourcesAndApply = (
   if (Object.keys(navigationApply).length) {
     const navigation: Record<string, unknown> = {
       mode: navigationApply.mode,
-      ...(navigationApply.iconMode === 'text' ? { iconMode: 'text' } : {})
+      ...(navigationApply.iconMode === 'text' ? { iconMode: 'text' } : {}),
+      ...(typeof navigationApply.transparentTitleBar === 'boolean'
+        ? { transparentTitleBar: navigationApply.transparentTitleBar }
+        : {})
     };
     const navBackground = findById(resources.navigationBackgrounds, navigationApply.backgroundId);
     if (navBackground) navigation.background = navBackground;
@@ -350,6 +354,13 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
         'INVALID_CONFIGURATION',
         'navigation.iconMode 只支持 text',
         'config.navigation.iconMode'
+      );
+    }
+    if (navigationRecord.transparentTitleBar !== undefined && typeof navigationRecord.transparentTitleBar !== 'boolean') {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'navigation.transparentTitleBar 必须是布尔值',
+        'config.navigation.transparentTitleBar'
       );
     }
     if (navigationRecord.mode === 'legacy'

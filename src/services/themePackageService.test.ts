@@ -14,6 +14,7 @@
  * @updated 2026-09-29: Covers scalable global floating-button background resources.
  * @updated 2026-09-29: Covers schema-version-two text-only navigation mode.
  * @updated 2026-09-29: Covers explicit default floating-button backgrounds.
+ * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  */
 
 import JSZip from 'jszip';
@@ -168,11 +169,11 @@ describe('parseThemePackage', () => {
       schemaVersion: 2,
       package: { id: 'text-navigation', name: 'Text Navigation', version: '1.0.0' },
       resources: {},
-      apply: { navigation: { mode: 'modern', iconMode: 'text' } }
+      apply: { navigation: { mode: 'modern', iconMode: 'text', transparentTitleBar: true } }
     };
 
     const result = await parseThemePackage(await createZip(manifest));
-    expect(result.manifest.config.navigation).toEqual({ mode: 'modern', iconMode: 'text' });
+    expect(result.manifest.config.navigation).toEqual({ mode: 'modern', iconMode: 'text', transparentTitleBar: true });
   });
 
   it('adapts a floating-button background resource and validates its scale', async () => {
