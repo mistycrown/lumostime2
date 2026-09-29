@@ -270,8 +270,8 @@ Charts and visual data representations.
 - `HeatmapCalendar.tsx`: Month-view intensity heatmap.
 - `MatrixAnalysisChart.tsx`: Bar charts for activity ranking.
 - `stats/CheckView.tsx`: Habit check statistics with support for manual count mode (shows completed counts).
-- `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView, Memoir, and detail-page history timelines, with last-node line truncation, centered summary dots, optional page-level rail-width caps, and Memoir-side offset support.
-- `TimelineItem.tsx`: Shared Memoir/timeline entry renderer with media grids that keep single-image, two-image, and multi-image cards visually aligned.
+- `TimelineStyleRail.tsx`: Styled rail and node renderer shared by TimelineView, Memoir, and detail-page history timelines, with last-node line truncation, optional page-level rail-width caps, and Memoir-side offset support.
+- `TimelineItem.tsx`: Shared Memoir/timeline entry renderer with media grids that keep single-image, two-image, and multi-image cards visually aligned; custom timeline themes apply the same node icon and color to logs and review entries while the default theme preserves review-type colors.
 
 ## Input & Forms
 Specialized input controls.
@@ -321,10 +321,10 @@ Components for theme and appearance customization.
 - `UiThemeButton.tsx`: 新增 - 从 SponsorshipView 中提取的可复用主题按钮组件
 - `TimePalSettings.tsx`: 新增 - 从 SponsorshipView 中提取的时光小友设置组件
 
-> ⚠️ 本文档最后更新：2026-05-15
+> ⚠️ 本文档最后更新：2026-09-29
 ## Recently Added (2026-03)
 - `TimelineStyleSelector.tsx`: 时间线样式切换与参数调节组件。
-- `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持摘要节点圆点对齐和页面级轨道宽度限制。
+- `TimelineStyleRail.tsx`: TimelineView、Memoir 与详情页共用的样式轨道渲染组件，支持页面级轨道宽度限制。
 - `TimelineStyleAdjuster.tsx`: 时间线样式调节浮窗，使用更紧凑的半屏宽度布局，并支持档案页专用水平偏移。
 
 - `CompactPreviewCardSelector.tsx`: 紧凑型卡片选择器，用于把样式页下拉替换成和配色区一致的小卡片预览网格。

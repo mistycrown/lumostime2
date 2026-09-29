@@ -5,7 +5,7 @@
  * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
  * @updated 2026-07-22: Added Memoir-specific text hooks so entry titles and body content remain readable in dark mode.
  * @updated 2026-09-12: Renders Routine Markdown checklists as visual rows in Memoir entries.
- * @updated 2026-09-27: Applies configured card backgrounds to daily, weekly, and monthly summary cards, hiding their border when active.
+ * @updated 2026-09-29: Makes review nodes inherit the active custom timeline icon and color while preserving default summary colors.
  */
 import React, { useState, useEffect } from 'react';
 import { DiaryEntry } from '../views/journalTypes';
@@ -277,19 +277,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         }
     };
 
-    const getSummaryNodeColor = () => {
-        switch (type) {
-            case 'daily_summary':
-                return '#8b5cf6';
-            case 'weekly_summary':
-                return '#f59e0b';
-            case 'monthly_summary':
-                return '#f472b6';
-            default:
-                return activeTimelineConfig.nodeColor;
-        }
-    };
-
     const cardBackground = useCardBackground(railIndex, isSummary);
 
     // Background style for summary cards
@@ -316,8 +303,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     showNode={true}
                     extendLinePastContainer={extendRailPastContainer}
                     anchorOffsetX={activeTimelineConfig.memoirOffsetX}
-                    forceDotNode={isSummary}
-                    nodeColorOverride={isSummary ? getSummaryNodeColor() : undefined}
                     maxTimelineWidth={memoirMaxTimelineWidth}
                 />
             )}
