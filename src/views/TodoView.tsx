@@ -17,6 +17,7 @@
  * @updated 2026-06-13: 解构并传递 handleQuickActionUpdateTitle 给 TodoQuickActionsModal 从而支持快捷编辑栏中的标题内联编辑和自动保存。
  * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
  * @updated 2026-09-26: Added configurable backgrounds to loose-mode todo cards.
+ * @updated 2026-09-29: Uses the theme accent for loose-card dates and focus starts when a custom card background is active.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -93,6 +94,10 @@ interface TodoViewProps {
   autoLinkRules?: AutoLinkRule[];
 }
 
+export const getTodoCardBackgroundAccentStyle = (hasCardBackground: boolean): React.CSSProperties | undefined => (
+  hasCardBackground ? { color: 'var(--accent-color)' } : undefined
+);
+
 // Sub-component for Swipeable Item
 const SwipeableTodoItem: React.FC<{
   todo: TodoItem;
@@ -140,6 +145,7 @@ const SwipeableTodoItem: React.FC<{
   backgroundIndex = 0
 }) => {
   const cardBackground = useCardBackground(backgroundIndex, viewMode === 'loose');
+  const cardBackgroundAccentStyle = getTodoCardBackgroundAccentStyle(cardBackground.active);
   const [translateX, setTranslateX] = useState(0);
   const isQuickReminder = isQuickTodo(todo);
   const canQuickToggle = true;
@@ -586,16 +592,16 @@ const SwipeableTodoItem: React.FC<{
           <div className={`flex items-end ${viewMode === 'compact' ? 'items-center pl-2' : 'min-w-fit flex-col justify-between self-stretch pl-2'}`}>
             {viewMode === 'loose' && (
               hasLooseDateMarkers ? (
-                <div className="flex flex-col items-end gap-0.5 pt-0.5 text-[11px] font-medium text-stone-400">
+                <div className="flex flex-col items-end gap-0.5 pt-0.5 text-[11px] font-medium text-stone-400" style={cardBackgroundAccentStyle}>
                   {scheduledDateLabel && (
                     <span className="inline-flex items-center gap-1 leading-none">
-                      <CalendarDays size={11} className="text-stone-350" />
+                      <CalendarDays size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
                       <span>{scheduledDateLabel}</span>
                     </span>
                   )}
                   {deadlineDateLabel && (
                     <span className="inline-flex items-center gap-1 leading-none">
-                      <Flag size={11} className="text-stone-350" />
+                      <Flag size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
                       <span>{deadlineDateLabel}</span>
                     </span>
                   )}
@@ -610,7 +616,8 @@ const SwipeableTodoItem: React.FC<{
               <button
                 data-todo-primary-ignore="true"
                 onClick={(e) => { e.stopPropagation(); onStartFocus(todo); }}
-                className={`text-stone-300 hover:text-orange-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${viewMode === 'compact' ? '' : 'pt-2'}`}
+                className={`text-stone-300 hover:!text-orange-500 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 ${viewMode === 'compact' ? '' : 'pt-2'}`}
+                style={cardBackgroundAccentStyle}
               >
                 <PlayCircle size={viewMode === 'compact' ? 20 : 26} />
               </button>
