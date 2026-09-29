@@ -12,6 +12,7 @@
  * @updated 2026-09-28: Applies complete 01-96 numbered UIIcon directories from theme packages.
  * @updated 2026-09-28: Scopes asset-based UIIcon IDs for retained-resource package copies.
  * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
+ * @updated 2026-09-29: Preserves packaged navigation stretching and applies text-only navigation icons.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -202,6 +203,7 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
     offsetY: '0px',
     offsetX: '0px',
     scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
+    verticalStretch: typeof backgroundConfig.verticalStretch === 'number' ? backgroundConfig.verticalStretch : 1,
     opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
   });
   writeJson(CUSTOM_NAVIGATION_BACKGROUND_KEY, backgrounds);
@@ -213,6 +215,7 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
       offsetY: typeof backgroundConfig.offsetY === 'string' ? backgroundConfig.offsetY : '0px',
       offsetX: typeof backgroundConfig.offsetX === 'string' ? backgroundConfig.offsetX : '0px',
       scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
+      verticalStretch: typeof backgroundConfig.verticalStretch === 'number' ? backgroundConfig.verticalStretch : 1,
       opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
     }
   });
@@ -221,6 +224,18 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
 
 const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
   const navigation = getConfigObject(record, 'navigation');
+  if (navigation?.iconMode === 'text') {
+    writeJson(NAVIGATION_ICON_SELECTION_KEY, {
+      mode: 'text',
+      customMapping: {},
+      showLabelWithIcon: false
+    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(NAVIGATION_ICON_CHANGE_EVENT));
+    }
+    return;
+  }
+
   const icons = navigation?.icons;
   if (!icons || typeof icons !== 'object' || Array.isArray(icons)) return;
 
@@ -689,7 +704,7 @@ export const applyImportedThemePackage = async (
     const shouldApply = section === 'settings'
       ? hasSettingsConfiguration
       : section === 'navigation-icons'
-        ? navigationConfig?.icons !== undefined
+        ? navigationConfig?.icons !== undefined || navigationConfig?.iconMode === 'text'
         : section === 'stickers'
           ? record.manifest.config.stickers !== undefined || record.manifest.config.stickerSelector !== undefined
           : section === 'floatingButtonBackground'

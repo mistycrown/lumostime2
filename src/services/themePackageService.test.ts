@@ -12,6 +12,7 @@
  * @updated 2026-09-26: Covers custom achievement-bottle icon-pack assets.
  * @updated 2026-09-27: Rejects packages that define more than one card-background group.
  * @updated 2026-09-29: Covers scalable global floating-button background resources.
+ * @updated 2026-09-29: Covers schema-version-two text-only navigation mode.
  */
 
 import JSZip from 'jszip';
@@ -158,6 +159,19 @@ describe('parseThemePackage', () => {
       code: 'INVALID_CONFIGURATION',
       path: 'apply.background.resourceId'
     });
+  });
+
+  it('adapts a text-only navigation icon mode', async () => {
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'text-navigation', name: 'Text Navigation', version: '1.0.0' },
+      resources: {},
+      apply: { navigation: { mode: 'modern', iconMode: 'text' } }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest));
+    expect(result.manifest.config.navigation).toEqual({ mode: 'modern', iconMode: 'text' });
   });
 
   it('adapts a floating-button background resource and validates its scale', async () => {
