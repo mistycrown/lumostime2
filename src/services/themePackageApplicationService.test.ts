@@ -10,10 +10,11 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled } = vi.hoisted(() => ({
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, setFloatingButtonBackground } = vi.hoisted(() => ({
   registerIconPack: vi.fn(async () => undefined),
   hydrateNavigationIcons: vi.fn(async () => undefined),
-  setNavigationEnabled: vi.fn()
+  setNavigationEnabled: vi.fn(),
+  setFloatingButtonBackground: vi.fn()
 }));
 
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -62,6 +63,10 @@ vi.mock('./moodCalendarBackgroundService', () => ({
   }
 }));
 
+vi.mock('./floatingButtonBackgroundService', () => ({
+  floatingButtonBackgroundService: { setSettings: setFloatingButtonBackground }
+}));
+
 describe('applyImportedThemePackage', () => {
   afterEach(() => {
     vi.resetModules();
@@ -69,6 +74,7 @@ describe('applyImportedThemePackage', () => {
     registerIconPack.mockClear();
     hydrateNavigationIcons.mockClear();
     setNavigationEnabled.mockClear();
+    setFloatingButtonBackground.mockClear();
   });
 
   it('applies custom bottle frames when achievementBottle is a top-level config section', async () => {
@@ -328,5 +334,38 @@ describe('applyImportedThemePackage', () => {
     ]);
     expect(values.get('lumostime_card_background_current_v1')).toBe('theme:card-theme:card-background-cards');
     expect(values.get('lumostime_card_background_opacity_v1')).toBe('0.25');
+  });
+
+  it('applies a mapped floating-button background image and scale', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    const result = await applyImportedThemePackage({
+      id: 'button-theme',
+      name: 'Button Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'button-theme', name: 'Button Theme', version: '1.0.0' },
+        config: {
+          floatingButtonBackground: {
+            image: 'assets/floating-button-backgrounds/flower.webp',
+            scale: 135
+          }
+        }
+      },
+      imageAssets: { 'assets/floating-button-backgrounds/flower.webp': 'theme-flower.webp' },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(result.appliedSections).toContain('floatingButtonBackground');
+    expect(setFloatingButtonBackground).toHaveBeenCalledWith('theme-flower.webp', 135);
   });
 });

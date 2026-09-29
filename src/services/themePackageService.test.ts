@@ -11,6 +11,7 @@
  * @updated 2026-09-26: Covers explicit legacy-navigation theme package configuration.
  * @updated 2026-09-26: Covers custom achievement-bottle icon-pack assets.
  * @updated 2026-09-27: Rejects packages that define more than one card-background group.
+ * @updated 2026-09-29: Covers scalable global floating-button background resources.
  */
 
 import JSZip from 'jszip';
@@ -156,6 +157,73 @@ describe('parseThemePackage', () => {
     }))).rejects.toMatchObject({
       code: 'INVALID_CONFIGURATION',
       path: 'apply.background.resourceId'
+    });
+  });
+
+  it('adapts a floating-button background resource and validates its scale', async () => {
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'button-theme', name: 'Button Theme', version: '1.0.0' },
+      resources: {
+        floatingButtonBackgrounds: [{ id: 'flower', image: 'assets/floating-button-backgrounds/flower.webp' }]
+      },
+      apply: { floatingButtonBackground: { resourceId: 'flower', scale: 135 } }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/floating-button-backgrounds/flower.webp': 'flower'
+    }));
+
+    expect(result.manifest.config.floatingButtonBackground).toEqual({
+      id: 'flower',
+      image: 'assets/floating-button-backgrounds/flower.webp',
+      scale: 135
+    });
+
+    await expect(parseThemePackage(await createZip({
+      ...manifest,
+      apply: { floatingButtonBackground: { resourceId: 'flower', scale: 201 } }
+    }, { 'assets/floating-button-backgrounds/flower.webp': 'flower' }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'apply.floatingButtonBackground.scale'
+    });
+  });
+
+  it('rejects an undeclared floating-button background selection', async () => {
+    await expect(parseThemePackage(await createZip({
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'missing-button', name: 'Missing Button', version: '1.0.0' },
+      resources: { floatingButtonBackgrounds: [] },
+      apply: { floatingButtonBackground: { resourceId: 'missing' } }
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'apply.floatingButtonBackground.resourceId'
+    });
+  });
+
+  it('requires a floating-button resource ID and image asset path', async () => {
+    const base = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'invalid-button', name: 'Invalid Button', version: '1.0.0' }
+    };
+    await expect(parseThemePackage(await createZip({
+      ...base,
+      resources: { floatingButtonBackgrounds: [{ id: 'flower', image: 'assets/floating-button-backgrounds/flower.ttf' }] },
+      apply: { floatingButtonBackground: { resourceId: 'flower' } }
+    }, { 'assets/floating-button-backgrounds/flower.ttf': 'font' }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'resources.floatingButtonBackgrounds[0].image'
+    });
+    await expect(parseThemePackage(await createZip({
+      ...base,
+      resources: { floatingButtonBackgrounds: [] },
+      apply: { floatingButtonBackground: { scale: 100 } }
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION',
+      path: 'apply.floatingButtonBackground.resourceId'
     });
   });
 

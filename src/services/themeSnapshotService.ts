@@ -9,6 +9,7 @@
  * @updated 2026-09-28: Preserves independently imported resource catalogs when applying a saved theme snapshot.
  * @updated 2026-09-28: Falls back from missing selected theme resources with user-facing warnings.
  * @updated 2026-09-28: Keeps an independently selected Memoir background active across ordinary theme switches.
+ * @updated 2026-09-29: Captures and validates the global floating-button image background.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS } from '../constants/storageKeys';
@@ -27,6 +28,7 @@ import { imageService } from './imageService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
 import { cardBackgroundService } from './cardBackgroundService';
+import { floatingButtonBackgroundService } from './floatingButtonBackgroundService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { UI_ICON_CUSTOM_ASSETS_KEY, uiIconService } from './uiIconService';
 import { extractCustomTimePalId } from '../constants/timePalConfig';
@@ -156,6 +158,13 @@ const validateActiveThemeResources = async (
     await validate('卡片背景', cardGroup.imageFilenames, () => cardBackgroundService.setCurrentGroup(null));
   }
 
+  const floatingButtonBackground = floatingButtonBackgroundService.getSettings();
+  if (floatingButtonBackground.imageFilename) {
+    await validate('悬浮按钮背景', [floatingButtonBackground.imageFilename], () => {
+      void floatingButtonBackgroundService.clearImage();
+    });
+  }
+
   const timePalId = extractCustomTimePalId(localStorage.getItem(TIMEPAL_KEYS.TYPE));
   if (timePalId) {
     const item = getStoredArray<{ id?: string; stageFilenames?: string[] }>(TIMEPAL_KEYS.CUSTOM_ITEMS)
@@ -230,6 +239,8 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
       if (Array.isArray(item?.stageFilenames)) item.stageFilenames.forEach(add);
     });
   };
+
+  add(values[THEME_KEYS.FLOATING_BUTTON_BACKGROUND]);
 
   addImageList('lumos_custom_backgrounds');
   addImageList('navigation_decoration_custom_list');
@@ -337,6 +348,7 @@ export const applyDefaultThemeSupplement = async (): Promise<void> => {
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, 'default');
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(DEFAULT_TIMELINE_STYLE_CONFIGS));
+  await floatingButtonBackgroundService.clearImage();
   fontService.setFont('default');
   await navigationBackgroundService.hydrateCustomBackgrounds();
   await navigationIconService.hydrateCustomIcons();

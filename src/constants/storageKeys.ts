@@ -57,6 +57,9 @@ export const THEME_KEYS = {
     ASSOCIATION_SELECTOR_COLUMNS: 'lumostime_association_selector_columns',
     ACHIEVEMENT_BOTTLE_STYLE: 'lumostime_achievement_bottle_style',
     ACHIEVEMENT_BOTTLE_ICON_PACK: 'lumostime_achievement_bottle_icon_pack',
+    /** 悬浮按钮圆形背景图片及缩放 */
+    FLOATING_BUTTON_BACKGROUND: 'lumostime_floating_button_background_v1',
+    FLOATING_BUTTON_BACKGROUND_SCALE: 'lumostime_floating_button_background_scale_v1',
     /** 自定义色组 */
     CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     CUSTOM_CHART_PALETTE_SEQUENCES: 'lumostime_custom_chart_palette_sequences',

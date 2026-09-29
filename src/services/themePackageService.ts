@@ -11,6 +11,7 @@
  * @updated 2026-09-26: Validates custom achievement-bottle PNG/WebP frame lists.
  * @updated 2026-09-27: Limits each version-two theme package to one card-background group.
  * @updated 2026-09-28: Validates complete numbered UIIcon directories in theme packages.
+ * @updated 2026-09-29: Validates image-backed global floating-button backgrounds in schema-v2 packages.
  */
 
 import JSZip from 'jszip';
@@ -41,6 +42,7 @@ const ALLOWED_ASSET_EXTENSIONS = new Set([
   'ttf',
   'otf'
 ]);
+const IMAGE_ASSET_EXTENSIONS = new Set(['bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp']);
 
 const ASSET_MIME_TYPES: Record<string, string> = {
   bmp: 'image/bmp',
@@ -185,6 +187,7 @@ const adaptResourcesAndApply = (
   }
   requireSelection('memoirCalendar', resources.memoirCalendarBackgrounds, 'backgroundId', 'apply.memoirCalendar.backgroundId');
   requireSelection('cardBackground', resources.cardBackgroundGroups, 'groupId', 'apply.cardBackground.groupId');
+  requireSelection('floatingButtonBackground', resources.floatingButtonBackgrounds, 'resourceId', 'apply.floatingButtonBackground.resourceId');
 
   const background = selected('background', resources.backgrounds);
   if (background || Object.prototype.hasOwnProperty.call(apply, 'background')) {
@@ -259,6 +262,13 @@ const adaptResourcesAndApply = (
   const cardBackgroundGroup = findById(resources.cardBackgroundGroups, cardBackgroundApply.groupId);
   if (cardBackgroundGroup || Object.keys(cardBackgroundApply).length) {
     config.cardBackground = { ...(cardBackgroundGroup || {}), ...cardBackgroundApply };
+  }
+
+  const floatingButtonBackgroundApply = applyRecord('floatingButtonBackground');
+  const floatingButtonBackground = findById(resources.floatingButtonBackgrounds, floatingButtonBackgroundApply.resourceId);
+  if (floatingButtonBackground || Object.keys(floatingButtonBackgroundApply).length) {
+    config.floatingButtonBackground = { ...(floatingButtonBackground || {}), ...floatingButtonBackgroundApply };
+    delete (config.floatingButtonBackground as Record<string, unknown>).resourceId;
   }
   return config;
 };
@@ -424,7 +434,8 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
     'fonts',
     'achievementBottleIconPacks',
     'memoirCalendarBackgrounds',
-    'cardBackgroundGroups'
+    'cardBackgroundGroups',
+    'floatingButtonBackgrounds'
   ];
   for (const key of collections) {
     const value = resources[key];
@@ -474,6 +485,15 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
           );
         }
       }
+      if (key === 'floatingButtonBackgrounds' && (
+        typeof item.image !== 'string' || !isAssetPath(item.image) || !IMAGE_ASSET_EXTENSIONS.has(getExtension(item.image))
+      )) {
+        throw new ThemePackageValidationError(
+          'INVALID_CONFIGURATION',
+          `${path}.image 必须是 assets/ 下的图片路径`,
+          `${path}.image`
+        );
+      }
     });
   }
 
@@ -497,6 +517,14 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
   validateSelection('font', 'resourceId', 'fonts');
   validateSelection('memoirCalendar', 'backgroundId', 'memoirCalendarBackgrounds');
   validateSelection('cardBackground', 'groupId', 'cardBackgroundGroups');
+  validateSelection('floatingButtonBackground', 'resourceId', 'floatingButtonBackgrounds');
+  if (isRecord(apply.floatingButtonBackground) && apply.floatingButtonBackground.resourceId === undefined) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      'apply.floatingButtonBackground 必须提供 resourceId',
+      'apply.floatingButtonBackground.resourceId'
+    );
+  }
   const cardBackgroundApply = apply.cardBackground;
   if (isRecord(cardBackgroundApply) && cardBackgroundApply.opacity !== undefined
     && (typeof cardBackgroundApply.opacity !== 'number' || cardBackgroundApply.opacity < 0 || cardBackgroundApply.opacity > 1)) {
@@ -504,6 +532,16 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
       'INVALID_CONFIGURATION',
       'apply.cardBackground.opacity 必须是 0 到 1 之间的数字',
       'apply.cardBackground.opacity'
+    );
+  }
+
+  const floatingButtonApply = apply.floatingButtonBackground;
+  if (isRecord(floatingButtonApply) && floatingButtonApply.scale !== undefined
+    && (typeof floatingButtonApply.scale !== 'number' || floatingButtonApply.scale < 50 || floatingButtonApply.scale > 200)) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      'apply.floatingButtonBackground.scale 必须是 50 到 200 之间的数字',
+      'apply.floatingButtonBackground.scale'
     );
   }
 

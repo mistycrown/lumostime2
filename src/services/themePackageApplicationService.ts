@@ -11,6 +11,7 @@
  * @updated 2026-09-26: Applies nested navigation icons, live background opacity, and refreshes packaged stickers.
  * @updated 2026-09-28: Applies complete 01-96 numbered UIIcon directories from theme packages.
  * @updated 2026-09-28: Scopes asset-based UIIcon IDs for retained-resource package copies.
+ * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -44,6 +45,7 @@ import {
   CARD_BACKGROUND_GROUPS_KEY,
   CARD_BACKGROUND_OPACITY_EVENT
 } from './cardBackgroundService';
+import { floatingButtonBackgroundService } from './floatingButtonBackgroundService';
 
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
@@ -467,6 +469,21 @@ const applyCardBackground = (record: ImportedThemePackageRecord): void => {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
 };
 
+const applyFloatingButtonBackground = (record: ImportedThemePackageRecord, warnings: string[]): void => {
+  const config = getConfigObject(record, 'floatingButtonBackground');
+  if (!config) return;
+
+  const imageFilename = getAssetFilename(record, config.image);
+  if (!imageFilename) {
+    warnings.push('主题包悬浮按钮背景资源不存在');
+    return;
+  }
+  floatingButtonBackgroundService.setSettings(
+    imageFilename,
+    typeof config.scale === 'number' ? config.scale : 100
+  );
+};
+
 const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
   const memoir = getConfigObject(record, 'memoirCalendar');
   const background = memoir?.background;
@@ -630,6 +647,7 @@ export const applyImportedThemePackage = async (
     ['timePal', async () => applyTimePal(record, warnings)],
     ['stickers', async () => applyStickers(record)],
     ['cardBackground', async () => applyCardBackground(record)],
+    ['floatingButtonBackground', async () => applyFloatingButtonBackground(record, warnings)],
     ['memoirCalendar', () => applyMemoirCalendar(record, warnings)],
     ['settings', async () => applySettings(record, warnings)]
   ];
