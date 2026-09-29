@@ -5,11 +5,13 @@
  * @pos Hook (UI Customization)
  * @description Keeps custom backgrounds event-driven, waits for the next image to preload before swapping, and downgrades heavy blur on lower-end mobile devices.
  * @updated 2026-04-20: Added shared background display state for Scene, Record, and Todo views.
+ * @updated 2026-09-29: Temporarily hides configured backgrounds while effective dark mode is active.
  */
 
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { backgroundService, type BackgroundSnapshot } from '../services/backgroundService';
+import { useCustomAppearanceEnabled } from './useCustomAppearanceEnabled';
 
 interface BackgroundDisplayState {
   backgroundUrl: string;
@@ -35,6 +37,7 @@ const shouldUseReducedEffects = (): boolean => {
 };
 
 export const useBackgroundDisplay = (): BackgroundDisplayState => {
+  const customAppearanceEnabled = useCustomAppearanceEnabled();
   const [snapshot, setSnapshot] = useState<BackgroundSnapshot>(() => backgroundService.getBackgroundSnapshot());
   const [backgroundUrl, setBackgroundUrl] = useState<string>(() => snapshot.background?.url || '');
   const [useReducedEffects, setUseReducedEffects] = useState<boolean>(() => shouldUseReducedEffects());
@@ -79,16 +82,18 @@ export const useBackgroundDisplay = (): BackgroundDisplayState => {
     };
   }, []);
 
-  const backgroundOpacity = snapshot.opacity;
+  const backgroundOpacity = customAppearanceEnabled ? snapshot.opacity : 0;
   const panelOverlayOpacity = useReducedEffects
     ? Math.min(0.98, 1 - backgroundOpacity + 0.08)
     : 1 - backgroundOpacity;
 
+  const visibleBackgroundUrl = customAppearanceEnabled ? backgroundUrl : '';
+
   return {
-    backgroundUrl,
+    backgroundUrl: visibleBackgroundUrl,
     backgroundOpacity,
     panelOverlayOpacity,
-    hasBackground: backgroundUrl !== '',
+    hasBackground: visibleBackgroundUrl !== '',
     useReducedEffects
   };
 };

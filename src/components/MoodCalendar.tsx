@@ -6,6 +6,7 @@
  * @updated 2026-09-28: Centers the clipped Memoir calendar background image.
  * @updated 2026-09-28: Shares the active calendar background with Memoir quick actions.
  * @updated 2026-09-29: Rehydrates persisted calendar images from the display path on mount.
+ * @updated 2026-09-29: Hides custom calendar backgrounds while effective dark mode is active.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -17,6 +18,7 @@ import {
     MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
     type MoodCalendarBackgroundSettings
 } from '../services/moodCalendarBackgroundService';
+import { useCustomAppearanceEnabled } from '../hooks/useCustomAppearanceEnabled';
 
 interface MoodCalendarProps {
     year: number;
@@ -48,6 +50,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         moodCalendarBackgroundService.getBackgroundById(moodCalendarBackgroundService.getCurrentBackground()) || {}
     ));
     const { uiIconTheme } = useSettings();
+    const customAppearanceEnabled = useCustomAppearanceEnabled();
 
     useEffect(() => {
         const updateBackground = (event?: Event) => {
@@ -122,7 +125,9 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         return days;
     }, [year, month]);
 
-    const selectedBackground = moodCalendarBackgroundService.getBackgroundById(backgroundId);
+    const selectedBackground = customAppearanceEnabled
+        ? moodCalendarBackgroundService.getBackgroundById(backgroundId)
+        : undefined;
     const selectedBackgroundUrl = selectedBackground?.url;
     const hasCalendarBackground = Boolean(selectedBackgroundUrl);
 

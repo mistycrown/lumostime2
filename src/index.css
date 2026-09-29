@@ -39,6 +39,11 @@ html[data-theme-mode='dark'] button.navigation-setting-switch .navigation-settin
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.48) !important;
 }
 
+html[data-custom-appearance-enabled='false'] #tags-content > .bg-layer,
+html[data-custom-appearance-enabled='false'] #scopes-content > .bg-layer {
+  display: none !important;
+}
+
 @layer components {
   .association-option-grid-wrap {
     container-type: inline-size;

@@ -14,6 +14,7 @@
  * @updated 2026-09-25: Connects the Memoir title bar transparency to the navigation setting instead of forcing it on.
  * @updated 2026-09-28: Mirrors the selected Memoir calendar texture on its quick navigation actions.
  * @updated 2026-09-28: Reduces the Memoir quick-action white overlay so its texture remains visible.
+ * @updated 2026-09-29: Disables custom Memoir and transparent-header visuals while effective dark mode is active.
  */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { DailyReview, Log, WeeklyReview, MonthlyReview } from '../types';
@@ -31,6 +32,7 @@ import { Comment as GlobalComment, Scope } from '../types';
 import { getDisplayIcon } from '../utils/iconUtils';
 import { parseNarrative } from '../utils/narrativeUtils';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { useCustomAppearanceEnabled } from '../hooks/useCustomAppearanceEnabled';
 import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
 
 
@@ -131,6 +133,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
     onOpenMonthlyReview,
     collapseThreshold = 9999
 }) => {
+    const customAppearanceEnabled = useCustomAppearanceEnabled();
     const { categories } = useCategoryScope();
     const { setLogs, collections, collectionEntries } = useData();
     const { backgroundUrl, hasBackground, panelOverlayOpacity, useReducedEffects } = useBackgroundDisplay();
@@ -718,7 +721,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
         onOpenWeeklyReview(start, end);
     };
 
-    const memoirQuickActionStyle = memoirCalendarBackground
+    const memoirQuickActionStyle = customAppearanceEnabled && memoirCalendarBackground
         ? {
             backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.25)), url(${memoirCalendarBackground.url})`,
             backgroundPosition: 'center',
@@ -726,7 +729,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             backgroundSize: '260%'
         }
         : undefined;
-    const memoirQuickActionClassName = memoirCalendarBackground
+    const memoirQuickActionClassName = customAppearanceEnabled && memoirCalendarBackground
         ? 'px-2.5 py-1 text-[10px] font-medium text-stone-600 hover:text-stone-900 hover:brightness-95 rounded-md transition-all'
         : 'px-2.5 py-1 text-[10px] font-medium text-stone-500 hover:text-stone-800 hover:bg-white/80 rounded-md transition-all';
 
@@ -756,7 +759,7 @@ export const JournalView: React.FC<JournalViewProps> = ({
             />
 
             {/* Sticky Header - 标题栏随滚动缩小 */}
-            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${isTransparentNavigation
+            <header className={`sticky top-0 z-40 transition-all duration-300 pt-[var(--app-safe-area-top)] ${customAppearanceEnabled && isTransparentNavigation
                 ? 'border-transparent bg-transparent h-[calc(3rem+var(--app-safe-area-top))]'
                 : isScrolled
                     ? `bg-[#faf9f6]/90 ${useReducedEffects ? '' : 'backdrop-blur-md'} shadow-sm h-[calc(3rem+var(--app-safe-area-top))]`

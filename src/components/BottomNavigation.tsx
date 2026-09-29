@@ -25,6 +25,7 @@
  * @updated 2026-09-26: Keeps the no-background navigation surface solid white regardless of transparency settings.
  * @updated 2026-09-26: Keeps title-bar transparency scoped to the top header, independent of legacy navigation surfaces.
  * @updated 2026-09-28: Applies independently persisted vertical stretching to new navigation background images.
+ * @updated 2026-09-29: Falls back to the default navigation surface in effective dark mode.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -38,6 +39,7 @@ import {
     NAVIGATION_BACKGROUND_PREVIEW_EVENT
 } from '../services/navigationBackgroundService';
 import { getNavigationIconFallbackUrl, NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from '../services/navigationIconService';
+import { useCustomAppearanceEnabled } from '../hooks/useCustomAppearanceEnabled';
 
 interface BottomNavigationProps {
     currentView: AppView;
@@ -64,6 +66,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     onViewChange,
     isVisible
 }) => {
+    const customAppearanceEnabled = useCustomAppearanceEnabled();
     const { defaultIndexView, navigationModuleVisibility } = useSettings();
     const visibleNavItems = NAV_ITEMS.filter((item) => navigationModuleVisibility[item.key as typeof NAV_ITEM_KEYS[number]]);
     const [currentDecoration, setCurrentDecoration] = useState<string>('default');
@@ -208,8 +211,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     if (!isVisible) return null;
 
-    const isNoBackgroundNavigation = isNewNavigation && currentBackground === 'new-none';
-    const useNewNavigationStyle = isNewNavigation && currentBackground !== 'new-none';
+    const isNoBackgroundNavigation = customAppearanceEnabled && isNewNavigation && currentBackground === 'new-none';
+    const useNewNavigationStyle = customAppearanceEnabled && isNewNavigation && currentBackground !== 'new-none';
     const hasNavigationBackground = useNewNavigationStyle && Boolean(backgroundUrl);
     const bgColor = isNoBackgroundNavigation
         ? 'bg-white'
@@ -221,7 +224,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
     // Calculate dynamic styles
     const navStyle: React.CSSProperties = {};
-    if (!isNewNavigation && currentDecoration !== 'default' && decorationUrl) {
+    if (customAppearanceEnabled && !isNewNavigation && currentDecoration !== 'default' && decorationUrl) {
         // 使用双引号包裹 url 防止 data: URL 包含导致 CSS 解析失败的特殊字符
         navStyle.backgroundImage = `url("${decorationUrl}")`;
         navStyle.backgroundRepeat = 'repeat-x';
@@ -234,7 +237,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         <>
             <div className="fixed bottom-0 left-0 w-full z-30">
                 {/* 装饰层 - 仅在非默认时显示 */}
-                {!isNewNavigation && currentDecoration !== 'default' && decorationUrl && (
+                {customAppearanceEnabled && !isNewNavigation && currentDecoration !== 'default' && decorationUrl && (
                     <div
                         className="absolute bottom-0 left-0 w-full h-40 md:h-48 pointer-events-none z-10"
                         style={navStyle}

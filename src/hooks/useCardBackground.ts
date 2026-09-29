@@ -3,6 +3,7 @@
  * @input Card order index and card-background settings
  * @output Resolved background image style for a card
  * @pos Hook (UI Customization)
+ * @updated 2026-09-29: Falls back to plain cards while effective dark mode is active.
  */
 import { useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
@@ -15,6 +16,7 @@ import {
 } from '../services/cardBackgroundService';
 import { imageService } from '../services/imageService';
 import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
+import { useCustomAppearanceEnabled } from './useCustomAppearanceEnabled';
 
 interface CardBackgroundState {
   style: CSSProperties;
@@ -24,6 +26,7 @@ interface CardBackgroundState {
 }
 
 export const useCardBackground = (index: number, enabled = true): CardBackgroundState => {
+  const customAppearanceEnabled = useCustomAppearanceEnabled();
   const [background, setBackground] = useState<CardBackgroundState>({ style: {}, active: false });
 
   useEffect(() => {
@@ -31,7 +34,7 @@ export const useCardBackground = (index: number, enabled = true): CardBackground
     let currentUrl = '';
 
     const load = async () => {
-      if (!enabled) {
+      if (!enabled || !customAppearanceEnabled) {
         if (currentUrl.startsWith('blob:')) URL.revokeObjectURL(currentUrl);
         currentUrl = '';
         setBackground({ style: {}, active: false });
@@ -79,7 +82,7 @@ export const useCardBackground = (index: number, enabled = true): CardBackground
       window.removeEventListener(APPEARANCE_RESTORED_EVENT, load);
       if (currentUrl.startsWith('blob:')) URL.revokeObjectURL(currentUrl);
     };
-  }, [index, enabled]);
+  }, [index, enabled, customAppearanceEnabled]);
 
   return background;
 };
