@@ -13,6 +13,7 @@
  * @updated 2026-09-27: Rejects packages that define more than one card-background group.
  * @updated 2026-09-29: Covers scalable global floating-button background resources.
  * @updated 2026-09-29: Covers schema-version-two text-only navigation mode.
+ * @updated 2026-09-29: Covers explicit default floating-button backgrounds.
  */
 
 import JSZip from 'jszip';
@@ -202,6 +203,18 @@ describe('parseThemePackage', () => {
       code: 'INVALID_CONFIGURATION',
       path: 'apply.floatingButtonBackground.scale'
     });
+  });
+
+  it('accepts an explicit default floating-button background', async () => {
+    const result = await parseThemePackage(await createZip({
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'default-button', name: 'Default Button', version: '1.0.0' },
+      resources: {},
+      apply: { floatingButtonBackground: { none: true } }
+    }));
+
+    expect(result.manifest.config.floatingButtonBackground).toEqual({ none: true });
   });
 
   it('rejects an undeclared floating-button background selection', async () => {

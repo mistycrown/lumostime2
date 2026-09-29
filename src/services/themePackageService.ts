@@ -13,6 +13,7 @@
  * @updated 2026-09-28: Validates complete numbered UIIcon directories in theme packages.
  * @updated 2026-09-29: Adapts text-only navigation icon mode from schema-version-two packages.
  * @updated 2026-09-29: Validates image-backed global floating-button backgrounds in schema-v2 packages.
+ * @updated 2026-09-29: Supports explicitly clearing the current floating-button background.
  */
 
 import JSZip from 'jszip';
@@ -529,7 +530,9 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
   validateSelection('memoirCalendar', 'backgroundId', 'memoirCalendarBackgrounds');
   validateSelection('cardBackground', 'groupId', 'cardBackgroundGroups');
   validateSelection('floatingButtonBackground', 'resourceId', 'floatingButtonBackgrounds');
-  if (isRecord(apply.floatingButtonBackground) && apply.floatingButtonBackground.resourceId === undefined) {
+  if (isRecord(apply.floatingButtonBackground)
+    && apply.floatingButtonBackground.resourceId === undefined
+    && apply.floatingButtonBackground.none !== true) {
     throw new ThemePackageValidationError(
       'INVALID_CONFIGURATION',
       'apply.floatingButtonBackground 必须提供 resourceId',
@@ -547,6 +550,13 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
   }
 
   const floatingButtonApply = apply.floatingButtonBackground;
+  if (isRecord(floatingButtonApply) && floatingButtonApply.none !== undefined && floatingButtonApply.none !== true) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      'apply.floatingButtonBackground.none 只能为 true',
+      'apply.floatingButtonBackground.none'
+    );
+  }
   if (isRecord(floatingButtonApply) && floatingButtonApply.scale !== undefined
     && (typeof floatingButtonApply.scale !== 'number' || floatingButtonApply.scale < 50 || floatingButtonApply.scale > 200)) {
     throw new ThemePackageValidationError(

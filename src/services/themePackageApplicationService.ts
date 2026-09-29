@@ -13,6 +13,7 @@
  * @updated 2026-09-28: Scopes asset-based UIIcon IDs for retained-resource package copies.
  * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
  * @updated 2026-09-29: Preserves packaged navigation stretching and applies text-only navigation icons.
+ * @updated 2026-09-29: Clears floating-button backgrounds when a package explicitly requests the default state.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -486,6 +487,10 @@ const applyCardBackground = (record: ImportedThemePackageRecord): void => {
 
 const applyFloatingButtonBackground = (record: ImportedThemePackageRecord, warnings: string[]): void => {
   const config = getConfigObject(record, 'floatingButtonBackground');
+  if (config?.none === true) {
+    floatingButtonBackgroundService.selectScheme(null);
+    return;
+  }
   const resources = Array.isArray(record.manifest.resources?.floatingButtonBackgrounds)
     ? record.manifest.resources?.floatingButtonBackgrounds
     : [];
