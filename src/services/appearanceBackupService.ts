@@ -81,7 +81,9 @@ const APPEARANCE_STORAGE_KEYS = [
   CARD_BACKGROUND_CURRENT_KEY,
   CARD_BACKGROUND_OPACITY_KEY,
   THEME_KEYS.FLOATING_BUTTON_BACKGROUND,
-  THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCALE
+  THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCALE,
+  THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCHEMES,
+  THEME_KEYS.FLOATING_BUTTON_BACKGROUND_CURRENT
 ] as const;
 
 type AppearanceStorage = Record<string, string | null>;
@@ -130,6 +132,10 @@ const addImageReference = (set: Set<string>, value: unknown, includeThumbnail = 
 const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string[] => {
   const referenced = new Set<string>();
   addImageReference(referenced, snapshot[THEME_KEYS.FLOATING_BUTTON_BACKGROUND]);
+  const floatingButtonSchemes = parseJsonValue(snapshot, THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCHEMES);
+  if (Array.isArray(floatingButtonSchemes)) {
+    floatingButtonSchemes.forEach((scheme) => addImageReference(referenced, scheme?.imageFilename));
+  }
   const cardBackgroundGroups = parseJsonValue(snapshot, CARD_BACKGROUND_GROUPS_KEY);
   if (Array.isArray(cardBackgroundGroups)) {
     cardBackgroundGroups.forEach((group) => {

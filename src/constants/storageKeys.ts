@@ -60,6 +60,8 @@ export const THEME_KEYS = {
     /** 悬浮按钮圆形背景图片及缩放 */
     FLOATING_BUTTON_BACKGROUND: 'lumostime_floating_button_background_v1',
     FLOATING_BUTTON_BACKGROUND_SCALE: 'lumostime_floating_button_background_scale_v1',
+    FLOATING_BUTTON_BACKGROUND_SCHEMES: 'lumostime_floating_button_background_schemes_v1',
+    FLOATING_BUTTON_BACKGROUND_CURRENT: 'lumostime_floating_button_background_current_v1',
     /** 自定义色组 */
     CUSTOM_COLOR_GROUP: 'lumostime_custom_color_group',
     CUSTOM_CHART_PALETTE_SEQUENCES: 'lumostime_custom_chart_palette_sequences',

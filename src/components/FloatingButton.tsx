@@ -1,7 +1,7 @@
 /**
  * @file FloatingButton.tsx
  * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
- * @updated 2026-09-29: Renders the user-configured scalable image beneath every floating-button icon.
+ * @updated 2026-09-29: Renders selected background schemes without the native button chrome.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -43,11 +43,13 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
 }) => {
     const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
     const [backgroundScale, setBackgroundScale] = useState(() => floatingButtonBackgroundService.getSettings().scale);
+    const [hasCustomBackground, setHasCustomBackground] = useState(() => Boolean(floatingButtonBackgroundService.getSettings().imageFilename));
     useEffect(() => {
         let isCurrent = true;
         const refresh = () => {
             const settings = floatingButtonBackgroundService.getSettings();
             setBackgroundScale(settings.scale);
+            setHasCustomBackground(Boolean(settings.imageFilename));
             if (!settings.imageFilename) {
                 setBackgroundImageUrl('');
                 return;
@@ -90,9 +92,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     const positionClass = position === 'custom' ? '' : 'fixed';
 
     // 如果禁用主题样式，使用传统的 Tailwind 类
-    const styleClasses = disableThemeStyle 
-        ? `${variantClasses[variant]} border shadow-2xl`
-        : 'floating-button'; // 使用 CSS 变量类
+    const styleClasses = hasCustomBackground
+        ? ''
+        : disableThemeStyle
+            ? `${variantClasses[variant]} border shadow-2xl`
+            : 'floating-button'; // 使用 CSS 变量类
 
     return (
         <button
@@ -110,7 +114,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 z-40
                 ${className}
             `.trim().replace(/\s+/g, ' ')}
-            style={style}
+            style={hasCustomBackground ? { ...style, backgroundColor: 'transparent', border: 'none', boxShadow: 'none' } : style}
             aria-label={ariaLabel}
             title={title}
         >

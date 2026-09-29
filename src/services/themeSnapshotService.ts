@@ -161,7 +161,7 @@ const validateActiveThemeResources = async (
   const floatingButtonBackground = floatingButtonBackgroundService.getSettings();
   if (floatingButtonBackground.imageFilename) {
     await validate('悬浮按钮背景', [floatingButtonBackground.imageFilename], () => {
-      void floatingButtonBackgroundService.clearImage();
+      floatingButtonBackgroundService.selectScheme(null);
     });
   }
 
@@ -241,6 +241,7 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
   };
 
   add(values[THEME_KEYS.FLOATING_BUTTON_BACKGROUND]);
+  addImageList(THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCHEMES);
 
   addImageList('lumos_custom_backgrounds');
   addImageList('navigation_decoration_custom_list');
@@ -348,7 +349,7 @@ export const applyDefaultThemeSupplement = async (): Promise<void> => {
   localStorage.setItem(THEME_KEYS.ACHIEVEMENT_BOTTLE_ICON_PACK, DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK);
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_THEME, 'default');
   localStorage.setItem(THEME_KEYS.TIMELINE_STYLE_CONFIGS, JSON.stringify(DEFAULT_TIMELINE_STYLE_CONFIGS));
-  await floatingButtonBackgroundService.clearImage();
+  floatingButtonBackgroundService.selectScheme(null);
   fontService.setFont('default');
   await navigationBackgroundService.hydrateCustomBackgrounds();
   await navigationIconService.hydrateCustomIcons();
