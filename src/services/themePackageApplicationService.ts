@@ -471,17 +471,47 @@ const applyCardBackground = (record: ImportedThemePackageRecord): void => {
 
 const applyFloatingButtonBackground = (record: ImportedThemePackageRecord, warnings: string[]): void => {
   const config = getConfigObject(record, 'floatingButtonBackground');
-  if (!config) return;
-
-  const imageFilename = getAssetFilename(record, config.image);
-  if (!imageFilename) {
+  const resources = Array.isArray(record.manifest.resources?.floatingButtonBackgrounds)
+    ? record.manifest.resources?.floatingButtonBackgrounds
+    : [];
+  const schemes = resources.flatMap((resource) => {
+    if (!resource || typeof resource !== 'object' || Array.isArray(resource)) return [];
+    const item = resource as Record<string, unknown>;
+    const resourceId = typeof item.id === 'string' ? item.id : '';
+    const imageFilename = getAssetFilename(record, item.image);
+    if (!resourceId || !imageFilename) return [];
+    return [{
+      id: `theme:${record.id}:floating-button-${resourceId}`,
+      imageFilename,
+      scale: config?.id === resourceId && typeof config.scale === 'number' ? config.scale : 100,
+      source: 'package' as const
+    }];
+  });
+  if (resources.length > 0 && schemes.length === 0) {
     warnings.push('主题包悬浮按钮背景资源不存在');
     return;
   }
-  floatingButtonBackgroundService.setSettings(
-    imageFilename,
-    typeof config.scale === 'number' ? config.scale : 100
-  );
+  if (resources.length === 0 && config?.image) {
+    const imageFilename = getAssetFilename(record, config.image);
+    if (!imageFilename) {
+      warnings.push('主题包悬浮按钮背景资源不存在');
+      return;
+    }
+    const legacyId = `theme:${record.id}:floating-button-legacy`;
+    floatingButtonBackgroundService.replacePackageSchemes(record.id, [{
+      id: legacyId,
+      imageFilename,
+      scale: typeof config.scale === 'number' ? config.scale : 100,
+      source: 'package'
+    }], legacyId);
+    return;
+  }
+  if (schemes.length > 0) {
+    const selectedId = config && typeof config.id === 'string'
+      ? `theme:${record.id}:floating-button-${config.id}`
+      : undefined;
+    floatingButtonBackgroundService.replacePackageSchemes(record.id, schemes, selectedId);
+  }
 };
 
 const applyMemoirCalendar = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
@@ -662,6 +692,8 @@ export const applyImportedThemePackage = async (
         ? navigationConfig?.icons !== undefined
         : section === 'stickers'
           ? record.manifest.config.stickers !== undefined || record.manifest.config.stickerSelector !== undefined
+          : section === 'floatingButtonBackground'
+            ? record.manifest.config.floatingButtonBackground !== undefined || Array.isArray(record.manifest.resources?.floatingButtonBackgrounds)
           : record.manifest.config[section] !== undefined;
     if (!shouldApply) continue;
     await task();

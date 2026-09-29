@@ -57,7 +57,7 @@ assets/
 
 ## 悬浮按钮背景
 
-全局悬浮按钮背景资源定义在 `resources.floatingButtonBackgrounds`，并由 `apply.floatingButtonBackground.resourceId` 选择。图片放在 `assets/floating-button-backgrounds/`；`scale` 为图片在圆形按钮内的大小百分比，范围是 50 到 200，默认 100。
+全局悬浮按钮背景资源定义在 `resources.floatingButtonBackgrounds`，可填写多项，导入后会全部注册为可选方案；`apply.floatingButtonBackground.resourceId` 选择初始方案。图片放在 `assets/floating-button-backgrounds/`；`scale` 为图片在圆形按钮内的大小百分比，范围是 50 到 200，默认 100。
 
 ```json
 {

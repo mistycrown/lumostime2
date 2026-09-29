@@ -10,11 +10,11 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, setFloatingButtonBackground } = vi.hoisted(() => ({
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, replaceFloatingButtonSchemes } = vi.hoisted(() => ({
   registerIconPack: vi.fn(async () => undefined),
   hydrateNavigationIcons: vi.fn(async () => undefined),
   setNavigationEnabled: vi.fn(),
-  setFloatingButtonBackground: vi.fn()
+  replaceFloatingButtonSchemes: vi.fn()
 }));
 
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -64,7 +64,7 @@ vi.mock('./moodCalendarBackgroundService', () => ({
 }));
 
 vi.mock('./floatingButtonBackgroundService', () => ({
-  floatingButtonBackgroundService: { setSettings: setFloatingButtonBackground }
+  floatingButtonBackgroundService: { replacePackageSchemes: replaceFloatingButtonSchemes }
 }));
 
 describe('applyImportedThemePackage', () => {
@@ -74,7 +74,7 @@ describe('applyImportedThemePackage', () => {
     registerIconPack.mockClear();
     hydrateNavigationIcons.mockClear();
     setNavigationEnabled.mockClear();
-    setFloatingButtonBackground.mockClear();
+    replaceFloatingButtonSchemes.mockClear();
   });
 
   it('applies custom bottle frames when achievementBottle is a top-level config section', async () => {
@@ -336,7 +336,7 @@ describe('applyImportedThemePackage', () => {
     expect(values.get('lumostime_card_background_opacity_v1')).toBe('0.25');
   });
 
-  it('applies a mapped floating-button background image and scale', async () => {
+  it('registers all packaged floating-button backgrounds and selects the configured scheme', async () => {
     const values = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => values.get(key) ?? null,
@@ -353,19 +353,78 @@ describe('applyImportedThemePackage', () => {
         format: 'lumostime-theme-package',
         schemaVersion: 2,
         package: { id: 'button-theme', name: 'Button Theme', version: '1.0.0' },
+        resources: {
+          floatingButtonBackgrounds: [
+            { id: 'flower', image: 'assets/floating-button-backgrounds/flower.webp' },
+            { id: 'leaf', image: 'assets/floating-button-backgrounds/leaf.webp' }
+          ]
+        },
+        apply: {
+          floatingButtonBackground: { resourceId: 'flower', scale: 135 }
+        },
         config: {
           floatingButtonBackground: {
-            image: 'assets/floating-button-backgrounds/flower.webp',
+            id: 'flower',
             scale: 135
           }
         }
       },
-      imageAssets: { 'assets/floating-button-backgrounds/flower.webp': 'theme-flower.webp' },
+      imageAssets: {
+        'assets/floating-button-backgrounds/flower.webp': 'theme-flower.webp',
+        'assets/floating-button-backgrounds/leaf.webp': 'theme-leaf.webp'
+      },
       importedAt: 1,
       updatedAt: 1
     });
 
     expect(result.appliedSections).toContain('floatingButtonBackground');
-    expect(setFloatingButtonBackground).toHaveBeenCalledWith('theme-flower.webp', 135);
+    expect(replaceFloatingButtonSchemes).toHaveBeenCalledWith('button-theme', [
+      {
+        id: 'theme:button-theme:floating-button-flower',
+        imageFilename: 'theme-flower.webp',
+        scale: 135,
+        source: 'package'
+      },
+      {
+        id: 'theme:button-theme:floating-button-leaf',
+        imageFilename: 'theme-leaf.webp',
+        scale: 100,
+        source: 'package'
+      }
+    ], 'theme:button-theme:floating-button-flower');
+  });
+
+  it('migrates a legacy single-image floating-button package into the scheme library', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'legacy-button-theme',
+      name: 'Legacy Button Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 1,
+        package: { id: 'legacy-button-theme', name: 'Legacy Button Theme', version: '1.0.0' },
+        config: {
+          floatingButtonBackground: { image: 'assets/floating-button-backgrounds/legacy.webp', scale: 120 }
+        }
+      },
+      imageAssets: { 'assets/floating-button-backgrounds/legacy.webp': 'legacy-button.webp' },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(replaceFloatingButtonSchemes).toHaveBeenCalledWith('legacy-button-theme', [{
+      id: 'theme:legacy-button-theme:floating-button-legacy',
+      imageFilename: 'legacy-button.webp',
+      scale: 120,
+      source: 'package'
+    }], 'theme:legacy-button-theme:floating-button-legacy');
   });
 });

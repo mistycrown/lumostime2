@@ -31,6 +31,7 @@ const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
 const CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
 const CARD_BACKGROUND_GROUPS_KEY = 'lumostime_card_background_groups_v1';
 const FLOATING_BUTTON_BACKGROUND_KEY = 'lumostime_floating_button_background_v1';
+const FLOATING_BUTTON_BACKGROUND_SCHEMES_KEY = 'lumostime_floating_button_background_schemes_v1';
 
 interface StoredCustomTimePalItem {
   stageFilenames?: unknown;
@@ -108,6 +109,14 @@ export const getSettingsReferencedImages = (): Set<string> => {
   if (isValidFilename(floatingButtonBackground)) {
     referencedImages.add(floatingButtonBackground);
     referencedImages.add(`thumb_${floatingButtonBackground}`);
+  }
+  const floatingButtonSchemes = readRawJson<Array<{ imageFilename?: unknown }>>(FLOATING_BUTTON_BACKGROUND_SCHEMES_KEY, []);
+  if (Array.isArray(floatingButtonSchemes)) {
+    floatingButtonSchemes.forEach((scheme) => {
+      if (!isValidFilename(scheme?.imageFilename)) return;
+      referencedImages.add(scheme.imageFilename);
+      referencedImages.add(`thumb_${scheme.imageFilename}`);
+    });
   }
 
   if (Array.isArray(customTimePalItems)) {
