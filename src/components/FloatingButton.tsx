@@ -1,7 +1,7 @@
 /**
  * @file FloatingButton.tsx
  * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
- * @updated 2026-09-29: Renders selected background schemes without the native button chrome.
+ * @updated 2026-09-29: Keeps notification badges visible outside the clipped image layer.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -107,7 +107,6 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 ${sizeClasses[size]}
                 ${styleClasses}
                 rounded-full
-                overflow-hidden
                 flex items-center justify-center
                 active:scale-90
                 transition-transform
