@@ -1,9 +1,15 @@
 /**
  * @file FloatingButton.tsx
- * @description 悬浮按钮组件 - 支持配色方案自动应用（通过 CSS 变量）
+ * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
+ * @updated 2026-09-29: Renders the user-configured scalable image beneath every floating-button icon.
  */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import {
+    FLOATING_BUTTON_BACKGROUND_CHANGED_EVENT,
+    floatingButtonBackgroundService
+} from '../services/floatingButtonBackgroundService';
+import { imageService } from '../services/imageService';
 
 interface FloatingButtonProps {
     onClick: () => void;
@@ -35,6 +41,30 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
     style = {},
     disableThemeStyle = false
 }) => {
+    const [backgroundImageUrl, setBackgroundImageUrl] = useState('');
+    const [backgroundScale, setBackgroundScale] = useState(() => floatingButtonBackgroundService.getSettings().scale);
+    useEffect(() => {
+        let isCurrent = true;
+        const refresh = () => {
+            const settings = floatingButtonBackgroundService.getSettings();
+            setBackgroundScale(settings.scale);
+            if (!settings.imageFilename) {
+                setBackgroundImageUrl('');
+                return;
+            }
+            void imageService.getImageUrl(settings.imageFilename).then((url) => {
+                if (isCurrent) setBackgroundImageUrl(url);
+            }).catch(() => {
+                if (isCurrent) setBackgroundImageUrl('');
+            });
+        };
+        refresh();
+        window.addEventListener(FLOATING_BUTTON_BACKGROUND_CHANGED_EVENT, refresh);
+        return () => {
+            isCurrent = false;
+            window.removeEventListener(FLOATING_BUTTON_BACKGROUND_CHANGED_EVENT, refresh);
+        };
+    }, []);
     // 尺寸映射
     const sizeClasses = {
         sm: 'w-12 h-12',
@@ -73,6 +103,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 ${sizeClasses[size]}
                 ${styleClasses}
                 rounded-full
+                relative overflow-hidden
                 flex items-center justify-center
                 active:scale-90
                 transition-transform
@@ -83,7 +114,17 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             aria-label={ariaLabel}
             title={title}
         >
-            {children}
+            {backgroundImageUrl && (
+                <span
+                    aria-hidden="true"
+                    className="absolute inset-0 rounded-full bg-center bg-no-repeat"
+                    style={{
+                        backgroundImage: `url("${backgroundImageUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`,
+                        backgroundSize: `${backgroundScale}%`
+                    }}
+                />
+            )}
+            <span className="relative z-10 flex items-center justify-center">{children}</span>
         </button>
     );
 };

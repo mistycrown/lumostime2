@@ -15,7 +15,8 @@
         "numberedDirectory": "assets/uiicon"
       }
     ],
-    "cardBackgroundGroups": []
+    "cardBackgroundGroups": [],
+    "floatingButtonBackgrounds": []
   },
   "apply": {
     "uiIcon": { "resourceId": "my-ui-icons" }

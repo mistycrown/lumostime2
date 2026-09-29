@@ -30,6 +30,7 @@ const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
 const CUSTOM_UI_ICON_ASSETS_KEY = 'lumostime_ui_icon_custom_assets_v1';
 const CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY = 'lumostime_achievement_bottle_custom_icon_packs_v1';
 const CARD_BACKGROUND_GROUPS_KEY = 'lumostime_card_background_groups_v1';
+const FLOATING_BUTTON_BACKGROUND_KEY = 'lumostime_floating_button_background_v1';
 
 interface StoredCustomTimePalItem {
   stageFilenames?: unknown;
@@ -102,6 +103,12 @@ export const getSettingsReferencedImages = (): Set<string> => {
   const customAchievementIconPacks = readRawJson<Record<string, unknown>>(CUSTOM_ACHIEVEMENT_ICON_PACKS_KEY, {});
   const cardBackgroundGroups = readRawJson<StoredCardBackgroundGroup[]>(CARD_BACKGROUND_GROUPS_KEY, []);
   const savedPresets = storage.getJSON<StoredCustomPreset[]>(THEME_KEYS.CUSTOM_PRESETS, []);
+  const floatingButtonBackground = localStorage.getItem(FLOATING_BUTTON_BACKGROUND_KEY);
+
+  if (isValidFilename(floatingButtonBackground)) {
+    referencedImages.add(floatingButtonBackground);
+    referencedImages.add(`thumb_${floatingButtonBackground}`);
+  }
 
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {

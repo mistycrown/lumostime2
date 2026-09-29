@@ -13,6 +13,7 @@
  * @updated 2026-09-26: Includes independent Memoir calendar background modes in appearance backup and restore.
  * @updated 2026-09-26: Includes custom card background groups, selection, opacity, and image references.
  * @updated 2026-09-28: Includes transparent navigation, chart palettes, and custom UI-icon theme names.
+ * @updated 2026-09-29: Includes the global floating-button image background and scale.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -78,7 +79,9 @@ const APPEARANCE_STORAGE_KEYS = [
   TIMEPAL_KEYS.CUSTOM_QUOTES,
   CARD_BACKGROUND_GROUPS_KEY,
   CARD_BACKGROUND_CURRENT_KEY,
-  CARD_BACKGROUND_OPACITY_KEY
+  CARD_BACKGROUND_OPACITY_KEY,
+  THEME_KEYS.FLOATING_BUTTON_BACKGROUND,
+  THEME_KEYS.FLOATING_BUTTON_BACKGROUND_SCALE
 ] as const;
 
 type AppearanceStorage = Record<string, string | null>;
@@ -126,6 +129,7 @@ const addImageReference = (set: Set<string>, value: unknown, includeThumbnail = 
 
 const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string[] => {
   const referenced = new Set<string>();
+  addImageReference(referenced, snapshot[THEME_KEYS.FLOATING_BUTTON_BACKGROUND]);
   const cardBackgroundGroups = parseJsonValue(snapshot, CARD_BACKGROUND_GROUPS_KEY);
   if (Array.isArray(cardBackgroundGroups)) {
     cardBackgroundGroups.forEach((group) => {

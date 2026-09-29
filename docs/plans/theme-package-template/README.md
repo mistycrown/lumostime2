@@ -23,6 +23,7 @@ assets/
   achievement-bottle/<pack-id>/
   memoir-calendar/
   card-backgrounds/
+  floating-button-backgrounds/
 ```
 
 ## 完整 UI 图标
@@ -50,6 +51,27 @@ assets/
   },
   "apply": {
     "cardBackground": { "groupId": "scene-cards", "opacity": 0.3 }
+  }
+}
+```
+
+## 悬浮按钮背景
+
+全局悬浮按钮背景资源定义在 `resources.floatingButtonBackgrounds`，并由 `apply.floatingButtonBackground.resourceId` 选择。图片放在 `assets/floating-button-backgrounds/`；`scale` 为图片在圆形按钮内的大小百分比，范围是 50 到 200，默认 100。
+
+```json
+{
+  "resources": {
+    "floatingButtonBackgrounds": [{
+      "id": "flower-button",
+      "image": "assets/floating-button-backgrounds/flower.webp"
+    }]
+  },
+  "apply": {
+    "floatingButtonBackground": {
+      "resourceId": "flower-button",
+      "scale": 100
+    }
   }
 }
 ```

@@ -24,6 +24,7 @@
  * @updated 2026-09-28: Added strict 96-image UIIcon ZIP import with duplicate-name resolution.
  * @updated 2026-09-28: Gives legacy built-in presets explicit defaults for modern navigation and Memoir calendar styling.
  * @updated 2026-09-28: Lets package-theme deletion retain user-selectable resources and resolves retained-resource reimports.
+ * @updated 2026-09-29: Added global scalable floating-button image background settings to the style tab.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -43,6 +44,7 @@ import { AchievementBottleIconPackSelector } from '../components/achievement/Ach
 import { AchievementBottleStyleSelector } from '../components/achievement/AchievementBottleStyleSelector';
 import { CalendarNumberStyleSelector } from '../components/CalendarNumberStyleSelector';
 import { CardBackgroundSelector } from '../components/CardBackgroundSelector';
+import { FloatingButtonBackgroundSelector } from '../components/FloatingButtonBackgroundSelector';
 import { iconService, ICON_OPTIONS } from '../services/iconService';
 import { AppView, Category, CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { useSettings } from '../contexts/SettingsContext';
@@ -2142,6 +2144,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
 
                             {activeTab === 'style' && (
                                 <div className="space-y-5 pt-2">
+                                    <FloatingButtonBackgroundSelector onToast={onToast} />
                                     <AchievementBottleIconPackSelector />
                                     <AchievementBottleStyleSelector />
                                     <CalendarNumberStyleSelector />
