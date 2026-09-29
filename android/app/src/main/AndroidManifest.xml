@@ -20,6 +20,7 @@
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTask"
             android:exported="true"
             android:enabled="true">
