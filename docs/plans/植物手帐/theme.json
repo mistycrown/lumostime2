@@ -4,7 +4,7 @@
   "package": {
     "id": "plant-journal",
     "name": "植物手帐",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "一套以植物、纸感贴纸与莫兰迪绿为灵感的手帐主题",
     "preview": "assets/background/main.webp"
   },
@@ -119,9 +119,10 @@
       ]
     },
     "font": { "source": "builtin", "fontId": "ding-lie-song" },
-    "achievementBottle": { "iconPackId": "candy", "style": { "id": "mintHaze" } },
+    "achievementBottle": { "iconPackId": "leaf", "style": { "id": "mintHaze" } },
     "timeline": { "themeId": "vine" },
     "memoirCalendar": { "backgroundId": "plant-journal-memoir" },
+    "cardBackground": { "groupId": "plant-journal-cards", "opacity": 0.4 },
     "floatingButtonBackground": { "resourceId": "plant-journal-floating-button", "scale": 100 }
   }
 }
