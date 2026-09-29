@@ -4,7 +4,7 @@
  * @output Current background, persisted opacity, and refresh events
  * @pos Service (UI Customization)
  * @description Stores a single fill image for each Memoir mood-calendar background.
- * @updated 2026-09-28: Keeps temporary blob URLs in memory and rehydrates them from the image library.
+ * @updated 2026-09-29: Deduplicates hydration, keeps temporary URLs out of storage, and merges results without overwriting concurrent edits.
  */
 import { imageService } from './imageService';
 
@@ -37,8 +37,14 @@ const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined)
     opacity: clamp(Number(settings?.opacity ?? DEFAULT_SETTINGS.opacity), 0, 1)
 });
 
+interface RuntimeMoodCalendarImage {
+    url: string;
+    imageFilename?: string;
+}
+
 class MoodCalendarBackgroundService {
-    private readonly runtimeImageUrls = new Map<string, string>();
+    private readonly runtimeImages = new Map<string, RuntimeMoodCalendarImage>();
+    private hydrationPromise: Promise<void> | null = null;
 
     getCurrentBackground(): string {
         const current = localStorage.getItem(MOOD_CALENDAR_BACKGROUND_CURRENT_KEY);
@@ -64,9 +70,15 @@ class MoodCalendarBackgroundService {
             if (!Array.isArray(parsed)) return [];
 
             return parsed.map((background) => {
-                const runtimeUrl = this.runtimeImageUrls.get(background.id);
-                const url = runtimeUrl || (this.isBlobUrl(background.url) ? '' : background.url);
-                const thumbnail = runtimeUrl || (this.isBlobUrl(background.thumbnail) ? '' : background.thumbnail);
+                if (this.isDataUrl(background.url) && !this.getRuntimeImageUrl(background)) {
+                    this.setRuntimeImage(background, background.url);
+                }
+                if (this.isDataUrl(background.thumbnail) && !this.getRuntimeImageUrl(background)) {
+                    this.setRuntimeImage(background, background.thumbnail);
+                }
+                const runtimeUrl = this.getRuntimeImageUrl(background);
+                const url = runtimeUrl || (this.isTemporaryUrl(background.url) ? '' : background.url);
+                const thumbnail = runtimeUrl || (this.isTemporaryUrl(background.thumbnail) ? '' : background.thumbnail);
                 return { ...background, url, thumbnail };
             });
         } catch {
@@ -76,38 +88,118 @@ class MoodCalendarBackgroundService {
 
     private saveCustomBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
         const persisted = backgrounds.map((background) => {
-            if (this.isBlobUrl(background.url)) this.runtimeImageUrls.set(background.id, background.url);
-            if (this.isBlobUrl(background.thumbnail) && !this.runtimeImageUrls.has(background.id)) {
-                this.runtimeImageUrls.set(background.id, background.thumbnail);
+            if (this.isTemporaryUrl(background.url)) this.setRuntimeImage(background, background.url);
+            if (this.isTemporaryUrl(background.thumbnail) && !this.getRuntimeImageUrl(background)) {
+                this.setRuntimeImage(background, background.thumbnail);
             }
 
             return {
                 ...background,
-                url: this.isBlobUrl(background.url) ? '' : background.url,
-                thumbnail: this.isBlobUrl(background.thumbnail) ? '' : background.thumbnail
+                url: this.isTemporaryUrl(background.url) ? '' : background.url,
+                thumbnail: this.isTemporaryUrl(background.thumbnail) ? '' : background.thumbnail
             };
         });
         localStorage.setItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, JSON.stringify(persisted));
     }
 
-    private isBlobUrl(value: unknown): value is string {
-        return typeof value === 'string' && value.startsWith('blob:');
+    private isDataUrl(value: unknown): value is string {
+        return typeof value === 'string' && value.startsWith('data:');
     }
 
-    async hydrateCustomBackgrounds(): Promise<void> {
-        const backgrounds = this.loadCustomBackgrounds();
-        let changed = false;
-        const hydrated = await Promise.all(backgrounds.map(async (background) => {
-            if (!background.imageFilename) return background;
-            const url = await imageService.getImageUrl(background.imageFilename).catch(() => '');
-            if (!url || url === background.url) return background;
-            changed = true;
-            return { ...background, url, thumbnail: url };
-        }));
+    private isTemporaryUrl(value: unknown): value is string {
+        return typeof value === 'string' && (value.startsWith('blob:') || value.startsWith('data:'));
+    }
 
-        if (changed) this.saveCustomBackgrounds(hydrated);
+    private getRuntimeImageUrl(background: Pick<MoodCalendarBackgroundOption, 'id' | 'imageFilename'>): string {
+        const runtimeImage = this.runtimeImages.get(background.id);
+        if (!runtimeImage || runtimeImage.imageFilename !== background.imageFilename) return '';
+        return runtimeImage.url;
+    }
+
+    private setRuntimeImage(
+        background: Pick<MoodCalendarBackgroundOption, 'id' | 'imageFilename'>,
+        url: string
+    ): void {
+        this.runtimeImages.set(background.id, { url, imageFilename: background.imageFilename });
+    }
+
+    hydrateCustomBackgrounds(): Promise<void> {
+        if (this.hydrationPromise) return this.hydrationPromise;
+
+        const hydration = this.performHydration();
+        const trackedHydration = hydration.finally(() => {
+            if (this.hydrationPromise === trackedHydration) this.hydrationPromise = null;
+        });
+        this.hydrationPromise = trackedHydration;
+        return trackedHydration;
+    }
+
+    private async performHydration(): Promise<void> {
+        const attemptedAssets = new Set<string>();
+
+        while (true) {
+            const backgrounds = this.loadCustomBackgrounds();
+            const pendingBackgrounds = backgrounds.filter((background) => {
+                if (!background.imageFilename || this.getRuntimeImageUrl(background)) return false;
+                return !attemptedAssets.has(`${background.id}\u0000${background.imageFilename}`);
+            });
+            if (pendingBackgrounds.length === 0) break;
+
+            pendingBackgrounds.forEach((background) => {
+                attemptedAssets.add(`${background.id}\u0000${background.imageFilename}`);
+            });
+            const hydrated = await Promise.all(pendingBackgrounds.map(async (background) => {
+                try {
+                    const url = await imageService.getImageUrl(background.imageFilename!);
+                    if (!url) {
+                        console.warn('[MoodCalendarBackgroundService] Background image is unavailable', {
+                            backgroundId: background.id,
+                            imageFilename: background.imageFilename
+                        });
+                        return null;
+                    }
+                    return { id: background.id, imageFilename: background.imageFilename, url };
+                } catch (error) {
+                    console.warn('[MoodCalendarBackgroundService] Failed to hydrate background image', {
+                        backgroundId: background.id,
+                        imageFilename: background.imageFilename,
+                        error
+                    });
+                    return null;
+                }
+            }));
+
+            const latestBackgrounds = this.loadCustomBackgrounds();
+            const latestById = new Map(latestBackgrounds.map((background) => [background.id, background]));
+            hydrated.forEach((result) => {
+                if (!result) return;
+                const latest = latestById.get(result.id);
+                if (latest?.imageFilename === result.imageFilename) this.setRuntimeImage(latest, result.url);
+            });
+            this.pruneRuntimeImages(latestBackgrounds);
+            this.persistLatestBackgrounds(latestBackgrounds);
+        }
+
+        const latestBackgrounds = this.loadCustomBackgrounds();
+        this.pruneRuntimeImages(latestBackgrounds);
+        this.persistLatestBackgrounds(latestBackgrounds);
         window.dispatchEvent(new CustomEvent(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, {
             detail: { backgroundId: this.getCurrentBackground() }
+        }));
+    }
+
+    private pruneRuntimeImages(backgrounds: MoodCalendarBackgroundOption[]): void {
+        const latestById = new Map(backgrounds.map((background) => [background.id, background]));
+        Array.from(this.runtimeImages.entries()).forEach(([backgroundId, runtimeImage]) => {
+            const latest = latestById.get(backgroundId);
+            if (!latest || latest.imageFilename !== runtimeImage.imageFilename) this.runtimeImages.delete(backgroundId);
+        });
+    }
+
+    private persistLatestBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
+        this.saveCustomBackgrounds(backgrounds.map((background) => {
+            const runtimeUrl = this.getRuntimeImageUrl(background);
+            return runtimeUrl ? { ...background, url: runtimeUrl, thumbnail: runtimeUrl } : background;
         }));
     }
 
@@ -164,7 +256,7 @@ class MoodCalendarBackgroundService {
         if (!target) return false;
         const wasCurrent = this.getCurrentBackground() === backgroundId;
 
-        this.runtimeImageUrls.delete(backgroundId);
+        this.runtimeImages.delete(backgroundId);
         this.saveCustomBackgrounds(backgrounds.filter((background) => background.id !== backgroundId));
         if (target.imageFilename) await imageService.deleteImage(target.imageFilename).catch(() => undefined);
         if (wasCurrent) this.setCurrentBackground('none');
