@@ -103,7 +103,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 ${sizeClasses[size]}
                 ${styleClasses}
                 rounded-full
-                relative overflow-hidden
+                overflow-hidden
                 flex items-center justify-center
                 active:scale-90
                 transition-transform
