@@ -8,14 +8,16 @@
  * @updated 2026-09-28: Covers complete numbered UIIcon directory application.
  * @updated 2026-09-29: Covers packaged navigation stretching and text-only icon mode.
  * @updated 2026-09-29: Covers explicitly restoring the default floating-button background.
+ * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, replaceFloatingButtonSchemes, selectFloatingButtonScheme } = vi.hoisted(() => ({
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, setTransparentNavigationEnabled, replaceFloatingButtonSchemes, selectFloatingButtonScheme } = vi.hoisted(() => ({
   registerIconPack: vi.fn(async () => undefined),
   hydrateNavigationIcons: vi.fn(async () => undefined),
   setNavigationEnabled: vi.fn(),
+  setTransparentNavigationEnabled: vi.fn(),
   replaceFloatingButtonSchemes: vi.fn(),
   selectFloatingButtonScheme: vi.fn()
 }));
@@ -48,6 +50,7 @@ vi.mock('./navigationIconService', () => ({
 vi.mock('./navigationBackgroundService', () => ({
   navigationBackgroundService: {
     setEnabled: setNavigationEnabled,
+    setTransparentNavigationEnabled,
     setCurrentBackground: vi.fn(),
     hydrateCustomBackgrounds: vi.fn(async () => undefined)
   }
@@ -80,6 +83,7 @@ describe('applyImportedThemePackage', () => {
     registerIconPack.mockClear();
     hydrateNavigationIcons.mockClear();
     setNavigationEnabled.mockClear();
+    setTransparentNavigationEnabled.mockClear();
     replaceFloatingButtonSchemes.mockClear();
     selectFloatingButtonScheme.mockClear();
   });
@@ -249,6 +253,7 @@ describe('applyImportedThemePackage', () => {
           navigation: {
             mode: 'modern',
             iconMode: 'text',
+            transparentTitleBar: true,
             background: {
               source: 'asset',
               file: 'assets/navigation/main.webp',
@@ -268,6 +273,7 @@ describe('applyImportedThemePackage', () => {
     expect(backgrounds).toMatchObject([{ verticalStretch: 1.15 }]);
     expect(settings['theme:stretched-navigation:navigation-background']).toMatchObject({ verticalStretch: 1.15 });
     expect(iconSelection).toMatchObject({ mode: 'text', customMapping: {}, showLabelWithIcon: false });
+    expect(setTransparentNavigationEnabled).toHaveBeenCalledWith(true);
   });
 
   it('sets the imported sticker default page and merges package sets into one selector group', async () => {

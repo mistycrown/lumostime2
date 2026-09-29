@@ -14,6 +14,7 @@
  * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
  * @updated 2026-09-29: Preserves packaged navigation stretching and applies text-only navigation icons.
  * @updated 2026-09-29: Clears floating-button backgrounds when a package explicitly requests the default state.
+ * @updated 2026-09-29: Applies packaged transparent title-bar preferences.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -139,6 +140,9 @@ const applyBackground = async (record: ImportedThemePackageRecord, warnings: str
 
 const applyNavigationBackground = async (record: ImportedThemePackageRecord, warnings: string[]): Promise<void> => {
   const navigation = getConfigObject(record, 'navigation');
+  if (typeof navigation?.transparentTitleBar === 'boolean') {
+    navigationBackgroundService.setTransparentNavigationEnabled(navigation.transparentTitleBar);
+  }
   if (navigation?.mode === 'legacy') {
     const decorationId = typeof navigation.decorationId === 'string' ? navigation.decorationId : 'default';
     if (navigation.decoration && typeof navigation.decoration === 'object' && !Array.isArray(navigation.decoration)) {
