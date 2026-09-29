@@ -10,6 +10,7 @@
  * @updated 2026-09-25: Marks transparent-title-bar layouts so page background masks can cover the full viewport without changing normal layout flow.
  * @updated 2026-09-25: Limits transparent title bars to Tags/Scopes index pages and restores the opaque detail-page header.
  * @updated 2026-09-28: Removes the extra index reading overlay so index and archive pages expose themed backgrounds consistently.
+ * @updated 2026-09-29: Disables transparent title bars while effective dark mode is active.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -29,6 +30,7 @@ import { UIIcon } from './UIIcon';
 import { FloatingButton } from './FloatingButton';
 import { navigationBackgroundService, NAVIGATION_TRANSPARENCY_CHANGE_EVENT } from '../services/navigationBackgroundService';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { useCustomAppearanceEnabled } from '../hooks/useCustomAppearanceEnabled';
 
 interface MainLayoutProps {
     children: React.ReactNode;
@@ -68,6 +70,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     handleCloseMonthlyReview,
     statsTitle
 }) => {
+    const customAppearanceEnabled = useCustomAppearanceEnabled();
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState<boolean>(() => localStorage.getItem('todoScreenMode') === 'week');
     const [isTransparentNavigation, setIsTransparentNavigation] = useState(() => navigationBackgroundService.isTransparentNavigationEnabled());
     const { backgroundUrl, backgroundOpacity, hasBackground } = useBackgroundDisplay();
@@ -162,7 +165,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         || (currentView === AppView.REVIEW && !hasReviewSubpage)
         || (currentView === AppView.TAGS && !selectedTagId && !selectedCategoryId)
         || (currentView === AppView.SCOPE && !selectedScopeId);
-    const shouldUseTransparentTitleBar = isTransparentNavigation && supportsTransparentTitleBar;
+    const shouldUseTransparentTitleBar = customAppearanceEnabled && isTransparentNavigation && supportsTransparentTitleBar;
     const shouldUseTransparentIndexSurface = shouldUseTransparentTitleBar
         && hasBackground
         && (currentView === AppView.TAGS || currentView === AppView.SCOPE);
