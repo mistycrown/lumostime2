@@ -7,15 +7,17 @@
  * @updated 2026-09-26: Covers custom icon-pack, sticker, and navigation icon application.
  * @updated 2026-09-28: Covers complete numbered UIIcon directory application.
  * @updated 2026-09-29: Covers packaged navigation stretching and text-only icon mode.
+ * @updated 2026-09-29: Covers explicitly restoring the default floating-button background.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, replaceFloatingButtonSchemes } = vi.hoisted(() => ({
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, replaceFloatingButtonSchemes, selectFloatingButtonScheme } = vi.hoisted(() => ({
   registerIconPack: vi.fn(async () => undefined),
   hydrateNavigationIcons: vi.fn(async () => undefined),
   setNavigationEnabled: vi.fn(),
-  replaceFloatingButtonSchemes: vi.fn()
+  replaceFloatingButtonSchemes: vi.fn(),
+  selectFloatingButtonScheme: vi.fn()
 }));
 
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -65,7 +67,10 @@ vi.mock('./moodCalendarBackgroundService', () => ({
 }));
 
 vi.mock('./floatingButtonBackgroundService', () => ({
-  floatingButtonBackgroundService: { replacePackageSchemes: replaceFloatingButtonSchemes }
+  floatingButtonBackgroundService: {
+    replacePackageSchemes: replaceFloatingButtonSchemes,
+    selectScheme: selectFloatingButtonScheme
+  }
 }));
 
 describe('applyImportedThemePackage', () => {
@@ -76,6 +81,7 @@ describe('applyImportedThemePackage', () => {
     hydrateNavigationIcons.mockClear();
     setNavigationEnabled.mockClear();
     replaceFloatingButtonSchemes.mockClear();
+    selectFloatingButtonScheme.mockClear();
   });
 
   it('applies custom bottle frames when achievementBottle is a top-level config section', async () => {
@@ -469,5 +475,34 @@ describe('applyImportedThemePackage', () => {
       scale: 120,
       source: 'package'
     }], 'theme:legacy-button-theme:floating-button-legacy');
+  });
+
+  it('clears the active floating-button background when requested by a package', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: vi.fn(),
+      removeItem: vi.fn()
+    });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'default-button-theme',
+      name: 'Default Button Theme',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'default-button-theme', name: 'Default Button Theme', version: '1.0.0' },
+        resources: {},
+        apply: {},
+        config: { floatingButtonBackground: { none: true } }
+      },
+      imageAssets: {},
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(selectFloatingButtonScheme).toHaveBeenCalledWith(null);
+    expect(replaceFloatingButtonSchemes).not.toHaveBeenCalled();
   });
 });

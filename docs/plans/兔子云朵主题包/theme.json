@@ -4,7 +4,7 @@
   "package": {
     "id": "rabbit",
     "name": "兔子云朵",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "一套以兔子与云朵为灵感的柔和主题",
     "preview": "assets/background/main.png"
   },
@@ -101,6 +101,7 @@
     "font": { "resourceId": "rabbit-bear-diary" },
     "achievementBottle": { "iconPackId": "candy", "style": { "id": "blushBloom" } },
     "memoirCalendar": { "backgroundId": "rabbit-memoir" },
-    "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.3 }
+    "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.3 },
+    "floatingButtonBackground": { "none": true }
   }
 }
