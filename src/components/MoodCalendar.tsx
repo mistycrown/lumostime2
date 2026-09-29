@@ -5,6 +5,7 @@
  * @updated 2026-09-27: Simplified Memoir calendar backgrounds to one clipped fill image.
  * @updated 2026-09-28: Centers the clipped Memoir calendar background image.
  * @updated 2026-09-28: Shares the active calendar background with Memoir quick actions.
+ * @updated 2026-09-29: Rehydrates persisted calendar images from the display path on mount.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -56,6 +57,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
             setBackgroundSettings(moodCalendarBackgroundService.getBackgroundById(nextId) || {});
         };
         window.addEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, updateBackground);
+        void moodCalendarBackgroundService.hydrateCustomBackgrounds();
         return () => {
             window.removeEventListener(MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, updateBackground);
         };

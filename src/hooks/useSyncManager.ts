@@ -22,6 +22,7 @@
  * @updated 2026-09-03: Skips full cloud payload downloads for already acknowledged versions and throttles repeated resume checks.
  * @updated 2026-09-20: Waits for AI chat storage hydration before building sync payloads so startup sync cannot upload a pre-hydration empty chat state.
  * @updated 2026-09-22: Syncs Memoir filters and a separate persisted-preferences snapshot, with restore events for mounted contexts.
+ * @updated 2026-09-29: Tracks Memoir mood-calendar background changes in appearance auto-sync.
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -41,6 +42,7 @@ import { compatibleS3Service } from '../services/compatibleS3Service';
 import { assistantBackupService } from '../services/assistantBackupService';
 import { aiChatStorageService } from '../services/aiChatStorageService';
 import { appearanceBackupService } from '../services/appearanceBackupService';
+import { MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT } from '../services/moodCalendarBackgroundService';
 import {
     loadWidgetTemplatesFromStorage,
     saveWidgetTemplatesToStorage,
@@ -1399,6 +1401,7 @@ export const useSyncManager = () => {
             'color-scheme-changed',
             'ui-icon-theme-changed',
             'lumostime:background-changed',
+             MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
             'navigationDecorationChange',
             'timepal-type-changed',
             'timepal-click-switch-changed',
