@@ -342,7 +342,7 @@ export const TimelineTodoSidebar: React.FC<TimelineTodoSidebarProps> = ({
   onTodoDrop
 }) => (
   <aside
-      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/75 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/75"
+      className="flex h-full min-w-0 shrink-0 flex-col bg-[#fdfbf7]/50 shadow-[-10px_0_30px_rgba(28,25,23,0.04)] backdrop-blur-md dark:bg-stone-900/75"
       style={{ width: `${ratio * 100}%`, minWidth: `${TIMELINE_SIDEBAR_MIN_RATIO * 100}%`, maxWidth: `${TIMELINE_SIDEBAR_MAX_RATIO * 100}%` }}
     aria-label="待办与日课"
   >

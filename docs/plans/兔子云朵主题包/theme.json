@@ -51,7 +51,7 @@
       ] }
     ],
     "navigationBackgrounds": [
-      { "id": "rabbit-navigation", "file": "assets/navigation/1.webp", "position": "center", "opacity": 0.8 }
+      { "id": "rabbit-navigation", "file": "assets/navigation/1.webp", "position": "center", "opacity": 0.9 }
     ],
     "navigationIcons": [
       { "id": "rabbit-navigation-icons", "files": {
@@ -75,7 +75,7 @@
       { "id": "rabbit-bear-diary", "file": "assets/fonts/rabbit-bear-diary.ttf", "displayName": "乐米小熊日记体", "familyName": "LumoRabbitCloud", "format": "ttf" }
     ],
     "memoirCalendarBackgrounds": [
-      { "id": "rabbit-memoir", "image": "assets/memoir-calendar/1.webp", "settings": { "opacity": 0.7 } }
+      { "id": "rabbit-memoir", "image": "assets/memoir-calendar/1.webp", "settings": { "opacity": 0.8 } }
     ],
     "cardBackgroundGroups": [
       { "id": "rabbit-cards", "name": "兔子云朵卡片背景", "alignment": "right-bottom", "files": [
@@ -101,7 +101,7 @@
     "font": { "resourceId": "rabbit-bear-diary" },
     "achievementBottle": { "iconPackId": "candy", "style": { "id": "blushBloom" } },
     "memoirCalendar": { "backgroundId": "rabbit-memoir" },
-    "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.6 },
+    "cardBackground": { "groupId": "rabbit-cards", "opacity": 0.7 },
     "floatingButtonBackground": { "none": true }
   }
 }

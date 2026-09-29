@@ -122,7 +122,7 @@
     "achievementBottle": { "iconPackId": "leaf", "style": { "id": "mintHaze" } },
     "timeline": { "themeId": "vine" },
     "memoirCalendar": { "backgroundId": "plant-journal-memoir" },
-    "cardBackground": { "groupId": "plant-journal-cards", "opacity": 0.4 },
+    "cardBackground": { "groupId": "plant-journal-cards", "opacity": 0.9 },
     "floatingButtonBackground": { "resourceId": "plant-journal-floating-button", "scale": 100 }
   }
 }

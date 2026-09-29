@@ -264,7 +264,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'purple',
         name: 'Purple',
-        description: '优雅的紫色主题',
+        description: '紫藤萝瀑布',
         icon: '💜',
         appIcon: 'icon_uvcd',
         uiTheme: 'purple',
@@ -276,7 +276,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'catty',
         name: 'Catty',
-        description: '可爱的粉色主题',
+        description: '粉色蓝色小猫',
         icon: '🐱',
         appIcon: 'icon_cat',
         uiTheme: 'cat',
@@ -288,7 +288,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'little-prince',
         name: 'Little Prince',
-        description: '梦幻的小王子主题',
+        description: '小王子',
         icon: '🤴',
         appIcon: 'icon_bijiaso',
         uiTheme: 'prince',
@@ -300,7 +300,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'forest',
         name: 'Forest',
-        description: '清新自然的绿色主题',
+        description: '森林与蘑菇',
         icon: '🌿',
         appIcon: 'icon_plant',
         uiTheme: 'forest',
@@ -312,7 +312,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'water-color',
         name: 'Water Color',
-        description: '宁静的青色主题',
+        description: '青色的水彩',
         icon: '🌊',
         appIcon: 'icon_sea',
         uiTheme: 'water',
@@ -324,7 +324,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'good-night',
         name: 'Good Night',
-        description: '温暖的夜晚主题',
+        description: '晚安好梦',
         icon: '🌙',
         appIcon: 'icon_moon',
         uiTheme: 'color',
@@ -336,7 +336,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'flower',
         name: 'Flower',
-        description: '清新的莫兰迪绿',
+        description: '家纹与花朵',
         icon: '🌸',
         appIcon: 'icon_plant',
         uiTheme: 'plant',
@@ -348,7 +348,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'knit',
         name: 'Knit',
-        description: '温暖的编织主题',
+        description: '编织毛线球',
         icon: '🧶',
         appIcon: 'icon_knot',
         uiTheme: 'knit',
@@ -360,7 +360,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'paper',
         name: 'Paper',
-        description: '清新的纸艺主题',
+        description: '纸张剪裁切割',
         icon: '📄',
         appIcon: 'icon_paper',
         uiTheme: 'paper',
@@ -372,7 +372,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'ancient',
         name: 'Ancient',
-        description: '古典雅致主题',
+        description: '古风小生',
         icon: '🏛️',
         appIcon: 'icon_Ukiyo-e',
         uiTheme: 'old',
@@ -384,7 +384,7 @@ const THEME_PRESETS: ThemePreset[] = ([
     {
         id: 'pencil',
         name: 'Pencil',
-        description: '日系胶片主题',
+        description: '彩铅手绘',
         icon: '✏️',
         appIcon: 'icon_sketch',
         uiTheme: 'pencil',
