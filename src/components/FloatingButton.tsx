@@ -1,7 +1,7 @@
 /**
  * @file FloatingButton.tsx
  * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
- * @updated 2026-09-30: Renders custom background images as a centered circular overflow-visible layer.
+ * @updated 2026-09-30: Removes edge-connected white pixels from custom background images before rendering them on a transparent button.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -10,6 +10,7 @@ import {
     floatingButtonBackgroundService
 } from '../services/floatingButtonBackgroundService';
 import { imageService } from '../services/imageService';
+import { createTransparentFloatingButtonImage } from '../utils/floatingButtonImageTransparency';
 
 interface FloatingButtonProps {
     onClick: () => void;
@@ -28,8 +29,7 @@ export const createFloatingButtonBackgroundImageStyle = (scale: number): React.C
     width: `${scale}%`,
     height: 'auto',
     maxWidth: 'none',
-    transform: 'translate(-50%, -50%)',
-    borderRadius: '50%'
+    transform: 'translate(-50%, -50%)'
 });
 
 /**
@@ -62,7 +62,11 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 setBackgroundImageUrl('');
                 return;
             }
-            void imageService.getImageUrl(settings.imageFilename).then((url) => {
+            setBackgroundImageUrl('');
+            void imageService.getImageUrl(settings.imageFilename).then(async (url) => {
+                if (!url) return '';
+                return createTransparentFloatingButtonImage(url);
+            }).then((url) => {
                 if (isCurrent) setBackgroundImageUrl(url);
             }).catch(() => {
                 if (isCurrent) setBackgroundImageUrl('');
