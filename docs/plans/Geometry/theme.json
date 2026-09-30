@@ -79,7 +79,8 @@
       "backgroundId": "geometry-navigation-background",
       "iconsId": "geometry-navigation-icons",
       "showLabelWithIcon": true,
-      "iconScale": 78
+      "iconScale": 78,
+      "transparentTitleBar": true
     },
     "font": {
       "source": "builtin",

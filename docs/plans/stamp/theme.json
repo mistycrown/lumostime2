@@ -1,0 +1,137 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 2,
+  "package": {
+    "id": "stamp",
+    "name": "stamp",
+    "version": "1.0.0",
+    "description": "一套以印章纹理为灵感的莫兰迪棕主题",
+    "preview": "assets/background/main.webp"
+  },
+  "resources": {
+    "backgrounds": [
+      {
+        "id": "stamp-background",
+        "file": "assets/background/main.webp",
+        "fit": "cover",
+        "position": "center"
+      }
+    ],
+    "stickers": [
+      {
+        "id": "stamp-stickers",
+        "name": "Stamp stickers",
+        "cover": "assets/stickers/stamp/01.webp",
+        "items": [
+          { "id": "stamp-sticker-01", "name": "Stamp sticker 01", "file": "assets/stickers/stamp/01.webp" },
+          { "id": "stamp-sticker-02", "name": "Stamp sticker 02", "file": "assets/stickers/stamp/02.webp" },
+          { "id": "stamp-sticker-03", "name": "Stamp sticker 03", "file": "assets/stickers/stamp/03.webp" },
+          { "id": "stamp-sticker-04", "name": "Stamp sticker 04", "file": "assets/stickers/stamp/04.webp" },
+          { "id": "stamp-sticker-05", "name": "Stamp sticker 05", "file": "assets/stickers/stamp/05.webp" },
+          { "id": "stamp-sticker-06", "name": "Stamp sticker 06", "file": "assets/stickers/stamp/06.webp" },
+          { "id": "stamp-sticker-07", "name": "Stamp sticker 07", "file": "assets/stickers/stamp/07.webp" },
+          { "id": "stamp-sticker-08", "name": "Stamp sticker 08", "file": "assets/stickers/stamp/08.webp" },
+          { "id": "stamp-sticker-09", "name": "Stamp sticker 09", "file": "assets/stickers/stamp/09.webp" },
+          { "id": "stamp-sticker-10", "name": "Stamp sticker 10", "file": "assets/stickers/stamp/10.webp" },
+          { "id": "stamp-sticker-11", "name": "Stamp sticker 11", "file": "assets/stickers/stamp/11.webp" },
+          { "id": "stamp-sticker-12", "name": "Stamp sticker 12", "file": "assets/stickers/stamp/12.webp" },
+          { "id": "stamp-sticker-13", "name": "Stamp sticker 13", "file": "assets/stickers/stamp/13.webp" },
+          { "id": "stamp-sticker-14", "name": "Stamp sticker 14", "file": "assets/stickers/stamp/14.webp" },
+          { "id": "stamp-sticker-15", "name": "Stamp sticker 15", "file": "assets/stickers/stamp/15.webp" },
+          { "id": "stamp-sticker-16", "name": "Stamp sticker 16", "file": "assets/stickers/stamp/16.webp" }
+        ]
+      },
+      {
+        "id": "stamp-stickers-2",
+        "name": "Stamp stickers II",
+        "cover": "assets/stickers/stamp-2/01.webp",
+        "items": [
+          { "id": "stamp-sticker-2-01", "name": "Stamp sticker II-01", "file": "assets/stickers/stamp-2/01.webp" },
+          { "id": "stamp-sticker-2-02", "name": "Stamp sticker II-02", "file": "assets/stickers/stamp-2/02.webp" },
+          { "id": "stamp-sticker-2-03", "name": "Stamp sticker II-03", "file": "assets/stickers/stamp-2/03.webp" },
+          { "id": "stamp-sticker-2-04", "name": "Stamp sticker II-04", "file": "assets/stickers/stamp-2/04.webp" },
+          { "id": "stamp-sticker-2-05", "name": "Stamp sticker II-05", "file": "assets/stickers/stamp-2/05.webp" },
+          { "id": "stamp-sticker-2-06", "name": "Stamp sticker II-06", "file": "assets/stickers/stamp-2/06.webp" },
+          { "id": "stamp-sticker-2-07", "name": "Stamp sticker II-07", "file": "assets/stickers/stamp-2/07.webp" },
+          { "id": "stamp-sticker-2-08", "name": "Stamp sticker II-08", "file": "assets/stickers/stamp-2/08.webp" },
+          { "id": "stamp-sticker-2-09", "name": "Stamp sticker II-09", "file": "assets/stickers/stamp-2/09.webp" },
+          { "id": "stamp-sticker-2-10", "name": "Stamp sticker II-10", "file": "assets/stickers/stamp-2/10.webp" },
+          { "id": "stamp-sticker-2-11", "name": "Stamp sticker II-11", "file": "assets/stickers/stamp-2/11.webp" },
+          { "id": "stamp-sticker-2-12", "name": "Stamp sticker II-12", "file": "assets/stickers/stamp-2/12.webp" },
+          { "id": "stamp-sticker-2-13", "name": "Stamp sticker II-13", "file": "assets/stickers/stamp-2/13.webp" },
+          { "id": "stamp-sticker-2-14", "name": "Stamp sticker II-14", "file": "assets/stickers/stamp-2/14.webp" },
+          { "id": "stamp-sticker-2-15", "name": "Stamp sticker II-15", "file": "assets/stickers/stamp-2/15.webp" },
+          { "id": "stamp-sticker-2-16", "name": "Stamp sticker II-16", "file": "assets/stickers/stamp-2/16.webp" }
+        ]
+      }
+    ],
+    "navigationBackgrounds": [
+      {
+        "id": "stamp-navigation-background",
+        "file": "assets/navigation/main.webp",
+        "position": "center"
+      }
+    ],
+    "navigationIcons": [
+      {
+        "id": "stamp-navigation-icons",
+        "files": {
+          "record": "assets/navigation/icons/record.webp",
+          "todo": "assets/navigation/icons/todo.webp",
+          "timeline": "assets/navigation/icons/timeline.webp",
+          "review": "assets/navigation/icons/review.webp",
+          "index": "assets/navigation/icons/index.webp"
+        }
+      }
+    ],
+    "memoirCalendarBackgrounds": [
+      {
+        "id": "stamp-memoir-background",
+        "image": "assets/memoir-calendar/main.webp",
+        "settings": { "opacity": 1 }
+      }
+    ],
+    "cardBackgroundGroups": [
+      {
+        "id": "stamp-card-backgrounds",
+        "name": "Stamp card backgrounds",
+        "alignment": "right-bottom",
+        "files": [
+          "assets/card-backgrounds/01.webp",
+          "assets/card-backgrounds/02.webp",
+          "assets/card-backgrounds/03.webp",
+          "assets/card-backgrounds/04.webp",
+          "assets/card-backgrounds/05.webp",
+          "assets/card-backgrounds/06.webp"
+        ]
+      }
+    ]
+  },
+  "apply": {
+    "background": { "resourceId": "stamp-background", "opacity": 1 },
+    "color": { "schemeId": "morandi-brown" },
+    "uiIcon": { "source": "builtin", "themeId": "water" },
+    "navigation": {
+      "mode": "modern",
+      "backgroundId": "stamp-navigation-background",
+      "iconsId": "stamp-navigation-icons",
+      "showLabelWithIcon": true,
+      "transparentTitleBar": true
+    },
+    "stickers": {
+      "defaultPage": "stamp-stickers",
+      "enabled": true,
+      "groups": [
+        {
+          "id": "stamp-sticker-collection",
+          "name": "Stamp stickers",
+          "sourceSetIds": ["stamp-stickers", "stamp-stickers-2"]
+        }
+      ]
+    },
+    "font": { "source": "builtin", "fontId": "default" },
+    "timeline": { "themeId": "default" },
+    "memoirCalendar": { "backgroundId": "stamp-memoir-background" },
+    "cardBackground": { "groupId": "stamp-card-backgrounds", "opacity": 1 }
+  }
+}
