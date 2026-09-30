@@ -10,17 +10,19 @@
  * @updated 2026-09-29: Covers explicitly restoring the default floating-button background.
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  * @updated 2026-09-30: Covers packaged labels below custom navigation icons.
+ * @updated 2026-09-30: Covers packaged custom navigation icon size scales.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, setTransparentNavigationEnabled, replaceFloatingButtonSchemes, selectFloatingButtonScheme } = vi.hoisted(() => ({
+const { registerIconPack, hydrateNavigationIcons, setNavigationEnabled, setTransparentNavigationEnabled, replaceFloatingButtonSchemes, selectFloatingButtonScheme, getNavigationSelection } = vi.hoisted(() => ({
   registerIconPack: vi.fn(async () => undefined),
   hydrateNavigationIcons: vi.fn(async () => undefined),
   setNavigationEnabled: vi.fn(),
   setTransparentNavigationEnabled: vi.fn(),
   replaceFloatingButtonSchemes: vi.fn(),
-  selectFloatingButtonScheme: vi.fn()
+  selectFloatingButtonScheme: vi.fn(),
+  getNavigationSelection: vi.fn(() => ({ showLabelWithIcon: false, iconScale: 100 }))
 }));
 
 vi.mock('./achievementBottleIconPackService', () => ({
@@ -43,7 +45,7 @@ vi.mock('./navigationIconService', () => ({
   NAVIGATION_ICON_CHANGE_EVENT: 'navigationIconChange',
   navigationIconService: {
     getSlots: () => ['record', 'todo', 'timeline', 'review', 'index'],
-    getSelection: () => ({ showLabelWithIcon: false }),
+    getSelection: getNavigationSelection,
     hydrateCustomIcons: hydrateNavigationIcons
   }
 }));
@@ -87,6 +89,8 @@ describe('applyImportedThemePackage', () => {
     setTransparentNavigationEnabled.mockClear();
     replaceFloatingButtonSchemes.mockClear();
     selectFloatingButtonScheme.mockClear();
+    getNavigationSelection.mockReset();
+    getNavigationSelection.mockReturnValue({ showLabelWithIcon: false, iconScale: 100 });
   });
 
   it('applies custom bottle frames when achievementBottle is a top-level config section', async () => {
@@ -198,6 +202,7 @@ describe('applyImportedThemePackage', () => {
           },
           navigation: {
             showLabelWithIcon: true,
+            iconScale: 125,
             icons: {
               source: 'asset',
               files: { record: 'assets/navigation/record.png' }
@@ -227,7 +232,8 @@ describe('applyImportedThemePackage', () => {
     expect(iconSelection).toMatchObject({
       mode: 'custom',
       schemeId: 'theme:asset-theme:navigation-icons',
-      showLabelWithIcon: true
+      showLabelWithIcon: true,
+      iconScale: 125
     });
     expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
     expect(setNavigationEnabled).toHaveBeenCalledWith(true);
@@ -279,7 +285,44 @@ describe('applyImportedThemePackage', () => {
     expect(backgrounds).toMatchObject([{ verticalStretch: 1.15 }]);
     expect(settings['theme:stretched-navigation:navigation-background']).toMatchObject({ verticalStretch: 1.15 });
     expect(iconSelection).toMatchObject({ mode: 'text', customMapping: {}, showLabelWithIcon: false });
+    expect(iconSelection).not.toHaveProperty('iconScale');
     expect(setTransparentNavigationEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('preserves the current icon scale when an image-icon package omits it', async () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key)
+    });
+    getNavigationSelection.mockReturnValue({ showLabelWithIcon: true, iconScale: 115 });
+
+    const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    await applyImportedThemePackage({
+      id: 'retain-navigation-scale',
+      name: 'Retain Navigation Scale',
+      version: '1.0.0',
+      manifest: {
+        format: 'lumostime-theme-package',
+        schemaVersion: 1,
+        package: { id: 'retain-navigation-scale', name: 'Retain Navigation Scale', version: '1.0.0' },
+        config: {
+          navigation: {
+            icons: { files: { record: 'assets/navigation/record.png' } }
+          }
+        }
+      },
+      imageAssets: { 'assets/navigation/record.png': 'navigation-record.png' },
+      importedAt: 1,
+      updatedAt: 1
+    });
+
+    expect(JSON.parse(values.get('navigation_icon_selection_v1') || '{}')).toMatchObject({
+      mode: 'custom',
+      showLabelWithIcon: true,
+      iconScale: 115
+    });
   });
 
   it('sets the imported sticker default page and merges package sets into one selector group', async () => {

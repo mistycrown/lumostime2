@@ -7,6 +7,7 @@
  * @updated 2026-09-25: Added multiple editable custom schemes with legacy selection migration.
  * @updated 2026-09-26: Added persisted opt-in labels below image navigation icons.
  * @updated 2026-09-28: Removed the packaged pink icon set and migrate its saved selection to text.
+ * @updated 2026-09-30: Added a normalized size scale for custom navigation images.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -34,14 +35,23 @@ export interface NavigationIconSelection {
     schemeId?: string;
     customMapping: Partial<Record<NavigationIconSlot, string>>;
     showLabelWithIcon: boolean;
+    iconScale: number;
 }
 
 export const NAVIGATION_ICON_CHANGE_EVENT = 'navigationIconChange';
 export const NAVIGATION_ICON_SELECTION_KEY = 'navigation_icon_selection_v1';
 export const NAVIGATION_ICON_CUSTOM_KEY = 'navigation_icon_custom_list_v1';
 export const NAVIGATION_ICON_SCHEMES_KEY = 'navigation_icon_schemes_v1';
+export const NAVIGATION_ICON_SCALE_MIN = 70;
+export const NAVIGATION_ICON_SCALE_MAX = 140;
+export const DEFAULT_NAVIGATION_ICON_SCALE = 100;
 
 const NAVIGATION_SLOTS: NavigationIconSlot[] = ['record', 'todo', 'timeline', 'review', 'index'];
+
+export const normalizeNavigationIconScale = (value: unknown): number => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_NAVIGATION_ICON_SCALE;
+    return Math.min(NAVIGATION_ICON_SCALE_MAX, Math.max(NAVIGATION_ICON_SCALE_MIN, Math.round(value)));
+};
 
 export const getNavigationIconFallbackUrl = (url: string): string => (
     resolveAssetPath(url.replace(/\.webp(?=$|[?#])/i, '.png'))
@@ -127,7 +137,8 @@ class NavigationIconService {
             mode,
             schemeId,
             customMapping: activeScheme?.mapping || (stored.customMapping && typeof stored.customMapping === 'object' ? stored.customMapping : {}),
-            showLabelWithIcon: stored.showLabelWithIcon === true
+            showLabelWithIcon: stored.showLabelWithIcon === true,
+            iconScale: normalizeNavigationIconScale(stored.iconScale)
         };
     }
 
@@ -135,6 +146,10 @@ class NavigationIconService {
 
     setShowLabelWithIcon(enabled: boolean): void {
         this.saveSelection({ ...this.getSelection(), showLabelWithIcon: enabled });
+    }
+
+    setIconScale(scale: number): void {
+        this.saveSelection({ ...this.getSelection(), iconScale: normalizeNavigationIconScale(scale) });
     }
 
     setActiveScheme(schemeId: string): void {

@@ -32,6 +32,10 @@ assets/
 
 复制本文件夹后，可按主题需要创建资源子目录；空目录和 `.gitkeep` 不会作为资源导入。
 
+## 导航图标大小
+
+自定义图片导航图标可在 `apply.navigation.iconScale` 中使用 70 到 140 的整数百分比调节大小；例如：`"navigation": { "mode": "modern", "iconsId": "my-navigation-icons", "iconScale": 110 }`。省略该字段时保留用户当前大小设置，文字导航不受影响。
+
 ## 卡片背景
 
 卡片背景资源组放在 `resources.cardBackgroundGroups`，应用时用 `apply.cardBackground.groupId` 选择。每组可配置多张图片和右侧对齐位置；透明度范围为 0 到 1。主题组会追加到用户已有卡片背景组，不会覆盖原有组。

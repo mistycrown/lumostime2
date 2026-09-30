@@ -150,11 +150,11 @@ assets/
     "review": "assets/navigation/icons/review.webp"
   } }]
 },
-"apply": { "navigation": { "mode": "modern", "backgroundId": "main", "iconsId": "main", "showLabelWithIcon": true } }
+"apply": { "navigation": { "mode": "modern", "backgroundId": "main", "iconsId": "main", "showLabelWithIcon": true, "iconScale": 100 } }
 ```
 
 新版导航 `mode` 为 `modern`。旧版导航用 `mode: "legacy"` 并通过 `decorationId` 指定应用内置装饰 ID，或引用 `resources.navigationDecorations` 中自定义装饰。未声明模式的旧 ZIP 按旧配置兼容。
-使用自定义图片图标时，`showLabelWithIcon: true` 会在图标下显示导航文字；省略时保持用户当前偏好。
+使用自定义图片图标时，`showLabelWithIcon: true` 会在图标下显示导航文字；省略时保持用户当前偏好。`iconScale` 可选，使用 70 到 140 的整数百分比调节图片图标大小；省略时保持用户当前大小设置，文字导航不受影响。
 
 ### 时间小友
 

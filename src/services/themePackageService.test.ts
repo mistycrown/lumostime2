@@ -17,6 +17,8 @@
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  * @updated 2026-09-30: Covers packaged navigation labels below custom icons.
  * @updated 2026-09-30: Covers mixed-case IDs for named theme packages.
+ * @updated 2026-09-30: Covers packaged navigation labels below custom icons.
+ * @updated 2026-09-30: Covers packaged custom navigation icon size scales.
  */
 
 import JSZip from 'jszip';
@@ -206,7 +208,7 @@ describe('parseThemePackage', () => {
         }]
       },
       apply: {
-        navigation: { mode: 'modern', iconsId: 'icons', showLabelWithIcon: true }
+        navigation: { mode: 'modern', iconsId: 'icons', showLabelWithIcon: true, iconScale: 125 }
       }
     };
 
@@ -217,8 +219,24 @@ describe('parseThemePackage', () => {
     expect(result.manifest.config.navigation).toMatchObject({
       mode: 'modern',
       showLabelWithIcon: true,
+      iconScale: 125,
       icons: { files: { record: 'assets/navigation/icons/record.webp' } }
     });
+  });
+
+  it('rejects invalid custom navigation icon scales', async () => {
+    for (const iconScale of [69, 141, 100.5, '125']) {
+      await expect(parseThemePackage(await createZip({
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'invalid-navigation-scale', name: 'Invalid Navigation Scale', version: '1.0.0' },
+        resources: {},
+        apply: { navigation: { mode: 'modern', iconScale } }
+      }))).rejects.toMatchObject({
+        code: 'INVALID_CONFIGURATION',
+        path: 'config.navigation.iconScale'
+      });
+    }
   });
 
   it('adapts a floating-button background resource and validates its scale', async () => {

@@ -1,0 +1,102 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 2,
+  "package": {
+    "id": "geometry",
+    "name": "Geometry",
+    "version": "1.0.0",
+    "description": "A geometric theme in a soft Morandi brown palette.",
+    "preview": "assets/background/main.webp"
+  },
+  "resources": {
+    "backgrounds": [
+      {
+        "id": "geometry-background",
+        "file": "assets/background/main.webp",
+        "fit": "cover",
+        "position": "center"
+      }
+    ],
+    "navigationBackgrounds": [
+      {
+        "id": "geometry-navigation-background",
+        "file": "assets/navigation/background.webp",
+        "position": "center"
+      }
+    ],
+    "navigationIcons": [
+      {
+        "id": "geometry-navigation-icons",
+        "files": {
+          "record": "assets/navigation/icons/record.webp",
+          "todo": "assets/navigation/icons/todo.webp",
+          "timeline": "assets/navigation/icons/timeline.webp",
+          "review": "assets/navigation/icons/review.webp",
+          "index": "assets/navigation/icons/index.webp"
+        }
+      }
+    ],
+    "memoirCalendarBackgrounds": [
+      {
+        "id": "geometry-memoir-background",
+        "image": "assets/memoir-calendar/background.webp",
+        "settings": {
+          "opacity": 1
+        }
+      }
+    ],
+    "cardBackgroundGroups": [
+      {
+        "id": "geometry-card-backgrounds",
+        "name": "Geometry card backgrounds",
+        "alignment": "right-bottom",
+        "files": [
+          "assets/card-backgrounds/01.webp",
+          "assets/card-backgrounds/02.webp",
+          "assets/card-backgrounds/03.webp",
+          "assets/card-backgrounds/04.webp",
+          "assets/card-backgrounds/05.webp",
+          "assets/card-backgrounds/06.webp",
+          "assets/card-backgrounds/07.webp"
+        ]
+      }
+    ]
+  },
+  "apply": {
+    "background": {
+      "resourceId": "geometry-background",
+      "opacity": 1
+    },
+    "uiIcon": {
+      "source": "builtin",
+      "themeId": "water"
+    },
+    "color": {
+      "schemeId": "morandi-brown"
+    },
+    "navigation": {
+      "mode": "modern",
+      "backgroundId": "geometry-navigation-background",
+      "iconsId": "geometry-navigation-icons",
+      "showLabelWithIcon": true,
+      "iconScale": 78
+    },
+    "font": {
+      "source": "builtin",
+      "fontId": "default"
+    },
+    "timeline": {
+      "themeId": "default"
+    },
+    "memoirCalendar": {
+      "backgroundId": "geometry-memoir-background"
+    },
+    "cardBackground": {
+      "groupId": "geometry-card-backgrounds",
+      "opacity": 1
+    },
+    "floatingButtonBackground": {
+      "none": true
+    }
+  }
+}
