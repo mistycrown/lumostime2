@@ -15,6 +15,7 @@
  * @updated 2026-09-29: Covers schema-version-two text-only navigation mode.
  * @updated 2026-09-29: Covers explicit default floating-button backgrounds.
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
+ * @updated 2026-09-30: Covers packaged navigation labels below custom icons.
  */
 
 import JSZip from 'jszip';
@@ -174,6 +175,33 @@ describe('parseThemePackage', () => {
 
     const result = await parseThemePackage(await createZip(manifest));
     expect(result.manifest.config.navigation).toEqual({ mode: 'modern', iconMode: 'text', transparentTitleBar: true });
+  });
+
+  it('preserves the navigation label preference for custom icons', async () => {
+    const manifest = {
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'labeled-navigation', name: 'Labeled Navigation', version: '1.0.0' },
+      resources: {
+        navigationIcons: [{
+          id: 'icons',
+          files: { record: 'assets/navigation/icons/record.webp' }
+        }]
+      },
+      apply: {
+        navigation: { mode: 'modern', iconsId: 'icons', showLabelWithIcon: true }
+      }
+    };
+
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/navigation/icons/record.webp': 'record'
+    }));
+
+    expect(result.manifest.config.navigation).toMatchObject({
+      mode: 'modern',
+      showLabelWithIcon: true,
+      icons: { files: { record: 'assets/navigation/icons/record.webp' } }
+    });
   });
 
   it('adapts a floating-button background resource and validates its scale', async () => {

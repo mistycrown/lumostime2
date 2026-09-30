@@ -1,0 +1,153 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 2,
+  "package": {
+    "id": "pencil",
+    "name": "pencil",
+    "version": "1.0.0",
+    "description": "克莱因蓝铅笔主题",
+    "preview": "assets/background/main.webp"
+  },
+  "resources": {
+    "backgrounds": [
+      {
+        "id": "pencil-background",
+        "file": "assets/background/main.webp",
+        "fit": "cover",
+        "position": "center"
+      }
+    ],
+    "stickers": [
+      {
+        "id": "pencil-stickers",
+        "name": "铅笔涂鸦贴纸",
+        "cover": "assets/stickers/pencil/01.webp",
+        "items": [
+          { "id": "pencil-sticker-01", "name": "铅笔涂鸦 01", "file": "assets/stickers/pencil/01.webp" },
+          { "id": "pencil-sticker-02", "name": "铅笔涂鸦 02", "file": "assets/stickers/pencil/02.webp" },
+          { "id": "pencil-sticker-03", "name": "铅笔涂鸦 03", "file": "assets/stickers/pencil/03.webp" },
+          { "id": "pencil-sticker-04", "name": "铅笔涂鸦 04", "file": "assets/stickers/pencil/04.webp" },
+          { "id": "pencil-sticker-05", "name": "铅笔涂鸦 05", "file": "assets/stickers/pencil/05.webp" },
+          { "id": "pencil-sticker-06", "name": "铅笔涂鸦 06", "file": "assets/stickers/pencil/06.webp" },
+          { "id": "pencil-sticker-07", "name": "铅笔涂鸦 07", "file": "assets/stickers/pencil/07.webp" },
+          { "id": "pencil-sticker-08", "name": "铅笔涂鸦 08", "file": "assets/stickers/pencil/08.webp" },
+          { "id": "pencil-sticker-09", "name": "铅笔涂鸦 09", "file": "assets/stickers/pencil/09.webp" },
+          { "id": "pencil-sticker-10", "name": "铅笔涂鸦 10", "file": "assets/stickers/pencil/10.webp" },
+          { "id": "pencil-sticker-11", "name": "铅笔涂鸦 11", "file": "assets/stickers/pencil/11.webp" },
+          { "id": "pencil-sticker-12", "name": "铅笔涂鸦 12", "file": "assets/stickers/pencil/12.webp" },
+          { "id": "pencil-sticker-13", "name": "铅笔涂鸦 13", "file": "assets/stickers/pencil/13.webp" },
+          { "id": "pencil-sticker-14", "name": "铅笔涂鸦 14", "file": "assets/stickers/pencil/14.webp" },
+          { "id": "pencil-sticker-15", "name": "铅笔涂鸦 15", "file": "assets/stickers/pencil/15.webp" },
+          { "id": "pencil-sticker-16", "name": "铅笔涂鸦 16", "file": "assets/stickers/pencil/16.webp" }
+        ]
+      },
+      {
+        "id": "pencil-semantic-glyphs",
+        "name": "语义图形贴纸",
+        "cover": "assets/stickers/semantic-glyphs/01.webp",
+        "items": [
+          { "id": "pencil-glyph-01", "name": "语义图形 01", "file": "assets/stickers/semantic-glyphs/01.webp" },
+          { "id": "pencil-glyph-02", "name": "语义图形 02", "file": "assets/stickers/semantic-glyphs/02.webp" },
+          { "id": "pencil-glyph-03", "name": "语义图形 03", "file": "assets/stickers/semantic-glyphs/03.webp" },
+          { "id": "pencil-glyph-04", "name": "语义图形 04", "file": "assets/stickers/semantic-glyphs/04.webp" },
+          { "id": "pencil-glyph-05", "name": "语义图形 05", "file": "assets/stickers/semantic-glyphs/05.webp" },
+          { "id": "pencil-glyph-06", "name": "语义图形 06", "file": "assets/stickers/semantic-glyphs/06.webp" },
+          { "id": "pencil-glyph-07", "name": "语义图形 07", "file": "assets/stickers/semantic-glyphs/07.webp" },
+          { "id": "pencil-glyph-08", "name": "语义图形 08", "file": "assets/stickers/semantic-glyphs/08.webp" },
+          { "id": "pencil-glyph-09", "name": "语义图形 09", "file": "assets/stickers/semantic-glyphs/09.webp" },
+          { "id": "pencil-glyph-10", "name": "语义图形 10", "file": "assets/stickers/semantic-glyphs/10.webp" },
+          { "id": "pencil-glyph-11", "name": "语义图形 11", "file": "assets/stickers/semantic-glyphs/11.webp" },
+          { "id": "pencil-glyph-12", "name": "语义图形 12", "file": "assets/stickers/semantic-glyphs/12.webp" },
+          { "id": "pencil-glyph-13", "name": "语义图形 13", "file": "assets/stickers/semantic-glyphs/13.webp" },
+          { "id": "pencil-glyph-14", "name": "语义图形 14", "file": "assets/stickers/semantic-glyphs/14.webp" },
+          { "id": "pencil-glyph-15", "name": "语义图形 15", "file": "assets/stickers/semantic-glyphs/15.webp" },
+          { "id": "pencil-glyph-16", "name": "语义图形 16", "file": "assets/stickers/semantic-glyphs/16.webp" }
+        ]
+      }
+    ],
+    "navigationBackgrounds": [
+      {
+        "id": "pencil-navigation",
+        "file": "assets/navigation/main.webp",
+        "position": "center"
+      }
+    ],
+    "navigationIcons": [
+      {
+        "id": "pencil-navigation-icons",
+        "files": {
+          "record": "assets/navigation/icons/record.webp",
+          "todo": "assets/navigation/icons/todo.webp",
+          "timeline": "assets/navigation/icons/timeline.webp",
+          "review": "assets/navigation/icons/review.webp",
+          "index": "assets/navigation/icons/index.webp"
+        }
+      }
+    ],
+    "fonts": [
+      {
+        "id": "lemi-hui",
+        "file": "assets/fonts/lemi-hui.ttf",
+        "displayName": "乐米惠体",
+        "familyName": "LemiHuiTi",
+        "format": "ttf"
+      }
+    ],
+    "memoirCalendarBackgrounds": [
+      {
+        "id": "pencil-memoir",
+        "image": "assets/memoir-calendar/main.webp",
+        "settings": { "opacity": 0.9 }
+      }
+    ],
+    "cardBackgroundGroups": [
+      {
+        "id": "pencil-cards",
+        "name": "pencil 卡片背景",
+        "alignment": "right-bottom",
+        "files": [
+          "assets/card-backgrounds/01.webp",
+          "assets/card-backgrounds/02.webp",
+          "assets/card-backgrounds/03.webp",
+          "assets/card-backgrounds/04.webp",
+          "assets/card-backgrounds/05.webp",
+          "assets/card-backgrounds/06.webp",
+          "assets/card-backgrounds/07.webp"
+        ]
+      }
+    ],
+    "floatingButtonBackgrounds": [
+      {
+        "id": "pencil-floating-button",
+        "image": "assets/floating-button-backgrounds/main.webp"
+      }
+    ]
+  },
+  "apply": {
+    "background": { "resourceId": "pencil-background", "opacity": 0.6 },
+    "color": { "schemeId": "klein-blue" },
+    "uiIcon": { "source": "builtin", "themeId": "pencil" },
+    "navigation": {
+      "mode": "modern",
+      "backgroundId": "pencil-navigation",
+      "iconsId": "pencil-navigation-icons",
+      "showLabelWithIcon": true
+    },
+    "stickers": {
+      "defaultPage": "pencil-stickers",
+      "enabled": true,
+      "groups": [
+        {
+          "id": "pencil-sticker-collection",
+          "name": "pencil 贴纸",
+          "sourceSetIds": ["pencil-stickers", "pencil-semantic-glyphs"]
+        }
+      ]
+    },
+    "font": { "resourceId": "lemi-hui" },
+    "timeline": { "themeId": "default" },
+    "memoirCalendar": { "backgroundId": "pencil-memoir" },
+    "cardBackground": { "groupId": "pencil-cards", "opacity": 0.65 },
+    "floatingButtonBackground": { "resourceId": "pencil-floating-button", "scale": 123 }
+  }
+}
