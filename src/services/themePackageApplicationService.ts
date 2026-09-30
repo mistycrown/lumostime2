@@ -15,6 +15,7 @@
  * @updated 2026-09-29: Preserves packaged navigation stretching and applies text-only navigation icons.
  * @updated 2026-09-29: Clears floating-button backgrounds when a package explicitly requests the default state.
  * @updated 2026-09-29: Applies packaged transparent title-bar preferences.
+ * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -293,7 +294,9 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
     mode: 'custom',
     schemeId: getNamespacedId(record, 'navigation-icons'),
     customMapping: mapping,
-    showLabelWithIcon: navigationIconService.getSelection().showLabelWithIcon
+    showLabelWithIcon: typeof navigation?.showLabelWithIcon === 'boolean'
+      ? navigation.showLabelWithIcon
+      : navigationIconService.getSelection().showLabelWithIcon
   });
   await navigationIconService.hydrateCustomIcons();
   if (typeof window !== 'undefined') {

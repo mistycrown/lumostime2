@@ -9,6 +9,7 @@
  * @updated 2026-09-29: Covers packaged navigation stretching and text-only icon mode.
  * @updated 2026-09-29: Covers explicitly restoring the default floating-button background.
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
+ * @updated 2026-09-30: Covers packaged labels below custom navigation icons.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -196,6 +197,7 @@ describe('applyImportedThemePackage', () => {
             opacity: 0.3
           },
           navigation: {
+            showLabelWithIcon: true,
             icons: {
               source: 'asset',
               files: { record: 'assets/navigation/record.png' }
@@ -222,7 +224,11 @@ describe('applyImportedThemePackage', () => {
     const customStickers = JSON.parse(values.get('lumostime_custom_stickers_v2') || '[]');
 
     expect(result.appliedSections).toContain('navigation-icons');
-    expect(iconSelection).toMatchObject({ mode: 'custom', schemeId: 'theme:asset-theme:navigation-icons' });
+    expect(iconSelection).toMatchObject({
+      mode: 'custom',
+      schemeId: 'theme:asset-theme:navigation-icons',
+      showLabelWithIcon: true
+    });
     expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
     expect(setNavigationEnabled).toHaveBeenCalledWith(true);
     const { backgroundService } = await import('./backgroundService');

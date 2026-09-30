@@ -15,6 +15,7 @@
  * @updated 2026-09-29: Validates image-backed global floating-button backgrounds in schema-v2 packages.
  * @updated 2026-09-29: Supports explicitly clearing the current floating-button background.
  * @updated 2026-09-29: Adapts packaged transparent title-bar preferences.
+ * @updated 2026-09-30: Preserves packaged navigation labels shown below custom icons.
  */
 
 import JSZip from 'jszip';
@@ -213,6 +214,9 @@ const adaptResourcesAndApply = (
     const navigation: Record<string, unknown> = {
       mode: navigationApply.mode,
       ...(navigationApply.iconMode === 'text' ? { iconMode: 'text' } : {}),
+      ...(typeof navigationApply.showLabelWithIcon === 'boolean'
+        ? { showLabelWithIcon: navigationApply.showLabelWithIcon }
+        : {}),
       ...(typeof navigationApply.transparentTitleBar === 'boolean'
         ? { transparentTitleBar: navigationApply.transparentTitleBar }
         : {})
@@ -354,6 +358,13 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
         'INVALID_CONFIGURATION',
         'navigation.iconMode 只支持 text',
         'config.navigation.iconMode'
+      );
+    }
+    if (navigationRecord.showLabelWithIcon !== undefined && typeof navigationRecord.showLabelWithIcon !== 'boolean') {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'navigation.showLabelWithIcon 必须是布尔值',
+        'config.navigation.showLabelWithIcon'
       );
     }
     if (navigationRecord.transparentTitleBar !== undefined && typeof navigationRecord.transparentTitleBar !== 'boolean') {
