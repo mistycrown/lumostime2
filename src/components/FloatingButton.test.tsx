@@ -20,6 +20,10 @@ vi.mock('../services/imageService', () => ({
   }
 }));
 
+vi.mock('../utils/floatingButtonImageTransparency', () => ({
+  createTransparentFloatingButtonImage: vi.fn((url: string) => Promise.resolve(url))
+}));
+
 import { FloatingButton, createFloatingButtonBackgroundImageStyle } from './FloatingButton';
 
 describe('FloatingButton', () => {
@@ -59,8 +63,7 @@ describe('FloatingButton', () => {
       width: '150%',
       height: 'auto',
       maxWidth: 'none',
-      transform: 'translate(-50%, -50%)',
-      borderRadius: '50%'
+      transform: 'translate(-50%, -50%)'
     });
   });
 });
