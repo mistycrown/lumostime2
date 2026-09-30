@@ -17,6 +17,7 @@
  * @updated 2026-06-13: 解构并传递 handleQuickActionUpdateTitle 给 TodoQuickActionsModal 从而支持快捷编辑栏中的标题内联编辑和自动保存。
  * @updated 2026-05-21: Unified the expanded left-sidebar entry heights with the collapsed rail so opening the Todo sidebar no longer stretches the column and pushes the bottom toggle under the fixed navigation.
  * @updated 2026-09-26: Added configurable backgrounds to loose-mode todo cards.
+ * @updated 2026-09-30: Defers local wallpapers to MainLayout under transparent title bars so Todo headers and content share one continuous image.
  * @updated 2026-09-29: Uses the theme accent for loose-card dates and focus starts when a custom card background is active.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
@@ -2314,7 +2315,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       >
         {hasBackground && (
           <div
-            className="absolute inset-0 -z-20"
+            className="todo-page-background-image absolute inset-0 -z-20"
             style={{
               backgroundImage: `url(${backgroundUrl})`,
               backgroundSize: 'cover',
@@ -2600,7 +2601,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       {/* 闁煎啿鏈▍娆撳炊閸撗冾暬閻?*/}
       {hasBackground && (
         <div 
-          className="absolute inset-0 -z-20"
+          className="todo-page-background-image absolute inset-0 -z-20"
           style={{
             backgroundImage: `url(${backgroundUrl})`,
             backgroundSize: 'cover',
