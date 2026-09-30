@@ -38,6 +38,7 @@
  * @updated 2026-09-22: Extracts the chat composer and quick-command menu.
  * @updated 2026-09-23: Removes stale extracted inputs, restores custom-prompt deletion wiring, and removes duplicate header props.
  * @updated 2026-09-23: Restores foreground-send dependencies for native user-turn notification and review commands.
+ * @updated 2026-09-30: Keeps the latest conversation visible through keyboard resize only when the user starts at the bottom.
  * @updated 2026-09-25: Carries surfaced background message locations into the shared unread AI navigation target.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -430,7 +431,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     processingDueReminderIdsRef, isProcessingAssistantLetterRef, assistantPartRevealTimeoutsRef,
     revealedAssistantPartCountsRef, hydratedRevealSessionIdsRef, assistantRevealTargetCountsRef,
     avatarInputRef, userAvatarInputRef, composerTextareaRef, composerMenuRef, pendingHomeMessageRef,
-    messagesEndRef, messageElementRefs, handledNavigationKeyRef, handledAssistantTriggerIdsRef,
+    messagesEndRef, messagesScrollContainerRef, shouldKeepLatestMessageVisibleRef,
+    messageElementRefs, handledNavigationKeyRef, handledAssistantTriggerIdsRef,
     processingAssistantTriggerIdsRef, hasCompletedStartupReminderCatchupRef, visualViewportBaselineRef,
     focusComposerAtEnd, handleMessageElementRef
   } = useAIBackfillChatViewState(isOpen);
@@ -587,8 +589,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     assistantRevealTargetCountsRef,
     hydratedRevealSessionIdsRef
   });
-  const { scrollToLatestMessage } = useAIBackfillChatViewport({
+  const {
+    handleComposerBlur,
+    handleComposerFocus,
+    handleConversationScroll,
+    scrollToLatestMessage
+  } = useAIBackfillChatViewport({
     isOpen,
+    isHomeView,
     targetSessionId,
     targetMessageId,
     activeSessionId,
@@ -599,6 +607,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setIsHomeView,
     setKeyboardBottomInset,
     messagesEndRef,
+    messagesScrollContainerRef,
+    shouldKeepLatestMessageVisibleRef,
     messageElementRefs,
     handledNavigationKeyRef,
     wasOpenRef,
@@ -2734,6 +2744,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           isPersonaPanelOpen={isPersonaPanelOpen}
           isShortcutSettingsOpen={isShortcutSettingsOpen}
           messagesEndRef={messagesEndRef}
+          messagesScrollContainerRef={messagesScrollContainerRef}
+          handleConversationScroll={handleConversationScroll}
           renderAppliedAction={renderAppliedAction}
           revealedAssistantPartCounts={revealedAssistantPartCounts}
           resolveMessageDebugViewer={resolveMessageDebugViewer}
@@ -2776,6 +2788,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           handleFillWriteMonthlyNarrativeCommand={handleFillWriteMonthlyNarrativeCommand}
           handleFillWriteWeeklyNarrativeCommand={handleFillWriteWeeklyNarrativeCommand}
           handleKeyDown={handleKeyDown}
+          handleComposerBlur={handleComposerBlur}
+          handleComposerFocus={handleComposerFocus}
           handleSend={handleSend}
           handleStopRequest={handleStopRequest}
           inputText={inputText}

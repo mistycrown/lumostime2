@@ -6,11 +6,19 @@
  * @description Renders the composer menu, text input, and send/stop controls.
  * @updated 2026-09-22: Extracted the composer view.
  * @updated 2026-09-29: Re-scrolls after Android keyboard resizing settles so the newest message remains visible after auto-focus.
+ * @updated 2026-09-30: Respects older-message reading position and delegates keyboard resize intent to the viewport hook.
  */
 
 import { Plus, Send, Square } from 'lucide-react';
 
-export const queueComposerFocusScroll = (scrollToLatestMessage: (behavior?: ScrollBehavior) => void) => {
+export const queueComposerFocusScroll = (
+  scrollToLatestMessage: (behavior?: ScrollBehavior) => void,
+  shouldScroll = true
+) => {
+  if (!shouldScroll) {
+    return;
+  }
+
   window.requestAnimationFrame(() => {
     scrollToLatestMessage('auto');
     window.requestAnimationFrame(() => {
@@ -38,6 +46,8 @@ export function AIBackfillChatComposer(props: Record<string, any>) {
     handleFillWriteMonthlyNarrativeCommand,
     handleFillWriteWeeklyNarrativeCommand,
     handleKeyDown,
+    handleComposerBlur,
+    handleComposerFocus,
     handleSend,
     handleStopRequest,
     inputText,
@@ -109,8 +119,9 @@ export function AIBackfillChatComposer(props: Record<string, any>) {
                 onChange={(event) => setInputText(event.target.value)}
                 onKeyDown={handleKeyDown}
                 onFocus={() => {
-                  queueComposerFocusScroll(scrollToLatestMessage);
+                  queueComposerFocusScroll(scrollToLatestMessage, handleComposerFocus());
                 }}
+                onBlur={handleComposerBlur}
                 placeholder={`和 ${activePersona.assistantSelfName || 'AI'} 说点什么...`}
                 className="scrollbar-hide order-2 min-h-[34px] max-h-[34px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-1 text-[15px] leading-6 outline-none"
                 style={{ color: AI_CHAT_THEME.textPrimary }}

@@ -4,6 +4,7 @@
  * @output Stable view-state bundle for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Keeps presentational state and element references out of the AI request and background-agent orchestration component.
+ * @updated 2026-09-30: Added conversation scroller and keyboard bottom-follow intent refs.
  */
 import { useCallback, useRef, useState } from 'react';
 import type { AssistantEditableMemoryListKey } from '../../types/assistant';
@@ -105,6 +106,8 @@ export const useAIBackfillChatViewState = (initialIsOpen = false) => {
   const composerMenuRef = useRef<HTMLDivElement | null>(null);
   const pendingHomeMessageRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const shouldKeepLatestMessageVisibleRef = useRef(false);
   const messageElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const handledNavigationKeyRef = useRef('');
   const handledAssistantTriggerIdsRef = useRef<Set<string>>(new Set());
@@ -168,7 +171,8 @@ export const useAIBackfillChatViewState = (initialIsOpen = false) => {
     processingDueReminderIdsRef, isProcessingAssistantLetterRef, assistantPartRevealTimeoutsRef,
     revealedAssistantPartCountsRef, hydratedRevealSessionIdsRef, assistantRevealTargetCountsRef,
     avatarInputRef, userAvatarInputRef, composerTextareaRef, composerMenuRef, pendingHomeMessageRef,
-    messagesEndRef, messageElementRefs, handledNavigationKeyRef, handledAssistantTriggerIdsRef,
+    messagesEndRef, messagesScrollContainerRef, shouldKeepLatestMessageVisibleRef,
+    messageElementRefs, handledNavigationKeyRef, handledAssistantTriggerIdsRef,
     processingAssistantTriggerIdsRef, hasCompletedStartupReminderCatchupRef, visualViewportBaselineRef,
     focusComposerAtEnd, handleMessageElementRef
   };

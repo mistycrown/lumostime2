@@ -5,6 +5,7 @@
  * @pos Component Support (AI Integration)
  * @description Keeps home and conversation view composition out of the modal coordinator.
  * @updated 2026-09-22: Extracted main chat view composition.
+ * @updated 2026-09-30: Wires conversation scroll tracking for keyboard-safe bottom following.
  */
 
 import { AIChatHome } from './AIChatHome';
@@ -53,6 +54,8 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
     isPersonaPanelOpen,
     isShortcutSettingsOpen,
     messagesEndRef,
+    messagesScrollContainerRef,
+    handleConversationScroll,
     onOpenAssistantLetter,
     onOpenDailyNewspaper,
     onOpenDailyReviewNarrative,
@@ -176,6 +179,8 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
             isLoading={isLoading}
             markdownComponents={CHAT_MARKDOWN_COMPONENTS}
             messagesEndRef={messagesEndRef}
+            messagesScrollContainerRef={messagesScrollContainerRef}
+            onConversationScroll={handleConversationScroll}
             onMessageRef={handleMessageElementRef}
             onOpenDailyNewspaper={handleOpenDailyNewspaper}
             onOpenDailyReviewNarrative={handleOpenDailyReviewNarrative}

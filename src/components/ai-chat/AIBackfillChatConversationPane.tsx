@@ -11,6 +11,7 @@
  * @updated 2026-05-18: Added configurable width classes so compact desktop AI shells can reuse the conversation renderer without forcing the full-screen modal measure.
  * @updated 2026-05-15: Rebuilt the conversation pane with the extracted empty state, message bubble rendering, and writeback cards.
  * @updated 2026-09-21: Reserves bottom space for the fixed chat composer so the latest message remains visible.
+ * @updated 2026-09-30: Exposes the message scroller for keyboard resize following and bottom-intent tracking.
  */
 import React from 'react';
 import { ChevronDown, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
@@ -80,6 +81,8 @@ interface AIBackfillChatConversationPaneProps {
   isLoading: boolean;
   markdownComponents: any;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  messagesScrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  onConversationScroll: (element: HTMLDivElement) => void;
   onMessageRef: (messageId: string, node: HTMLDivElement | null) => void;
   onOpenDailyReviewNarrative: (date: string) => void;
   onOpenDailyNewspaper: (date: string) => void;
@@ -419,6 +422,8 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   isLoading,
   markdownComponents,
   messagesEndRef,
+  messagesScrollContainerRef,
+  onConversationScroll,
   onMessageRef,
   onOpenDailyReviewNarrative,
   onOpenDailyNewspaper,
@@ -942,7 +947,11 @@ export const AIBackfillChatConversationPane: React.FC<AIBackfillChatConversation
   };
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-5 sm:pb-32 sm:pt-5">
+    <div
+      ref={messagesScrollContainerRef}
+      onScroll={(event) => onConversationScroll(event.currentTarget)}
+      className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 sm:px-5 sm:pb-32 sm:pt-5"
+    >
       {!activeSession || activeSession.messages.length === 0 ? (
         <div
           className={`mx-auto mt-10 ${emptyStateMaxWidthClassName} rounded-[0.9rem] border border-dashed px-6 py-7 text-sm leading-7`}
