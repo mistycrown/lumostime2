@@ -4,11 +4,31 @@
  * @output Scroll helpers and keyboard-safe viewport effects for AIBackfillChatModal
  * @pos Component Support (AI Integration)
  * @description Keeps message scrolling, deep-link navigation, and visual viewport keyboard handling out of the main chat coordinator.
+ * @updated 2026-09-30: Tracks bottom intent and follows keyboard-driven conversation resizing without interrupting older-message reading.
  */
 import { useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { AIChatSession } from './AIBackfillChatShared';
 import { MOBILE_KEYBOARD_INSET_THRESHOLD } from './AIBackfillChatShared';
+
+export const AI_CHAT_BOTTOM_FOLLOW_THRESHOLD_PX = 48;
+
+interface AIChatScrollMetrics {
+  clientHeight: number;
+  scrollHeight: number;
+  scrollTop: number;
+}
+
+export const isAIChatScrollNearBottom = (
+  metrics: AIChatScrollMetrics,
+  threshold = AI_CHAT_BOTTOM_FOLLOW_THRESHOLD_PX
+) => metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= threshold;
+
+export const shouldFollowAIChatViewportResize = (
+  shouldKeepLatestVisible: boolean,
+  activeElement: Element | null,
+  composerTextarea: HTMLTextAreaElement | null
+) => shouldKeepLatestVisible && composerTextarea !== null && activeElement === composerTextarea;
 
 interface ViewportOptions {
   isOpen: boolean;
