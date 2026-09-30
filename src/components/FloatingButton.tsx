@@ -1,7 +1,7 @@
 /**
  * @file FloatingButton.tsx
  * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
- * @updated 2026-09-29: Keeps notification badges visible outside the clipped image layer.
+ * @updated 2026-09-30: Renders custom background images as a centered overflow-visible layer.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -23,6 +23,13 @@ interface FloatingButtonProps {
     style?: React.CSSProperties;
     disableThemeStyle?: boolean; // 禁用主题样式，使用默认样式
 }
+
+export const createFloatingButtonBackgroundImageStyle = (scale: number): React.CSSProperties => ({
+    width: `${scale}%`,
+    height: 'auto',
+    maxWidth: 'none',
+    transform: 'translate(-50%, -50%)'
+});
 
 /**
  * 悬浮按钮组件
@@ -107,6 +114,7 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
                 ${sizeClasses[size]}
                 ${styleClasses}
                 rounded-full
+                overflow-visible
                 flex items-center justify-center
                 active:scale-90
                 transition-transform
@@ -117,15 +125,21 @@ export const FloatingButton: React.FC<FloatingButtonProps> = ({
             aria-label={ariaLabel}
             title={title}
         >
-            {backgroundImageUrl && (
+            {hasCustomBackground && (
                 <span
                     aria-hidden="true"
-                    className="absolute inset-0 rounded-full bg-center bg-no-repeat"
-                    style={{
-                        backgroundImage: `url("${backgroundImageUrl.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`,
-                        backgroundSize: `${backgroundScale}%`
-                    }}
-                />
+                    data-floating-button-image-layer="true"
+                    className="pointer-events-none absolute inset-0 overflow-visible"
+                >
+                    {backgroundImageUrl && (
+                        <img
+                            src={backgroundImageUrl}
+                            alt=""
+                            className="pointer-events-none absolute left-1/2 top-1/2 h-auto max-w-none"
+                            style={createFloatingButtonBackgroundImageStyle(backgroundScale)}
+                        />
+                    )}
+                </span>
             )}
             <span className="relative z-10 flex items-center justify-center">{children}</span>
         </button>
