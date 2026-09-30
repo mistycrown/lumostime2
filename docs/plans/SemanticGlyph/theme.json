@@ -1,0 +1,153 @@
+{
+  "format": "lumostime-theme-package",
+  "schemaVersion": 2,
+  "package": {
+    "id": "SemanticGlyph",
+    "name": "Semantic Glyph",
+    "version": "1.0.0",
+    "description": "Anthropomorphism and Riso",
+    "preview": "assets/background/main.webp"
+  },
+  "resources": {
+    "backgrounds": [
+      {
+        "id": "semantic-glyph-background",
+        "file": "assets/background/main.webp",
+        "fit": "cover",
+        "position": "center"
+      }
+    ],
+    "stickers": [
+      {
+        "id": "semantic-glyph-anthropomorphism",
+        "name": "Anthropomorphism",
+        "cover": "assets/stickers/anthropomorphism/01.webp",
+        "items": [
+          { "id": "semantic-glyph-anthropomorphism-01", "name": "Anthropomorphism 01", "file": "assets/stickers/anthropomorphism/01.webp" },
+          { "id": "semantic-glyph-anthropomorphism-02", "name": "Anthropomorphism 02", "file": "assets/stickers/anthropomorphism/02.webp" },
+          { "id": "semantic-glyph-anthropomorphism-03", "name": "Anthropomorphism 03", "file": "assets/stickers/anthropomorphism/03.webp" },
+          { "id": "semantic-glyph-anthropomorphism-04", "name": "Anthropomorphism 04", "file": "assets/stickers/anthropomorphism/04.webp" },
+          { "id": "semantic-glyph-anthropomorphism-05", "name": "Anthropomorphism 05", "file": "assets/stickers/anthropomorphism/05.webp" },
+          { "id": "semantic-glyph-anthropomorphism-06", "name": "Anthropomorphism 06", "file": "assets/stickers/anthropomorphism/06.webp" },
+          { "id": "semantic-glyph-anthropomorphism-07", "name": "Anthropomorphism 07", "file": "assets/stickers/anthropomorphism/07.webp" },
+          { "id": "semantic-glyph-anthropomorphism-08", "name": "Anthropomorphism 08", "file": "assets/stickers/anthropomorphism/08.webp" },
+          { "id": "semantic-glyph-anthropomorphism-09", "name": "Anthropomorphism 09", "file": "assets/stickers/anthropomorphism/09.webp" },
+          { "id": "semantic-glyph-anthropomorphism-10", "name": "Anthropomorphism 10", "file": "assets/stickers/anthropomorphism/10.webp" },
+          { "id": "semantic-glyph-anthropomorphism-11", "name": "Anthropomorphism 11", "file": "assets/stickers/anthropomorphism/11.webp" },
+          { "id": "semantic-glyph-anthropomorphism-12", "name": "Anthropomorphism 12", "file": "assets/stickers/anthropomorphism/12.webp" },
+          { "id": "semantic-glyph-anthropomorphism-13", "name": "Anthropomorphism 13", "file": "assets/stickers/anthropomorphism/13.webp" },
+          { "id": "semantic-glyph-anthropomorphism-14", "name": "Anthropomorphism 14", "file": "assets/stickers/anthropomorphism/14.webp" },
+          { "id": "semantic-glyph-anthropomorphism-15", "name": "Anthropomorphism 15", "file": "assets/stickers/anthropomorphism/15.webp" },
+          { "id": "semantic-glyph-anthropomorphism-16", "name": "Anthropomorphism 16", "file": "assets/stickers/anthropomorphism/16.webp" }
+        ]
+      },
+      {
+        "id": "semantic-glyphs",
+        "name": "Semantic Glyphs",
+        "cover": "assets/stickers/semantic-glyphs/01.webp",
+        "items": [
+          { "id": "semantic-glyph-01", "name": "Semantic Glyph 01", "file": "assets/stickers/semantic-glyphs/01.webp" },
+          { "id": "semantic-glyph-02", "name": "Semantic Glyph 02", "file": "assets/stickers/semantic-glyphs/02.webp" },
+          { "id": "semantic-glyph-03", "name": "Semantic Glyph 03", "file": "assets/stickers/semantic-glyphs/03.webp" },
+          { "id": "semantic-glyph-04", "name": "Semantic Glyph 04", "file": "assets/stickers/semantic-glyphs/04.webp" },
+          { "id": "semantic-glyph-05", "name": "Semantic Glyph 05", "file": "assets/stickers/semantic-glyphs/05.webp" },
+          { "id": "semantic-glyph-06", "name": "Semantic Glyph 06", "file": "assets/stickers/semantic-glyphs/06.webp" },
+          { "id": "semantic-glyph-07", "name": "Semantic Glyph 07", "file": "assets/stickers/semantic-glyphs/07.webp" },
+          { "id": "semantic-glyph-08", "name": "Semantic Glyph 08", "file": "assets/stickers/semantic-glyphs/08.webp" },
+          { "id": "semantic-glyph-09", "name": "Semantic Glyph 09", "file": "assets/stickers/semantic-glyphs/09.webp" },
+          { "id": "semantic-glyph-10", "name": "Semantic Glyph 10", "file": "assets/stickers/semantic-glyphs/10.webp" },
+          { "id": "semantic-glyph-11", "name": "Semantic Glyph 11", "file": "assets/stickers/semantic-glyphs/11.webp" },
+          { "id": "semantic-glyph-12", "name": "Semantic Glyph 12", "file": "assets/stickers/semantic-glyphs/12.webp" },
+          { "id": "semantic-glyph-13", "name": "Semantic Glyph 13", "file": "assets/stickers/semantic-glyphs/13.webp" },
+          { "id": "semantic-glyph-14", "name": "Semantic Glyph 14", "file": "assets/stickers/semantic-glyphs/14.webp" },
+          { "id": "semantic-glyph-15", "name": "Semantic Glyph 15", "file": "assets/stickers/semantic-glyphs/15.webp" },
+          { "id": "semantic-glyph-16", "name": "Semantic Glyph 16", "file": "assets/stickers/semantic-glyphs/16.webp" }
+        ]
+      }
+    ],
+    "navigationBackgrounds": [
+      {
+        "id": "semantic-glyph-navigation",
+        "file": "assets/navigation/main.webp",
+        "position": "center"
+      }
+    ],
+    "navigationIcons": [
+      {
+        "id": "semantic-glyph-navigation-icons",
+        "files": {
+          "record": "assets/navigation/icons/record.webp",
+          "todo": "assets/navigation/icons/todo.webp",
+          "timeline": "assets/navigation/icons/timeline.webp",
+          "review": "assets/navigation/icons/review.webp",
+          "index": "assets/navigation/icons/index.webp"
+        }
+      }
+    ],
+    "fonts": [
+      {
+        "id": "lemi-hui",
+        "file": "assets/fonts/lemi-hui.ttf",
+        "displayName": "乐米惠体",
+        "familyName": "LemiHuiTi",
+        "format": "ttf"
+      }
+    ],
+    "memoirCalendarBackgrounds": [
+      {
+        "id": "semantic-glyph-memoir",
+        "image": "assets/memoir-calendar/main.webp",
+        "settings": { "opacity": 0.9 }
+      }
+    ],
+    "cardBackgroundGroups": [
+      {
+        "id": "semantic-glyph-cards",
+        "name": "Semantic Glyph card backgrounds",
+        "alignment": "right-bottom",
+        "files": [
+          "assets/card-backgrounds/01.webp",
+          "assets/card-backgrounds/02.webp",
+          "assets/card-backgrounds/03.webp",
+          "assets/card-backgrounds/04.webp",
+          "assets/card-backgrounds/05.webp",
+          "assets/card-backgrounds/06.webp",
+          "assets/card-backgrounds/07.webp"
+        ]
+      }
+    ],
+    "floatingButtonBackgrounds": [
+      {
+        "id": "semantic-glyph-floating-button",
+        "image": "assets/floating-button-backgrounds/main.webp"
+      }
+    ]
+  },
+  "apply": {
+    "background": { "resourceId": "semantic-glyph-background", "opacity": 0.6 },
+    "color": { "schemeId": "klein-blue" },
+    "uiIcon": { "source": "builtin", "themeId": "pencil" },
+    "navigation": {
+      "mode": "modern",
+      "backgroundId": "semantic-glyph-navigation",
+      "iconsId": "semantic-glyph-navigation-icons",
+      "showLabelWithIcon": true
+    },
+    "stickers": {
+      "defaultPage": "semantic-glyph-anthropomorphism",
+      "enabled": true,
+      "groups": [
+        {
+          "id": "semantic-glyph-sticker-collection",
+          "name": "Semantic Glyph",
+          "sourceSetIds": ["semantic-glyph-anthropomorphism", "semantic-glyphs"]
+        }
+      ]
+    },
+    "font": { "resourceId": "lemi-hui" },
+    "timeline": { "themeId": "default" },
+    "memoirCalendar": { "backgroundId": "semantic-glyph-memoir" },
+    "cardBackground": { "groupId": "semantic-glyph-cards", "opacity": 0.65 },
+    "floatingButtonBackground": { "resourceId": "semantic-glyph-floating-button", "scale": 123 }
+  }
+}

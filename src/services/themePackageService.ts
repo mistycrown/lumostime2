@@ -16,6 +16,7 @@
  * @updated 2026-09-29: Supports explicitly clearing the current floating-button background.
  * @updated 2026-09-29: Adapts packaged transparent title-bar preferences.
  * @updated 2026-09-30: Preserves packaged navigation labels shown below custom icons.
+ * @updated 2026-09-30: Accepts mixed-case package IDs used by named theme packages.
  */
 
 import JSZip from 'jszip';
@@ -24,7 +25,7 @@ export const THEME_PACKAGE_FORMAT = 'lumostime-theme-package';
 export const SUPPORTED_THEME_PACKAGE_SCHEMA_VERSION = 2;
 const LEGACY_THEME_PACKAGE_SCHEMA_VERSION = 1;
 
-const PACKAGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const PACKAGE_ID_PATTERN = /^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$/;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
 const SAFE_ASSET_PATH_PATTERN = /^assets\/[A-Za-z0-9._/-]+$/;
 const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;

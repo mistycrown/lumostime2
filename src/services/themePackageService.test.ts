@@ -16,6 +16,7 @@
  * @updated 2026-09-29: Covers explicit default floating-button backgrounds.
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  * @updated 2026-09-30: Covers packaged navigation labels below custom icons.
+ * @updated 2026-09-30: Covers mixed-case IDs for named theme packages.
  */
 
 import JSZip from 'jszip';
@@ -99,6 +100,22 @@ describe('parseThemePackage', () => {
     expect(result.manifest.package.id).toBe('moonlit-garden');
     expect(result.assets.has('assets/background/main.webp')).toBe(true);
     expect(result.assets.get('assets/background/main.webp')?.type).toBe('image/webp');
+  });
+
+  it('accepts mixed-case package IDs used by named themes', async () => {
+    const manifest = {
+      ...baseManifest,
+      package: {
+        ...baseManifest.package,
+        id: 'SemanticGlyph'
+      }
+    };
+    const result = await parseThemePackage(await createZip(manifest, {
+      'assets/preview.webp': 'preview',
+      'assets/background/main.webp': 'background'
+    }));
+
+    expect(result.manifest.package.id).toBe('SemanticGlyph');
   });
 
   it('adapts schema-version-two resources and apply selections to the existing config model', async () => {
