@@ -11,6 +11,7 @@
  * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
  * @updated 2026-09-27: Migrates stable theme sticker IDs to replacement image filenames during package updates.
  * @updated 2026-09-28: Retains package images that remain referenced by independent user settings during deletion or replacement.
+ * @updated 2026-09-30: Passes packaged font Blobs with their archive filenames to avoid Android synthetic File metadata failures.
  * @updated 2026-09-28: Supports retaining package resources after deleting a theme and resolving same-package reimports.
  */
 
@@ -678,8 +679,11 @@ export const themePackageImportService = {
           throw new ThemePackageImportError('FONT_IMPORT_FAILED', '主题字体资源不存在或格式不受支持');
         }
 
-        const fontFile = new File([fontBlob], getFilename(fontConfig.file), { type: fontBlob.type });
-        const fontResult = await fontService.addCustomFont(fontFile, fontConfig.displayName);
+        const fontResult = await fontService.addCustomFont(
+          fontBlob,
+          fontConfig.displayName,
+          getFilename(fontConfig.file),
+        );
         if (!fontResult.success || !fontResult.fontId) {
           throw new ThemePackageImportError('FONT_IMPORT_FAILED', fontResult.message || '主题字体导入失败');
         }

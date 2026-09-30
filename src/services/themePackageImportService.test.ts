@@ -10,6 +10,7 @@
  * @updated 2026-09-28: Prevents package cleanup from deleting images still used by standalone settings.
  * @updated 2026-09-28: Covers retaining package resources and resolving later same-package imports.
  * @updated 2026-09-30: Covers rollback when a packaged custom font cannot be registered.
+ * @updated 2026-09-30: Ensures packaged fonts bypass Android's synthetic File constructor behavior.
  */
 
 import JSZip from 'jszip';
@@ -221,6 +222,22 @@ describe('themePackageImportService', () => {
       .rejects.toMatchObject({ code: 'FONT_IMPORT_FAILED' });
     expect(deleteImageLocalOnly).toHaveBeenCalledWith('image-image-content.webp');
     expect(themePackageImportService.getImportedPackages()).toEqual([]);
+  });
+
+  it('passes a packaged font Blob and its archive filename without constructing a File', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    const fileConstructor = vi.fn();
+    vi.stubGlobal('File', fileConstructor);
+    addCustomFont.mockResolvedValue({ success: true, fontId: 'theme-font-id', message: '字体已导入' });
+
+    const { themePackageImportService } = await import('./themePackageImportService');
+    await expect(themePackageImportService.importPackage(await createPackageWithCustomFont())).resolves.toMatchObject({
+      localAssets: { fontId: 'theme-font-id' }
+    });
+
+    expect(addCustomFont).toHaveBeenCalledWith(expect.any(Blob), 'Theme Font', 'theme.ttf');
+    expect(fileConstructor).not.toHaveBeenCalled();
   });
 
   it('finds uiicon/01.webp as the first UIIcon image for a theme card', async () => {
