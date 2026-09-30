@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 const filesystem = process.getBuiltinModule('fs');
 const source = filesystem?.readFileSync(new URL('./AIChatHome.tsx', import.meta.url), 'utf8') ?? '';
+const mainViewSource = filesystem?.readFileSync(new URL('./AIBackfillChatMainView.tsx', import.meta.url), 'utf8') ?? '';
 
 describe('AIChatHome composer background', () => {
   it('extends the themed surface through the bottom viewport edge', () => {
@@ -19,5 +20,15 @@ describe('AIChatHome composer background', () => {
     expect(source).toContain('onFocusChat: (text: string) => void;');
     expect(source).toContain('onFocus={() => onFocusChat(quickChatText)}');
     expect(source).toContain("if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); }");
+  });
+
+  it('opens the most recently updated conversation when the composer receives focus', () => {
+    const focusHandler = mainViewSource.slice(
+      mainViewSource.indexOf('onFocusChat={(text) => {'),
+      mainViewSource.indexOf('onQuickAddTodo=')
+    );
+
+    expect(focusHandler).toContain('const latestSession = sortedSessions[0] || activeSession;');
+    expect(focusHandler).toContain('setActiveSessionId(latestSession.id);');
   });
 });
