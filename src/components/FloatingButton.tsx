@@ -1,7 +1,7 @@
 /**
  * @file FloatingButton.tsx
  * @description 悬浮按钮组件 - 支持配色方案和全局图片背景自动应用（通过 CSS 变量）
- * @updated 2026-09-30: Renders custom background images as a centered overflow-visible layer.
+ * @updated 2026-09-30: Renders custom background images as a centered circular overflow-visible layer.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -28,7 +28,8 @@ export const createFloatingButtonBackgroundImageStyle = (scale: number): React.C
     width: `${scale}%`,
     height: 'auto',
     maxWidth: 'none',
-    transform: 'translate(-50%, -50%)'
+    transform: 'translate(-50%, -50%)',
+    borderRadius: '50%'
 });
 
 /**

@@ -59,7 +59,8 @@ describe('FloatingButton', () => {
       width: '150%',
       height: 'auto',
       maxWidth: 'none',
-      transform: 'translate(-50%, -50%)'
+      transform: 'translate(-50%, -50%)',
+      borderRadius: '50%'
     });
   });
 });

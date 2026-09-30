@@ -4,7 +4,7 @@
 
 **Goal:** 让悬浮按钮的自定义背景图片在放大时可以超出按钮视觉边界，同时保持按钮原有的点击区域、定位和尺寸。
 
-**Architecture:** 仅调整 `FloatingButton` 的自定义背景渲染层。用居中的 `<img>` 替代当前带圆角的 CSS 背景层，图片宽度沿用方案的百分比缩放值并取消全局最大宽度限制；默认主题按钮、背景方案服务和选择器数据流保持不变。
+**Architecture:** 仅调整 `FloatingButton` 的自定义背景渲染层。用居中的 `<img>` 替代当前带圆角的 CSS 背景层，图片宽度沿用方案的百分比缩放值并取消全局最大宽度限制；图片自身使用圆形裁切隐藏白色方角，但外层按钮不裁切，默认主题按钮、背景方案服务和选择器数据流保持不变。
 
 **Tech Stack:** React 19, TypeScript, Tailwind CSS, Vitest, React DOM server rendering
 **Spec:** `docs/plans/2026-09-30-floating-button-image-overflow-design.md`
@@ -14,6 +14,7 @@
 - 所有修改文件使用 UTF-8 编码。
 - 自定义图片的缩放范围继续由背景方案服务限制为 50% 至 200%。
 - 图片视觉层允许溢出，但悬浮按钮的点击区域、定位、尺寸和图标层级不变。
+- 图片自身使用 `border-radius: 50%`，外层按钮和图片包裹层保持 `overflow-visible`。
 - 未选择自定义背景时继续使用原有主题 CSS 样式。
 - 不新增依赖，不修改背景方案持久化、上传、主题包导入或 Android 工程。
 
@@ -22,6 +23,7 @@
 - 默认背景方案：继续渲染 `floating-button` 主题样式；由 Task 1 的默认分支测试覆盖。
 - 自定义背景方案：不再添加默认背景、边框和阴影；由 Task 1 的自定义分支测试覆盖。
 - 缩放值超过 100%：图片宽度应使用对应百分比且不受 `max-width: 100%` 限制；由 Task 1 的图片样式测试覆盖。
+- 图片四角：图片样式应使用 `borderRadius: '50%'`，由 Task 1 的图片样式测试覆盖。
 - 图片视觉层：不接收指针事件，不能遮挡按钮点击；由 Task 1 的图片样式测试覆盖。
 - 图标层：继续位于背景图片之上；由 Task 1 的静态渲染测试覆盖。
 
@@ -43,7 +45,7 @@
 
   - Default settings render the `floating-button` class and do not apply the transparent custom-background inline style.
   - Custom settings omit the `floating-button` class and keep `background-color: transparent`, `border: none`, and `box-shadow: none` on the button.
-  - `createFloatingButtonBackgroundImageStyle(150)` returns `width: '150%'`, `height: 'auto'`, `maxWidth: 'none'`, and `transform: 'translate(-50%, -50%)'`.
+  - `createFloatingButtonBackgroundImageStyle(150)` returns `width: '150%'`, `height: 'auto'`, `maxWidth: 'none'`, `transform: 'translate(-50%, -50%)'`, and `borderRadius: '50%'`.
   - The custom image layer markup uses `absolute`, `left-1/2`, `top-1/2`, `max-w-none`, and `pointer-events-none`, while the icon remains in the `relative z-10` wrapper.
 
 - [ ] **Step 2: Run the focused test to verify it fails**
@@ -54,7 +56,7 @@
 
 - [ ] **Step 3: Implement the overflow-visible image layer**
 
-  In `src/components/FloatingButton.tsx`, export `createFloatingButtonBackgroundImageStyle`, replace the rounded `background-image` span with an absolutely positioned `<img>`, apply the helper style and `pointer-events-none`, and preserve the existing image URL escaping, custom button chrome removal, and icon wrapper.
+  In `src/components/FloatingButton.tsx`, export `createFloatingButtonBackgroundImageStyle`, replace the rounded `background-image` span with an absolutely positioned `<img>`, apply the helper style including `borderRadius: '50%'` and `pointer-events-none`, and preserve the existing image URL escaping, custom button chrome removal, and icon wrapper.
 
 - [ ] **Step 4: Run focused tests and production build**
 
