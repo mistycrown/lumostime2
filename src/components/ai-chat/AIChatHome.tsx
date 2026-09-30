@@ -345,8 +345,8 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
         </div>
       </div>
 
-      {!isOverlayOpen && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5">
-        <div ref={composerMenuRef} className="pointer-events-auto relative mx-auto max-w-6xl pt-3" style={{ backgroundColor: theme.shellLayerBg }}>
+      {!isOverlayOpen && <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5" style={{ backgroundColor: theme.shellLayerBg }}>
+        <div ref={composerMenuRef} className="pointer-events-auto relative mx-auto max-w-6xl pt-3">
           {isQuickInputMenuOpen && (
             <div className="absolute bottom-[calc(100%+0.65rem)] left-0 z-30 w-[min(20rem,calc(100vw-2rem))] rounded-[1rem] border p-2" style={{ borderColor: theme.panelBorder, backgroundColor: theme.panelBg, boxShadow: theme.cardShadowStrong }}>
               <div className="grid grid-cols-2 gap-1">
