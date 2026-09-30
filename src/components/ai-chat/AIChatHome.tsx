@@ -9,6 +9,7 @@
  * @updated 2026-09-20: Removed the composer separator line and kept compact spacing before the shortcut section.
  * @updated 2026-09-20: Added the +待办 shortcut that opens chat with the quick-add command prefilled without sending it.
  * @updated 2026-09-21: Keeps the homepage composer pinned to the bottom with a bare plus action and a unified send icon.
+ * @updated 2026-09-30: Opens the conversation view and transfers the draft when the homepage composer receives focus.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -96,6 +97,7 @@ interface AIChatHomeProps {
   onOpenMemory: () => void;
   onOpenHistory: () => void;
   onOpenSettings: () => void;
+  onFocusChat: (text: string) => void;
   onSendShortcut: (text: string) => void;
   onQuickAddTodo: () => void;
   onQuickAddNote: () => void;
@@ -146,6 +148,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
   onOpenMemory,
   onOpenHistory,
   onOpenSettings,
+  onFocusChat,
   onSendShortcut,
   onQuickAddTodo,
   onQuickAddNote,
@@ -364,7 +367,7 @@ export const AIChatHome: React.FC<AIChatHomeProps> = ({
               <button type="button" onClick={() => setIsQuickInputMenuOpen((open) => !open)} className="inline-flex h-9 w-9 shrink-0 items-center justify-center p-0 transition-opacity hover:opacity-70" style={{ color: theme.textSecondary }} title="更多功能" aria-label="更多功能" aria-expanded={isQuickInputMenuOpen}>
                 <Plus size={19} strokeWidth={1.8} />
               </button>
-              <input value={quickChatText} onChange={(event) => setQuickChatText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); } }} placeholder="和 AI 说点什么…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none" style={{ color: theme.textPrimary }} />
+              <input value={quickChatText} onChange={(event) => setQuickChatText(event.target.value)} onFocus={() => onFocusChat(quickChatText)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); } }} placeholder="和 AI 说点什么…" className="min-w-0 flex-1 bg-transparent px-1 py-2.5 text-sm outline-none" style={{ color: theme.textPrimary }} />
               <button type="button" onClick={sendQuickChat} disabled={!quickChatText.trim() || isLoading} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full disabled:opacity-40" style={{ backgroundColor: theme.primaryButtonBg, color: theme.primaryButtonText }} title="发送" aria-label="发送"><Send size={16} /></button>
             </div>
           </div>

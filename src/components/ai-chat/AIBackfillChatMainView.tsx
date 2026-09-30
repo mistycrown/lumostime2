@@ -6,6 +6,7 @@
  * @description Keeps home and conversation view composition out of the modal coordinator.
  * @updated 2026-09-22: Extracted main chat view composition.
  * @updated 2026-09-30: Wires conversation scroll tracking for keyboard-safe bottom following.
+ * @updated 2026-09-30: Transfers the AI homepage composer draft into the focused conversation composer on focus.
  */
 
 import { AIChatHome } from './AIChatHome';
@@ -122,6 +123,11 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
               onOpenMemory={handleOpenAssistantMemoryViewer}
               onOpenHistory={() => setIsHistoryPanelOpen(true)}
               onOpenSettings={() => setIsShortcutSettingsOpen(true)}
+              onFocusChat={(text) => {
+                setInputText(text);
+                setIsHomeView(false);
+                focusComposerAtEnd();
+              }}
               onQuickAddTodo={() => {
                 if (activeSession?.templateMeta) {
                   const nextSession = createDefaultSession(activeSession.personaId);
