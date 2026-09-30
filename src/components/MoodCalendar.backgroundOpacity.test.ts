@@ -4,6 +4,7 @@
  * @output Regression coverage for card-style white-mask opacity semantics
  * @description Verifies that Memoir calendar opacity maps to a white overlay instead of making the image element transparent.
  * @updated 2026-09-30: Added normal, boundary, out-of-range, and non-finite opacity coverage.
+ * @updated 2026-09-30: Added regression coverage for Memoir calendar text contrast classes.
  */
 
 import React from 'react';
@@ -67,5 +68,22 @@ describe('getMemoirCalendarMaskOpacity', () => {
     expect(markup).toContain('data-memoir-calendar-background-mask="true"');
     expect(markup).toContain('pointer-events-none absolute inset-0 bg-white');
     expect(markup).toContain('style="opacity:0.75"');
+  });
+
+  test('renders weekday, ordinary date, and today text at the intended contrast levels', () => {
+    const today = new Date();
+    const markup = renderToStaticMarkup(
+      React.createElement(MoodCalendar, {
+        year: today.getFullYear(),
+        month: today.getMonth(),
+        dailyReviews: [],
+        onUpdateMood: () => undefined,
+        onClearMood: () => undefined
+      })
+    );
+
+    expect(markup).toContain('memoir-calendar-weekday text-center text-sm text-stone-600 font-light');
+    expect(markup).toContain('memoir-calendar-day text-stone-500');
+    expect(markup).toContain('memoir-calendar-today text-stone-900 font-bold');
   });
 });
