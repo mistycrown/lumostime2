@@ -8,6 +8,7 @@
  * @updated 2026-09-29: Rehydrates persisted calendar images from the display path on mount.
  * @updated 2026-09-29: Hides custom calendar backgrounds while effective dark mode is active.
  * @updated 2026-09-30: Matches card backgrounds by controlling image visibility with a white overlay instead of image alpha.
+ * @updated 2026-09-30: Increased Memoir calendar weekday and date text contrast.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -200,7 +201,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                 {/* Weekday Headers */}
                 <div className="relative z-10 grid grid-cols-7 mb-4">
                     {WEEK_DAYS.map((day, i) => (
-                        <div key={i} className="memoir-calendar-weekday text-center text-sm text-stone-400 font-light">
+                        <div key={i} className="memoir-calendar-weekday text-center text-sm text-stone-600 font-light">
                             {day}
                         </div>
                     ))}
@@ -242,7 +243,7 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
                                         className={`text-sm font-handwriting ${
                                             today 
                                                 ? 'memoir-calendar-today text-stone-900 font-bold'
-                                                : 'memoir-calendar-day text-stone-400'
+                                                : 'memoir-calendar-day text-stone-500'
                                         }`}
                                     >
                                         {day}
