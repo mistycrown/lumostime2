@@ -30,8 +30,31 @@ export const shouldFollowAIChatViewportResize = (
   composerTextarea: HTMLTextAreaElement | null
 ) => shouldKeepLatestVisible && composerTextarea !== null && activeElement === composerTextarea;
 
+export const queueAIChatViewportResizeScroll = (
+  shouldFollow: () => boolean,
+  scrollToLatestMessage: (behavior?: ScrollBehavior) => void,
+  pendingFrameId: number | null,
+  requestFrame: (callback: FrameRequestCallback) => number,
+  cancelFrame: (frameId: number) => void
+) => {
+  if (pendingFrameId !== null) {
+    cancelFrame(pendingFrameId);
+  }
+
+  if (!shouldFollow()) {
+    return null;
+  }
+
+  return requestFrame(() => {
+    if (shouldFollow()) {
+      scrollToLatestMessage('auto');
+    }
+  });
+};
+
 interface ViewportOptions {
   isOpen: boolean;
+  isHomeView: boolean;
   targetSessionId?: string;
   targetMessageId?: string;
   activeSessionId: string;
@@ -42,6 +65,8 @@ interface ViewportOptions {
   setIsHomeView: (isHomeView: boolean) => void;
   setKeyboardBottomInset: React.Dispatch<React.SetStateAction<number>>;
   messagesEndRef: React.MutableRefObject<HTMLDivElement | null>;
+  messagesScrollContainerRef: React.MutableRefObject<HTMLDivElement | null>;
+  shouldKeepLatestMessageVisibleRef: React.MutableRefObject<boolean>;
   messageElementRefs: React.MutableRefObject<Map<string, HTMLDivElement | null>>;
   handledNavigationKeyRef: React.MutableRefObject<string>;
   wasOpenRef: React.MutableRefObject<boolean>;
@@ -51,6 +76,7 @@ interface ViewportOptions {
 
 export const useAIBackfillChatViewport = ({
   isOpen,
+  isHomeView,
   targetSessionId,
   targetMessageId,
   activeSessionId,
@@ -61,6 +87,8 @@ export const useAIBackfillChatViewport = ({
   setIsHomeView,
   setKeyboardBottomInset,
   messagesEndRef,
+  messagesScrollContainerRef,
+  shouldKeepLatestMessageVisibleRef,
   messageElementRefs,
   handledNavigationKeyRef,
   wasOpenRef,
@@ -70,6 +98,59 @@ export const useAIBackfillChatViewport = ({
   const scrollToLatestMessage = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
   }, [messagesEndRef]);
+
+  const handleConversationScroll = useCallback((element: HTMLElement) => {
+    shouldKeepLatestMessageVisibleRef.current = isAIChatScrollNearBottom(element);
+  }, [shouldKeepLatestMessageVisibleRef]);
+
+  const handleComposerFocus = useCallback(() => {
+    const scrollContainer = messagesScrollContainerRef.current;
+    const shouldKeepLatestVisible = scrollContainer === null
+      || isAIChatScrollNearBottom(scrollContainer);
+    shouldKeepLatestMessageVisibleRef.current = shouldKeepLatestVisible;
+    return shouldKeepLatestVisible;
+  }, [messagesScrollContainerRef, shouldKeepLatestMessageVisibleRef]);
+
+  const handleComposerBlur = useCallback(() => {
+    shouldKeepLatestMessageVisibleRef.current = false;
+  }, [shouldKeepLatestMessageVisibleRef]);
+
+  useEffect(() => {
+    if (!isOpen || isHomeView) {
+      shouldKeepLatestMessageVisibleRef.current = false;
+      return;
+    }
+
+    const scrollContainer = messagesScrollContainerRef.current;
+    if (!scrollContainer || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    let resizeFrameId: number | null = null;
+    const shouldFollow = () => shouldFollowAIChatViewportResize(
+      shouldKeepLatestMessageVisibleRef.current,
+      document.activeElement,
+      composerTextareaRef.current
+    );
+    const resizeObserver = new ResizeObserver(() => {
+      resizeFrameId = queueAIChatViewportResizeScroll(
+        shouldFollow,
+        scrollToLatestMessage,
+        resizeFrameId,
+        window.requestAnimationFrame.bind(window),
+        window.cancelAnimationFrame.bind(window)
+      );
+    });
+
+    resizeObserver.observe(scrollContainer);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeFrameId !== null) {
+        window.cancelAnimationFrame(resizeFrameId);
+      }
+    };
+  }, [composerTextareaRef, isHomeView, isOpen, messagesScrollContainerRef, scrollToLatestMessage, shouldKeepLatestMessageVisibleRef]);
 
   const shouldUseVisualViewportKeyboardInset = !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android');
   const getKeyboardBottomInset = useCallback(() => {
@@ -155,7 +236,11 @@ export const useAIBackfillChatViewport = ({
       const nextInset = getKeyboardBottomInset();
       setKeyboardBottomInset((current) => (current === nextInset ? current : nextInset));
 
-      if (nextInset > 0 && document.activeElement === composerTextareaRef.current) {
+      if (nextInset > 0 && shouldFollowAIChatViewportResize(
+        shouldKeepLatestMessageVisibleRef.current,
+        document.activeElement,
+        composerTextareaRef.current
+      )) {
         if (frameId !== null) {
           window.cancelAnimationFrame(frameId);
         }
@@ -176,7 +261,7 @@ export const useAIBackfillChatViewport = ({
         window.cancelAnimationFrame(frameId);
       }
     };
-  }, [composerTextareaRef, getKeyboardBottomInset, isOpen, scrollToLatestMessage, setKeyboardBottomInset, shouldUseVisualViewportKeyboardInset, visualViewportBaselineRef]);
+  }, [composerTextareaRef, getKeyboardBottomInset, isOpen, scrollToLatestMessage, setKeyboardBottomInset, shouldKeepLatestMessageVisibleRef, shouldUseVisualViewportKeyboardInset, visualViewportBaselineRef]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -215,5 +300,10 @@ export const useAIBackfillChatViewport = ({
     });
   }, [activeNavigationKey, activeSession?.messages, activeSessionId, hasPendingNavigation, isOpen, messageElementRefs, scrollToLatestMessage, sessions, setActiveSessionId, setIsHomeView, targetMessageId, targetSessionId]);
 
-  return { scrollToLatestMessage };
+  return {
+    handleComposerBlur,
+    handleComposerFocus,
+    handleConversationScroll,
+    scrollToLatestMessage
+  };
 };

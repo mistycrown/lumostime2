@@ -7,10 +7,11 @@
  * @updated 2026-09-30: Added bottom-threshold and keyboard-resize follow regression coverage.
  */
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   AI_CHAT_BOTTOM_FOLLOW_THRESHOLD_PX,
   isAIChatScrollNearBottom,
+  queueAIChatViewportResizeScroll,
   shouldFollowAIChatViewportResize
 } from './useAIBackfillChatViewport';
 
@@ -54,5 +55,80 @@ describe('shouldFollowAIChatViewportResize', () => {
 
     expect(shouldFollowAIChatViewportResize(true, composer, composer)).toBe(true);
     expect(shouldFollowAIChatViewportResize(true, composer, composer)).toBe(true);
+  });
+});
+
+describe('queueAIChatViewportResizeScroll', () => {
+  test('coalesces repeated resize notifications into the latest frame', () => {
+    const callbacks = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 0;
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      const frameId = ++nextFrameId;
+      callbacks.set(frameId, callback);
+      return frameId;
+    });
+    const cancelFrame = vi.fn((frameId: number) => callbacks.delete(frameId));
+    const scrollToLatestMessage = vi.fn();
+
+    const firstFrameId = queueAIChatViewportResizeScroll(
+      () => true,
+      scrollToLatestMessage,
+      null,
+      requestFrame,
+      cancelFrame
+    );
+    const secondFrameId = queueAIChatViewportResizeScroll(
+      () => true,
+      scrollToLatestMessage,
+      firstFrameId,
+      requestFrame,
+      cancelFrame
+    );
+
+    expect(cancelFrame).toHaveBeenCalledWith(firstFrameId);
+    expect(callbacks.has(firstFrameId as number)).toBe(false);
+    callbacks.get(secondFrameId as number)?.(16);
+    expect(scrollToLatestMessage).toHaveBeenCalledTimes(1);
+    expect(scrollToLatestMessage).toHaveBeenCalledWith('auto');
+  });
+
+  test('cancels pending scrolling when bottom intent is no longer active', () => {
+    const requestFrame = vi.fn(() => 7);
+    const cancelFrame = vi.fn();
+    const scrollToLatestMessage = vi.fn();
+
+    const frameId = queueAIChatViewportResizeScroll(
+      () => false,
+      scrollToLatestMessage,
+      6,
+      requestFrame,
+      cancelFrame
+    );
+
+    expect(frameId).toBeNull();
+    expect(cancelFrame).toHaveBeenCalledWith(6);
+    expect(requestFrame).not.toHaveBeenCalled();
+    expect(scrollToLatestMessage).not.toHaveBeenCalled();
+  });
+
+  test('rechecks bottom intent before the scheduled scroll executes', () => {
+    let shouldFollow = true;
+    let scheduledCallback: FrameRequestCallback | null = null;
+    const scrollToLatestMessage = vi.fn();
+
+    queueAIChatViewportResizeScroll(
+      () => shouldFollow,
+      scrollToLatestMessage,
+      null,
+      (callback) => {
+        scheduledCallback = callback;
+        return 1;
+      },
+      vi.fn()
+    );
+    shouldFollow = false;
+    (scheduledCallback as FrameRequestCallback | null)?.(16);
+
+    expect(scrollToLatestMessage).not.toHaveBeenCalled();
   });
 });

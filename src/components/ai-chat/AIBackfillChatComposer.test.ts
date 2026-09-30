@@ -5,6 +5,7 @@
  * @pos Component Support Test (AI Integration)
  * @description Verifies the composer scrolls once in the focus frame and once after the next layout frame so Android keyboard resize cannot leave the newest message hidden.
  * @updated 2026-09-29: Added keyboard-resize focus-scroll regression coverage.
+ * @updated 2026-09-30: Ensures older-message reading positions do not queue focus scrolling.
  */
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -39,5 +40,16 @@ describe('queueComposerFocusScroll', () => {
 
     expect(scrollToLatestMessage).toHaveBeenCalledTimes(2);
     expect(scrollToLatestMessage).toHaveBeenLastCalledWith('auto');
+  });
+
+  test('does not schedule scrolling when focus starts away from the bottom', () => {
+    const requestAnimationFrame = vi.fn();
+    const scrollToLatestMessage = vi.fn();
+    vi.stubGlobal('window', { requestAnimationFrame });
+
+    queueComposerFocusScroll(scrollToLatestMessage, false);
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(scrollToLatestMessage).not.toHaveBeenCalled();
   });
 });
