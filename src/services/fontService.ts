@@ -1,6 +1,7 @@
 /**
  * @file fontService.ts
  * @description 字体管理服务 - 管理内置字体与本地上传字体的切换、持久化与恢复
+ * @updated 2026-09-30: Retries custom font registration with a data URL when Android WebView rejects an ArrayBuffer source.
  */
 
 import { customFontStorageService, FontFormat, StoredCustomFontRecord } from './customFontStorageService';
@@ -165,10 +166,26 @@ class FontService {
       throw new Error('当前环境不支持 FontFace API');
     }
 
-    const arrayBuffer = await record.blob.arrayBuffer();
-    const fontFace = new FontFace(record.familyName, arrayBuffer);
-    await fontFace.load();
-    (document.fonts as FontFaceSet & { add: (font: FontFace) => void }).add(fontFace);
+    const registerFontFace = async (source: BufferSource | string): Promise<void> => {
+      const fontFace = new FontFace(record.familyName, source);
+      await fontFace.load();
+      (document.fonts as FontFaceSet & { add: (font: FontFace) => void }).add(fontFace);
+    };
+
+    try {
+      await registerFontFace(await record.blob.arrayBuffer());
+    } catch (arrayBufferError) {
+      try {
+        const dataUrl = await this.blobToDataUrl(record.blob);
+        const escapedDataUrl = dataUrl.replace(/["\\\n\r\f]/g, '\\$&');
+        await registerFontFace(`url("${escapedDataUrl}")`);
+      } catch (dataUrlError) {
+        throw new Error('自定义字体注册失败', {
+          cause: { arrayBufferError, dataUrlError }
+        });
+      }
+    }
+
     this.registeredCustomFontIds.add(record.id);
   }
 

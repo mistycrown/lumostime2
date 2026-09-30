@@ -9,6 +9,7 @@
  * @updated 2026-09-27: Keeps stable theme sticker IDs and historical mood references readable across package-version replacements.
  * @updated 2026-09-28: Prevents package cleanup from deleting images still used by standalone settings.
  * @updated 2026-09-28: Covers retaining package resources and resolving later same-package imports.
+ * @updated 2026-09-30: Covers rollback when a packaged custom font cannot be registered.
  */
 
 import JSZip from 'jszip';
@@ -17,6 +18,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const {
   saveImage,
   deleteImage,
+  deleteImageLocalOnly,
   addCustomFont,
   removeCustomFont,
   setFont,
@@ -26,6 +28,7 @@ const {
 } = vi.hoisted(() => ({
   saveImage: vi.fn(async () => `image-${Math.random()}.webp`),
   deleteImage: vi.fn(async () => undefined),
+  deleteImageLocalOnly: vi.fn(async () => undefined),
   addCustomFont: vi.fn(async () => ({ success: false })),
   removeCustomFont: vi.fn(async () => undefined),
   setFont: vi.fn(() => ({ success: true })),
@@ -41,7 +44,7 @@ vi.mock('./imageService', () => ({
     saveImage,
     deleteImage,
     removeFromReferencedList: vi.fn(),
-    deleteImageLocalOnly: vi.fn(),
+    deleteImageLocalOnly,
     getReferencedImageManifest: vi.fn(() => ({ content: [] }))
   }
 }));
@@ -137,6 +140,26 @@ const createStickerPackage = async (version: string): Promise<Blob> => {
   return zip.generateAsync({ type: 'blob' });
 };
 
+const createPackageWithCustomFont = async (): Promise<Blob> => {
+  const zip = new JSZip();
+  zip.file('theme.json', JSON.stringify({
+    format: 'lumostime-theme-package',
+    schemaVersion: 2,
+    package: { id: 'font-theme', name: 'Font Theme', version: '1.0.0' },
+    resources: {
+      backgrounds: [{ id: 'main', file: 'assets/background/main.webp' }],
+      fonts: [{ id: 'theme-font', file: 'assets/fonts/theme.ttf', displayName: 'Theme Font' }]
+    },
+    apply: {
+      background: { resourceId: 'main' },
+      font: { resourceId: 'theme-font' }
+    }
+  }));
+  zip.file('assets/background/main.webp', 'image-content');
+  zip.file('assets/fonts/theme.ttf', 'font-content');
+  return zip.generateAsync({ type: 'blob' });
+};
+
 const makeLocalStorage = () => {
   const values = new Map<string, string>();
   return {
@@ -153,6 +176,9 @@ describe('themePackageImportService', () => {
     vi.unstubAllGlobals();
     saveImage.mockClear();
     deleteImage.mockClear();
+    deleteImageLocalOnly.mockClear();
+    addCustomFont.mockReset();
+    addCustomFont.mockResolvedValue({ success: false });
     removeCustomFont.mockClear();
     loadReviewEntriesSnapshot.mockClear();
     saveDailyReviews.mockClear();
@@ -181,6 +207,20 @@ describe('themePackageImportService', () => {
 
     await expect(themePackageImportService.importPackage(await createPackage('second-id', 'same name', '1.0.0')))
       .rejects.toBeInstanceOf(ThemePackageImportError);
+  });
+
+  it('rolls back package images when its custom font cannot be registered', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { addEventListener: vi.fn(), dispatchEvent: vi.fn() });
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+    addCustomFont.mockResolvedValue({ success: false, message: '字体解析失败' });
+
+    const { themePackageImportService } = await import('./themePackageImportService');
+
+    await expect(themePackageImportService.importPackage(await createPackageWithCustomFont()))
+      .rejects.toMatchObject({ code: 'FONT_IMPORT_FAILED' });
+    expect(deleteImageLocalOnly).toHaveBeenCalledWith('image-image-content.webp');
+    expect(themePackageImportService.getImportedPackages()).toEqual([]);
   });
 
   it('finds uiicon/01.webp as the first UIIcon image for a theme card', async () => {
