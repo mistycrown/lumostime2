@@ -5,6 +5,7 @@
  * @pos Test (Font Service)
  * @description Verifies custom font registration prefers ArrayBuffer sources and recovers with a data URL source.
  * @updated 2026-09-30: Added Android WebView-compatible FontFace registration coverage.
+ * @updated 2026-09-30: Covers explicit Blob filenames so mobile theme imports do not depend on File.name.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -114,6 +115,40 @@ describe('fontService custom font registration', () => {
 
     expect(result.success).toBe(false);
     expect(fontFace).toHaveBeenCalledTimes(2);
+    expect(saveFont).not.toHaveBeenCalled();
+  });
+
+  it('uses an explicit filename when importing a Blob without File metadata', async () => {
+    const fontFace = vi.fn(function () {
+      return { load: vi.fn(async () => undefined) };
+    });
+    vi.stubGlobal('FontFace', fontFace);
+    vi.stubGlobal('document', { fonts: { add: vi.fn() } });
+
+    const { fontService } = await import('./fontService');
+    const result = await fontService.addCustomFont(
+      new Blob(['font'], { type: 'font/ttf' }),
+      'Rabbit Font',
+      'rabbit-bear-diary.ttf'
+    );
+
+    expect(result.success).toBe(true);
+    expect(saveFont).toHaveBeenCalledWith(expect.objectContaining({
+      fileName: 'rabbit-bear-diary.ttf',
+      displayName: 'Rabbit Font'
+    }));
+  });
+
+  it('rejects a non-string File name without calling split', async () => {
+    const invalidNamedBlob = Object.assign(
+      new Blob(['font'], { type: 'font/ttf' }),
+      { name: { value: 'theme.ttf' } }
+    );
+
+    const { fontService } = await import('./fontService');
+    const result = await fontService.addCustomFont(invalidNamedBlob);
+
+    expect(result).toMatchObject({ success: false });
     expect(saveFont).not.toHaveBeenCalled();
   });
 });

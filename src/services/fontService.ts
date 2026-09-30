@@ -2,6 +2,7 @@
  * @file fontService.ts
  * @description 字体管理服务 - 管理内置字体与本地上传字体的切换、持久化与恢复
  * @updated 2026-09-30: Retries custom font registration with a data URL when Android WebView rejects an ArrayBuffer source.
+ * @updated 2026-09-30: Accepts archive Blobs with an explicit filename so Android imports do not depend on synthetic File metadata.
  */
 
 import { customFontStorageService, FontFormat, StoredCustomFontRecord } from './customFontStorageService';
@@ -101,10 +102,24 @@ class FontService {
   /**
    * 从文件名推断格式
    */
-  private detectFontFormat(fileName: string): FontFormat | null {
-    const extension = fileName.split('.').pop()?.toLowerCase();
+  private detectFontFormat(fileName: unknown): FontFormat | null {
+    if (typeof fileName !== 'string') return null;
+
+    const trimmedFileName = fileName.trim();
+    if (!trimmedFileName) return null;
+
+    const extension = trimmedFileName.split('.').pop()?.toLowerCase();
     if (!extension) return null;
     return ALLOWED_FONT_FORMATS.includes(extension as FontFormat) ? (extension as FontFormat) : null;
+  }
+
+  private resolveFontFileName(file: Blob | File, explicitFileName?: string): string {
+    if (typeof explicitFileName === 'string' && explicitFileName.trim()) {
+      return explicitFileName.trim();
+    }
+
+    const candidate = (file as File).name;
+    return typeof candidate === 'string' ? candidate.trim() : '';
   }
 
   /**
@@ -217,8 +232,13 @@ class FontService {
   /**
    * 上传并保存自定义字体
    */
-  async addCustomFont(file: File, displayName?: string): Promise<AddCustomFontResult> {
-    const format = this.detectFontFormat(file.name);
+  async addCustomFont(
+    file: Blob | File,
+    displayName?: string,
+    explicitFileName?: string,
+  ): Promise<AddCustomFontResult> {
+    const fileName = this.resolveFontFileName(file, explicitFileName);
+    const format = this.detectFontFormat(fileName);
     if (!format) {
       return {
         success: false,
@@ -236,14 +256,14 @@ class FontService {
     const now = Date.now();
     const randomSuffix = Math.random().toString(36).slice(2, 8);
     const fontId = `custom-${now}-${randomSuffix}`;
-    const finalDisplayName = this.sanitizeDisplayName(displayName || file.name.replace(/\.[^/.]+$/, ''));
+    const finalDisplayName = this.sanitizeDisplayName(displayName || fileName.replace(/\.[^/.]+$/, ''));
     const familyName = this.buildCustomFamilyName(fontId);
 
     const record: StoredCustomFontRecord = {
       id: fontId,
       displayName: finalDisplayName,
       familyName,
-      fileName: file.name,
+      fileName,
       format,
       size: file.size,
       createdAt: now,
