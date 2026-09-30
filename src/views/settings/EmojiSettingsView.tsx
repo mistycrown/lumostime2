@@ -1,7 +1,8 @@
 /**
  * @file EmojiSettingsView.tsx
+ * @updated 2026-09-30: Moved the compact default sticker picker to the fish-feeding Icon tab.
  * @updated 2026-07-21: Reworked effect notices and edit controls for dark-mode contrast.
- * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格和 Selector 默认页
+ * @description Emoji 和 Sticker 设置页面 - 管理心情日历的 emoji 组、emoji 渲染风格
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Plus, Trash2, Edit2, Check, X, RotateCcw } from 'lucide-react';
@@ -9,8 +10,6 @@ import { IconRenderer } from '../../components/IconRenderer';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { useSettings } from '../../contexts/SettingsContext';
 import type { EmojiStyle } from '../../contexts/SettingsContext';
-import { stickerService } from '../../services/stickerService';
-import { RedemptionService } from '../../services/redemptionService';
 import { DEFAULT_REACTIONS } from '../../components/ReactionComponents';
 
 // Emoji 预览组件 - 用于显示不同风格的 emoji
@@ -120,12 +119,7 @@ interface EmojiSettingsViewProps {
 }
 
 export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) => {
-    const { emojiStyle, setEmojiStyle, defaultSelectorPage, setDefaultSelectorPage } = useSettings();
-    
-    // 验证状态
-    const [isRedeemed, setIsRedeemed] = useState(false);
-    // 使用 useMemo 避免重复实例化
-    const redemptionService = React.useMemo(() => new RedemptionService(), []);
+    const { emojiStyle, setEmojiStyle } = useSettings();
     
     // 从 localStorage 读取设置
     const [selectedGroupId, setSelectedGroupId] = useState<string>(() => {
@@ -159,15 +153,6 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
     const MAX_REACTIONS = 6;
 
     const allGroups = [...PRESET_EMOJI_GROUPS, ...customGroups];
-
-    // 检查验证状态
-    useEffect(() => {
-        const checkVerification = async () => {
-            const result = await redemptionService.isVerified();
-            setIsRedeemed(result.isVerified);
-        };
-        checkVerification();
-    }, []);
 
     // 保存选择的组
     const handleSelectGroup = (groupId: string) => {
@@ -403,56 +388,6 @@ export const EmojiSettingsView: React.FC<EmojiSettingsViewProps> = ({ onBack }) 
                         ))}
                     </div>
                 </div>
-
-                {/* Selector 默认页 - 仅在已验证时显示 */}
-                {isRedeemed && (
-                    <div className="bg-white rounded-xl p-4 shadow-sm">
-                        <h3 className="text-sm font-bold text-stone-700 mb-3">Selector 默认页</h3>
-                        <p className="text-xs text-stone-500 mb-4">选择打开心情选择器时默认显示的页面。emoji和sticker风格不统一，尽量不要混用。</p>
-                        
-                        <div className="space-y-2">
-                            {/* Emoji 页选项 */}
-                            <button
-                                onClick={() => setDefaultSelectorPage('emoji')}
-                                className={`w-full text-left p-3 rounded-lg border transition-all ${
-                                    defaultSelectorPage === 'emoji'
-                                        ? 'border-stone-400 bg-stone-50'
-                                        : 'border-stone-200 hover:border-stone-300'
-                                }`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-bold text-stone-800">Emoji 页</span>
-                                    {defaultSelectorPage === 'emoji' && (
-                                        <Check size={16} className="text-green-600" />
-                                    )}
-                                </div>
-                            </button>
-
-                            {/* Sticker 页选项 */}
-                            {stickerService.getAllStickerSets().map((stickerSet) => (
-                                <button
-                                    key={stickerSet.id}
-                                    onClick={() => setDefaultSelectorPage(stickerSet.id)}
-                                    className={`w-full text-left p-3 rounded-lg border transition-all ${
-                                        defaultSelectorPage === stickerSet.id
-                                            ? 'border-stone-400 bg-stone-50'
-                                            : 'border-stone-200 hover:border-stone-300'
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-bold text-stone-800">{stickerSet.name}</span>
-                                        {defaultSelectorPage === stickerSet.id && (
-                                            <Check size={16} className="text-green-600" />
-                                        )}
-                                    </div>
-                                    {stickerSet.description && (
-                                        <p className="text-xs text-stone-500 mt-1">{stickerSet.description}</p>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
 
                 {/* Selector 图标组 */}
                 <div className="bg-white rounded-xl p-4 shadow-sm">
