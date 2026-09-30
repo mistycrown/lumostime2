@@ -7,6 +7,7 @@
  * @updated 2026-09-28: Shares the active calendar background with Memoir quick actions.
  * @updated 2026-09-29: Rehydrates persisted calendar images from the display path on mount.
  * @updated 2026-09-29: Hides custom calendar backgrounds while effective dark mode is active.
+ * @updated 2026-09-30: Matches card backgrounds by controlling image visibility with a white overlay instead of image alpha.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { DailyReview } from '../types';
@@ -32,6 +33,13 @@ interface MoodCalendarProps {
 }
 
 const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // 周一到周日
+
+export const getMemoirCalendarMaskOpacity = (opacity: number | undefined): number => {
+    const safeOpacity = typeof opacity === 'number' && Number.isFinite(opacity)
+        ? Math.min(1, Math.max(0, opacity))
+        : 1;
+    return 1 - safeOpacity;
+};
 
 export const MoodCalendar: React.FC<MoodCalendarProps> = ({
     year,
@@ -180,7 +188,14 @@ export const MoodCalendar: React.FC<MoodCalendarProps> = ({
         <>
             <div className={`memoir-mood-calendar relative overflow-visible rounded-[1.75rem] shadow-[0_14px_32px_rgba(68,56,43,0.12)] ${hasCalendarBackground ? 'has-custom-background' : 'bg-stone-50'} p-6 mb-6`}>
                 {hasCalendarBackground && (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[1.75rem]"><img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" style={{ opacity: backgroundSettings.opacity ?? 1 }} /></div>
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden rounded-[1.75rem]">
+                        <img src={selectedBackgroundUrl} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+                        <div
+                            data-memoir-calendar-background-mask="true"
+                            className="pointer-events-none absolute inset-0 bg-white"
+                            style={{ opacity: getMemoirCalendarMaskOpacity(backgroundSettings.opacity) }}
+                        />
+                    </div>
                 )}
                 {/* Weekday Headers */}
                 <div className="relative z-10 grid grid-cols-7 mb-4">
