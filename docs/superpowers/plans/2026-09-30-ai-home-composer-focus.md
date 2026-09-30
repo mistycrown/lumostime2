@@ -4,7 +4,7 @@
 
 **Goal:** Make focusing the AI home composer open the conversation view with the draft preserved and the conversation composer focused.
 
-**Architecture:** `AIChatHome` reports its composer focus to `AIBackfillChatMainView`. The parent owns the shared conversation draft and view state, so it copies the homepage draft into that state, switches views, and invokes the existing deferred composer focus helper. No routing or request flow changes are needed.
+**Architecture:** `AIChatHome` reports its composer focus to `AIBackfillChatMainView`. The parent selects the most recently updated session, copies the homepage draft into the shared conversation state, switches views, and invokes the existing deferred composer focus helper. No request flow changes are needed.
 
 **Tech Stack:** React, TypeScript, Vitest, Vite.
 **Spec:** `docs/plans/2026-09-30-ai-home-composer-focus-design.md`
@@ -35,7 +35,7 @@
 
 **Interfaces:**
 - Consumes: `setInputText(text: string)`, `setIsHomeView(isHomeView: boolean)`, and `focusComposerAtEnd(): void` already supplied to `AIBackfillChatMainView`.
-- Produces: `AIChatHomeProps.onFocusChat(text: string): void`, called by the home `<input>` focus event.
+- Produces: `AIChatHomeProps.onFocusChat(text: string): void`, called by the home `<input>` focus event and selecting `sortedSessions[0]` when available.
 
 - [ ] **Step 1: Write the failing regression test**
 
@@ -49,7 +49,7 @@ Expected: FAIL because the composer has no focus callback.
 
 - [ ] **Step 3: Implement the focus callback contract**
 
-In `AIChatHome.tsx`, add `onFocusChat` to `AIChatHomeProps` and invoke it with `quickChatText` from the input `onFocus` handler. In `AIBackfillChatMainView.tsx`, pass a handler that calls `setInputText(text)`, `setIsHomeView(false)`, and `focusComposerAtEnd()` in that order. Update each edited source-file header with this behavior.
+In `AIChatHome.tsx`, add `onFocusChat` to `AIChatHomeProps` and invoke it with `quickChatText` from the input `onFocus` handler. In `AIBackfillChatMainView.tsx`, pass a handler that selects `sortedSessions[0]` when available, then calls `setInputText(text)`, `setIsHomeView(false)`, and `focusComposerAtEnd()`. Update each edited source-file header with this behavior.
 
 - [ ] **Step 4: Run focused verification**
 
