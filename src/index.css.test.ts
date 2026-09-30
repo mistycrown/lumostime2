@@ -15,6 +15,7 @@ describe('transparent title page backgrounds', () => {
       /\.transparent-title-bar-active\s+\.record-page-background-image[\s\S]*?\}/
     )?.[0] ?? '';
 
+    expect(localImageRule).toContain('.scene-page-background-image');
     expect(localImageRule).toContain('.todo-page-background-image');
     expect(localImageRule).toContain('display: none');
     expect(localImageRule).not.toContain('memoir');

@@ -4,6 +4,7 @@
 
 /* Keep transparent index surfaces above the shared background image. */
 .transparent-title-bar-active .record-page-background-image,
+.transparent-title-bar-active .scene-page-background-image,
 .transparent-title-bar-active .todo-page-background-image {
   display: none;
 }

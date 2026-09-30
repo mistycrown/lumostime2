@@ -126,7 +126,7 @@
   "apply": {
     "background": { "resourceId": "semantic-glyph-background", "opacity": 0.6 },
     "color": { "schemeId": "klein-blue" },
-    "uiIcon": { "source": "builtin", "themeId": "pencil" },
+    "uiIcon": { "source": "builtin", "themeId": "paper" },
     "navigation": {
       "mode": "modern",
       "backgroundId": "semantic-glyph-navigation",
