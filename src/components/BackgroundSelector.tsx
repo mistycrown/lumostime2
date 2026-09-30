@@ -5,6 +5,7 @@
  * @pos Component (Selector)
  * @updated 2026-09-20: Refreshes previews when asynchronously hydrated image-backed backgrounds become available.
  * @updated 2026-09-28: Extends main-background opacity control to the full 0–100% range.
+ * @updated 2026-09-30: Keeps custom-background delete controls outside their selection buttons.
  * @description 背景图片选择组件 - 支持预设背景、自定义上传、透明度调节
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
@@ -202,34 +203,39 @@ export const BackgroundSelector: React.FC<BackgroundSelectorProps> = ({
                 gridTemplateColumns: 'repeat(auto-fit, minmax(64px, 1fr))'
             }}>
                 {backgrounds.map((background) => (
-                    <button
-                        key={background.id}
-                        onClick={() => handleBackgroundSelect(background.id)}
-                        className={`relative aspect-[4/5] rounded-lg border-2 transition-all overflow-hidden ${
-                            currentBackground === background.id
-                                ? 'border-stone-400 ring-2 ring-stone-200'
-                                : 'border-stone-200 hover:border-stone-300'
-                        }`}
-                    >
-                        {renderBackgroundPreview(background)}
-                        
-                        {/* 选中状态指示器 */}
-                        {currentBackground === background.id && (
-                            <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
-                                <Check size={12} className="text-white" />
-                            </div>
-                        )}
+                    <div key={background.id} className="relative aspect-[4/5]">
+                        <button
+                            type="button"
+                            onClick={() => handleBackgroundSelect(background.id)}
+                            aria-label={`选择背景：${background.name}`}
+                            className={`w-full h-full rounded-lg border-2 transition-all overflow-hidden ${
+                                currentBackground === background.id
+                                    ? 'border-stone-400 ring-2 ring-stone-200'
+                                    : 'border-stone-200 hover:border-stone-300'
+                            }`}
+                        >
+                            {renderBackgroundPreview(background)}
+
+                            {/* 选中状态指示器 */}
+                            {currentBackground === background.id && (
+                                <div className="absolute top-1 right-1 w-5 h-5 bg-stone-800 rounded-full flex items-center justify-center shadow-lg">
+                                    <Check size={12} className="text-white" />
+                                </div>
+                            )}
+                        </button>
 
                         {/* 删除按钮（仅自定义背景） */}
                         {background.type === 'custom' && (
                             <button
+                                type="button"
+                                aria-label={`删除背景：${background.name}`}
                                 onClick={(e) => handleDeleteBackground(background.id, e)}
                                 className="absolute top-1 left-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
                             >
                                 <X size={10} className="text-white" />
                             </button>
                         )}
-                    </button>
+                    </div>
                 ))}
 
                 {/* 添加自定义背景按钮 */}
