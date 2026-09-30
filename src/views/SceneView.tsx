@@ -1,6 +1,7 @@
 /**
  * @file SceneView.tsx
  * @updated 2026-08-06: Made the scene time-slot sidebar explicitly prefer configured UI icons over stored emoji fallbacks.
+ * @updated 2026-09-30: Defers its local wallpaper to MainLayout while transparent title bars are active so the title and content share one continuous image.
  * @input Scene groups, cards, categories, todos, reviews, active sessions, and background settings
  * @output Interactive scene dashboard with quick actions, card status, and review navigation
  * @pos View (Scene)
@@ -1030,7 +1031,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
     >
       {hasBackground && (
         <div 
-          className="absolute inset-0 -z-20"
+          className="scene-page-background-image absolute inset-0 -z-20"
           style={{
             backgroundImage: `url(${backgroundUrl})`,
             backgroundSize: 'cover',

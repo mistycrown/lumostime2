@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-09-30: `MainLayout.tsx` includes Scene in the shared transparent-title background path, allowing its header and content to use one continuous navigation image.
+
 - Update 2026-09-28: `NavigationDecorationDebugger.tsx` and `BottomNavigation.tsx` provide a persisted 10–300% vertical-stretch control for new navigation background images, while legacy navigation decorations remain unchanged.
 
 - Update 2026-09-28: `BackgroundSelector.tsx` lets main-background opacity span 0–100% and presents the corresponding slider endpoint.

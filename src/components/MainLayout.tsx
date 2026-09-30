@@ -11,6 +11,7 @@
  * @updated 2026-09-25: Limits transparent title bars to Tags/Scopes index pages and restores the opaque detail-page header.
  * @updated 2026-09-28: Removes the extra index reading overlay so index and archive pages expose themed backgrounds consistently.
  * @updated 2026-09-29: Disables transparent title bars while effective dark mode is active.
+ * @updated 2026-09-30: Extends the shared transparent title background to Scene so its title and content use one continuous image.
  * @pos Component (Layout)
  * @description 主应用布局组件 - 包含顶部导航栏、主内容区域和浮动按钮
  * 
@@ -161,6 +162,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     const hasReviewSubpage = isDailyReviewOpen || isDailyNewspaperOpen || isWeeklyNewspaperOpen
         || isMonthlyNewspaperOpen || isOnThisDayOpen || isWeeklyReviewOpen || isMonthlyReviewOpen || isAchievementOpen;
     const supportsTransparentTitleBar = currentView === AppView.RECORD
+        || currentView === AppView.SCENE
         || (currentView === AppView.TODO && !isTodoScheduleMode)
         || (currentView === AppView.REVIEW && !hasReviewSubpage)
         || (currentView === AppView.TAGS && !selectedTagId && !selectedCategoryId)

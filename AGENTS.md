@@ -1,4 +1,6 @@
 # Repository Guidelines
+所有操作，只要用户没用明确说明，都按照native方式执行，不用开Subagent-driven，不需要询问用户。
+简单任务不需要写执行计划plan，直接执行修复即可。
 
 ## Project Structure & Module Organization
 - `src/` contains the product code (React + TypeScript).
