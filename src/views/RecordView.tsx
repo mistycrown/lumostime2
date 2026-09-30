@@ -4,6 +4,7 @@
  * @output Measurement Start Event
  * @pos View (Main Tab)
  * @description The primary interface for starting new time blocks. Features a category sidebar and a grid of activity buttons with larger start-card icons.
+ * @updated 2026-09-30: Defers its local wallpaper to MainLayout while transparent title bars are active so the header and content share one continuous image.
  * @updated 2026-05-05: Reworked the custom-background surface stack so the whole record page gets one shared base scrim and the right content panel adds a second warm overlay, eliminating sidebar seams without separate left-rail patches.
  * @updated 2026-05-05: Matched the record-page sidebar width behavior to TodoView so the left-rail scrim and panel bridge render with the same visual footprint.
  * @updated 2026-05-05: Softened the custom-background sidebar scrim with a warm bridge into the main panel so the record layout no longer shows a visible wallpaper seam.
@@ -155,7 +156,7 @@ export const RecordView: React.FC<RecordViewProps> = ({
       {/* 背景图片层 */}
       {hasBackground && (
         <div 
-          className="absolute inset-0 -z-20"
+          className="record-page-background-image absolute inset-0 -z-20"
           style={{
             backgroundImage: `url(${backgroundUrl})`,
             backgroundSize: 'cover',
