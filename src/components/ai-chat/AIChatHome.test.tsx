@@ -14,4 +14,10 @@ describe('AIChatHome composer background', () => {
     expect(source).toContain('absolute inset-x-0 bottom-0 z-20 px-4 pb-4 sm:px-8 sm:pb-5" style={{ backgroundColor: theme.shellLayerBg }}');
     expect(source).not.toContain('className="pointer-events-auto relative mx-auto max-w-6xl pt-3" style={{ backgroundColor: theme.shellLayerBg }}');
   });
+
+  it('opens the chat view from composer focus without sending the draft', () => {
+    expect(source).toContain('onFocusChat: (text: string) => void;');
+    expect(source).toContain('onFocus={() => onFocusChat(quickChatText)}');
+    expect(source).toContain("if (event.key === 'Enter') { event.preventDefault(); sendQuickChat(); }");
+  });
 });
