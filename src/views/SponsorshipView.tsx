@@ -25,9 +25,10 @@
  * @updated 2026-09-28: Gives legacy built-in presets explicit defaults for modern navigation and Memoir calendar styling.
  * @updated 2026-09-28: Lets package-theme deletion retain user-selectable resources and resolves retained-resource reimports.
  * @updated 2026-09-29: Added global scalable floating-button image background settings to the style tab.
+ * @updated 2026-09-30: Moved default sticker selection into the Icon tab's compact Sticker picker.
  */
 import React, { useRef, useState, useEffect } from 'react';
-import { ChevronLeft, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../components/Toast';
 import { RedemptionService } from '../services/redemptionService';
@@ -86,6 +87,7 @@ import { resolveAssetPath } from '../utils/assetPath';
 import { getTimePalPreviewPath } from '../constants/timePalConfig';
 import {
     buildDefaultStickerSelectorGroups,
+    resolveStickerSelectorGroups,
     type StickerSelectorGroup
 } from '../services/stickerSelectorLayoutService';
 
@@ -515,6 +517,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [stickerSetName, setStickerSetName] = useState('');
     const [editingSelectorGroupId, setEditingSelectorGroupId] = useState<string | null>(null);
     const [isSelectorGroupEditorOpen, setIsSelectorGroupEditorOpen] = useState(false);
+    const [isDefaultSelectorSheetOpen, setIsDefaultSelectorSheetOpen] = useState(false);
     const [selectorGroupName, setSelectorGroupName] = useState('');
     const [selectorGroupSourceSetIds, setSelectorGroupSourceSetIds] = useState<string[]>([]);
     const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<StickerDeleteTarget>(null);
@@ -858,6 +861,19 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         () => stickerService.getAllStickerSets(),
         [customStickerSets, customStickers]
     );
+    const defaultSelectorOptions = React.useMemo(() => {
+        const stickerOptions = stickerSelectorConfig.enabled
+            ? resolveStickerSelectorGroups(stickerSelectorConfig, selectorSourceSets).map((group) => ({
+                id: group.id,
+                name: group.name
+            }))
+            : selectorSourceSets.map((set) => ({ id: set.id, name: set.name }));
+
+        return [{ id: 'emoji', name: 'Emoji 页' }, ...stickerOptions];
+    }, [selectorSourceSets, stickerSelectorConfig]);
+    const defaultSelectorPageName = defaultSelectorOptions.find((option) => (
+        option.id === defaultSelectorPage
+    ))?.name || 'Emoji 页';
 
     const getSelectorSourceSetOwner = (setId: string) => stickerSelectorConfig.groups.find((group) => (
         group.id !== editingSelectorGroupId && group.sourceSetIds.includes(setId)
@@ -2061,6 +2077,18 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             )}
                                         </div>
 
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsDefaultSelectorSheetOpen(true)}
+                                            className="flex w-full items-center justify-between border-t border-stone-200 pt-5 text-left"
+                                        >
+                                            <span className="text-sm font-medium text-stone-700">默认贴纸</span>
+                                            <span className="flex min-w-0 items-center gap-1.5 text-sm text-stone-400">
+                                                <span className="truncate">{defaultSelectorPageName}</span>
+                                                <ChevronRight size={16} className="shrink-0" />
+                                            </span>
+                                        </button>
+
                                         <StickerSetEditModal
                                             isOpen={isEditingStickerSet}
                                             setId={editingStickerSetId}
@@ -2083,6 +2111,53 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             cancelText="取消"
                                             type="danger"
                                         />
+
+                                        {isDefaultSelectorSheetOpen && (
+                                            <div
+                                                className="fixed inset-0 z-[120] flex items-end justify-center bg-stone-900/40 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-sm md:items-center md:pb-4"
+                                                role="dialog"
+                                                aria-modal="true"
+                                                aria-label="默认贴纸"
+                                                onClick={() => setIsDefaultSelectorSheetOpen(false)}
+                                            >
+                                                <div
+                                                    className="w-full max-w-md overflow-hidden rounded-2xl bg-[#faf9f6] shadow-2xl"
+                                                    onClick={(event) => event.stopPropagation()}
+                                                >
+                                                    <div className="flex items-center justify-between border-b border-stone-200 px-5 py-4">
+                                                        <h5 className="text-base font-bold text-stone-800">默认贴纸</h5>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsDefaultSelectorSheetOpen(false)}
+                                                            className="rounded-lg p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600"
+                                                            aria-label="关闭"
+                                                        >
+                                                            <X size={18} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="max-h-[60vh] overflow-y-auto p-3">
+                                                        {defaultSelectorOptions.map((option) => (
+                                                            <button
+                                                                key={option.id}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setDefaultSelectorPage(option.id);
+                                                                    setIsDefaultSelectorSheetOpen(false);
+                                                                }}
+                                                                className={`flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm transition-colors ${
+                                                                    defaultSelectorPage === option.id
+                                                                        ? 'bg-stone-200 font-medium text-stone-800'
+                                                                        : 'text-stone-600 hover:bg-stone-100'
+                                                                }`}
+                                                            >
+                                                                <span className="truncate">{option.name}</span>
+                                                                {defaultSelectorPage === option.id && <Check size={17} className="shrink-0 text-stone-700" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
