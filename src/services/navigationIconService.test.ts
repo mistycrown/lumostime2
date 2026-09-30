@@ -4,9 +4,11 @@
  * @output Regression coverage for icon-scheme persistence and legacy fallback
  * @pos Test (UI Customization)
  * @updated 2026-09-28: Covers migration from the removed built-in pink icon mode.
+ * @updated 2026-09-30: Covers image icon size normalization and persistence.
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  NAVIGATION_ICON_CHANGE_EVENT,
   NAVIGATION_ICON_SCHEMES_KEY,
   navigationIconService,
   NavigationIconSlot
@@ -85,6 +87,35 @@ describe('navigationIconService custom schemes', () => {
     expect(JSON.parse(localStorage.getItem('navigation_icon_selection_v1') || '{}')).toMatchObject({
       showLabelWithIcon: true
     });
+  });
+
+  it('normalizes missing and invalid icon scale values', () => {
+    expect(navigationIconService.getSelection().iconScale).toBe(100);
+
+    [
+      [69, 70],
+      [141, 140],
+      [100.5, 101],
+      ['large', 100]
+    ].forEach(([iconScale, expected]) => {
+      localStorage.setItem('navigation_icon_selection_v1', JSON.stringify({ iconScale }));
+      expect(navigationIconService.getSelection().iconScale).toBe(expected);
+    });
+  });
+
+  it('persists icon scale and notifies mounted navigation', () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('CustomEvent', class {
+      constructor(public type: string) {}
+    });
+    vi.stubGlobal('window', { dispatchEvent });
+
+    navigationIconService.setIconScale(125);
+
+    expect(navigationIconService.getSelection()).toMatchObject({ iconScale: 125 });
+    expect(JSON.parse(localStorage.getItem('navigation_icon_selection_v1') || '{}')).toMatchObject({ iconScale: 125 });
+    expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: NAVIGATION_ICON_CHANGE_EVENT }));
+    vi.unstubAllGlobals();
   });
 
   it('falls back to text for the removed built-in pink icon mode', () => {

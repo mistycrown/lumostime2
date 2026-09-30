@@ -17,6 +17,7 @@
  * @updated 2026-09-29: Adapts packaged transparent title-bar preferences.
  * @updated 2026-09-30: Preserves packaged navigation labels shown below custom icons.
  * @updated 2026-09-30: Accepts mixed-case package IDs used by named theme packages.
+ * @updated 2026-09-30: Validates packaged custom navigation icon size scales.
  */
 
 import JSZip from 'jszip';
@@ -218,6 +219,9 @@ const adaptResourcesAndApply = (
       ...(typeof navigationApply.showLabelWithIcon === 'boolean'
         ? { showLabelWithIcon: navigationApply.showLabelWithIcon }
         : {}),
+      ...(navigationApply.iconScale !== undefined
+        ? { iconScale: navigationApply.iconScale }
+        : {}),
       ...(typeof navigationApply.transparentTitleBar === 'boolean'
         ? { transparentTitleBar: navigationApply.transparentTitleBar }
         : {})
@@ -366,6 +370,18 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
         'INVALID_CONFIGURATION',
         'navigation.showLabelWithIcon 必须是布尔值',
         'config.navigation.showLabelWithIcon'
+      );
+    }
+    if (navigationRecord.iconScale !== undefined && (
+      typeof navigationRecord.iconScale !== 'number'
+      || !Number.isInteger(navigationRecord.iconScale)
+      || navigationRecord.iconScale < 70
+      || navigationRecord.iconScale > 140
+    )) {
+      throw new ThemePackageValidationError(
+        'INVALID_CONFIGURATION',
+        'navigation.iconScale 必须是 70 到 140 之间的整数',
+        'config.navigation.iconScale'
       );
     }
     if (navigationRecord.transparentTitleBar !== undefined && typeof navigationRecord.transparentTitleBar !== 'boolean') {

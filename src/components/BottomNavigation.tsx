@@ -26,6 +26,7 @@
  * @updated 2026-09-26: Keeps title-bar transparency scoped to the top header, independent of legacy navigation surfaces.
  * @updated 2026-09-28: Applies independently persisted vertical stretching to new navigation background images.
  * @updated 2026-09-29: Falls back to the default navigation surface in effective dark mode.
+ * @updated 2026-09-30: Scales custom navigation image icons from persisted settings.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -302,7 +303,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                                         <img
                                             src={icon?.url}
                                             alt={item.label}
-                                            className={`h-7 w-7 object-contain transition-all duration-200 md:h-9 md:w-9 ${isActive ? 'opacity-100' : 'opacity-55'}`}
+                                            className={`h-[var(--navigation-icon-mobile-size)] w-[var(--navigation-icon-mobile-size)] object-contain transition-all duration-200 md:h-[var(--navigation-icon-desktop-size)] md:w-[var(--navigation-icon-desktop-size)] ${isActive ? 'opacity-100' : 'opacity-55'}`}
+                                            style={{
+                                                '--navigation-icon-mobile-size': `${0.28 * iconSelection.iconScale}px`,
+                                                '--navigation-icon-desktop-size': `${0.36 * iconSelection.iconScale}px`
+                                            } as React.CSSProperties}
                                             onError={(event) => {
                                                 const fallbackUrl = icon?.url ? getNavigationIconFallbackUrl(icon.url) : '';
                                                 if (fallbackUrl && event.currentTarget.src !== fallbackUrl && icon?.url.endsWith('.webp')) {
