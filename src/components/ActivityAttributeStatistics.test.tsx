@@ -2,10 +2,11 @@
  * @file ActivityAttributeStatistics.test.tsx
  * @input Text attribute values.
  * @output Regression coverage for text-term extraction used by attribute statistics.
+ * @updated 2026-10-01: Covers hour/minute duration formatting used by duration statistic cards.
  */
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
-import { filterLogsForAttribute, filterLogsByRange, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
+import { filterLogsForAttribute, filterLogsByRange, formatHoursMinutes, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
 import { aggregateHourBuckets } from './stats/PetalTimelineChart';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
@@ -32,6 +33,14 @@ describe('getTextTerms', () => {
 
   it('handles short English values', () => {
     expect(getTextTerms('A')).toEqual(['a']);
+  });
+});
+
+describe('formatHoursMinutes', () => {
+  it('formats minute-only, hour-only, and mixed durations without a unit suffix', () => {
+    expect(formatHoursMinutes(24 * 60)).toBe('24m');
+    expect(formatHoursMinutes(5 * 60 * 60)).toBe('5h');
+    expect(formatHoursMinutes(31 * 60 * 60 + 47 * 60)).toBe('31h 47m');
   });
 });
 

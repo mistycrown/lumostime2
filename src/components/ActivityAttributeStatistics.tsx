@@ -26,6 +26,7 @@
  * @updated 2026-09-21: Restores statistic-card type subtitles while keeping the redundant inner chart description removed.
  * @updated 2026-09-23: Adds shared weekly/monthly/yearly petal rhythm charts for duration sources.
  * @updated 2026-09-25: Keeps rolling stacked choice charts bounded to the selected dates instead of expanding to full calendar months.
+ * @updated 2026-10-01: Aligns custom duration-card separators, duration KPI formatting, week-hour heatmap labels, and treemap label overflow.
  * @updated 2026-08-31: Splits conditional attribute analytics by their triggering single-choice option and shows units.
  * @updated 2026-08-25: Added type-specific visualizations, text aggregation, date ranges, and theme-aware styling.
  */
@@ -93,7 +94,7 @@ const inferAttributeType = (value: ActivityAttributeValue): ActivityAttributeTyp
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value);
 
-const formatHoursMinutes = (seconds: number) => {
+export const formatHoursMinutes = (seconds: number) => {
   const totalMinutes = Math.max(0, Math.floor(seconds / 60));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -172,6 +173,7 @@ interface ActivityAttributeStatisticsProps {
   rangeLabel?: string;
   paletteId?: ActivityStatisticPaletteId;
   fixedRange?: RangeKey;
+  hideSectionBorder?: boolean;
   allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>;
   categoryActivityOptions?: ActivityAttributeOption[];
   title?: string;
@@ -213,9 +215,10 @@ const AttributeSection: React.FC<{
   typeLabel: string;
   count: React.ReactNode;
   rangeLabel?: string;
+  hideTopBorder?: boolean;
   children: React.ReactNode;
-}> = ({ title, typeLabel, count, rangeLabel, children }) => (
-  <section className="border-t border-stone-300 pt-6">
+}> = ({ title, typeLabel, count, rangeLabel, hideTopBorder = false, children }) => (
+  <section className={`${hideTopBorder ? '' : 'border-t border-stone-300'} pt-6`}>
     <div className="mb-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>
@@ -227,7 +230,7 @@ const AttributeSection: React.FC<{
   </section>
 );
 
-const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange }) => {
+const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false }) => {
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
   const [selectedMode, setSelectedMode] = useState<StatisticMode>('count');
@@ -335,7 +338,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, MAX_TEXT_TERMS);
               const maxCount = terms[0]?.[1] || 1;
               return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${textValueCount} 条已填写`}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${textValueCount} 条已填写`}>
                   {terms.length === 0 ? <p className="text-sm text-stone-400">暂无有效文本</p> : (
                     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-3 rounded-xl px-1 py-2">
                       {terms.map(([term, count], index) => {
@@ -355,7 +358,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             if (attribute.type === 'number') {
               const numbers = values.flatMap((value) => 'value' in value && typeof value.value === 'number' ? [value.value] : []);
               if (numbers.length === 0) return null;
-              const isDurationNumber = attribute.id === '__tag-duration__';
+              const isDurationNumber = attribute.id === '__tag-duration__' || attribute.id === '__category-duration__';
               const formatNumericValue = (value: number) => isDurationNumber ? formatHoursMinutes(value) : formatNumber(value);
               const numericUnit = isDurationNumber ? '' : attribute.unit ? ` ${attribute.unit}` : '';
               const sum = numbers.reduce((total, value) => total + value, 0);
@@ -397,7 +400,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 if (range === '7d') {
                   const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
                   return (
-                    <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '近 7 天'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
+                    <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '近 7 天'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                       <div className="mt-5 py-1">
                         <div className="grid grid-cols-7 gap-2">
                           {calendarDays.map((day) => {
@@ -414,7 +417,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   );
                 }
                 return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
                       <div className={`grid gap-x-3 gap-y-3 ${range === 'month' ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
                         {calendarMonths.map((monthKey) => {
@@ -432,7 +435,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               }
               if (chartVariant === 'numberHistogram') {
                 return (
-                  <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值分布'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值分布'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
                     <div className="mt-5 py-1">
                       <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible" role="img" aria-label={`${attribute.name} 数值分布`}>
                         <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
@@ -457,7 +460,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 );
               }
               return (
-                <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
+                <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '数值'}`} rangeLabel={rangeLabel} count={`${numbers.length} 条已填写`}>
                   {chartVariant === 'numberKpi' && <div className="grid grid-cols-2 border-y border-stone-200 sm:grid-cols-4">
                     {[
                       ['合计', `${formatNumericValue(sum)}${numericUnit}`],
@@ -498,7 +501,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             const rankedOptions = [...selectedByOption.entries()].sort((left, right) => right[1] - left[1]);
             const maxOptionMetric = Math.max(...rankedOptions.map(([, metric]) => metric), 1);
             return (
-              <AttributeSection key={attribute.id} title={attribute.name} typeLabel={`${attribute.type === 'single' ? 'SINGLE' : 'MULTI'} / ${attribute.type === 'single' ? '单选' : '多选'}`} rangeLabel={rangeLabel} count={statisticMode === 'duration' ? `${formatDuration(totalMetric)} 时长` : `${values.length} 条已填写`}>
+              <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`${attribute.type === 'single' ? 'SINGLE' : 'MULTI'} / ${attribute.type === 'single' ? '单选' : '多选'}`} rangeLabel={rangeLabel} count={statisticMode === 'duration' ? `${formatDuration(totalMetric)} 时长` : `${values.length} 条已填写`}>
                 <div className="space-y-3">
                   {rankedOptions.map(([optionId, metric], index) => {
                     const option = options.get(optionId);
@@ -656,7 +659,7 @@ const ChoiceTreemapPreview: React.FC<{ attribute: ActivityAttributeDefinition; l
   if (items.length === 0 || total === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无选项数据</p>;
   const rects = buildTreemapRects(items);
   return <div className="relative aspect-[16/9] overflow-hidden border border-[#eadfd4] bg-[#eadfd4]" role="img" aria-label={`${attribute.name} 选项面积分布`}>
-    {rects.map((rect, index) => <div key={rect.id} className="absolute flex items-center justify-center border border-white/70 p-2 text-center text-xs font-medium text-white transition-opacity hover:z-10 hover:opacity-90" style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%`, backgroundColor: palette.colors[index % palette.colors.length] }} title={`${labels.get(rect.id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(rect.value) : rect.value}`}><span className="line-clamp-2 max-w-full break-words">{labels.get(rect.id) || MISSING_OPTION}</span></div>)}
+    {rects.map((rect, index) => <div key={rect.id} className="absolute flex items-center justify-center border border-white/70 p-2 text-center text-xs font-medium text-white transition-opacity hover:z-10 hover:opacity-90" style={{ left: `${rect.x}%`, top: `${rect.y}%`, width: `${rect.width}%`, height: `${rect.height}%`, backgroundColor: palette.colors[index % palette.colors.length] }} title={`${labels.get(rect.id) || MISSING_OPTION} · ${mode === 'duration' ? formatDuration(rect.value) : rect.value}`}><span className="min-w-0 max-w-full truncate">{labels.get(rect.id) || MISSING_OPTION}</span></div>)}
   </div>;
 };
 
@@ -728,13 +731,14 @@ const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palet
   const minHour = activeHours.length > 0 ? Math.min(...activeHours) : 0;
   const maxHour = activeHours.length > 0 ? Math.max(...activeHours) : 0;
   const hours = Array.from({ length: maxHour - minHour + 1 }, (_, index) => minHour + index);
+  const minGridWidth = 22 + hours.length * 18;
   const maxDuration = Math.max(...[...buckets.values()].map((bucket) => bucket.duration), 1);
   const heatColor = palette.accent;
   if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
-  return <div>
-    <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `22px repeat(${hours.length}, minmax(0, 1fr))` }}>
+  return <div className="overflow-x-auto pb-1">
+    <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `22px repeat(${hours.length}, minmax(18px, 1fr))`, minWidth: `${minGridWidth}px` }}>
       <span />
-      {hours.map((hour) => <span key={hour} className="truncate text-center font-mono text-[9px]">{String(hour).padStart(2, '0')}</span>)}
+      {hours.map((hour) => <span key={hour} className="whitespace-nowrap text-center font-mono text-[9px]">{String(hour).padStart(2, '0')}</span>)}
       {weekLabels.map((label, weekday) => <React.Fragment key={label}>
         <span className="flex items-center justify-center font-medium">{label}</span>
         {hours.map((hour) => {
@@ -1033,7 +1037,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TIME RHYTHM / {card.timelineStyle === 'histogram' ? '24 HOUR BARS' : '12 PETALS'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><PetalTimelineChart logs={logs} range={rhythmRange} palette={chartPalette} timelineStyle={card.timelineStyle || 'petal'} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
-       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar hideSectionBorder chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
     }
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
