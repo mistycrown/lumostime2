@@ -20,6 +20,7 @@
  * @updated 2026-09-30: Defers local wallpapers to MainLayout under transparent title bars so Todo headers and content share one continuous image.
  * @updated 2026-09-29: Uses the theme accent for loose-card dates and focus starts when a custom card background is active.
  * @updated 2026-10-01: Displays completion dates in compact and loose todo rows when completedAt is available.
+ * @updated 2026-10-01: Hides scheduled and deadline labels when the completion date is present.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -596,23 +597,26 @@ const SwipeableTodoItem: React.FC<{
             {viewMode === 'loose' && (
               hasLooseDateMarkers ? (
                 <div className="flex flex-col items-end gap-0.5 pt-0.5 text-[11px] font-medium text-stone-400" style={cardBackgroundAccentStyle}>
-                  {scheduledDateLabel && (
-                    <span className="inline-flex items-center gap-1 leading-none">
-                      <CalendarDays size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
-                      <span>{scheduledDateLabel}</span>
-                    </span>
-                  )}
-                  {deadlineDateLabel && (
-                    <span className="inline-flex items-center gap-1 leading-none">
-                      <Flag size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
-                      <span>{deadlineDateLabel}</span>
-                    </span>
-                  )}
-                  {completedDateLabel && (
+                  {completedDateLabel ? (
                     <span className="inline-flex items-center gap-1 leading-none">
                       <CheckCircle2 size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
                       <span>{completedDateLabel}</span>
                     </span>
+                  ) : (
+                    <>
+                      {scheduledDateLabel && (
+                        <span className="inline-flex items-center gap-1 leading-none">
+                          <CalendarDays size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
+                          <span>{scheduledDateLabel}</span>
+                        </span>
+                      )}
+                      {deadlineDateLabel && (
+                        <span className="inline-flex items-center gap-1 leading-none">
+                          <Flag size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
+                          <span>{deadlineDateLabel}</span>
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (

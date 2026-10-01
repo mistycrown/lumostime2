@@ -7,6 +7,7 @@
  * @updated 2026-05-05: Updated ordering coverage so category lists preserve incoming per-group order instead of re-sorting by schedule dates.
  * @updated 2026-05-05: Updated compact summary coverage to expect symbol-only date suffixes appended directly after the title.
  * @updated 2026-10-01: Added completed-date formatting coverage for compact todo summaries.
+ * @updated 2026-10-01: Added precedence coverage so completion dates hide schedule and deadline labels.
  */
 
 import { describe, expect, test } from 'vitest';
@@ -51,7 +52,12 @@ describe('todoListDisplayUtils', () => {
       completedAt: '2026-05-10T10:00:00+08:00',
       scheduledDate: '2026-05-06',
       deadlineDate: '2026-05-09'
-    }))).toBe('(05.06)[05.09]{05.10}');
+    }))).toBe('{05.10}');
+
+    expect(formatTodoCompactScheduleSummary(buildTodo({
+      isCompleted: true,
+      completedAt: '2026-05-10T10:00:00+08:00'
+    }))).toBe('{05.10}');
 
     expect(formatTodoCompactScheduleSummary(buildTodo({
       completedAt: '2026-05-10T10:00:00+08:00'
