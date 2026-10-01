@@ -8,6 +8,7 @@
  * @output 顶部时光小友卡片
  * @updated 2026-07-22: Added dark mode colors for the Time Pal card surface and content.
  * @updated 2026-08-09: Planned timeline blocks are excluded from Time Pal focus totals.
+ * @updated 2026-10-01: Added an option to hide seconds in the card display.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Log, Category, ActiveSession } from '../types';
@@ -23,8 +24,10 @@ import {
     readStoredTimePalStageThresholds
 } from '../utils/timePalStageThresholds';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { formatTimePalDuration } from '../utils/timePalDisplay';
 
 const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
+const TIMEPAL_SHOW_SECONDS_CHANGED_EVENT = 'timepal-show-seconds-changed';
 
 interface TimePalCardProps {
     logs: Log[];
@@ -32,13 +35,6 @@ interface TimePalCardProps {
     categories: Category[];
     activeSessions?: ActiveSession[];
 }
-
-const formatDuration = (seconds: number): string => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-};
 
 const getFormDescription = (level: number): string => {
     const descriptions = [
@@ -61,6 +57,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     const [isCustomTypesLoaded, setIsCustomTypesLoaded] = useState(false);
     const [isClickSwitchEnabled, setIsClickSwitchEnabled] = useState<boolean>(() => {
         return storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true);
+    });
+    const [showSeconds, setShowSeconds] = useState<boolean>(() => {
+        return storage.getBoolean(TIMEPAL_KEYS.SHOW_SECONDS, true);
     });
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [debugMode, setDebugMode] = useState(false);
@@ -122,6 +121,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const syncClickSwitchEnabled = () => {
             setIsClickSwitchEnabled(storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true));
         };
+        const syncShowSeconds = () => {
+            setShowSeconds(storage.getBoolean(TIMEPAL_KEYS.SHOW_SECONDS, true));
+        };
         const syncStageThresholds = () => {
             setStageThresholds(readStoredTimePalStageThresholds());
         };
@@ -129,6 +131,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         const handleStorageChange = () => {
             syncTimePalType();
             syncClickSwitchEnabled();
+            syncShowSeconds();
             syncStageThresholds();
         };
         const handleTypeChange = () => {
@@ -136,6 +139,9 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         };
         const handleClickSwitchChange = () => {
             syncClickSwitchEnabled();
+        };
+        const handleShowSecondsChange = () => {
+            syncShowSeconds();
         };
         const handleStageThresholdsChange = () => {
             syncStageThresholds();
@@ -152,6 +158,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('timepal-type-changed', handleTypeChange);
         window.addEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
+        window.addEventListener(TIMEPAL_SHOW_SECONDS_CHANGED_EVENT, handleShowSecondsChange);
         window.addEventListener(TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT, handleStageThresholdsChange);
         window.addEventListener('timepal-debug-mode', handleDebugMode as EventListener);
 
@@ -159,6 +166,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('timepal-type-changed', handleTypeChange);
             window.removeEventListener(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT, handleClickSwitchChange);
+            window.removeEventListener(TIMEPAL_SHOW_SECONDS_CHANGED_EVENT, handleShowSecondsChange);
             window.removeEventListener(TIMEPAL_STAGE_THRESHOLDS_CHANGED_EVENT, handleStageThresholdsChange);
             window.removeEventListener('timepal-debug-mode', handleDebugMode as EventListener);
         };
@@ -246,7 +254,7 @@ export const TimePalCard: React.FC<TimePalCardProps> = ({ logs, currentDate, cat
     const { imageUrl, hasError: imageError, emoji, handleImageError } = useTimePalImage(effectiveTimePalType, formLevel);
     const imageFitClass = isCustomTimePalType(effectiveTimePalType) ? 'object-fill' : 'object-cover';
 
-    const timeDisplay = formatDuration(totalFocusSeconds);
+    const timeDisplay = formatTimePalDuration(totalFocusSeconds, showSeconds);
     const formDesc = getFormDescription(formLevel);
     const quote = useMemo(() => getRandomQuote(), [currentDate]);
 

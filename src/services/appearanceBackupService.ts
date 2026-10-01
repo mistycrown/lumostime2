@@ -14,6 +14,7 @@
  * @updated 2026-09-26: Includes custom card background groups, selection, opacity, and image references.
  * @updated 2026-09-28: Includes transparent navigation, chart palettes, and custom UI-icon theme names.
  * @updated 2026-09-29: Includes the global floating-button image background and scale.
+ * @updated 2026-10-01: Includes the TimePal card seconds-visibility preference.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -73,6 +74,7 @@ const APPEARANCE_STORAGE_KEYS = [
   TIMEPAL_KEYS.CUSTOM_ITEMS,
   TIMEPAL_KEYS.STAGE_THRESHOLDS,
   TIMEPAL_KEYS.CLICK_SWITCH_ENABLED,
+  TIMEPAL_KEYS.SHOW_SECONDS,
   TIMEPAL_KEYS.FILTER_ENABLED,
   TIMEPAL_KEYS.FILTER_ACTIVITIES,
   TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED,

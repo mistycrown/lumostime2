@@ -5,6 +5,7 @@
  * @output 时光小友设置界面，包含选择、筛选、自定义名言和点击切换开关
  * @pos Component
  * @updated 2026-08-10: Reloads all TimePal controls after cloud or export settings restore.
+ * @updated 2026-10-01: Added the card seconds-visibility setting.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, X } from 'lucide-react';
@@ -27,6 +28,7 @@ import {
 } from '../utils/timePalStageThresholds';
 
 const TIMEPAL_CLICK_SWITCH_CHANGED_EVENT = 'timepal-click-switch-changed';
+const TIMEPAL_SHOW_SECONDS_CHANGED_EVENT = 'timepal-show-seconds-changed';
 type StageThresholdInputState = [string, string, string, string];
 
 interface TimePalSettingsProps {
@@ -95,6 +97,9 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
     });
     const [clickSwitchEnabled, setClickSwitchEnabled] = useState<boolean>(() => {
         return storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true);
+    });
+    const [showSeconds, setShowSeconds] = useState<boolean>(() => {
+        return storage.getBoolean(TIMEPAL_KEYS.SHOW_SECONDS, true);
     });
     const [savedStageThresholds, setSavedStageThresholds] = useState<TimePalStageThresholds>(() => {
         return readStoredTimePalStageThresholds();
@@ -172,6 +177,7 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
             setCustomQuotesEnabled(storage.getBoolean(TIMEPAL_KEYS.CUSTOM_QUOTES_ENABLED, false));
             setCustomQuotes(storage.getJSON<string[]>(TIMEPAL_KEYS.CUSTOM_QUOTES, []).join('\n'));
             setClickSwitchEnabled(storage.getBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, true));
+            setShowSeconds(storage.getBoolean(TIMEPAL_KEYS.SHOW_SECONDS, true));
             const restoredThresholds = readStoredTimePalStageThresholds();
             setSavedStageThresholds(restoredThresholds);
             setStageThresholdInputs(buildStageThresholdInputs(restoredThresholds));
@@ -216,6 +222,11 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
         storage.setBoolean(TIMEPAL_KEYS.CLICK_SWITCH_ENABLED, clickSwitchEnabled);
         window.dispatchEvent(new Event(TIMEPAL_CLICK_SWITCH_CHANGED_EVENT));
     }, [clickSwitchEnabled]);
+
+    useEffect(() => {
+        storage.setBoolean(TIMEPAL_KEYS.SHOW_SECONDS, showSeconds);
+        window.dispatchEvent(new Event(TIMEPAL_SHOW_SECONDS_CHANGED_EVENT));
+    }, [showSeconds]);
 
     const handleCustomQuotesChange = (value: string) => {
         setCustomQuotes(value);
@@ -442,6 +453,28 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
                 </div>
                 <p className="text-xs text-stone-500">
                     开启后，可在脉络页顶部卡片中点击小友图片切换类型。
+                </p>
+            </div>
+
+            <div className="pt-4 border-t border-stone-200 bg-white rounded-lg p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
+                        卡片显示秒
+                    </label>
+                    <button
+                        type="button"
+                        onClick={() => setShowSeconds(!showSeconds)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${
+                            showSeconds
+                                ? 'bg-stone-900 text-white'
+                                : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                        }`}
+                    >
+                        {showSeconds ? '已开启' : '关闭'}
+                    </button>
+                </div>
+                <p className="text-xs text-stone-500">
+                    关闭后，时间小友卡片只显示小时和分钟。
                 </p>
             </div>
 
