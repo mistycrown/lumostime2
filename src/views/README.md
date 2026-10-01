@@ -37,6 +37,7 @@ The `views/` directory contains all the React components that represent the dist
 - Update 2026-08-10: `DailyCheckDetailView.tsx` presents an immediate loading screen, renders the current-month data first, and defers all-history statistics plus the 30-day trend until after first paint.
 - Update 2026-08-10: `DailyCheckDetailView.tsx` uses the selected daily-check theme color consistently for its progress ring, heatmap, and trend.
 - Update 2026-08-10: `DailyCheckDetailView.tsx` now presents its 30-day trend as a static chart without hover tooltips, pointer interaction, or Recharts focus outlines.
+- Update 2026-10-01: `TimelineView.tsx` and `settings/CollectionSettingsView.tsx` now pass each record's complete media group and selected thumbnail index to the shared image preview, so swipe navigation stays within that record while long images scroll vertically at fitted width.
 - Update 2026-07-30: `TimelineView.tsx` and `DailyReviewView.tsx` now use the shared auto-check change detector so reorder-only refreshes do not trigger redundant review writes.
 - Update 2026-07-31: `TimelineView.tsx` now receives the active Chronicle layout from the app shell, while the settings selector acts as the default layout for fresh Timeline entries.
 - Update 2026-07-31: `TimelineView.tsx` keeps planned logs out of the pure timeline stream so idle gaps, exports, gallery data, and historical same-day links only reflect entity records.

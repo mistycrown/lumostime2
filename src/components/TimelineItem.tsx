@@ -3,6 +3,7 @@
  * @input DiaryEntry data, timeline callbacks, shared timeline style settings
  * @output Memoir/timeline entry cards with text, media, reactions, and comments
  * @description Renders a single timeline entry, including media grids that keep image containers and images aligned across different image counts, plus shared metadata chips such as todo, collection, tag, and domain badges.
+ * @updated 2026-10-01: Opens the clicked media index in an attachment-scoped shared preview instead of resolving only one image.
  * @updated 2026-07-22: Added Memoir-specific text hooks so entry titles and body content remain readable in dark mode.
  * @updated 2026-09-12: Renders Routine Markdown checklists as visual rows in Memoir entries.
  * @updated 2026-09-29: Makes review nodes inherit the active custom timeline icon and color while preserving default summary colors.
@@ -161,7 +162,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 }) => {
     const [isCommenting, setIsCommenting] = useState(false);
     const [commentText, setCommentText] = useState('');
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
     const { isPrivacyMode } = usePrivacy();
     const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
 
@@ -205,11 +206,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             return (
                 <div
                     className="mt-4 rounded-lg overflow-hidden shadow-sm border border-gray-100 cursor-zoom-in"
-                    onClick={async (e) => {
+                    onClick={(e) => {
                         e.stopPropagation();
-                        // 点击时加载原图用于预览
-                        const url = await imageService.getImageUrl(entry.media![0].url, 'original');
-                        if (url) setPreviewImage(url);
+                        setPreviewImageIndex(0);
                     }}
                 >
                     <TimelineImage
@@ -228,11 +227,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                         <div
                             key={i}
                             className="rounded-lg overflow-hidden aspect-[4/3] shadow-sm border border-gray-100 cursor-zoom-in"
-                            onClick={async (e) => {
+                            onClick={(e) => {
                                 e.stopPropagation();
-                                // 点击时加载原图用于预览
-                                const url = await imageService.getImageUrl(m.url, 'original');
-                                if (url) setPreviewImage(url);
+                                setPreviewImageIndex(i);
                             }}
                         >
                             <TimelineImage src={m.url} alt={`memory-${i}`} className="w-full h-full object-cover" />
@@ -248,11 +245,9 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                     <div
                         key={i}
                         className="rounded-md overflow-hidden aspect-square shadow-sm border border-gray-100 cursor-zoom-in"
-                        onClick={async (e) => {
+                        onClick={(e) => {
                             e.stopPropagation();
-                            // 点击时加载原图用于预览
-                            const url = await imageService.getImageUrl(m.url, 'original');
-                            if (url) setPreviewImage(url);
+                            setPreviewImageIndex(i);
                         }}
                     >
                         <TimelineImage src={m.url} alt={`memory-${i}`} className="w-full h-full object-cover" />
@@ -478,8 +473,10 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             </div>
 
             <ImagePreviewModal
-                imageUrl={previewImage}
-                onClose={() => setPreviewImage(null)}
+                imageUrl={previewImageIndex === null ? null : entry.media?.[previewImageIndex]?.url}
+                images={entry.media?.map((media) => media.url)}
+                initialIndex={previewImageIndex ?? undefined}
+                onClose={() => setPreviewImageIndex(null)}
             />
         </div>
     );
