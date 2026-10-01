@@ -75,6 +75,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     zoomIn: () => void;
     zoomOut: () => void;
     resetTransform: () => void;
+    centerView: (scale?: number, animationTime?: number) => void;
   } | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [rotation, setRotation] = useState(0);
@@ -106,6 +107,15 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     )
   );
   const hasMultipleImages = previewItems.length > 1;
+  const resetAndCenterActiveTransform = useCallback(() => {
+    const handlers = zoomHandlersRef.current;
+    if (!handlers) {
+      return;
+    }
+
+    handlers.resetTransform(0);
+    handlers.centerView(1, 0);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) {
@@ -192,9 +202,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
 
     setRotation(0);
-    const frame = window.requestAnimationFrame(() => zoomHandlersRef.current?.resetTransform());
+    const frame = window.requestAnimationFrame(resetAndCenterActiveTransform);
     return () => window.cancelAnimationFrame(frame);
-  }, [activeIndex, isOpen]);
+  }, [activeIndex, isOpen, resetAndCenterActiveTransform]);
 
   useLayoutEffect(() => {
     if (!isOpen || !carouselRef.current) {
@@ -287,6 +297,17 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
         ? current
         : { ...current, [source]: { width: naturalWidth, height: naturalHeight } }
     ));
+  };
+
+  const handleTransformImageLoad = (
+    source: string,
+    index: number,
+    event: React.SyntheticEvent<HTMLImageElement>
+  ) => {
+    handleImageLoad(source, event);
+    if (index === activeIndex) {
+      window.requestAnimationFrame(resetAndCenterActiveTransform);
+    }
   };
 
   const handleDeleteClick = () => {
@@ -393,9 +414,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     limitToBounds={false}
                     panning={{ disabled: hasMultipleImages }}
                   >
-                    {({ zoomIn, zoomOut, resetTransform }) => {
+                    {({ zoomIn, zoomOut, resetTransform, centerView }) => {
                       if (index === activeIndex) {
-                        zoomHandlersRef.current = { zoomIn, zoomOut, resetTransform };
+                        zoomHandlersRef.current = { zoomIn, zoomOut, resetTransform, centerView };
                       }
 
                       return (
@@ -412,7 +433,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                               maxHeight: Math.abs(rotation % 180) === 90 ? '90vw' : '90vh',
                               maxWidth: Math.abs(rotation % 180) === 90 ? '90vh' : '90vw'
                             }}
-                            onLoad={(event) => handleImageLoad(item.source, event)}
+                            onLoad={(event) => handleTransformImageLoad(item.source, index, event)}
                           />
                         </TransformComponent>
                       );
