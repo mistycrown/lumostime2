@@ -19,6 +19,7 @@
  * @updated 2026-09-26: Added configurable backgrounds to loose-mode todo cards.
  * @updated 2026-09-30: Defers local wallpapers to MainLayout under transparent title bars so Todo headers and content share one continuous image.
  * @updated 2026-09-29: Uses the theme accent for loose-card dates and focus starts when a custom card background is active.
+ * @updated 2026-10-01: Displays completion dates in compact and loose todo rows when completedAt is available.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
@@ -61,7 +62,7 @@ import {
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
-import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
+import { formatTodoCompactScheduleSummary, formatTodoCompletionDate, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { isQuickTodo } from '../utils/todoKindUtils';
@@ -160,10 +161,11 @@ const SwipeableTodoItem: React.FC<{
     : 0;
   const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
   const deadlineDateLabel = formatTodoInlineDate(todo.deadlineDate);
+  const completedDateLabel = todo.isCompleted ? formatTodoCompletionDate(todo.completedAt) : null;
   const compactScheduleSummary = viewMode === 'compact' && compactDisplaySettings.showScheduleTime
     ? formatTodoCompactScheduleSummary(todo)
     : null;
-  const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel);
+  const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel || completedDateLabel);
   const progressRatio = (todo.completedUnits || 0) / (todo.totalAmount || 1);
   const progressPercentage = Math.round(progressRatio * 100);
   const progressBarWidth = Math.min(100, Math.max(0, progressRatio * 100));
@@ -604,6 +606,12 @@ const SwipeableTodoItem: React.FC<{
                     <span className="inline-flex items-center gap-1 leading-none">
                       <Flag size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
                       <span>{deadlineDateLabel}</span>
+                    </span>
+                  )}
+                  {completedDateLabel && (
+                    <span className="inline-flex items-center gap-1 leading-none">
+                      <CheckCircle2 size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
+                      <span>{completedDateLabel}</span>
                     </span>
                   )}
                 </div>
