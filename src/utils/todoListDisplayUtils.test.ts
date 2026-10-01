@@ -6,11 +6,12 @@
  * @description Verifies the shared compact schedule summary text and the category-list grouping rule that keeps incomplete todos before completed ones without reordering items inside either group.
  * @updated 2026-05-05: Updated ordering coverage so category lists preserve incoming per-group order instead of re-sorting by schedule dates.
  * @updated 2026-05-05: Updated compact summary coverage to expect symbol-only date suffixes appended directly after the title.
+ * @updated 2026-10-01: Added completed-date formatting coverage for compact todo summaries.
  */
 
 import { describe, expect, test } from 'vitest';
 import { TodoItem } from '../types';
-import { formatTodoCompactScheduleSummary, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from './todoListDisplayUtils';
+import { formatTodoCompactScheduleSummary, formatTodoCompletionDate, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from './todoListDisplayUtils';
 
 const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
   id: 'todo-1',
@@ -23,6 +24,12 @@ const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
 describe('todoListDisplayUtils', () => {
   test('formats inline dates as month-day pairs', () => {
     expect(formatTodoInlineDate('2026-05-06')).toBe('05.06');
+  });
+
+  test('formats completed timestamps as local month-day pairs', () => {
+    expect(formatTodoCompletionDate('2026-05-09T10:00:00+08:00')).toBe('05.09');
+    expect(formatTodoCompletionDate()).toBeNull();
+    expect(formatTodoCompletionDate('not-a-date')).toBeNull();
   });
 
   test('builds compact symbol-only summaries and omits missing fields', () => {
@@ -38,6 +45,17 @@ describe('todoListDisplayUtils', () => {
     expect(formatTodoCompactScheduleSummary(buildTodo({
       scheduledDate: '2026-05-06'
     }))).toBe('(05.06)');
+
+    expect(formatTodoCompactScheduleSummary(buildTodo({
+      isCompleted: true,
+      completedAt: '2026-05-10T10:00:00+08:00',
+      scheduledDate: '2026-05-06',
+      deadlineDate: '2026-05-09'
+    }))).toBe('(05.06)[05.09]{05.10}');
+
+    expect(formatTodoCompactScheduleSummary(buildTodo({
+      completedAt: '2026-05-10T10:00:00+08:00'
+    }))).toBeNull();
 
     expect(formatTodoCompactScheduleSummary(buildTodo({}))).toBeNull();
   });
