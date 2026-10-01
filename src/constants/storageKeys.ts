@@ -7,6 +7,7 @@
  * @updated 2026-08-06: Added the association selector column-count preference key.
  * @updated 2026-08-11: Added the last-seen cloud upload timestamp for dual-path sync decisions.
  * @updated 2026-09-26: Added imported theme package metadata storage for appearance sync.
+ * @updated 2026-10-01: Added the TimePal card seconds-visibility preference.
  * 
  * 集中管理所有 localStorage 键名，避免硬编码字符串分散在各处
  * 便于维护和重构
@@ -22,6 +23,7 @@ export const TIMEPAL_KEYS = {
     CUSTOM_ITEMS: 'lumostime_timepal_custom_items',
     STAGE_THRESHOLDS: 'lumostime_timepal_stage_thresholds',
     CLICK_SWITCH_ENABLED: 'lumostime_timepal_click_switch_enabled',
+    SHOW_SECONDS: 'lumostime_timepal_show_seconds',
     /** 是否启用标签筛选 */
     FILTER_ENABLED: 'lumostime_timepal_filter_enabled',
     /** 筛选的活动标签 ID 列表 */

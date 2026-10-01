@@ -57,6 +57,7 @@
 - Modify: `src/constants/storageKeys.ts`
 - Modify: `src/components/TimePalSettings.tsx`
 - Modify: `src/components/TimePalCard.tsx`
+- Modify: `src/services/appearanceBackupService.ts`
 
 **Interfaces:**
 - `TIMEPAL_KEYS.SHOW_SECONDS` stores `lumostime_timepal_show_seconds`。
@@ -64,7 +65,7 @@
 
 - [ ] **Step 1: Add the storage key and settings state**
 
-  Add `SHOW_SECONDS` with default `true`; load it on initial render and in `APPEARANCE_RESTORED_EVENT` restoration. Add a concise “卡片显示秒” toggle in the existing TimePal controls and persist changes through `storage.setBoolean`.
+  Add `SHOW_SECONDS` with default `true`; include it in appearance backup payloads, load it on initial render and in `APPEARANCE_RESTORED_EVENT` restoration. Add a concise “卡片显示秒” toggle in the existing TimePal controls and persist changes through `storage.setBoolean`.
 
 - [ ] **Step 2: Subscribe the card to the setting**
 
@@ -77,4 +78,4 @@
 
 - [ ] **Step 4: Inspect the diff and commit only task files**
 
-  Run `git status --short` and `git diff --check`; stage only the design/plan files and the five feature/test files, leaving the three pre-existing detail-view changes unstaged. Commit with `feat: 支持时间小友卡片隐藏秒数`。
+  Run `git status --short` and `git diff --check`; stage only the updated plan and the six feature/test files, leaving the three pre-existing detail-view changes unstaged. Commit with `feat: 支持时间小友卡片隐藏秒数`。
