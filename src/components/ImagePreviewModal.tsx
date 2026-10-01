@@ -370,8 +370,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 
                       return (
                         <TransformComponent
-                          wrapperClass="w-full h-full !overflow-visible"
-                          contentClass="w-full h-full flex items-center justify-center p-4"
+                          wrapperClass="!h-full !w-full !overflow-visible flex items-center justify-center"
+                          contentClass="flex items-center justify-center p-4"
                         >
                           <img
                             src={resolvedUrl}
