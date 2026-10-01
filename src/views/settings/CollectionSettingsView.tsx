@@ -1,5 +1,6 @@
 /**
  * @file CollectionSettingsView.tsx
+ * @updated 2026-10-01: Opens collection-entry attachments in the shared grouped preview while retaining remote-media support.
  * @updated 2026-07-21: Added dark-mode outline treatment for selected collection rows.
  * @input Collection data from DataContext plus edit handlers for logs and todos
  * @output A settings-level Collection list plus mixed-item detail timeline
@@ -241,23 +242,13 @@ const CollectionTimelineImage: React.FC<{ src: string; alt: string; className: s
 };
 
 const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry; onOpen?: () => void }> = ({ entry, onOpen }) => {
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
   const { isPrivacyMode } = usePrivacy();
   const hasMetadata = (entry.relatedTodos?.length || 0) + (entry.tags?.length || 0) + (entry.domains?.length || 0) > 0;
   const previewMedia = entry.media?.[0];
   const extraImageCount = Math.max(0, (entry.media?.length || 0) - 1);
 
-  const handlePreviewImage = async (imageUrl: string) => {
-    if (imageUrl.startsWith('http') || imageUrl.startsWith('data:')) {
-      setPreviewImage(imageUrl);
-      return;
-    }
-
-    const resolvedUrl = await imageService.getImageUrl(imageUrl, 'original');
-    if (resolvedUrl) {
-      setPreviewImage(resolvedUrl);
-    }
-  };
+  const handlePreviewImage = (index: number) => setPreviewImageIndex(index);
 
   const renderMedia = () => {
     if (!previewMedia) {
@@ -270,7 +261,7 @@ const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry; on
         className="relative overflow-hidden rounded-xl border border-stone-200/80 bg-white shadow-[0_1px_0_rgba(28,25,23,0.03)]"
         onClick={(event) => {
           event.stopPropagation();
-          void handlePreviewImage(previewMedia.url);
+          handlePreviewImage(0);
         }}
         onKeyDown={(event) => {
           event.stopPropagation();
@@ -368,7 +359,12 @@ const CollectionTimelineEntryCard: React.FC<{ entry: CollectionTimelineEntry; on
         </div>
         <div className="clear-both" />
       </div>
-      <ImagePreviewModal imageUrl={previewImage} onClose={() => setPreviewImage(null)} />
+      <ImagePreviewModal
+        imageUrl={previewImageIndex === null ? null : entry.media?.[previewImageIndex]?.url}
+        images={entry.media?.map((media) => media.url)}
+        initialIndex={previewImageIndex ?? undefined}
+        onClose={() => setPreviewImageIndex(null)}
+      />
     </div>
   );
 };

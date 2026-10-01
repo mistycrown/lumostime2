@@ -1,6 +1,7 @@
 /**
  * @file GalleryView.tsx
  * @description 画廊视图 - 以瀑布流方式展示所有带图片的记录
+ * @updated 2026-10-01: Limits shared preview swipe navigation to the clicked record's attachments.
  */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Log, Category, DailyReview } from '../types';
@@ -133,7 +134,7 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
     const [isScrolled, setIsScrolled] = useState(false);
     const [displayCount, setDisplayCount] = useState(12); // 优化：初始显示12张图片
     const LOAD_MORE_COUNT = 12; // 优化：每次加载12张
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewImage, setPreviewImage] = useState<{ images: string[]; index: number } | null>(null);
     const [activeMonth, setActiveMonth] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showExportView, setShowExportView] = useState(false);
@@ -356,10 +357,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                                                     className="cursor-pointer"
                                                 >
                                                     <div 
-                                                        onClick={async (e) => {
+                                                        onClick={(e) => {
                                                             e.stopPropagation();
-                                                            const url = await imageService.getImageUrl(item.image, 'original');
-                                                            if (url) setPreviewImage(url);
+                                                            setPreviewImage({
+                                                                images: item.log.images || [],
+                                                                index: item.log.images?.indexOf(item.image) ?? 0
+                                                            });
                                                         }}
                                                         className="active:opacity-70 transition-opacity"
                                                     >
@@ -411,10 +414,12 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
                                                     className="cursor-pointer"
                                                 >
                                                     <div 
-                                                        onClick={async (e) => {
+                                                        onClick={(e) => {
                                                             e.stopPropagation();
-                                                            const url = await imageService.getImageUrl(item.image, 'original');
-                                                            if (url) setPreviewImage(url);
+                                                            setPreviewImage({
+                                                                images: item.log.images || [],
+                                                                index: item.log.images?.indexOf(item.image) ?? 0
+                                                            });
                                                         }}
                                                         className="active:opacity-70 transition-opacity"
                                                     >
@@ -482,7 +487,9 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
             {/* 图片预览模态框 */}
             <ImagePreviewModal
-                imageUrl={previewImage}
+                imageUrl={previewImage ? previewImage.images[previewImage.index] : null}
+                images={previewImage?.images}
+                initialIndex={previewImage?.index}
                 onClose={() => setPreviewImage(null)}
             />
 

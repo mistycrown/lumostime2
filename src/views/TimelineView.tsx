@@ -4,6 +4,7 @@
  * @output Log CRUD, Date Navigation, Gesture/Calendar Animated Day Navigation, Search Trigger, Filter Trigger, Review Navigation
  * @pos View (Main Tab)
  * @description The primary daily view. Visualizes time usage on a timeline, supports adding/editing logs, gap detection, gesture and lightweight calendar date-switch animation, quick search and custom filter entry points, and integrates Daily/Weekly/Monthly review plus achievement bottle entry points.
+ * @updated 2026-10-01: Opens log attachments in the shared grouped preview at the thumbnail's selected index.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-26: Renders Markdown Routine checklists from timeline notes with their completion state.
@@ -255,7 +256,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
     const { isPrivacyMode } = usePrivacy();
     const { backgroundUrl, hasBackground, panelOverlayOpacity } = useBackgroundDisplay();
     const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewImage, setPreviewImage] = useState<{ images: string[]; index: number } | null>(null);
     const [copyFailureModal, setCopyFailureModal] = useState<{ isOpen: boolean; text: string }>({ isOpen: false, text: '' });
     const [sidebarTodoCategoryId, setSidebarTodoCategoryId] = useState<string | null>(null);
     const [isSidebarTodoListPickerOpen, setIsSidebarTodoListPickerOpen] = useState(false);
@@ -1763,13 +1764,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                                 {(item.logData.images.length > 3
                                                     ? item.logData.images.slice(0, 2)
                                                     : item.logData.images
-                                                ).map(img => (
+                                                ).map((img, imageIndex) => (
                                                     <div
                                                         key={img}
-                                                        onClick={async (e) => {
+                                                        onClick={(e) => {
                                                             e.stopPropagation();
-                                                            const url = await imageService.getImageUrl(img, 'original');
-                                                            if (url) setPreviewImage(url);
+                                                            setPreviewImage({ images: item.logData.images || [], index: imageIndex });
                                                         }}
                                                         className="cursor-zoom-in transition-transform hover:scale-105"
                                                     >
@@ -2537,7 +2537,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                 <UIIcon type="add-record" fallbackIcon={Plus} size={24} />
             </FloatingButton>
             <ImagePreviewModal
-                imageUrl={previewImage}
+                imageUrl={previewImage ? previewImage.images[previewImage.index] : null}
+                images={previewImage?.images}
+                initialIndex={previewImage?.index}
                 onClose={() => setPreviewImage(null)}
             />
 

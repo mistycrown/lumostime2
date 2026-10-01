@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-01: Sends the current record's full attachment list to the shared preview so swiping, download, and deletion stay on the active image.
  * @updated 2026-09-17: Uses an adaptive equal-sided time grid so the start/end inputs and center separator stay horizontally and vertically aligned across modal widths.
  * @updated 2026-09-05: Shows a linked todo's pre-record progress when editing an existing progress log.
  * @updated 2026-09-03: Passes record notes to shared attributes for automatic choice-option matching.
@@ -1340,12 +1341,14 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
 
       {/* Full Screen Image Preview */}
       <ImagePreviewModal
-        imageUrl={imageManager.previewFilename ? (imageManager.imageUrls[imageManager.previewFilename] || '') : null}
+        imageUrl={imageManager.previewFilename}
+        images={imageManager.images}
+        initialIndex={imageManager.previewFilename ? imageManager.images.indexOf(imageManager.previewFilename) : undefined}
         downloadFilename={imageManager.previewFilename || undefined}
         onClose={() => imageManager.setPreviewFilename(null)}
-        onDelete={() => {
-          if (imageManager.previewFilename) {
-            handleDeleteImage(imageManager.previewFilename);
+        onDelete={(item) => {
+          if (item.source) {
+            handleDeleteImage(item.source);
             imageManager.setPreviewFilename(null);
           }
         }}
