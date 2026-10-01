@@ -4,6 +4,7 @@
  * @output Full-screen image preview modal with grouped navigation, long-image reading, zoom, rotate, delete, and download actions
  * @pos Component (Modal)
  * @description Shared full-screen image preview used across logs, timeline, gallery, and collection surfaces.
+ * @updated 2026-10-01: Preloads adjacent slides and resets persistent transforms without remounting images, preventing visible flashes during attachment swipes.
  * @updated 2026-10-01: Added attachment-scoped swipe navigation, active-image actions, and width-fit vertical reading for long images.
  * @updated 2026-05-21: Added a shared download/save action with toast feedback so every preview modal can save the current image without duplicating button logic.
  */
@@ -70,7 +71,11 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
 }) => {
   const { addToast } = useToast();
   const carouselRef = useRef<HTMLDivElement>(null);
-  const zoomHandlersRef = useRef<{ zoomIn: () => void; zoomOut: () => void } | null>(null);
+  const zoomHandlersRef = useRef<{
+    zoomIn: () => void;
+    zoomOut: () => void;
+    resetTransform: () => void;
+  } | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -124,38 +129,62 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !activeItem || resolvedUrls[activeItem.source] || failedSources.has(activeItem.source)) {
+    if (!isOpen) {
+      return;
+    }
+
+    const nearbySources = Array.from(new Set(
+      [activeIndex - 1, activeIndex, activeIndex + 1]
+        .map((index) => previewItems[index]?.source)
+        .filter((source): source is string => Boolean(source))
+        .filter((source) => !resolvedUrls[source] && !failedSources.has(source))
+    ));
+
+    if (nearbySources.length === 0) {
       return;
     }
 
     let isCurrent = true;
-    const source = activeItem.source;
 
-    const resolveImageUrl = async () => {
-      try {
-        const url = isDirectImageUrl(source) ? source : await imageService.getImageUrl(source, 'original');
-        if (!isCurrent) {
-          return;
-        }
-
-        if (url) {
-          setResolvedUrls((current) => ({ ...current, [source]: url }));
-        } else {
-          setFailedSources((current) => new Set(current).add(source));
-        }
-      } catch (error) {
-        if (isCurrent) {
+    const resolveNearbyImages = async () => {
+      const results = await Promise.all(nearbySources.map(async (source) => {
+        try {
+          const url = isDirectImageUrl(source) ? source : await imageService.getImageUrl(source, 'original');
+          return { source, url };
+        } catch (error) {
           console.error('[ImagePreviewModal] Failed to resolve preview image', error);
-          setFailedSources((current) => new Set(current).add(source));
+          return { source, url: '' };
         }
+      }));
+
+      if (!isCurrent) {
+        return;
+      }
+
+      const resolvedEntries = results.filter((result) => Boolean(result.url));
+      const failedEntries = results.filter((result) => !result.url);
+
+      if (resolvedEntries.length > 0) {
+        setResolvedUrls((current) => ({
+          ...current,
+          ...Object.fromEntries(resolvedEntries.map((result) => [result.source, result.url]))
+        }));
+      }
+
+      if (failedEntries.length > 0) {
+        setFailedSources((current) => {
+          const next = new Set(current);
+          failedEntries.forEach((result) => next.add(result.source));
+          return next;
+        });
       }
     };
 
-    void resolveImageUrl();
+    void resolveNearbyImages();
     return () => {
       isCurrent = false;
     };
-  }, [activeItem, failedSources, isOpen, resolvedUrls]);
+  }, [activeIndex, failedSources, isOpen, previewItems, resolvedUrls]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -163,7 +192,8 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
     }
 
     setRotation(0);
-    zoomHandlersRef.current = null;
+    const frame = window.requestAnimationFrame(() => zoomHandlersRef.current?.resetTransform());
+    return () => window.cancelAnimationFrame(frame);
   }, [activeIndex, isOpen]);
 
   useLayoutEffect(() => {
@@ -355,7 +385,7 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                   </div>
                 ) : (
                   <TransformWrapper
-                    key={`${item.source}-${activeIndex}`}
+                    key={`${item.source}-${index}`}
                     initialScale={1}
                     minScale={0.2}
                     maxScale={5}
@@ -363,9 +393,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
                     limitToBounds={false}
                     panning={{ disabled: hasMultipleImages }}
                   >
-                    {({ zoomIn, zoomOut }) => {
+                    {({ zoomIn, zoomOut, resetTransform }) => {
                       if (index === activeIndex) {
-                        zoomHandlersRef.current = { zoomIn, zoomOut };
+                        zoomHandlersRef.current = { zoomIn, zoomOut, resetTransform };
                       }
 
                       return (
