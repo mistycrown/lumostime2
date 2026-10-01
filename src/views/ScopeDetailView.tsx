@@ -940,7 +940,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                         onClick={() => setActiveTab(tab)}
                         className={`pb-3 text-sm font-serif tracking-wide whitespace-nowrap transition-colors ${activeTab === tab ? 'text-stone-900 border-b-2 border-stone-900 font-bold' : 'text-stone-400 hover:text-stone-600'}`}
                     >
-                        {tab === '时间线' ? '時間線' : tab}
+                        {tab === '时间线' ? '时间线' : tab}
                     </button>
                 ))}
             </div>
