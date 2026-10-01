@@ -7,6 +7,7 @@
  * @updated 2026-05-05: Category-list ordering now only groups incomplete todos before completed ones while preserving each group's incoming array order from batch-management saves.
  * @updated 2026-05-05: Switched compact inline schedule summaries to symbol-only `(MM.DD)[MM.DD]` formatting so dates can sit immediately after the title.
  * @updated 2026-10-01: Added safe local-date formatting and compact summary support for completed todos.
+ * @updated 2026-10-01: Prioritized a valid completion date over scheduled and deadline labels.
  *
  * Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -37,6 +38,10 @@ export const formatTodoCompletionDate = (completedAt?: string): string | null =>
 
 export const formatTodoCompactScheduleSummary = (todo: TodoScheduleDisplayItem): string | null => {
   const completionDate = todo.isCompleted ? formatTodoCompletionDate(todo.completedAt) : null;
+  if (completionDate) {
+    return `{${completionDate}}`;
+  }
+
   const segments = [
     todo.scheduledDate ? `(${formatTodoInlineDate(todo.scheduledDate)})` : null,
     todo.deadlineDate ? `[${formatTodoInlineDate(todo.deadlineDate)}]` : null,
