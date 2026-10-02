@@ -1,5 +1,6 @@
 /**
  * @file assistantMemoryService.ts
+ * @updated 2026-10-02: Persists normalized defaults once so repeated backup reads keep stable timestamps.
  * @input Local storage state plus optional assistant memory patches and decision summaries
  * @output Persistent structured assistant memory snapshots
  * @pos Service (Assistant Memory)
@@ -189,7 +190,12 @@ export const assistantMemoryService = {
   },
 
   getMemory(): AssistantMemory {
-    return normalizeMemory(safeParseJson<unknown>(localStorage.getItem(ASSISTANT_MEMORY_KEY), null));
+    const raw = localStorage.getItem(ASSISTANT_MEMORY_KEY);
+    const memory = normalizeMemory(safeParseJson<unknown>(raw, null));
+    const serialized = JSON.stringify(memory);
+    // Persist generated defaults/migrations once; a read must not invent a new backup version.
+    if (serialized !== raw) localStorage.setItem(ASSISTANT_MEMORY_KEY, serialized);
+    return memory;
   },
 
   saveMemory(memory: AssistantMemory): AssistantMemory {

@@ -1,5 +1,6 @@
 /**
  * @file dreamService.ts
+ * @updated 2026-10-02: Persists generated defaults and migrations once so sync reads do not create fresh revisions.
  * @input User-authored Dream topics, AI-generated Dream patch payloads, and optional query text for Dream-context selection
  * @output Persistent Dream state snapshots, scoped Dream context digests, and AI-generated Dream run results
  * @pos Service (Dream)
@@ -656,7 +657,12 @@ export const dreamService = {
   },
 
   getState(): DreamState {
-    return normalizeDreamState(safeParseJson<unknown>(localStorage.getItem(DREAM_STORAGE_KEY), null));
+    const raw = localStorage.getItem(DREAM_STORAGE_KEY);
+    const state = normalizeDreamState(safeParseJson<unknown>(raw, null));
+    const serialized = JSON.stringify(state);
+    // Save generated timestamps/IDs and migrations once without reporting a user edit.
+    if (serialized !== raw) localStorage.setItem(DREAM_STORAGE_KEY, serialized);
+    return state;
   },
 
   saveState(state: DreamState): DreamState {

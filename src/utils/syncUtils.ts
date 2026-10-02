@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.ts
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-10-02: Publishes unique revisions, distinguishes missing objects from read failures, and restores the exact selected snapshot.
  * @updated 2026-09-25: Builds and uploads separate content/theme image manifest groups with legacy cloud-list compatibility.
  * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
  * @updated 2026-04-20: Cleaned user-facing messages and kept compatible S3 fully aligned with the shared upload/restore flow.
@@ -40,6 +41,31 @@ export interface SyncResult {
 }
 
 export const MAIN_BACKUP_FILENAME = 'lumostime_backup.json';
+
+export function getCloudDestinationIdentity(service: CloudService): string {
+  const config = service.getConfig?.() as any;
+  return JSON.stringify({
+    service: getServiceName(service), url: config?.url, username: config?.username,
+    bucket: config?.bucketName, region: config?.region, endpoint: config?.endpoint,
+    account: config?.accessKeyId || config?.secretId
+  });
+}
+
+export async function readCloudSnapshot(service: CloudService): Promise<any | null> {
+  let data: any;
+  try {
+    data = await service.downloadData(MAIN_BACKUP_FILENAME);
+  } catch (error: any) {
+    const code = error?.code || error?.name;
+    const status = error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.$metadata?.httpStatusCode;
+    if (code !== 'NoSuchBucket' && (code === 'NoSuchKey' || code === 'NotFound' || Number(status) === 404)) {
+      return null;
+    }
+    throw error;
+  }
+  if (!isValidSyncPayload(data)) throw new Error('云端备份格式无效，已停止同步');
+  return data;
+}
 
 function isValidSyncPayload(data: any): boolean {
   return validateLocalData(data).isValid;
@@ -291,6 +317,7 @@ export async function uploadDataToCloud(
     const dataToSync = {
       ...localData,
       timestamp: uploadTimestamp,
+      syncRevision: localData.syncRevision || crypto.randomUUID(),
       version: '1.0.0'
     };
 
@@ -342,10 +369,11 @@ export async function uploadDataToCloud(
     };
     await service.uploadImageList(finalGroups);
 
+
     return {
       success: true,
       message: buildUploadMessage(displayName, localImageList, imageResult),
-      data: { timestamp: uploadTimestamp },
+      data: dataToSync,
       imageStats: imageResult
     };
   } catch (error: any) {
@@ -367,13 +395,14 @@ export async function uploadDataToCloud(
 
 export async function downloadDataFromCloud(
   service: CloudService,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  selectedSnapshot?: any
 ): Promise<SyncResult> {
   const displayName = getServiceDisplayName(service);
 
   try {
     onProgress?.(`正在从${displayName}下载数据...`);
-    const rawData = await service.downloadData();
+    const rawData = selectedSnapshot ?? await service.downloadData();
     console.log('[syncUtils] Raw cloud payload summary:', {
       service: displayName,
       timestamp: rawData?.timestamp,
@@ -534,7 +563,8 @@ export async function backupLocalDataToCloud(
 export async function downloadWithBackup(
   service: CloudService,
   localData: any,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  selectedSnapshot?: any
 ): Promise<SyncResult> {
   const backupResult = await backupLocalDataToCloud(service, localData, onProgress);
 
@@ -546,5 +576,5 @@ export async function downloadWithBackup(
   }
 
   onProgress?.(backupResult.message);
-  return downloadDataFromCloud(service, onProgress);
+  return downloadDataFromCloud(service, onProgress, selectedSnapshot);
 }

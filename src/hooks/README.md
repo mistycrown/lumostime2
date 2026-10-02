@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> Update 2026-10-02: `useSyncManager.ts` now uses destination-specific version/content checkpoints and one automatic queue. Native/DOM callbacks read current React snapshots; edits during transfer remain pending; cloud restore waits for a React commit, and settings transfers share the same coordinator. Timestamp/JSON-size direction rules described in older entries below are superseded. See `../utils/cloud-sync.md` and run `node scripts/test-sync-renderer.mjs` for real React lifecycle regressions.
+
 > Update 2026-08-26: `useLogManager.ts` atomically replaces a source record with two proportional-progress segments after a confirmed split.
 
 > Update 2026-08-27: `useLogManager.ts` merges a record into an adjacent target with gap-inclusive duration, collection migration, and linked-todo progress reconciliation.

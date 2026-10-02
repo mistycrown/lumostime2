@@ -4,8 +4,9 @@
  * @output Shared helpers for reading, updating, locking, and broadcasting local user-change and cloud acknowledgement timestamps
  * @pos Utility (Sync Metadata)
  * @description Centralizes the local-data timestamp so all sync-relevant state changes can update one consistent clock without fighting restore flows.
+ * @updated 2026-10-02: Tracks monotonic edit revisions and acknowledges only captured revisions; asynchronous edits no longer depend on recent DOM input.
  * @updated 2026-08-11: Treats missing local timestamps as neutral and stores cloud acknowledgements separately from user edits.
- * @updated 2026-08-11: Rejects background startup writes until a real user interaction occurs, preventing initialization tasks from becoming local edits.
+ * @updated 2026-10-02: Hydration guards stay with data owners; persisted content checkpoints distinguish edits from restore normalization.
  * @updated 2026-08-11: Records pending user edits separately so automatic sync can ignore stale timestamps left by earlier startup writes.
  * @updated 2026-08-11: Provides an explicit local-edit marker for import and programmatic user actions that do not originate from a DOM event.
  */
@@ -18,24 +19,9 @@ export interface LocalDataTimestampUpdatedDetail {
 }
 
 let isTimestampUpdateLocked = false;
-let lastUserInteractionAt = 0;
+const EDIT_REVISION_KEY = 'lumostime_local_edit_revision_v2';
 
-const USER_INTERACTION_WINDOW_MS = 15_000;
-
-export const recordLocalDataUserInteraction = (): void => {
-  lastUserInteractionAt = Date.now();
-};
-
-const wasRecentlyChangedByUser = (): boolean => (
-  lastUserInteractionAt > 0 && Date.now() - lastUserInteractionAt <= USER_INTERACTION_WINDOW_MS
-);
-
-if (typeof window !== 'undefined') {
-  const recordInteraction = () => recordLocalDataUserInteraction();
-  ['pointerdown', 'keydown', 'input', 'change'].forEach((eventName) => {
-    window.addEventListener(eventName, recordInteraction, { capture: true, passive: true });
-  });
-}
+export const getLocalEditRevision = (): number => Number(localStorage.getItem(EDIT_REVISION_KEY)) || 0;
 
 export const getLocalDataTimestamp = (): number => {
   const stored = storage.get(USER_DATA_KEYS.LOCAL_TIMESTAMP);
@@ -60,16 +46,13 @@ export const markLocalDataEdited = (): number => {
     return getLocalDataTimestamp();
   }
 
-  const timestamp = setLocalDataTimestampValue(Date.now());
+  localStorage.setItem(EDIT_REVISION_KEY, String(getLocalEditRevision() + 1));
   storage.set(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT, 'true');
+  const timestamp = setLocalDataTimestampValue(Date.now());
   return timestamp;
 };
 
 export const updateLocalDataTimestamp = (): number => {
-  if (isTimestampUpdateLocked || !wasRecentlyChangedByUser()) {
-    return getLocalDataTimestamp();
-  }
-
   return markLocalDataEdited();
 };
 
@@ -77,8 +60,9 @@ export const hasPendingLocalDataEdit = (): boolean => (
   storage.get(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT) === 'true'
 );
 
-export const clearPendingLocalDataEdit = (): void => {
-  storage.remove(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT);
+export const clearPendingLocalDataEdit = (expectedRevision?: number): void => {
+  // Legacy callers without a captured revision cannot safely acknowledge in-flight edits.
+  if (getLocalEditRevision() === expectedRevision) storage.remove(SYNC_KEYS.HAS_PENDING_LOCAL_EDIT);
 };
 
 export const getLastSeenCloudUploadedAt = (): number => {
