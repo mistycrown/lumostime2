@@ -1,30 +1,10 @@
 /**
  * @file useSyncManager.ts
- * @input DataContext (logs, todos, categories, etc.), SettingsContext (sync config, timestamps), CategoryScopeContext (categories, scopes, goals), ReviewContext (reviews), NavigationContext (currentView, modal states), ToastContext (addToast)
- * @output Sync Operations (performSync, handleQuickSync, handleImageSync, cloud/local payload application), Sync State (isSyncing, refreshKey), and size-conflict resolution state
+ * @input Live application contexts, cloud provider configuration, and data/lifecycle events
+ * @output Versioned cloud handoff, manual overrides, conflict choices, and sync status
  * @pos Hook (System Integration)
- * @description 同步管理 Hook - 处理数据和图片的云端同步，支持启动同步、恢复同步、手动同步、自动同步等多种模式，并在恢复筛选器时保持顺序稳定，同时保证空值恢复与 majorGoals 载荷一致。
- * @updated 2026-07-06: Included the self-belief library in backup/sync payloads and restore handling so identity descriptions travel with user data.
- * @updated 2026-08-11: Separates local user-edit time from cloud upload time, preserves JSON-size conflict protection, and records acknowledged cloud uploads without rewriting local edit time.
- * @updated 2026-08-11: Ignores startup hydration and no-op appearance events so initialization cannot be recorded as a local user edit.
- * @updated 2026-08-11: Uses a pending-user-edit acknowledgement to prevent legacy startup timestamps from overriding newer cloud data.
- * @updated 2026-08-11: Treats unseen cloud versions as restore candidates even when their JSON byte size matches the local payload, and separates local edits from cloud restores.
- * @updated 2026-06-15: Added JSON-size conflict protection so timestamp-based cloud decisions now pause before any larger backup payload would be overwritten by a smaller one, letting the user choose upload vs restore explicitly.
- * @updated 2026-06-14: Prefer uploading confirmed pending local edits during auto-sync even when the local/cloud timestamps still fall inside the equal-tolerance window, so newly created todos are not skipped.
- * @updated 2026-05-18: Reduced timestamp comparison tolerance handling by routing sync direction through a shared helper, so fresh desktop edits are no longer swallowed as "equal" for several seconds after the previous sync.
- * @updated 2026-06-13: Included data collections and collection entries in unified backup/sync payloads, restore handling, and auto-sync change detection.
- * @updated 2026-05-18: Extended the unified backup/sync payload to include the achievement bottle backup block, and now restore that state alongside the main app data during imports and cloud downloads.
- * @updated 2026-05-17: Extended the unified backup/sync payload to include the shared AI backup block, and now restore that AI state alongside the main app data during imports and cloud downloads.
- * @updated 2026-05-18: Included the persisted custom color group in backup/sync payloads and now auto-sync palette-only edits as part of user data.
- * @updated 2026-08-10: Included Android widget templates in backup/sync payloads, restores them through widgetService, and auto-syncs template-only changes.
- * @updated 2026-08-11: Adds shareable error IDs to user-visible manual cloud sync failures.
- * @updated 2026-08-26: Includes Routine configuration in backup payloads and restore handling.
- * @updated 2026-09-03: Skips full cloud payload downloads for already acknowledged versions and throttles repeated resume checks.
- * @updated 2026-09-20: Waits for AI chat storage hydration before building sync payloads so startup sync cannot upload a pre-hydration empty chat state.
- * @updated 2026-09-22: Syncs Memoir filters and a separate persisted-preferences snapshot, with restore events for mounted contexts.
- * @updated 2026-09-29: Tracks Memoir mood-calendar background changes in appearance auto-sync.
- *
- * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
+ * @description Uses current snapshots and one queue; timestamps and file sizes never choose direction.
+ * @updated 2026-10-02: Adds destination checkpoints, safe in-flight edits, exact restores, and retry scheduling.
  */
 import { useState, useRef, useEffect } from 'react';
 import { App } from '@capacitor/app';
@@ -52,9 +32,7 @@ import {
     CUSTOM_COLOR_GROUP_UPDATED_EVENT,
     customColorGroupService
 } from '../services/customColorGroupService';
-import { imageService } from '../services/imageService';
-import { syncService } from '../services/syncService';
-import { downloadWithBackup, getServiceName, uploadDataToCloud, CloudService } from '../utils/syncUtils';
+import { downloadWithBackup, getServiceName, getCloudDestinationIdentity, uploadDataToCloud, readCloudSnapshot, CloudService } from '../utils/syncUtils';
 import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
@@ -62,22 +40,15 @@ import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkIt
 import { AI_BACKUP_CHANGED_EVENT } from '../utils/aiBackupChange';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
 import {
-    detectForcedSyncConflict,
-    getComparableSyncJsonByteSize,
-    resolveSyncComparisonTimestamp,
-    resolveSyncDirectionDecision,
-    SyncDirectionDecision
-} from '../utils/syncTimestampDirection';
-import { getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
+    hashSyncContent, readSyncCheckpoint, writeSyncCheckpoint, serializeSyncContent,
+    runSyncCycle, getRemoteVersion, readPendingUpload, writePendingUpload, clearPendingUpload
+} from '../utils/syncProtocol';
+import { createSyncScheduler, SyncAttempt } from '../utils/syncScheduler';
+import { getJsonByteSize, getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
 import {
-    clearPendingLocalDataEdit,
-    getLocalDataTimestamp,
-    getLastSeenCloudUploadedAt,
-    hasPendingLocalDataEdit,
-    markLocalDataEdited,
-    setLastSeenCloudUploadedAt,
-    setLocalDataTimestampUpdateLocked,
-    updateLocalDataTimestamp
+    clearPendingLocalDataEdit, getLocalDataTimestamp, getLocalEditRevision,
+    hasPendingLocalDataEdit, markLocalDataEdited, setLastSeenCloudUploadedAt,
+    setLocalDataTimestampUpdateLocked, LOCAL_DATA_TIMESTAMP_UPDATED_EVENT
 } from '../utils/localDataTimestamp';
 import {
     buildSceneGroupStateFromLegacySlots,
@@ -94,6 +65,11 @@ import {
 export const useSyncManager = () => {
     type SyncMode = 'startup' | 'resume' | 'manual' | 'auto';
     type SyncExecutionDirection = 'upload' | 'restore';
+    interface SyncDirectionDecision {
+        direction: 'conflict';
+        localJsonSize: number;
+        cloudJsonSize: number;
+    }
     interface SyncConflictModalState {
         isOpen: boolean;
         mode: SyncMode;
@@ -103,6 +79,8 @@ export const useSyncManager = () => {
         localTimestamp: number;
         cloudTimestamp: number;
         decision: SyncDirectionDecision | null;
+        remoteVersion?: string;
+        destination?: string;
     }
 
     // Access Contexts at the top level
@@ -121,7 +99,7 @@ export const useSyncManager = () => {
         customStickers, setCustomStickers,
         filters, setFilters,
         memoirFilterConfig, setMemoirFilterConfig,
-        lastSyncTime, updateLastSyncTime,
+        updateLastSyncTime,
         isRestoring,
         isSyncing, setIsSyncing,
         manualSyncMode
@@ -173,9 +151,35 @@ export const useSyncManager = () => {
         decision: null
     });
 
+    const observedContentRef = useRef<string | null>(null);
+    const trackingContentRef = useRef(false);
+    const initializedRef = useRef(false);
+    const schedulerRef = useRef<ReturnType<typeof createSyncScheduler> | null>(null);
+    const conflictRef = useRef(false);
+    const [isApplyingCloud, setIsApplyingCloud] = useState(false);
+    const restoreCommitRef = useRef<(() => void) | null>(null);
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            restoreCommitRef.current?.();
+            restoreCommitRef.current = null;
+        };
+    }, []);
+    useEffect(() => {
+        const resolve = restoreCommitRef.current;
+        if (resolve) {
+            restoreCommitRef.current = null;
+            // Context persistence effects finish in the same passive-effect flush.
+            queueMicrotask(resolve);
+        }
+    });
+
     const applyDataUpdate = async (data: any, source: 'cloud' | 'local') => {
         const isCloudRestore = source === 'cloud';
         if (isCloudRestore) {
+            setIsApplyingCloud(true);
             isRestoring.current = true;
             setLocalDataTimestampUpdateLocked(true);
         }
@@ -277,7 +281,10 @@ export const useSyncManager = () => {
                 preferencesBackupService.applyBackupPayload(data.preferencesData);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 10));
+            await new Promise<void>(resolve => {
+                restoreCommitRef.current = resolve;
+                setRefreshKey(previous => previous + 1);
+            });
             console.log(`[Sync] Applied ${source} data payload`);
 
             // console.log('[App] 同步数据更新完成');
@@ -286,16 +293,30 @@ export const useSyncManager = () => {
             }
         } finally {
             if (isCloudRestore) {
-                isRestoring.current = false;
-                // Delay re-enabling timestamp updates to ensure all state effects have processed.
-                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.DATA_UPDATE_UNLOCK_DELAY_MS));
+                observedContentRef.current = serializeSyncContent(latestRef.current.getLocal());
                 setLocalDataTimestampUpdateLocked(false);
+                isRestoring.current = false;
+                setIsApplyingCloud(false);
                 console.log('[Sync] Unlocked timestamp updates');
             }
         }
     };
 
-    const handleSyncDataUpdate = (data: any) => applyDataUpdate(data, 'cloud');
+    const handleSyncDataUpdate = async (data: any) => {
+        const activeService = getActiveCloudService().service;
+        const identity = activeService ? getCloudDestinationIdentity(activeService) : null;
+        await applyDataUpdate(data, 'cloud');
+        if (identity && activeService && getCloudDestinationIdentity(activeService) === identity) {
+            const applied = latestRef.current.getLocal();
+            writeSyncCheckpoint(await hashSyncContent(identity), {
+                remoteVersion: await getRemoteVersion(data),
+                localHash: await hashSyncContent(serializeSyncContent(applied))
+            });
+            if (serializeSyncContent(latestRef.current.getLocal()) === serializeSyncContent(applied)) {
+                clearPendingLocalDataEdit(getLocalEditRevision());
+            }
+        }
+    };
 
     const handleLocalDataUpdate = async (data: any) => {
         await applyDataUpdate(data, 'local');
@@ -338,19 +359,6 @@ export const useSyncManager = () => {
         return localData;
     };
 
-    const backupLocalData = async (activeService: any, prefix: string = 'auto_backup') => {
-        try {
-            const localData = getFullLocalData();
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const backupFilename = `backups/${prefix}_${timestamp}.json`;
-            await activeService.uploadData(localData, backupFilename);
-            return true;
-        } catch (error) {
-            console.error('[Sync] Backup failed:', error);
-            return false;
-        }
-    };
-
     const syncLock = useRef(false);
 
     /**
@@ -389,1208 +397,313 @@ export const useSyncManager = () => {
         return { service: hasS3 ? s3Service : webdavService, error: null };
     };
 
-    const resolveCanonicalSyncedTimestamp = async (
-        activeService: CloudService,
-        fallbackTimestamp: number
-    ): Promise<number> => {
-        try {
-            const remoteFileDate = await activeService.statFile?.();
-            if (remoteFileDate) {
-                return remoteFileDate.getTime();
-            }
-        } catch (error) {
-            console.warn('[Sync] Failed to read canonical remote timestamp after sync, falling back to payload timestamp.', error);
-        }
 
-        return fallbackTimestamp;
-    };
+    const destinationIdentity = getCloudDestinationIdentity;
 
-    const formatJsonSize = (size: number): string => {
-        if (size < 1024) {
-            return `${size} B`;
-        }
+    // Long-lived native and DOM callbacks always dereference the current render.
+    const latestRef = useRef({ getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, isSyncing });
+    latestRef.current = { getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, isSyncing };
+    const performRef = useRef<(mode: SyncMode) => Promise<SyncAttempt>>(async () => 'blocked');
 
-        if (size < 1024 * 1024) {
-            return `${(size / 1024).toFixed(1)} KB`;
-        }
-
-        return `${(size / (1024 * 1024)).toFixed(2)} MB`;
+    const closeSyncConflictModal = () => {
+        // Dismissal pauses automatic sync until the user explicitly retries or chooses a direction.
+        setSyncConflictModalState(previous => ({ ...previous, isOpen: false }));
     };
 
     const buildSyncConflictDescription = (
+        _mode: SyncMode, _localTimestamp: number, _cloudTimestamp: number, _decision: SyncDirectionDecision
+    ): string => '本地和云端都存在尚未共同确认的变化，已暂停自动同步。\n\n请选择要保留的数据。覆盖前会备份被替换的一份。';
+
+    const performSync = async (
         mode: SyncMode,
-        localTimestamp: number,
-        cloudTimestamp: number,
-        decision: SyncDirectionDecision
-    ): string => {
-        const timestampPreference = decision.timestampDirection === 'upload'
-            ? '时间戳判断倾向于“本地覆盖云端”'
-            : decision.timestampDirection === 'restore'
-                ? '时间戳判断倾向于“云端覆盖本地”'
-                : '时间戳判断两边接近';
-        const sizePreference = decision.sizeDirection === 'upload'
-            ? 'JSON 大小判断倾向于“本地覆盖云端”'
-            : decision.sizeDirection === 'restore'
-                ? 'JSON 大小判断倾向于“云端覆盖本地”'
-                : 'JSON 大小判断两边相同';
-        const modeLabel = mode === 'auto'
-            ? '自动同步'
-            : mode === 'resume'
-                ? '恢复同步'
-                : mode === 'startup'
-                    ? '启动同步'
-                    : '手动同步';
-        const conflictReason = decision.conflictSource === 'forced-direction-vs-size'
-            ? '你当前选择的同步方向会让较小的 JSON 覆盖较大的 JSON。'
-            : `${timestampPreference}，但 ${sizePreference}。`;
-
-        return [
-            `${modeLabel}检测到同步方向矛盾。`,
-            conflictReason,
-            '',
-            `本地时间戳：${localTimestamp > 0 ? new Date(localTimestamp).toLocaleString() : '无'}`,
-            `云端时间戳：${cloudTimestamp > 0 ? new Date(cloudTimestamp).toLocaleString() : '无'}`,
-            `本地 JSON 大小：${formatJsonSize(decision.localJsonSize)}`,
-            `云端 JSON 大小：${formatJsonSize(decision.cloudJsonSize)}`,
-            '',
-            '继续同步前，请手动选择最终覆盖方向。'
-        ].join('\n');
-    };
-
-    const closeSyncConflictModal = () => {
-        setSyncConflictModalState({
-            isOpen: false,
-            mode: 'manual',
-            activeService: null,
-            localData: null,
-            cloudData: null,
-            localTimestamp: 0,
-            cloudTimestamp: 0,
-            decision: null
-        });
-    };
-
-    const uploadPreparedData = async (
-        activeService: CloudService,
-        localData: any,
-        localTimestamp: number,
-        mode: SyncMode
-    ): Promise<{
-        status: 'uploaded' | 'error';
-        message: string;
-        hasImageWarnings: boolean;
-        syncedTimestamp: number | null;
-    }> => {
-        if (!localData.logs || !localData.todos) {
-            console.error('[Sync] Critical: Logs or Todos are undefined in upload payload!');
-            return {
-                status: 'error',
-                message: '同步取消：本地数据为空',
-                hasImageWarnings: false,
-                syncedTimestamp: null
-            };
+        force?: SyncExecutionDirection,
+        expected?: { remoteVersion?: string; destination?: string },
+        requestedService?: CloudService
+    ): Promise<SyncAttempt> => {
+        if (syncLock.current || latestRef.current.isSyncing) {
+            if (mode === 'manual') addToast('info', '正在同步，请稍后再试');
+            return 'retry';
+        }
+        if (mode !== 'manual' && (latestRef.current.manualSyncMode || conflictRef.current)) return 'blocked';
+        const { service: activeService, error: serviceError } = requestedService
+            ? { service: requestedService, error: null }
+            : getActiveCloudService();
+        if (!activeService || serviceError) {
+            if (mode === 'manual') {
+                if (serviceError === 'multiple_services') addToast('error', '请在设置中只保留一个云端服务连接');
+                setIsSettingsOpen(true);
+            }
+            return 'blocked';
         }
 
-        const result = await uploadDataToCloud(
-            activeService,
-            localData,
-            undefined
-        );
-
-        if (!result.success) {
-            return {
-                status: 'error',
-                message: result.message,
-                hasImageWarnings: false,
-                syncedTimestamp: null
-            };
+        const identity = destinationIdentity(activeService);
+        if (expected?.destination && expected.destination !== identity) {
+            addToast('warning', '云端连接已改变，请重新同步');
+            return 'blocked';
         }
-
-        const syncedTimestamp = await resolveCanonicalSyncedTimestamp(
-            activeService,
-            result.data?.timestamp || localTimestamp
-        );
-
-        if (mode === 'startup') {
-            updateLastSyncTime();
-        }
-
-        return {
-            status: 'uploaded',
-            message: result.message,
-            hasImageWarnings: !!result.imageStats?.errors.length,
-            syncedTimestamp
+        const ensureDestination = () => {
+            if (!mountedRef.current) throw new Error('同步页面已关闭，已停止本次同步');
+            if ((!requestedService && getActiveCloudService().service !== activeService) || destinationIdentity(activeService) !== identity) {
+                throw new Error('云端连接已改变，已停止本次同步');
+            }
+            if (mode !== 'manual' && latestRef.current.manualSyncMode) throw new Error('已切换到手动同步');
         };
-    };
-
-    const restorePreparedData = async (
-        activeService: CloudService,
-        localData: any,
-        cloudData: any,
-        cloudTimestamp: number,
-        mode: SyncMode
-    ): Promise<{
-        status: 'restored' | 'error';
-        message: string;
-        hasImageWarnings: boolean;
-        syncedTimestamp: number | null;
-    }> => {
-        const result = await downloadWithBackup(
-            activeService,
-            localData,
-            undefined
-        );
-
-        if (!result.success || !result.data) {
-            return {
-                status: 'error',
-                message: result.message,
-                hasImageWarnings: false,
-                syncedTimestamp: null
-            };
-        }
-
-        await handleSyncDataUpdate(result.data);
-
-        const syncedTimestamp = cloudTimestamp || cloudData?.timestamp || result.data?.timestamp || getLocalDataTimestamp();
-
-        if (mode === 'startup') {
-            updateLastSyncTime();
-        }
-
-        return {
-            status: 'restored',
-            message: result.message,
-            hasImageWarnings: !!result.imageStats?.errors.length,
-            syncedTimestamp
-        };
-    };
-
-    const openSyncConflictModal = (
-        mode: SyncMode,
-        activeService: CloudService,
-        localData: any,
-        cloudData: any,
-        localTimestamp: number,
-        cloudTimestamp: number,
-        decision: SyncDirectionDecision
-    ) => {
-        setSyncConflictModalState({
-            isOpen: true,
-            mode,
-            activeService,
-            localData,
-            cloudData,
-            localTimestamp,
-            cloudTimestamp,
-            decision
-        });
-    };
-
-    /**
-     * Core Sync Logic - Unified for all sync triggers
-     * @param mode 'startup' = App launch | 'resume' = App resume/tab visible | 'manual' = User click | 'auto' = Auto-sync
-     */
-    const performSync = async (mode: SyncMode) => {
-        if (syncLock.current || isSyncing) {
-            console.log(`[Sync] Skipped ${mode} sync: Already syncing.`);
-            return;
-        }
-
         syncLock.current = true;
         setIsSyncing(true);
+        let message = '';
+        let imageWarnings = false;
 
         try {
             await aiChatStorageService.initialize();
-
-            // [Fix] Clear pending flag immediately when starting sync.
-            // If new changes happen *during* sync, useEffect will set it to true again,
-            // allowing the finally block to catch them. This prevents infinite loops on error.
-            // IMPORTANT: Save the pending flag state BEFORE clearing it for startup check
-            const hadPendingAutoSync = pendingAutoSyncRef.current;
-            pendingAutoSyncRef.current = false;
-
-            // 获取活跃的云服务
-            const { service: activeService, error: serviceError } = getActiveCloudService();
-            
-            if (serviceError === 'no_service') {
-                if (mode === 'manual') setIsSettingsOpen(true);
-                return;
-            }
-            
-            if (serviceError === 'multiple_services') {
-                if (mode === 'manual') {
-                    addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
-                    setIsSettingsOpen(true);
-                }
-                return;
-            }
-
-            // [Pre-check] Verify connection before attempting sync
-            // This prevents infinite loops on Auth errors and avoids unnecessary retries when offline
-            if (activeService.checkConnection) {
-                try {
-                    // console.log(`[Sync] Checking connection for ${mode} sync...`);
-                    // Note: s3Service returns { success: boolean, message?: string }, webdavService returns boolean
-                    const result = await activeService.checkConnection();
-                    const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
-
-                    if (!isConnected) {
-                        console.warn(`[Sync] Connection check failed. Aborting ${mode} sync.`);
-
-                        if (mode === 'manual') {
-                            const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                            addSyncErrorToast(msg, 'check_connection', activeService);
-                        } else {
-                            // For auto/startup/resume, fail silently or log
-                            // console.log(`[Sync] Skipped ${mode}: Connection unestablished`);
-                        }
-                        return; // Abort sync
+            const destination = await hashSyncContent(identity);
+            const result = await runSyncCycle({
+                readLocal: () => latestRef.current.getLocal(),
+                readRemote: async () => {
+                    ensureDestination();
+                    return readCloudSnapshot(activeService);
+                },
+                readCheckpoint: () => readSyncCheckpoint(destination),
+                readPendingUpload: () => readPendingUpload(destination),
+                recordPendingUpload: checkpoint => writePendingUpload(destination, checkpoint),
+                legacyPending: hasPendingLocalDataEdit,
+                acknowledge: (checkpoint, snapshot) => {
+                    ensureDestination();
+                    writeSyncCheckpoint(destination, checkpoint);
+                    clearPendingUpload(destination);
+                    setLastSeenCloudUploadedAt(getSyncPayloadTimestamp(snapshot, Date.now()));
+                    if (serializeSyncContent(latestRef.current.getLocal()) === serializeSyncContent(snapshot)) {
+                        clearPendingLocalDataEdit(getLocalEditRevision());
+                    } else if (!latestRef.current.manualSyncMode) {
+                        schedulerRef.current?.request('auto');
                     }
-                    // console.log(`[Sync] Connection verified.`);
-                } catch (err) {
-                    console.error(`[Sync] Connection check exception:`, err);
-                    if (mode === 'manual') addSyncErrorToast('连接检查出错', 'check_connection', activeService, err);
-                    return;
+                    updateLastSyncTime();
+                },
+                upload: async (snapshot) => {
+                    ensureDestination();
+                    const uploaded = await uploadDataToCloud(activeService, snapshot);
+                    if (!uploaded.success || !uploaded.data) throw new Error(uploaded.message);
+                    message = uploaded.message;
+                    imageWarnings = !!uploaded.imageStats?.errors.length;
+                    return uploaded.data;
+                },
+                prepareRestore: async (remote, local) => {
+                    ensureDestination();
+                    const downloaded = await downloadWithBackup(activeService, local, undefined, remote);
+                    if (!downloaded.success || !downloaded.data) throw new Error(downloaded.message);
+                    message = downloaded.message;
+                    imageWarnings = !!downloaded.imageStats?.errors.length;
+                    return downloaded.data;
+                },
+                applyRestore: async (remote) => {
+                    ensureDestination();
+                    await latestRef.current.applyDataUpdate(remote, 'cloud');
+                },
+                backupRemote: async (remote) => {
+                    ensureDestination();
+                    const filename = 'backups/cloud_backup_' + crypto.randomUUID() + '.json';
+                    await activeService.uploadData(remote, filename);
+                    const verified = await activeService.downloadData(filename);
+                    if (JSON.stringify(verified) !== JSON.stringify(remote)) throw new Error('云端安全备份校验失败，已停止覆盖');
                 }
+            }, { force, expectedRemoteVersion: expected?.remoteVersion });
+
+            if (result.direction === 'conflict') {
+                conflictRef.current = true;
+                setSyncConflictModalState({
+                    isOpen: true, mode, activeService,
+                    localData: result.localData, cloudData: result.cloudData,
+                    localTimestamp: getSyncPayloadTimestamp(result.localData),
+                    cloudTimestamp: getSyncPayloadTimestamp(result.cloudData),
+                    decision: {
+                        direction: 'conflict',
+                        localJsonSize: getJsonByteSize(result.localData),
+                        cloudJsonSize: getJsonByteSize(result.cloudData)
+                    },
+                    remoteVersion: result.remoteVersion, destination: identity
+                });
+                return 'blocked';
             }
-
-            const localData = getFullLocalData();
-            const localJsonSize = getComparableSyncJsonByteSize(localData);
-
-            // Track status
-            let dataSyncStatus: 'restored' | 'uploaded' | 'equal' | 'error' = 'equal';
-            let dataSyncMsg = '';
-            let hasImageWarnings = false;
-            let syncedTimestamp: number | null = null;
-
-            // 容错阈值：处理上传延迟导致的时间差
-            const SYNC_TOLERANCE_MS = SYNC_CONFIG.TOLERANCE_MS;
-
-            // 1. 获取本地时间戳（直接从 localStorage 读取，确保是最新值）
-            const localTimestamp = getLocalDataTimestamp();
-            console.log(`[Sync][Step 1] 本地时间戳: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
-
-            // 2. 获取云端时间戳
-            // 策略：优先使用文件修改时间（statFile），如果失败则下载文件获取内部时间戳
-            let cloudTimestamp = 0;
-            let cloudData: any = null;
-            let usedFileModTime = false;
-
-            try {
-                console.log(`[Sync][Step 2] 开始获取云端时间戳...`);
-                
-                // 2a. 尝试获取文件修改时间（优先方案）
-                console.log(`[Sync][Step 2a] 尝试获取文件修改时间 (statFile)...`);
-                const cloudFileDate = await activeService.statFile?.();
-                
-                if (cloudFileDate) {
-                    cloudTimestamp = cloudFileDate.getTime();
-                    usedFileModTime = true;
-                    console.log(`[Sync][Step 2a] ✓ 成功获取文件修改时间: ${cloudTimestamp} (${cloudFileDate.toLocaleString()})`);
-                } else {
-                    console.log(`[Sync][Step 2a] ✗ statFile 返回 null，启动备用方案`);
-                    
-                    // 2b. 备用方案：下载文件获取内部时间戳
-                    console.log(`[Sync][Step 2b] 启动备用方案：下载文件获取内部时间戳...`);
-                    cloudData = await activeService.downloadData();
-                    cloudTimestamp = cloudData?.timestamp || 0;
-                    console.log(`[Sync][Step 2b] ✓ 从文件内部获取时间戳: ${cloudTimestamp} (${new Date(cloudTimestamp).toLocaleString()})`);
-                }
-            } catch (err) {
-                console.log(`[Sync][Step 2] ✗ 获取云端时间戳失败，可能云端无数据`);
-                console.log(`[Sync][Step 2] 错误详情:`, err);
-                cloudTimestamp = 0;
-            }
-
-            // 3. 比较时间戳（使用容错阈值）
-            const lastSeenCloudUploadedAt = getLastSeenCloudUploadedAt();
-            const hasPendingLocalEdit = hasPendingLocalDataEdit();
-            const cloudAlreadyApplied = mode !== 'manual'
-                && !hasPendingLocalEdit
-                && cloudTimestamp > 0
-                && cloudTimestamp <= lastSeenCloudUploadedAt;
-
-            try {
-                if (cloudAlreadyApplied) {
-                    console.log('[Sync][Step 2c] Skipping canonical cloud download: version already acknowledged locally.');
-                } else {
-                    const canonicalCloudData = await activeService.downloadData();
-                    const canonicalCloudTimestamp = getSyncPayloadTimestamp(canonicalCloudData, 0);
-                    cloudData = canonicalCloudData;
-
-                    if (canonicalCloudTimestamp > 0 && !usedFileModTime) {
-                        cloudTimestamp = canonicalCloudTimestamp;
-                    }
-
-                    console.log('[Sync][Step 2c] Canonical cloud main backup loaded:', {
-                        cloudTimestamp,
-                        cloudTimestampSource: canonicalCloudTimestamp > 0 ? 'payload' : 'metadata-fallback',
-                        cloudJsonSize: getComparableSyncJsonByteSize(cloudData)
-                    });
-                }
-            } catch (error) {
-                console.warn('[Sync] Failed to load canonical cloud main backup; keeping metadata fallback.', error);
-            }
-
-            const {
-                comparisonLocalTimestamp,
-                shouldRestoreUnseenCloud
-            } = resolveSyncComparisonTimestamp({
-                localTimestamp,
-                cloudTimestamp,
-                lastSeenCloudUploadedAt,
-                hasPendingLocalEdit,
-                mode
-            });
-            const timeDiff = comparisonLocalTimestamp - cloudTimestamp;
-            console.log(`[Sync][Step 3] 时间戳比较:`);
-            console.log(`[Sync][Step 3]   - 本地时间: ${localTimestamp} (${new Date(localTimestamp).toLocaleString()})`);
-            console.log(`[Sync][Step 3]   - 云端时间: ${cloudTimestamp} (${cloudTimestamp > 0 ? new Date(cloudTimestamp).toLocaleString() : '无数据'})`);
-            console.log(`[Sync][Step 3]   - 时间差: ${timeDiff}ms (${(timeDiff / 1000).toFixed(1)}秒)`);
-            console.log(`[Sync][Step 3]   - 容错阈值: ±${SYNC_TOLERANCE_MS}ms (±${SYNC_TOLERANCE_MS / 1000}秒)`);
-            console.log(`[Sync][Step 3]   - 时间来源: ${usedFileModTime ? '文件修改时间' : '文件内部时间戳'}`);
-            console.log(`[Sync][Step 3]   - 已见云端上传时间: ${lastSeenCloudUploadedAt || '无'}`);
-            console.log(`[Sync][Step 3]   - 待上传本地编辑: ${hasPendingLocalEdit ? '有' : '无'}`);
-            console.log(`[Sync][Step 3]   - 云端版本状态: ${cloudAlreadyApplied ? '已应用' : shouldRestoreUnseenCloud ? '未见过，优先下载' : '按本地编辑时间比较'}`);
-
-            // 4. 执行操作（使用容错阈值判断）
-            if (!cloudAlreadyApplied && !cloudData && cloudTimestamp > 0) {
-                try {
-                    cloudData = await activeService.downloadData();
-                } catch (error) {
-                    console.warn('[Sync] Failed to download cloud data for JSON-size comparison.', error);
-                }
-            }
-
-            const cloudJsonSize = cloudAlreadyApplied
-                ? localJsonSize
-                : cloudData ? getComparableSyncJsonByteSize(cloudData) : 0;
-            const decision = resolveSyncDirectionDecision({
-                localTimestamp: comparisonLocalTimestamp,
-                cloudTimestamp,
-                toleranceMs: SYNC_TOLERANCE_MS,
-                mode,
-                hadPendingAutoSync,
-                localJsonSize,
-                cloudJsonSize
-            });
-
-            console.log('[Sync][Step 3]   - 本地 JSON 大小:', localJsonSize);
-            console.log('[Sync][Step 3]   - 云端 JSON 大小:', cloudJsonSize);
-            console.log('[Sync][Step 3]   - 时间戳方向:', decision.timestampDirection);
-            console.log('[Sync][Step 3]   - 大小方向:', decision.sizeDirection);
-            console.log('[Sync][Step 3]   - 最终方向:', decision.direction);
-
-            if (decision.direction === 'conflict') {
-                console.warn('[Sync][Step 4] 判定: 同步方向冲突，暂停等待用户选择');
-                openSyncConflictModal(
-                    mode,
-                    activeService,
-                    localData,
-                    cloudData,
-                    localTimestamp,
-                    cloudTimestamp,
-                    decision
-                );
-                return;
-            }
-
-            if (decision.direction === 'restore') {
-                // Case 1: Cloud is Newer (超过容错阈值) -> Restore (下载)
-                console.log('[Sync][Step 4] 判定: 云端明显较新 -> 执行下载恢复');
-                console.log(`[Sync][Step 4]   - 云端比本地新 ${((cloudTimestamp - localTimestamp) / 1000).toFixed(1)} 秒`);
-
-                // Check if there's a pending auto-sync (user just made changes)
-                if (mode === 'startup' && hadPendingAutoSync) {
-                    console.log('[Sync] 跳过云端恢复：检测到待处理的自动同步（用户刚做了修改）');
-                    dataSyncStatus = 'equal';
-                    dataSyncMsg = '检测到本地变更，跳过云端恢复';
-                } else {
-                    const result = await restorePreparedData(
-                        activeService,
-                        localData,
-                        cloudData,
-                        cloudTimestamp,
-                        mode
-                    );
-
-                    if (result.status === 'error') {
-                        dataSyncStatus = 'error';
-                        dataSyncMsg = result.message;
-                        if (mode === 'manual') addToast('error', result.message);
-                        return;
-                    }
-
-                    hasImageWarnings = result.hasImageWarnings;
-                    syncedTimestamp = result.syncedTimestamp;
-                    console.log(`[Sync] 数据恢复完成，立即更新 localStorage 时间戳: ${syncedTimestamp}`);
-                    dataSyncStatus = 'restored';
-                    dataSyncMsg = result.message;
-                }
-            }
-            else if (decision.direction === 'upload') {
-                // Case 2: Local is Newer (超过容错阈值) -> Upload (上传)
-                console.log('[Sync][Step 4] 判定: 本地明显较新 -> 执行上传');
-                console.log(`[Sync][Step 4]   - 本地比云端新 ${((localTimestamp - cloudTimestamp) / 1000).toFixed(1)} 秒`);
-                const result = await uploadPreparedData(
-                    activeService,
-                    localData,
-                    localTimestamp,
-                    mode
-                );
-
-                if (result.status === 'error') {
-                    dataSyncStatus = 'error';
-                    dataSyncMsg = result.message;
-                    if (mode === 'manual') addToast('error', result.message);
-                    return;
-                }
-
-                hasImageWarnings = result.hasImageWarnings;
-                syncedTimestamp = result.syncedTimestamp;
-                dataSyncStatus = 'uploaded';
-                dataSyncMsg = result.message;
-            }
-            else {
-                // Case 3: Equal (时间差在容错阈值内)
-                console.log('[Sync][Step 4] 判定: 时间戳一致（差值在容错范围内）');
-                console.log(`[Sync][Step 4]   - 时间差 ${Math.abs(timeDiff)}ms < 容错阈值 ${SYNC_TOLERANCE_MS}ms`);
-                dataSyncStatus = 'equal';
-                dataSyncMsg = '数据已是一致';
-            }
-
-            // 5. Construct Final Feedback (Only for Manual Mode)
-            // 注意：统一函数已经返回完整的消息，包含图片同步信息
+            conflictRef.current = false;
             if (mode === 'manual') {
-                if (dataSyncStatus === 'equal') {
-                    addToast('info', '云端与本地数据一致，无需同步');
-                } else if (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded') {
-                    // dataSyncMsg 已经包含了图片同步信息（来自统一函数）
-                    addToast(hasImageWarnings ? 'warning' : 'success', dataSyncMsg);
-                } else if (dataSyncStatus === 'error') {
-                    // 错误消息已经在上面显示过了
-                }
-            } else if (mode === 'startup' && dataSyncStatus === 'restored') {
-                // Startup mode: Only toast when restored
-                addToast('success', '启动同步：已下载云端数据');
-            } else if (mode === 'resume' && (dataSyncStatus === 'restored' || dataSyncStatus === 'uploaded')) {
-                // Resume mode: Toast when data changed
-                const msg = dataSyncStatus === 'restored' ? '已下载云端数据' : '已上传本地数据';
-                addToast('success', msg);
-            } else if (mode === 'auto') {
-                // Auto mode: Silent, no toast
+                addToast(imageWarnings ? 'warning' : result.direction === 'equal' ? 'info' : 'success',
+                    result.direction === 'equal' ? '云端与本地数据一致，无需同步' : message);
+            } else if (result.direction === 'restore' || imageWarnings) {
+                addToast(imageWarnings ? 'warning' : 'success', message || '已下载云端数据');
             }
-
-            // Sync completion acknowledges the cloud version but never changes the user-edit timestamp.
-            if ((dataSyncStatus === 'uploaded' || dataSyncStatus === 'restored') && typeof syncedTimestamp === 'number') {
-                setLastSeenCloudUploadedAt(syncedTimestamp);
-                clearPendingLocalDataEdit();
-                console.log(`[Sync] 已确认云端上传时间: ${syncedTimestamp} (${new Date(syncedTimestamp).toLocaleString()})`);
-            }
-
-            if ((currentView === AppView.TIMELINE) || (mode === 'startup' && dataSyncStatus === 'restored')) {
-                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
-                setRefreshKey(prev => prev + 1);
-            }
-
+            return 'success';
         } catch (error) {
-            console.error("Sync failed", error);
-            if (mode === 'manual') addSyncErrorToast('同步失败，请检查网络或配置', 'perform_sync', undefined, error);
+            console.error('[Sync] Sync attempt failed; pending edits are retained.', error);
+            if (mode === 'manual') addSyncErrorToast(
+                error instanceof Error ? error.message : '同步失败，请检查网络或配置',
+                'versioned_sync', activeService, error
+            );
+            return 'retry';
         } finally {
-            setIsSyncing(false);
             syncLock.current = false;
-
-            // [Retry Logic] If an auto-sync was requested WHILE we were syncing, trigger it now
-            // But only if we are not already in a recursive loop (simple check)
-            if (pendingAutoSyncRef.current) {
-                console.log('[Sync] Pending auto-sync detected after sync finished. Retrying...');
-                // Use setTimeout to break the stack and allow state updates
-                setTimeout(() => performSync('auto'), SYNC_CONFIG.PENDING_SYNC_RETRY_DELAY_MS);
-            }
+            setIsSyncing(false);
         }
     };
+    performRef.current = (mode) => performSync(mode);
 
-    const handleQuickSync = async (e?: React.MouseEvent | { stopPropagation?: () => void } | null) => {
-        if (typeof e?.stopPropagation === 'function') {
-            e.stopPropagation();
-        }
-        
-        // 如果开启了手动同步模式，弹出方向选择模态框
+    const handleQuickSync = async (event?: React.MouseEvent | { stopPropagation?: () => void } | null) => {
+        event?.stopPropagation?.();
         if (manualSyncMode) {
             setIsSyncDirectionModalOpen(true);
             return;
         }
-        
-        // 否则执行自动检测同步
+        conflictRef.current = false;
         await performSync('manual');
     };
-
-    const resolveSyncConflict = async (direction: SyncExecutionDirection) => {
-        const {
-            activeService,
-            localData,
-            cloudData,
-            localTimestamp,
-            cloudTimestamp,
-            decision,
-            mode
-        } = syncConflictModalState;
-
-        if (!activeService || !localData || !decision) {
-            closeSyncConflictModal();
-            return;
-        }
-
-        closeSyncConflictModal();
-
-        if (syncLock.current || isSyncing) {
-            return;
-        }
-
-        syncLock.current = true;
-        setIsSyncing(true);
-
-        try {
-            if (direction === 'upload') {
-                const result = await uploadPreparedData(activeService, localData, localTimestamp, mode);
-                if (result.status === 'error') {
-                    addToast('error', result.message);
-                    return;
-                }
-
-                if (typeof result.syncedTimestamp === 'number') {
-                    setLastSeenCloudUploadedAt(result.syncedTimestamp);
-                    clearPendingLocalDataEdit();
-                }
-
-                addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
-            } else {
-                const result = await restorePreparedData(
-                    activeService,
-                    localData,
-                    cloudData,
-                    cloudTimestamp,
-                    mode
-                );
-
-                if (result.status === 'error') {
-                    addToast('error', result.message);
-                    return;
-                }
-
-                if (typeof result.syncedTimestamp === 'number') {
-                    setLastSeenCloudUploadedAt(result.syncedTimestamp);
-                    clearPendingLocalDataEdit();
-                }
-
-                addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
-            }
-
-            if (currentView === AppView.TIMELINE) {
-                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
-                setRefreshKey(prev => prev + 1);
-            }
-        } catch (error) {
-            console.error('Resolve sync conflict failed', error);
-            addSyncErrorToast('同步失败，请检查网络或配置', 'resolve_sync_conflict', activeService, error);
-        } finally {
-            setIsSyncing(false);
-            syncLock.current = false;
-        }
-    };
-
-    const handleConflictUpload = async () => {
-        await resolveSyncConflict('upload');
-    };
-
-    const handleConflictDownload = async () => {
-        await resolveSyncConflict('restore');
-    };
-    
-    // 手动上传到云端（完整流程：主数据 + 图片列表 JSON + 图片文件）
     const handleManualUpload = async () => {
-        if (syncLock.current || isSyncing) {
-            console.log('[Sync] Skipped manual upload: Already syncing.');
-            return;
-        }
-
-        syncLock.current = true;
-        setIsSyncing(true);
-
-        try {
-            // 获取活跃的云服务
-            const { service: activeService, error: serviceError } = getActiveCloudService();
-            
-            if (serviceError === 'no_service') {
-                addToast('error', '未连接任何云端服务');
-                setIsSettingsOpen(true);
-                return;
-            }
-            
-            if (serviceError === 'multiple_services') {
-                addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
-                setIsSettingsOpen(true);
-                return;
-            }
-            
-            // 验证连接
-            if (activeService.checkConnection) {
-                const result = await activeService.checkConnection();
-                const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
-                if (!isConnected) {
-                    const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                    addSyncErrorToast(msg, 'manual_upload_check_connection', activeService);
-                    return;
-                }
-            }
-
-            const localData = getFullLocalData();
-            let cloudData: any = null;
-
-            try {
-                cloudData = await activeService.downloadData();
-            } catch (error) {
-                console.warn('[Sync] Failed to download cloud data before manual upload size check.', error);
-            }
-            const cloudTimestamp = await resolveCanonicalSyncedTimestamp(
-                activeService,
-                getSyncPayloadTimestamp(cloudData, 0)
-            );
-
-            const conflictDecision = detectForcedSyncConflict(
-                'upload',
-                getComparableSyncJsonByteSize(localData),
-                cloudData ? getComparableSyncJsonByteSize(cloudData) : 0
-            );
-
-            if (conflictDecision.direction === 'conflict') {
-                openSyncConflictModal(
-                    'manual',
-                    activeService,
-                    localData,
-                    cloudData,
-                    localData.timestamp || getLocalDataTimestamp(),
-                    cloudTimestamp,
-                    conflictDecision
-                );
-                return;
-            }
-
-            const result = await uploadPreparedData(
-                activeService,
-                localData,
-                localData.timestamp || getLocalDataTimestamp(),
-                'manual'
-            );
-
-            if (result.status === 'error') {
-                addToast('error', result.message);
-                return;
-            }
-
-            if (typeof result.syncedTimestamp === 'number') {
-                setLastSeenCloudUploadedAt(result.syncedTimestamp);
-                clearPendingLocalDataEdit();
-                console.log(`[Sync] 手动上传完成，已确认云端上传时间: ${result.syncedTimestamp}`);
-            }
-
-            addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
-
-            if (currentView === AppView.TIMELINE) {
-                await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
-                setRefreshKey(prev => prev + 1);
-            }
-
-        } catch (error) {
-            console.error("Manual upload failed", error);
-            addSyncErrorToast('上传失败，请检查网络或配置', 'manual_upload', undefined, error);
-        } finally {
-            setIsSyncing(false);
-            syncLock.current = false;
-        }
+        setIsSyncDirectionModalOpen(false);
+        conflictRef.current = false;
+        await performSync('manual', 'upload');
     };
-    
-    // 手动从云端下载（完整流程：主数据 + 图片列表 JSON + 图片文件）
     const handleManualDownload = async () => {
-        if (syncLock.current || isSyncing) {
-            console.log('[Sync] Skipped manual download: Already syncing.');
-            return;
-        }
-
-        syncLock.current = true;
-        setIsSyncing(true);
-
-        try {
-            // 获取活跃的云服务
-            const { service: activeService, error: serviceError } = getActiveCloudService();
-            
-            if (serviceError === 'no_service') {
-                addToast('error', '未连接任何云端服务');
-                setIsSettingsOpen(true);
-                return;
-            }
-            
-            if (serviceError === 'multiple_services') {
-                addToast('error', '检测到同时连接了多个云端服务，请在设置中断开其余连接后再同步');
-                setIsSettingsOpen(true);
-                return;
-            }
-            
-            // 验证连接
-            if (activeService.checkConnection) {
-                const result = await activeService.checkConnection();
-                const isConnected = (typeof result === 'object' && 'success' in result) ? result.success : !!result;
-                if (!isConnected) {
-                    const msg = (typeof result === 'object' && result.message) ? result.message : '连接测试失败，请检查网络或配置';
-                    addSyncErrorToast(msg, 'manual_download_check_connection', activeService);
-                    return;
-                }
-            }
-
-            const localData = getFullLocalData();
-            let cloudData: any = null;
-
-            try {
-                cloudData = await activeService.downloadData();
-            } catch (error) {
-                console.warn('[Sync] Failed to download cloud data before manual download size check.', error);
-            }
-            const cloudTimestamp = await resolveCanonicalSyncedTimestamp(
-                activeService,
-                getSyncPayloadTimestamp(cloudData, 0)
-            );
-
-            const conflictDecision = detectForcedSyncConflict(
-                'restore',
-                getComparableSyncJsonByteSize(localData),
-                cloudData ? getComparableSyncJsonByteSize(cloudData) : 0
-            );
-
-            if (conflictDecision.direction === 'conflict') {
-                openSyncConflictModal(
-                    'manual',
-                    activeService,
-                    localData,
-                    cloudData,
-                    localData.timestamp || getLocalDataTimestamp(),
-                    cloudTimestamp,
-                    conflictDecision
-                );
-                return;
-            }
-
-            const result = await restorePreparedData(
-                activeService,
-                localData,
-                cloudData,
-                cloudTimestamp,
-                'manual'
-            );
-
-            if (result.status === 'error') {
-                addToast('error', result.message);
-                return;
-            }
-
-            if (typeof result.syncedTimestamp === 'number') {
-                setLastSeenCloudUploadedAt(result.syncedTimestamp);
-                clearPendingLocalDataEdit();
-                console.log(`[Sync] 手动下载完成，已确认云端上传时间: ${result.syncedTimestamp}`);
-            }
-
-            addToast(result.hasImageWarnings ? 'warning' : 'success', result.message);
-
-            await new Promise(resolve => setTimeout(resolve, SYNC_CONFIG.UI_REFRESH_DELAY_MS));
-            setRefreshKey(prev => prev + 1);
-
-        } catch (error) {
-            console.error("Manual download failed", error);
-            addSyncErrorToast('下载失败，请检查网络或配置', 'manual_download', undefined, error);
-        } finally {
-            setIsSyncing(false);
-            syncLock.current = false;
-        }
+        setIsSyncDirectionModalOpen(false);
+        conflictRef.current = false;
+        await performSync('manual', 'restore');
+    };
+    const handleServiceSync = async (service: CloudService, direction: SyncExecutionDirection) => {
+        conflictRef.current = false;
+        await performSync('manual', direction, undefined, service);
+    };
+    const resolveConflict = async (direction: SyncExecutionDirection) => {
+        const expected = { remoteVersion: syncConflictModalState.remoteVersion, destination: syncConflictModalState.destination };
+        closeSyncConflictModal();
+        conflictRef.current = false;
+        // Re-read both sides; do not upload the snapshot captured when the dialog opened.
+        await performSync('manual', direction, expected, syncConflictModalState.activeService || undefined);
     };
 
-    // --- Effects ---
-    // 1. Startup Pull
+    const trackChanges = () => {
+        if (!initializedRef.current || isRestoring.current || trackingContentRef.current) return;
+        trackingContentRef.current = true;
+        try {
+            const content = serializeSyncContent(latestRef.current.getLocal());
+            if (observedContentRef.current === content) return;
+            const previous = observedContentRef.current;
+            observedContentRef.current = content;
+            if (previous === null) return;
+            markLocalDataEdited();
+            if (!latestRef.current.manualSyncMode) schedulerRef.current?.request('auto');
+        } finally {
+            trackingContentRef.current = false;
+        }
+    };
+    const trackRef = useRef(trackChanges);
+    trackRef.current = trackChanges;
+
+    // Every payload field is covered, including major goals, Memoir filters and achievement-only edits.
     useEffect(() => {
-        // 如果开启了手动同步模式，跳过启动同步
-        if (!manualSyncMode) {
-            performSync('startup');
-        }
-        // 注意：这里只依赖 manualSyncMode，因为：
-        // 1. performSync 内部直接从 localStorage 读取时间戳（不依赖 state）
-        // 2. 使用 ref 管理锁状态（不依赖 state）
-        // 3. 只在 manualSyncMode 变化时需要重新评估是否启动同步
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [manualSyncMode]);
-
-    // 2. Data Auto Sync
-    const isFirstRun = useRef(true);
-    const isSyncingRef = useRef(isSyncing);
-    const pendingAutoSyncRef = useRef(false); // Track if auto-sync is pending
-
-    useEffect(() => {
-        isSyncingRef.current = isSyncing;
-    }, [isSyncing]);
-
-    useEffect(() => {
-        if (isFirstRun.current) {
-            isFirstRun.current = false;
-            return;
-        }
-
-        // 如果开启了手动同步模式，不触发自动同步
-        if (manualSyncMode) {
-            return;
-        }
-
-        // [Fix] Do not set pending flag if we are currently restoring from cloud.
-        // Data changes during restore are NOT user actions and should not trigger auto-sync.
-        if (isRestoring.current || isSyncingRef.current) {
-            // Note: isSyncingRef might be too broad if we want to allow user edits during sync to queue up.
-            // But definitely isRestoring should block it.
-            if (isRestoring.current) return;
-        }
-
-        // Set pending flag immediately when data changes
-        pendingAutoSyncRef.current = true;
-
-        const timer = setTimeout(async () => {
-            // Prevent auto-sync if a manual/startup sync is in progress
-            if (isSyncingRef.current || isRestoring.current) {
-                // Keep pending flag true if we skipped, so next time it might try? 
-                // Alternatively, performSync calls are locked anyway.
-                return;
-            }
-
-            // Using unified logic for auto-sync
-            // This ensures we do checks and conflict handling even for auto-sync
-            await performSync('auto');
-
-            pendingAutoSyncRef.current = false;
-
-        }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS); // 使用配置的防抖时间
-        return () => {
-            clearTimeout(timer);
-            // Don't clear the pending flag here, only clear it when sync completes or is skipped
-        };
+        trackRef.current();
     }, [
-        logs, todos, categories, todoCategories, collections, collectionEntries,
-        scopes, goals, autoLinkRules, reviewTemplates, checkTemplates, dailyReviews,
-        weeklyReviews, monthlyReviews, onThisDayEntries, customNarrativeTemplates,
-        userPersonalInfo, customStickerSets, customStickers, filters, manualSyncMode
+        logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
+        autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews,
+        onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers,
+        filters, memoirFilterConfig, buildAchievementBackupPayload
     ]);
 
-    // 2b. Image List Auto Sync (监听图片列表 JSON 的变化)
+    const service = getActiveCloudService().service;
+    const destination = service ? destinationIdentity(service) : '';
     useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        
-        const handleImageListChanged = () => {
-            // 如果开启了手动同步模式，不触发自动同步
-            if (manualSyncMode) return;
-            
-            // 如果正在恢复数据，不触发自动同步
-            if (isRestoring.current) return;
-            
-            // 清除之前的定时器
-            if (timer) clearTimeout(timer);
-            
-            // 设置待同步标志
-            pendingAutoSyncRef.current = true;
-            
-            // 使用配置的防抖时间触发自动同步
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
-        };
-        
-        window.addEventListener('imageListChanged', handleImageListChanged as EventListener);
-        
+        let cancelled = false;
+        const scheduler = createSyncScheduler(mode => performRef.current(mode), {
+            debounceMs: SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS,
+            maxWaitMs: SYNC_CONFIG.AUTO_SYNC_MAX_WAIT_MS,
+            cooldownMs: SYNC_CONFIG.RESUME_SYNC_COOLDOWN_MS,
+            retryMs: SYNC_CONFIG.PENDING_SYNC_RETRY_DELAY_MS,
+            maxRetryMs: SYNC_CONFIG.MAX_RETRY_DELAY_MS
+        });
+        schedulerRef.current = scheduler;
+        conflictRef.current = false;
+        void aiChatStorageService.initialize().then(() => {
+            if (cancelled) return;
+            if (!initializedRef.current) {
+                observedContentRef.current = serializeSyncContent(latestRef.current.getLocal());
+                initializedRef.current = true;
+            }
+            if (!manualSyncMode && destination) scheduler.request('startup', true);
+        }).catch(error => {
+            console.error('[Sync] Failed to initialize chat storage', error);
+            if (!cancelled && !manualSyncMode) scheduler.request('startup');
+        });
         return () => {
-            window.removeEventListener('imageListChanged', handleImageListChanged as EventListener);
-            if (timer) clearTimeout(timer);
+            cancelled = true;
+            scheduler.dispose();
+            if (schedulerRef.current === scheduler) schedulerRef.current = null;
         };
-    }, [manualSyncMode]);
+    }, [manualSyncMode, destination]);
 
-    // 2c. AI-only localStorage Auto Sync
     useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-
-        const handleAIBackupChanged = () => {
-            if (manualSyncMode || isRestoring.current) {
-                return;
-            }
-
-            if (timer) {
-                clearTimeout(timer);
-            }
-
-            pendingAutoSyncRef.current = true;
-
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        const changed = () => trackRef.current();
+        const blockRestoreInput = (event: Event) => {
+            if (!isRestoring.current) return;
+            event.preventDefault();
+            event.stopImmediatePropagation();
         };
-
-        window.addEventListener(AI_BACKUP_CHANGED_EVENT, handleAIBackupChanged as EventListener);
-
-        return () => {
-            window.removeEventListener(AI_BACKUP_CHANGED_EVENT, handleAIBackupChanged as EventListener);
-            if (timer) clearTimeout(timer);
-        };
-    }, [manualSyncMode]);
-
-    // 2d. Custom color group Auto Sync
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        let serializedColorGroup = JSON.stringify(customColorGroupService.getGroup());
-
-        const handleCustomColorGroupChanged = () => {
-            if (isRestoring.current) {
-                return;
-            }
-
-            const nextSerializedColorGroup = JSON.stringify(customColorGroupService.getGroup());
-            if (nextSerializedColorGroup === serializedColorGroup) {
-                return;
-            }
-            serializedColorGroup = nextSerializedColorGroup;
-
-            updateLocalDataTimestamp();
-
-            if (manualSyncMode) {
-                return;
-            }
-
-            if (timer) {
-                clearTimeout(timer);
-            }
-
-            pendingAutoSyncRef.current = true;
-
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
-        };
-
-        window.addEventListener(CUSTOM_COLOR_GROUP_UPDATED_EVENT, handleCustomColorGroupChanged as EventListener);
-
-        return () => {
-            window.removeEventListener(CUSTOM_COLOR_GROUP_UPDATED_EVENT, handleCustomColorGroupChanged as EventListener);
-            if (timer) clearTimeout(timer);
-        };
-    }, [manualSyncMode]);
-
-    // 2e. Appearance and TimePal Auto Sync
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        let serializedAppearanceData = JSON.stringify(appearanceBackupService.buildBackupPayload());
-        const appearanceEvents = [
-            'color-scheme-changed',
-            'ui-icon-theme-changed',
-            'lumostime:background-changed',
-             MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT,
-            'navigationDecorationChange',
-            'timepal-type-changed',
-            'timepal-click-switch-changed',
-            'timepal-stage-thresholds-changed',
-            'timepal-custom-changed',
-            'achievement-bottle-icon-packs-changed',
+        const inputEvents = ['pointerdown', 'click', 'keydown', 'beforeinput', 'submit'];
+        inputEvents.forEach(name => window.addEventListener(name, blockRestoreInput, { capture: true, passive: false }));
+        const events = [
+            LOCAL_DATA_TIMESTAMP_UPDATED_EVENT, AI_BACKUP_CHANGED_EVENT,
+            CUSTOM_COLOR_GROUP_UPDATED_EVENT, PREFERENCES_CHANGED_EVENT, WIDGET_TEMPLATES_UPDATED_EVENT,
+            MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT, 'imageListChanged',
+            'sceneGroupsUpdated', 'sceneTimeSlotsUpdated', 'principleLibraryChanged', 'selfBeliefLibraryChanged',
+            'routinesUpdated', 'color-scheme-changed', 'ui-icon-theme-changed',
+            'lumostime:background-changed', 'navigationDecorationChange', 'navigationIconChange',
+            'timepal-type-changed', 'timepal-click-switch-changed', 'timepal-stage-thresholds-changed',
+            'timepal-custom-changed', 'achievement-bottle-icon-packs-changed',
             'achievement-bottle-icon-pack-selection-changed'
         ];
-
-        const handleAppearanceDataChanged = () => {
-            if (isRestoring.current) {
-                return;
-            }
-
-            const nextSerializedAppearanceData = JSON.stringify(appearanceBackupService.buildBackupPayload());
-            if (nextSerializedAppearanceData === serializedAppearanceData) {
-                return;
-            }
-            serializedAppearanceData = nextSerializedAppearanceData;
-
-            updateLocalDataTimestamp();
-
-            if (manualSyncMode) {
-                return;
-            }
-
-            if (timer) {
-                clearTimeout(timer);
-            }
-
-            pendingAutoSyncRef.current = true;
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
+        events.forEach(name => window.addEventListener(name, changed));
+        const resume = (urgent = false) => {
+            trackRef.current();
+            if (!latestRef.current.manualSyncMode) schedulerRef.current?.request('resume', urgent);
         };
-
-        appearanceEvents.forEach((eventName) => {
-            window.addEventListener(eventName, handleAppearanceDataChanged);
-        });
-
+        const visibility = () => {
+            if (document.visibilityState === 'visible' && !Capacitor.isNativePlatform()) resume();
+            else if (document.visibilityState === 'hidden' && !latestRef.current.manualSyncMode && hasPendingLocalDataEdit()) {
+                schedulerRef.current?.request('auto', true);
+            }
+        };
+        const online = () => resume(true);
+        document.addEventListener('visibilitychange', visibility);
+        window.addEventListener('online', online);
+        // A content-only audit catches localStorage writers that don't yet dispatch a change event.
+        const audit = setInterval(() => {
+            if (document.visibilityState === 'visible') trackRef.current();
+        }, SYNC_CONFIG.LOCAL_AUDIT_INTERVAL_MS);
+        let cancelled = false;
+        let appListener: { remove: () => Promise<void> } | undefined;
+        void App.addListener('appStateChange', state => {
+            if (state.isActive && Capacitor.isNativePlatform()) resume();
+            else if (!state.isActive && !latestRef.current.manualSyncMode && hasPendingLocalDataEdit()) {
+                schedulerRef.current?.request('auto', true);
+            }
+        }).then(listener => {
+            if (cancelled) void listener.remove();
+            else appListener = listener;
+        }).catch(error => console.warn('[Sync] Native lifecycle listener unavailable', error));
         return () => {
-            appearanceEvents.forEach((eventName) => {
-                window.removeEventListener(eventName, handleAppearanceDataChanged);
-            });
-            if (timer) {
-                clearTimeout(timer);
-            }
+            cancelled = true;
+            events.forEach(name => window.removeEventListener(name, changed));
+            inputEvents.forEach(name => window.removeEventListener(name, blockRestoreInput, true));
+            document.removeEventListener('visibilitychange', visibility);
+            window.removeEventListener('online', online);
+            clearInterval(audit);
+            void appListener?.remove();
         };
-    }, [manualSyncMode]);
-
-    // 2f. Preference and Memoir filter Auto Sync
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        let serializedPreferences = JSON.stringify(preferencesBackupService.buildBackupPayload());
-
-        const handlePreferencesChanged = () => {
-            if (isRestoring.current) return;
-
-            const nextSerializedPreferences = JSON.stringify(preferencesBackupService.buildBackupPayload());
-            if (nextSerializedPreferences === serializedPreferences) return;
-            serializedPreferences = nextSerializedPreferences;
-            updateLocalDataTimestamp();
-
-            if (manualSyncMode) return;
-            if (timer) clearTimeout(timer);
-            pendingAutoSyncRef.current = true;
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
-        };
-
-        window.addEventListener(PREFERENCES_CHANGED_EVENT, handlePreferencesChanged);
-        return () => {
-            window.removeEventListener(PREFERENCES_CHANGED_EVENT, handlePreferencesChanged);
-            if (timer) clearTimeout(timer);
-        };
-    }, [manualSyncMode]);
-
-    // 2g. Android widget template Auto Sync
-    useEffect(() => {
-        let timer: NodeJS.Timeout | null = null;
-        let serializedWidgetTemplates = JSON.stringify(loadWidgetTemplatesFromStorage());
-
-        const handleWidgetTemplatesUpdated = () => {
-            if (isRestoring.current) {
-                return;
-            }
-
-            const nextSerializedWidgetTemplates = JSON.stringify(loadWidgetTemplatesFromStorage());
-            if (nextSerializedWidgetTemplates === serializedWidgetTemplates) {
-                return;
-            }
-            serializedWidgetTemplates = nextSerializedWidgetTemplates;
-
-            updateLocalDataTimestamp();
-
-            if (manualSyncMode) {
-                return;
-            }
-
-            if (timer) {
-                clearTimeout(timer);
-            }
-
-            pendingAutoSyncRef.current = true;
-
-            timer = setTimeout(async () => {
-                if (!isSyncingRef.current && !isRestoring.current) {
-                    await performSync('auto');
-                    pendingAutoSyncRef.current = false;
-                }
-            }, SYNC_CONFIG.AUTO_SYNC_DEBOUNCE_MS);
-        };
-
-        window.addEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleWidgetTemplatesUpdated as EventListener);
-
-        return () => {
-            window.removeEventListener(WIDGET_TEMPLATES_UPDATED_EVENT, handleWidgetTemplatesUpdated as EventListener);
-            if (timer) clearTimeout(timer);
-        };
-    }, [manualSyncMode]);
-
-    // 3. App LifeCycle Auto Sync (Resume)
-    useEffect(() => {
-        // A. Resume (Foreground) -> Check for Cloud Updates
-        let appListener: any;
-        let lastResumeSyncAt = 0;
-        const triggerResumeSync = () => {
-            if (manualSyncMode) return;
-            const now = Date.now();
-            if (now - lastResumeSyncAt < SYNC_CONFIG.RESUME_SYNC_COOLDOWN_MS) {
-                console.log('[App] Resume sync skipped: cooldown is active.');
-                return;
-            }
-            lastResumeSyncAt = now;
-            void performSync('resume');
-        };
-        const setupListener = async () => {
-            appListener = await App.addListener('appStateChange', async (state) => {
-                // On native platforms, use App state
-                if (state.isActive && Capacitor.isNativePlatform()) {
-                    // 如果开启了手动同步模式，跳过恢复同步
-                    console.log('[App] App resumed. Checking for updates...');
-                    triggerResumeSync();
-                }
-            });
-        };
-        setupListener();
-
-        // B. Web Visibility API - Resume
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                // On Web, switching tabs back to visible should also check (similar to App Resume)
-                if (!Capacitor.isNativePlatform()) {
-                    // 如果开启了手动同步模式，跳过恢复同步
-                    console.log('[App] Tab visible. Checking for updates...');
-                    triggerResumeSync();
-                }
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            if (appListener) appListener.remove();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [manualSyncMode]); // 只依赖 manualSyncMode
+    }, []);
 
     return {
-        isSyncing,
-        refreshKey,
-        setRefreshKey,
-        handleQuickSync,
-        handleSyncDataUpdate,
-        handleLocalDataUpdate,
-        isSyncDirectionModalOpen,
-        setIsSyncDirectionModalOpen,
-        handleManualUpload,
-        handleManualDownload,
-        syncConflictModalState,
-        closeSyncConflictModal,
-        handleConflictUpload,
-        handleConflictDownload,
+        isSyncing, isApplyingCloud, refreshKey, setRefreshKey,
+        handleQuickSync, handleSyncDataUpdate, handleLocalDataUpdate,
+        isSyncDirectionModalOpen, setIsSyncDirectionModalOpen,
+        handleManualUpload, handleManualDownload,
+        handleServiceSync,
+        syncConflictModalState, closeSyncConflictModal,
+        handleConflictUpload: () => resolveConflict('upload'),
+        handleConflictDownload: () => resolveConflict('restore'),
         buildSyncConflictDescription
     };
 };

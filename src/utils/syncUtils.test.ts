@@ -1,5 +1,6 @@
 /**
  * @file syncUtils.test.ts
+ * @updated 2026-10-02: Covers exact-snapshot restores, missing-object classification, and destination identity.
  * @input Mock cloud services and local sync payloads
  * @output Regression coverage for main-backup upload verification
  * @pos Test
@@ -20,7 +21,7 @@ const { storage } = vi.hoisted(() => {
   return { storage };
 });
 
-import { downloadWithBackup, uploadDataToCloud } from './syncUtils';
+import { downloadWithBackup, uploadDataToCloud, readCloudSnapshot, getCloudDestinationIdentity } from './syncUtils';
 
 vi.mock('../services/imageService', () => ({
   imageService: {
@@ -55,7 +56,7 @@ vi.mock('../services/compatibleS3Service', () => ({
 }));
 
 const createMockCloudService = (downloadData: ReturnType<typeof vi.fn>) => ({
-  uploadData: vi.fn(async () => true),
+  uploadData: vi.fn(async (_data: any, _filename?: string) => true),
   downloadData,
   downloadImageList: vi.fn(async () => ({ images: [], timestamp: 0 })),
   uploadImageList: vi.fn(async () => true),
@@ -105,6 +106,16 @@ describe('uploadDataToCloud', () => {
 });
 
 describe('downloadWithBackup', () => {
+  test('restores the exact selected snapshot without fetching a different main backup', async () => {
+    const selected = buildValidPayload(20);
+    const local = buildValidPayload(10);
+    const cloud = createMockCloudService(vi.fn(async () => local));
+    const result = await downloadWithBackup(cloud as any, local, undefined, selected);
+    expect(result.success).toBe(true);
+    expect(result.data.timestamp).toBe(20);
+    expect(cloud.downloadData).toHaveBeenCalledTimes(1);
+    expect(cloud.downloadData).toHaveBeenCalledWith(expect.stringMatching(/^backups\/local_backup_/));
+  });
   test('does not restore from cloud when the local safety backup fails', async () => {
     const cloud = createMockCloudService(vi.fn(async () => buildValidPayload(20)));
     cloud.uploadData.mockRejectedValueOnce(new Error('backup write failed'));
@@ -125,5 +136,31 @@ describe('downloadWithBackup', () => {
     expect(result.message).toContain('校验失败');
     expect(cloud.downloadData).toHaveBeenCalledTimes(1);
     expect(cloud.downloadData).toHaveBeenCalledWith(expect.stringMatching(/^backups\/local_backup_/));
+  });
+});
+
+describe('readCloudSnapshot', () => {
+  test.each([{ status: 404 }, { code: 'NoSuchKey' }, { name: 'NotFound', $metadata: { httpStatusCode: 404 } }])('recognizes an explicitly missing object: %j', async (error) => {
+    const cloud = createMockCloudService(vi.fn().mockRejectedValue(error));
+    expect(await readCloudSnapshot(cloud as any)).toBeNull();
+  });
+
+  test.each([{ status: 403 }, { status: 500 }, { code: 'NoSuchBucket', statusCode: 404 }, new Error('network timeout')])('never treats failed reads as an empty cloud: %j', async (error) => {
+    const cloud = createMockCloudService(vi.fn().mockRejectedValue(error));
+    await expect(readCloudSnapshot(cloud as any)).rejects.toBe(error);
+    expect(cloud.uploadData).not.toHaveBeenCalled();
+  });
+
+  test('rejects empty and malformed successful responses', async () => {
+    for (const value of [null, {}, '<html>error</html>']) {
+      const cloud = createMockCloudService(vi.fn().mockResolvedValue(value));
+      await expect(readCloudSnapshot(cloud as any)).rejects.toThrow('格式无效');
+    }
+  });
+
+  test('isolates cloud account and bucket identities without including credentials', () => {
+    const make = (bucketName: string) => ({ getConfig: () => ({ bucketName, region: 'r', secretId: 'account', secretKey: 'secret' }) });
+    expect(getCloudDestinationIdentity(make('a') as any)).not.toBe(getCloudDestinationIdentity(make('b') as any));
+    expect(getCloudDestinationIdentity(make('a') as any)).not.toContain('secret');
   });
 });

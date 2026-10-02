@@ -1,5 +1,6 @@
 /**
  * @file syncPayloadMetadata.ts
+ * @updated 2026-10-02: Byte sizes are diagnostic metadata only; removed timestamp/size direction classification.
  * @input Sync payload objects plus optional fallback timestamps
  * @output Shared helpers for extracting canonical sync timestamps and comparing cloud backup payloads
  * @pos Utility (Sync Metadata)
@@ -7,7 +8,10 @@
  * @updated 2026-06-21: Added canonical payload metadata helpers for write-after-read upload verification and stale-cloud detection.
  */
 
-import { getJsonByteSize } from './syncTimestampDirection';
+export const getJsonByteSize = (data: unknown): number => {
+  const serialized = JSON.stringify(data) ?? 'null';
+  return new TextEncoder().encode(serialized).length;
+};
 
 export interface SyncPayloadMetadata {
   timestamp: number;

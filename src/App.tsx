@@ -1,5 +1,6 @@
 /**
  * @file App.tsx
+ * @updated 2026-10-02: Routes settings transfers through the shared sync coordinator and blocks editing during cloud application.
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
  * @pos Root Component, Application Entry Point (Logic Hub)
@@ -1384,6 +1385,7 @@ const AppContent: React.FC = () => {
             onImport={handleImportData}
             onToast={addToast}
             onSyncUpdate={syncManager.handleSyncDataUpdate}
+            onCloudSync={syncManager.handleServiceSync}
             onLocalDataUpdate={syncManager.handleLocalDataUpdate}
 
             // Data Props
@@ -1540,6 +1542,11 @@ const AppContent: React.FC = () => {
       />
       
       {/* Sync Direction Modal */}
+      {syncManager.isApplyingCloud && (
+        <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/20" role="status" aria-live="polite">
+          <span className="rounded-xl bg-white px-5 py-3 text-sm text-stone-700">正在应用云端数据…</span>
+        </div>
+      )}
       <SyncDirectionModal
         isOpen={syncManager.isSyncDirectionModalOpen}
         onClose={() => syncManager.setIsSyncDirectionModalOpen(false)}
