@@ -2,8 +2,10 @@
  * @file calendarTest.ts
  * @input Server-only Feishu user token, optional calendar ID, and a validated test request.
  * @output Writable calendar metadata and a single 15-minute test event.
+ * @updated 2026-10-03: Permission recovery directs users to read/write consent rather than app publication.
  * @pos Server integration (never imported by the renderer).
  * @description Checks access before creating a private, free, notification-free event with a retry-stable idempotency key.
+ * @updated 2026-10-03: Reconciles category metadata and confirmed calendar deletions.
  */
 export interface CalendarTestRequest {
   requestId: string;
@@ -23,13 +25,27 @@ export interface CalendarTestResult {
 export class CalendarTestError extends Error {
   status: number;
   rejected: boolean;
+  resource?: 'calendar' | 'event';
 
-  constructor(message: string, status = 502, rejected = false) {
+  constructor(message: string, status = 502, rejected = false, resource?: 'calendar' | 'event') {
     super(message);
     this.status = status;
     this.rejected = rejected;
+    this.resource = resource;
   }
 }
+
+// Calendar deletion can be reported as HTTP 403; distinguish it from missing consent.
+export function calendarResourceError(path: string, status: number, code: unknown): CalendarTestError | null {
+  if ([191000, 191003].includes(code as number)) return new CalendarTestError('飞书分类日历已删除或不存在。', 404, true, 'calendar');
+  if ([193001, 193003].includes(code as number)) return new CalendarTestError('飞书日程已删除或不存在。', 404, true, 'event');
+  if (status === 404) return new CalendarTestError('飞书日历或日程已不存在。', 404, true,
+    /^calendars\/[^/?]+(?:\?|$)/.test(path) ? 'calendar' : 'event');
+  return null;
+}
+
+export const isMissingCalendar = (error: unknown): error is CalendarTestError => error instanceof CalendarTestError
+  && error.status === 404 && error.resource === 'calendar';
 
 // Feishu's official CLI error categories: access-token invalid/expired or consumed refresh token.
 export const FEISHU_AUTH_ERROR_CODES = [99991663, 99991668, 99991671, 99991677, 20026, 20037, 20064, 20073];
@@ -73,7 +89,7 @@ export async function runCalendarTest(
     } catch {
       throw new CalendarTestError(stage === '创建'
         ? '日历已连通，但创建结果尚未确认。请使用原请求重试。'
-        : '无法连接飞书，请检查服务端网络。');
+        : '无法连接飞书，请检查网络后重试。');
     }
     const data = await response.json().catch(() => null);
     if (response.status === 429) throw new CalendarTestError('飞书请求过于频繁，请稍后重试。', 429, true);
@@ -82,8 +98,10 @@ export async function runCalendarTest(
       // Never relay upstream messages: they can contain credentials or request details.
       const expired = response.status === 401 || FEISHU_AUTH_ERROR_CODES.includes(data?.code);
       if (expired) throw new CalendarTestError(`飞书授权已失效${code}，请重新连接。`, 401);
+      const missing = calendarResourceError(path, response.status, data?.code);
+      if (missing) throw missing;
       if (response.status === 403 || FEISHU_PERMISSION_ERROR_CODES.includes(data?.code)) {
-        throw new CalendarTestError(`飞书日历权限不足${code}，请确认应用权限已发布并重新授权。`, 403);
+        throw new CalendarTestError(`飞书日历授权范围不足${code}，请重新连接并同意日历读取与写入权限。`, 403);
       }
       throw new CalendarTestError(stage === '创建'
         ? `日历已连通，但测试块未确认创建成功${code}。请检查日历写入权限；重试将复用原请求。`

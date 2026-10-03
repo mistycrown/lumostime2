@@ -4,22 +4,29 @@
  * @output User authorization, category calendars, explicit test/Log imports and eight-digit date range.
  * @pos Settings / Data and Sync.
  * @description Polls authorization status only while waiting; never automatically imports events.
- * @updated 2026-10-03: Exports log attributes, ratings and resolved todo/scope names in calendar descriptions.
+ * @updated 2026-10-03: Manually synchronizes updates, deletions and category moves from a complete hydrated log snapshot.
+ * @updated 2026-10-03: Persists multi-select ignored categories beside the date fields and preserves their existing events.
+ * @updated 2026-10-03: Opens Android authorization externally while retaining the local connection session.
+ * @updated 2026-10-03: Uses compact ignored-category buttons without ambiguous color dots.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { CalendarDays, CheckCircle2, ChevronLeft, Loader2 } from 'lucide-react';
+import { CalendarDays, Check, CheckCircle2, ChevronLeft, Loader2 } from 'lucide-react';
 import {
-  getFeishuConnection, importFeishuLogs, requestFeishu, startFeishuAuthorization, testFeishuCalendar,
+  getFeishuConnection, getFeishuImportedLogs, importFeishuLogs, requestFeishu, startFeishuAuthorization, testFeishuCalendar,
+  validateFeishuAuthorizationUrl,
   type FeishuConnectionStatus, type FeishuTestRequest, type FeishuTestResult
 } from '../../services/feishuCalendarClient';
 import { FEISHU_IMPORT_PRESETS, getFeishuImportPreset, getFeishuImportRangeBounds } from '../../utils/feishuImportRange';
 import { prepareFeishuLogImport } from '../../utils/feishuLogImport';
+import { prepareFeishuSyncPlan } from '../../utils/feishuSyncPlan';
 import { useCategoryScope } from '../../contexts/CategoryScopeContext';
 import { useData } from '../../contexts/DataContext';
 import { FeishuConnectionPanel } from '../../components/FeishuConnectionPanel';
+import { CustomSelect } from '../../components/CustomSelect';
 
 const PENDING_KEY = 'lumos_feishu_pending_test';
+const IGNORED_CATEGORIES_KEY = 'lumos_feishu_ignored_categories';
 
 export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { categories, scopes, isReady: categoriesReady } = useCategoryScope();
@@ -29,12 +36,30 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
   const [error, setError] = useState('');
   const [result, setResult] = useState<FeishuTestResult | null>(null);
   const [importRange, setImportRange] = useState(() => getFeishuImportPreset('thisWeek'));
+  const [ignoredCategoryIds, setIgnoredCategoryIds] = useState<string[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(IGNORED_CATEGORIES_KEY) || '[]');
+      return Array.isArray(saved) ? [...new Set(saved.filter((id): id is string => typeof id === 'string' && /^[\w-]{1,128}$/.test(id)))].slice(0, 1000) : [];
+    } catch { return []; }
+  });
+  const ignoredCategories = new Set(ignoredCategoryIds);
   const [testCategoryId, setTestCategoryId] = useState('');
-  const [importSummary, setImportSummary] = useState<{ created: number; skipped: number; failed: number; processed: number; total: number; errors: string[] } | null>(null);
+  const [importSummary, setImportSummary] = useState<{ created: number; updated: number; moved: number; deleted: number; skipped: number; failed: number; processed: number; total: number; errors: string[] } | null>(null);
   const locked = useRef(false);
   const mounted = useRef(true);
   const pending = useRef<{ target: string; request: FeishuTestRequest } | null>(null);
   const generation = useRef(0);
+  const latestData = useRef({ logs, categories, scopes, todos, logsReady, categoriesReady, usesFallbackSeedData });
+  latestData.current = { logs, categories, scopes, todos, logsReady, categoriesReady, usesFallbackSeedData };
+  const testCategories = categories.filter((category) => !category.isArchived);
+  const selectedTestCategory = testCategories.find((category) => category.id === testCategoryId) || testCategories[0];
+  const filterCategories = [...categories.map((category) => ({ id: category.id, name: category.name })),
+    ...(connection?.categoryCalendars || []).filter((calendar) => !categories.some((category) => category.id === calendar.categoryId))
+      .map((calendar) => ({ id: calendar.categoryId, name: calendar.categoryName || calendar.name }))];
+
+  useEffect(() => {
+    try { localStorage.setItem(IGNORED_CATEGORIES_KEY, JSON.stringify(ignoredCategoryIds)); } catch { /* Keep session choices if storage is unavailable. */ }
+  }, [ignoredCategoryIds]);
 
   useEffect(() => {
     mounted.current = true;
@@ -109,7 +134,10 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
         const url = await startFeishuAuthorization();
         if (!mounted.current) { popup?.close(); return; }
         setConnection(await getFeishuConnection());
-        if (native) window.location.assign(url);
+        if (Capacitor.getPlatform() === 'android') {
+          const { openNativeFeishuAuthorization } = await import('../../services/feishuAuthorization');
+          await openNativeFeishuAuthorization(url);
+        } else if (native) window.location.assign(url);
         else if (desktop) window.open(url, '_blank');
         else if (popup && !popup.closed) popup.location.replace(url);
         else throw new Error('授权窗口已关闭，请重新连接。');
@@ -117,9 +145,25 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
     });
   };
 
+  const continueAuthorization = async () => {
+    if (busy || !connection?.authorizationUrl) return;
+    try {
+      const url = validateFeishuAuthorizationUrl(connection.authorizationUrl);
+      if (Capacitor.getPlatform() === 'android') {
+        const { openNativeFeishuAuthorization } = await import('../../services/feishuAuthorization');
+        await openNativeFeishuAuthorization(url);
+      } else if (Capacitor.isNativePlatform()) window.location.assign(url);
+      else {
+        const popup = window.open(url, '_blank');
+        if (popup) popup.opener = null;
+        else if (!window.feishuConnection) setError('请允许打开飞书确认窗口后重试。');
+      }
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '飞书确认页面无效。'); }
+  };
+
   const handleTest = () => void perform(async () => {
     if (connection?.status !== 'connected') throw new Error('请先连接飞书。');
-    const category = categories.find((item) => item.id === testCategoryId) || categories.find((item) => !item.isArchived);
+    const category = selectedTestCategory;
     const descriptor = category ? { id: category.id, name: category.name.slice(0, 80), color: /^#[0-9a-f]{6}$/i.test(category.themeColor) ? category.themeColor : '#8b7c6b' } : undefined;
     const target = `${connection.accountId}:${category?.id || connection.calendarId}`;
     setResult(null);
@@ -147,21 +191,45 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
   const handleImport = () => void perform(async () => {
     if (connection?.status !== 'connected') throw new Error('请先连接飞书。');
     if (!logsReady || !categoriesReady || usesFallbackSeedData) throw new Error('本地记录尚未准备好，请稍后重试。');
-    const candidates = prepareFeishuLogImport(logs, categories, importRange, { todos, scopes });
+    setImportSummary(null);
+    const snapshot = latestData.current;
+    const assertCurrentSnapshot = () => {
+      const current = latestData.current;
+      if (!current.logsReady || !current.categoriesReady || current.usesFallbackSeedData || current.logs !== snapshot.logs
+        || current.categories !== snapshot.categories || current.scopes !== snapshot.scopes || current.todos !== snapshot.todos) {
+        throw new Error('本地记录已变化，已停止本次同步，请重新同步。');
+      }
+    };
+    const references = await getFeishuImportedLogs(getFeishuImportRangeBounds(importRange));
+    if (!mounted.current) return;
+    assertCurrentSnapshot();
+    const candidates = prepareFeishuSyncPlan(snapshot.logs, snapshot.categories, importRange, references,
+      { todos: snapshot.todos, scopes: snapshot.scopes, ignoredCategoryIds: ignoredCategories });
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
-    const summary = { created: 0, skipped: 0, failed: 0, processed: 0, total: candidates.records.length, errors: [] as string[] };
+    const summary = { created: 0, updated: 0, moved: 0, deleted: 0, skipped: 0, failed: 0, processed: 0,
+      total: candidates.records.length + candidates.deleteIds.length, errors: [] as string[] };
     setImportSummary({ ...summary });
-    for (let offset = 0; offset < candidates.records.length; offset += 5) {
+    const operations = [...candidates.records.map((record) => ({ record, deleteId: undefined as string | undefined })),
+      ...candidates.deleteIds.map((deleteId) => ({ record: undefined, deleteId }))];
+    for (let offset = 0; offset < operations.length; offset += 5) {
       if (!mounted.current) break;
-      const records = candidates.records.slice(offset, offset + 5);
+      assertCurrentSnapshot();
+      const slice = operations.slice(offset, offset + 5);
+      const records = slice.flatMap((item) => item.record ? [item.record] : []);
+      const deleteIds = slice.flatMap((item) => item.deleteId ? [item.deleteId] : []);
       const categoryIds = new Set(records.map((record) => record.categoryId));
-      const response = await importFeishuLogs({ records, categories: candidates.categories.filter((category) => categoryIds.has(category.id)), timezone, range: candidates.range });
+      const response = await importFeishuLogs({ sync: true, records, deleteIds,
+        ignoredCategoryIds: candidates.ignoredCategoryIds,
+        categories: candidates.categories.filter((category) => categoryIds.has(category.id)), timezone, range: candidates.range });
       response.results.forEach((item) => {
         if (item.status === 'created') summary.created++;
+        else if (item.status === 'updated') summary.updated++;
+        else if (item.status === 'moved') summary.moved++;
+        else if (item.status === 'deleted') summary.deleted++;
         else if (item.status === 'skipped') summary.skipped++;
         else { summary.failed++; if (item.error && !summary.errors.includes(item.error)) summary.errors.push(item.error); }
       });
-      summary.processed += records.length;
+      summary.processed += slice.length;
       if (mounted.current) setImportSummary({ ...summary, errors: [...summary.errors] });
     }
     const status = await getFeishuConnection();
@@ -170,7 +238,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
 
   let rangeError = '';
   let importCandidates: ReturnType<typeof prepareFeishuLogImport> | null = null;
-  try { getFeishuImportRangeBounds(importRange); importCandidates = prepareFeishuLogImport(logs, categories, importRange, { todos, scopes }); }
+  try { getFeishuImportRangeBounds(importRange); importCandidates = prepareFeishuLogImport(logs, categories, importRange, { todos, scopes, ignoredCategoryIds: ignoredCategories }); }
   catch (failure) { rangeError = failure instanceof Error ? failure.message : '请选择有效的日期范围。'; }
   const timeLabel = (time: number) => new Date(time).toLocaleString('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: result?.timezone
@@ -187,27 +255,28 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
         <details className="text-sm text-stone-600">
           <summary className="cursor-pointer">连接与导入步骤</summary>
           <ol className="mt-3 list-decimal pl-5 space-y-2 leading-relaxed">
-            <li>点击“连接飞书”，在打开的飞书网页中登录并同意授权。</li>
+            <li>点击“连接飞书”，在飞书网页中登录并确认创建你自己的专属应用。</li>
+            <li>返回这里，点击“授权飞书日历”，在飞书网页中同意日历授权。</li>
             <li>返回这里，看到“已连接”后，点击“测试导入一个日程”。</li>
             <li>测试成功后，在飞书日历中查看测试日程。</li>
-            <li>填写八位数字的开始和结束日期，例如 20261002，或选择快捷范围，点击“导入到飞书日历”。</li>
+            <li>填写八位数字日期或选择快捷范围，点击“同步到飞书日历”，新增、更新、删除和分类迁移会一并处理。如果历史数据过多，建议先小批次实验，然后分批次导入，避免卡顿。</li>
+            <li>可以在飞书日历中更改每一个日历分类的颜色，这样显示更清晰。</li>
           </ol>
         </details>
-        <FeishuConnectionPanel connection={connection} busy={busy} onConnect={connect} onDisconnect={() => void perform(async () => {
+        <FeishuConnectionPanel connection={connection} busy={busy} onConnect={connect} onContinue={continueAuthorization} onDisconnect={() => void perform(async () => {
           await requestFeishu('disconnect'); clearTest(); setImportSummary(null); if (mounted.current) setConnection(await getFeishuConnection());
         })} />
         {connection?.status === 'connected' && (
           <>
             <p className="text-sm text-stone-600">按活动分类自动创建日历，并使用分类颜色。</p>
-            <label className="block space-y-2 text-sm text-stone-600">
-              <span>测试分类</span>
-              <select value={testCategoryId || categories.find((category) => !category.isArchived)?.id || ''} disabled={busy} onChange={(event) => {
-                setTestCategoryId(event.target.value); clearTest();
-              }} className="w-full bg-transparent border-b border-stone-300 py-2 outline-none">
-                {categories.filter((category) => !category.isArchived).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                {!categories.some((category) => !category.isArchived) && <option value="">主日历</option>}
-              </select>
-            </label>
+            <CustomSelect label="测试分类" value={selectedTestCategory?.id || ''} disabled={busy} renderDropdownInPortal
+              options={testCategories.length ? testCategories.map((category) => ({
+                value: category.id, label: category.name,
+                icon: <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full" style={{
+                  backgroundColor: /^#[0-9a-f]{6}$/i.test(category.themeColor) ? category.themeColor : '#8b7c6b'
+                }} />
+              })) : [{ value: '', label: '主日历' }]}
+              onChange={(id) => { setTestCategoryId(id); clearTest(); }} />
             <button onClick={handleTest} disabled={busy} aria-busy={busy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-stone-800 text-white text-sm disabled:opacity-50">
               {busy && <Loader2 size={16} className="animate-spin" />}{busy ? '正在处理…' : result ? '再次测试导入' : '测试导入一个日程'}
             </button>
@@ -241,6 +310,20 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
                 className="w-full min-w-0 bg-transparent border-b border-stone-300 py-2 outline-none font-sans" />
             </label>
           ))}</div>
+          {filterCategories.length > 0 && <fieldset className="min-w-0 space-y-2" disabled={busy || !categoriesReady}>
+            <legend className="text-sm text-stone-600">忽略分类</legend>
+            <div className="flex flex-wrap gap-1.5">{filterCategories.map((category) => {
+              const selected = ignoredCategories.has(category.id);
+              return <button key={category.id} type="button" aria-pressed={selected}
+                onClick={() => {
+                  setIgnoredCategoryIds((ids) => ids.includes(category.id) ? ids.filter((id) => id !== category.id) : [...ids, category.id]);
+                  setImportSummary(null);
+                }}
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs leading-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500 disabled:opacity-50 ${selected ? 'bg-stone-800 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'}`}>
+                {category.name}{selected && <Check size={12} aria-hidden="true" />}
+              </button>;
+            })}</div>
+          </fieldset>}
           {rangeError && <p id="feishu-import-range-error" role="alert" className="text-sm text-red-600">{rangeError}</p>}
           {importCandidates && <p className="text-sm text-stone-500">范围内 {importCandidates.records.length} 条记录 · {importCandidates.categories.length} 个分类</p>}
           {importCandidates && connection?.status === 'connected' && <dl className="space-y-2 text-sm text-stone-600">
@@ -249,13 +332,13 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
               <dd className="text-stone-400">{connection.categoryCalendars?.find((calendar) => calendar.categoryId === category.id)?.name || `LumosTime · ${category.name}`}</dd>
             </div>)}
           </dl>}
-          <button disabled={busy || connection?.status !== 'connected' || Boolean(rangeError) || !importCandidates?.records.length || !logsReady || !categoriesReady || usesFallbackSeedData}
+          <button disabled={busy || connection?.status !== 'connected' || Boolean(rangeError) || !logsReady || !categoriesReady || usesFallbackSeedData}
             onClick={handleImport} aria-busy={busy} className="w-full py-3 rounded-xl bg-stone-800 text-white text-sm disabled:opacity-50">
-            {busy && importSummary ? `正在导入 ${importSummary.processed}/${importSummary.total}…` : '导入到飞书日历'}
+            {busy ? importSummary ? `正在同步 ${importSummary.processed}/${importSummary.total}…` : '正在核对记录…' : '同步到飞书日历'}
           </button>
           {importSummary && <div role="status" className="text-sm text-stone-600 space-y-2">
-            <p>新增 {importSummary.created} · 已导入跳过 {importSummary.skipped} · 失败 {importSummary.failed}</p>
-            {importSummary.processed < importSummary.total && !busy && <p>已处理 {importSummary.processed}/{importSummary.total}，再次导入将核查并继续。</p>}
+            <p>新增 {importSummary.created} · 更新 {importSummary.updated} · 迁移 {importSummary.moved} · 删除 {importSummary.deleted} · 跳过 {importSummary.skipped} · 失败 {importSummary.failed}</p>
+            {importSummary.processed < importSummary.total && !busy && <p>已处理 {importSummary.processed}/{importSummary.total}，再次同步将核查并继续。</p>}
             {importSummary.errors.map((message) => <p key={message} className="text-red-600">{message}</p>)}
           </div>}
         </section>

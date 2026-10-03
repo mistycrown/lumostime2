@@ -5,8 +5,10 @@
  * @pos Application integration tests.
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: vi.fn(() => false) }, CapacitorHttp: { request: vi.fn() } }));
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: vi.fn(() => false), getPlatform: vi.fn(() => 'web') }, CapacitorHttp: { request: vi.fn() } }));
+vi.mock('./feishuNativeConnection', () => ({ requestNativeFeishu: vi.fn() }));
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { requestNativeFeishu } from './feishuNativeConnection';
 import { getFeishuServiceEndpoint, getFeishuConnection, importFeishuLogs, requestFeishu, startFeishuAuthorization, testFeishuCalendar } from './feishuCalendarClient';
 
 const request = { requestId: '28acddbc-4156-4f49-8ce0-1f9ecb10fef9', startTime: Date.now(), timezone: 'Asia/Shanghai' };
@@ -16,8 +18,17 @@ beforeEach(() => {
   vi.stubGlobal('window', { location: { protocol: 'https:' } });
   vi.stubEnv('VITE_FEISHU_SERVICE_URL', '');
   vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
+  vi.mocked(Capacitor.getPlatform).mockReturnValue('web');
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+it('accepts personal app confirmation pages and validates the second authorization URL', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ authorizeUrl: 'https://open.feishu.cn/page/launcher?user_code=CODE' })))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ configured: true, status: 'pending', phase: 'create', authorizationUrl: 'https://open.feishu.cn/page/launcher?user_code=CODE' })))
+    .mockResolvedValueOnce(new Response(JSON.stringify({ configured: true, status: 'pending', phase: 'authorize', authorizationUrl: 'https://evil.example/' }))));
+  expect(await startFeishuAuthorization()).toContain('open.feishu.cn/page/launcher');
+  await expect(getFeishuConnection()).rejects.toThrow('授权地址');
+});
 
 it('uses only a maintainer-configured HTTPS service and rejects insecure roots', () => {
   expect(getFeishuServiceEndpoint('status')).toBe('/api/feishu/status');
@@ -64,9 +75,24 @@ it('detects blocked cookies, rejects malformed status and does not retry imports
   expect(fetchFn).toHaveBeenCalledTimes(4);
 });
 
-it('uses Android native HTTP with its cookie jar', async () => {
+it('uses local Android execution with no configured remote service or HTTP cookie session', async () => {
+  vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+  vi.mocked(Capacitor.getPlatform).mockReturnValue('android');
+  vi.mocked(requestNativeFeishu).mockResolvedValue({ status: 200, data: result });
+  vi.stubGlobal('fetch', vi.fn());
+  expect(await testFeishuCalendar(request)).toEqual(result);
+  expect(requestNativeFeishu).toHaveBeenCalledWith('test', request);
+  expect(CapacitorHttp.request).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  vi.stubEnv('VITE_FEISHU_SERVICE_URL', 'https://legacy.example');
+  expect(await testFeishuCalendar(request)).toEqual(result);
+  expect(CapacitorHttp.request).not.toHaveBeenCalled();
+});
+
+it('uses native HTTP with its cookie jar on other native platforms', async () => {
   vi.stubEnv('VITE_FEISHU_SERVICE_URL', 'https://connect.example');
   vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+  vi.mocked(Capacitor.getPlatform).mockReturnValue('ios');
   vi.mocked(CapacitorHttp.request).mockResolvedValue({ status: 200, data: result, headers: {}, url: 'https://connect.example/api/feishu/test' });
   expect(await testFeishuCalendar(request)).toEqual(result);
   expect(CapacitorHttp.request).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://connect.example/api/feishu/test', method: 'POST', data: request }));
@@ -115,7 +141,8 @@ it('reports unavailable API responses without mislabeling them as the user netwo
 it('preserves uncertain import handling for malformed responses on native transports', async () => {
   vi.stubEnv('VITE_FEISHU_SERVICE_URL', 'https://connect.example');
   vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
-  vi.mocked(CapacitorHttp.request).mockResolvedValue({ status: 502, data: '<html>proxy error</html>', headers: {}, url: 'https://connect.example/api/feishu/test' });
+  vi.mocked(Capacitor.getPlatform).mockReturnValue('android');
+  vi.mocked(requestNativeFeishu).mockResolvedValue({ status: 502, data: null });
   await expect(testFeishuCalendar(request)).rejects.toThrow('原请求');
   await expect(requestFeishu('import', {})).rejects.toThrow('稍后重试核查');
 });

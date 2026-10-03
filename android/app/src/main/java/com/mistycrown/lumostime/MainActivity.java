@@ -10,6 +10,7 @@
  * @updated 2026-08-10: Reapplies immersive system-bar hiding after Android orientation and focus transitions, while keeping web controls above the native status-bar backdrop.
  * @updated 2026-08-15: Hides a native ActionBar restored by certain Android activity-alias theme fallbacks so it cannot cover the WebView header.
  * @updated 2026-08-15: Installs the AndroidX splash screen before Activity creation so MIUI applies the configured post-splash NoActionBar theme.
+ * @updated 2026-10-03: Registers the local Feishu encrypted-storage and authorization-browser bridge.
  */
 package com.mistycrown.lumostime;
 
@@ -51,6 +52,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ImmersiveModePlugin.class);
         registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
+        registerPlugin(FeishuNativePlugin.class);
         configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 

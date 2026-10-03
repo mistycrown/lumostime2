@@ -1,13 +1,15 @@
 /**
  * @file calendarImport.ts
  * @input Validated category descriptors and small batches of actual log records.
- * @output Category calendars, durable import results and safe reconciliation of uncertain writes.
- * @updated 2026-10-03: Preserves structured descriptions up to 12000 characters and separates the source marker.
+ * @output Category calendars, durable manual sync results and safe reconciliation of uncertain writes.
+ * @updated 2026-10-03: Synchronizes edits, explicit deletions and category moves while accepting legacy create-only requests.
  * @pos Feishu server import service; all writes require an explicit user action.
+ * @updated 2026-10-03: Reconciles category metadata and confirmed calendar deletions.
  */
 import { randomUUID } from 'node:crypto';
 import { CalendarTestError } from './calendarTest.ts';
 import { OAuthStore, tokenHash } from './oauthStore.ts';
+import { FeishuCalendarSync } from './calendarSync.ts';
 
 export interface ImportCategory { id: string; name: string; color: string }
 export interface ImportRecord { id: string; categoryId: string; title: string; note: string; startTime: number; endTime: number }
@@ -30,9 +32,9 @@ export function validateCategory(value: any): ImportCategory {
   return { id: value.id, name: value.name.trim(), color: value.color };
 }
 
-export function validateImportBatch(body: any): { categories: ImportCategory[]; records: ImportRecord[]; timezone: string } {
-  if (!body || !Array.isArray(body.categories) || !body.categories.length || body.categories.length > 20
-    || !Array.isArray(body.records) || !body.records.length || body.records.length > 20
+export function validateImportBatch(body: any, syncing = false): { categories: ImportCategory[]; records: ImportRecord[]; timezone: string } {
+  if (!body || !Array.isArray(body.categories) || !syncing && !body.categories.length || body.categories.length > 20
+    || !Array.isArray(body.records) || !syncing && !body.records.length || body.records.length > 20
     || typeof body.timezone !== 'string' || body.timezone.length > 100
     || !Number.isSafeInteger(body.range?.startTime) || !Number.isSafeInteger(body.range?.endTimeExclusive)
     || body.range.endTimeExclusive <= body.range.startTime) throw new CalendarTestError('导入请求无效。', 400);
@@ -47,7 +49,7 @@ export function validateImportBatch(body: any): { categories: ImportCategory[]; 
       || typeof record.title !== 'string' || !record.title.trim() || record.title.length > 200
       || typeof record.note !== 'string' || record.note.length > 12000
       || !Number.isSafeInteger(record.startTime) || !Number.isSafeInteger(record.endTime)
-      || record.startTime < body.range.startTime || record.startTime >= body.range.endTimeExclusive
+      || !syncing && (record.startTime < body.range.startTime || record.startTime >= body.range.endTimeExclusive)
       || Math.floor(record.endTime / 1000) <= Math.floor(record.startTime / 1000)) {
       throw new CalendarTestError('导入记录无效，请检查日期和分类。', 400);
     }
@@ -61,26 +63,62 @@ export function validateImportBatch(body: any): { categories: ImportCategory[]; 
 export class FeishuCalendarImport {
   private store: OAuthStore;
   private running = new Set<string>();
+  private sync: FeishuCalendarSync;
 
-  constructor(store: OAuthStore) { this.store = store; }
+  constructor(store: OAuthStore) {
+    this.store = store;
+    this.sync = new FeishuCalendarSync(store, { mappings: (accountId) => this.mappings(accountId),
+      calendar: (accountId, category, call) => this.calendar(accountId, category, call),
+      create: (accountId, body, call) => this.runLegacy(accountId, body, call, true),
+      validate: (body) => validateImportBatch(body, true) });
+  }
 
   private marker(accountId: string, categoryId: string): string { return `[LumosTime:category:${tokenHash(`${accountId}:${categoryId}`)}]`; }
 
+  private async updateMetadata(accountId: string, category: ImportCategory, existing: CategoryCalendar, remote: any, call: CalendarCall) {
+    const name = `LumosTime · ${category.name}`;
+    const patch: Record<string, unknown> = {};
+    // An alias takes precedence in Feishu. Writers can change their own alias, but not the shared title.
+    if (remote.role === 'writer') {
+      if ((remote.summary_alias || remote.summary || existing.name) !== name || existing.categoryName !== category.name) patch.summary_alias = name;
+    } else {
+      if ((remote.summary || existing.name) !== name || existing.categoryName !== category.name) patch.summary = name;
+      if (remote.summary_alias && remote.summary_alias !== name) patch.summary_alias = name;
+    }
+    // Preserve a color chosen in Feishu unless the local category color itself changed.
+    if (existing.color.toLowerCase() !== category.color.toLowerCase()) patch.color = parseInt(category.color.slice(1), 16);
+    if (Object.keys(patch).length) await call(`calendars/${encodeURIComponent(existing.id)}`, 'PATCH', patch);
+    const result = { ...existing, categoryName: category.name, name, color: category.color };
+    this.store.setValue('category_calendars', tokenHash(`category:${accountId}:${category.id}`), result, accountId);
+    return result;
+  }
+
   async calendar(accountId: string, category: ImportCategory, call: CalendarCall): Promise<CategoryCalendar> {
     const key = tokenHash(`category:${accountId}:${category.id}`);
-    const existing = this.store.getValue<CategoryCalendar>('category_calendars', key);
+    let existing = this.store.getValue<CategoryCalendar>('category_calendars', key);
     if (existing) {
-      const data = await call(`calendars/${encodeURIComponent(existing.id)}`);
-      const calendar = data.calendar ?? data;
-      if (!['owner', 'writer'].includes(calendar?.role) || calendar?.is_deleted) {
-        throw new CalendarTestError('分类日历不可写或已删除，请在飞书恢复日历权限后重试。', 403);
+      let calendar: any;
+      try {
+        const data = await call(`calendars/${encodeURIComponent(existing.id)}`);
+        calendar = data.calendar ?? data;
+      } catch (error) {
+        // A missing calendar GET is definitive; permission/network failures must retain the binding.
+        if (!(error instanceof CalendarTestError && error.status === 404)) throw error;
+        calendar = { is_deleted: true };
       }
-      if (!existing.subscribed) {
-        await call(`calendars/${encodeURIComponent(existing.id)}/subscribe`, 'POST', {});
-        existing.subscribed = true;
-        this.store.setValue('category_calendars', key, existing, accountId);
+      if (calendar?.is_deleted) {
+        this.sync.forgetCalendar(accountId, existing.id);
+        existing = null;
+      } else {
+        if (!['owner', 'writer'].includes(calendar?.role)) throw new CalendarTestError('分类日历不可写，请在飞书恢复日历权限后重试。', 403);
+        existing = await this.updateMetadata(accountId, category, existing, calendar, call);
+        if (!existing.subscribed) {
+          await call(`calendars/${encodeURIComponent(existing.id)}/subscribe`, 'POST', {});
+          existing.subscribed = true;
+          this.store.setValue('category_calendars', key, existing, accountId);
+        }
+        return existing;
       }
-      return existing;
     }
     // Scan by a stable source marker, never by title: names can collide or change.
     const marker = this.marker(accountId, category.id);
@@ -113,10 +151,11 @@ export class FeishuCalendarImport {
       if (!data.calendar?.calendar_id) throw new CalendarTestError('分类日历创建结果尚未确认，请稍后重试。');
       found = data.calendar;
     }
-    const result = { categoryId: category.id, categoryName: category.name, id: found.calendar_id,
+    let result = { categoryId: category.id, categoryName: category.name, id: found.calendar_id,
       name: String(found.summary || `LumosTime · ${category.name}`), color: category.color, subscribed: false };
     this.store.setValue('category_calendars', key, result, accountId);
     this.store.removeValue('category_uncertain', key);
+    result = await this.updateMetadata(accountId, category, result, found, call);
     // Save the ID before subscribing, so a subscription failure never causes a duplicate calendar.
     await call(`calendars/${encodeURIComponent(result.id)}/subscribe`, 'POST', {});
     result.subscribed = true;
@@ -152,9 +191,20 @@ export class FeishuCalendarImport {
   }
 
   async run(accountId: string, body: unknown, call: CalendarCall) {
+    if ((body as any)?.operation === 'catalog' || (body as any)?.sync === true) {
+      if (this.running.has(accountId)) throw new CalendarTestError('正在同步，请等待当前操作完成。', 409);
+      this.running.add(accountId);
+      try {
+        return (body as any).operation === 'catalog' ? this.sync.catalog(accountId, body) : await this.sync.run(accountId, body, call);
+      } finally { this.running.delete(accountId); }
+    }
+    return this.runLegacy(accountId, body, call);
+  }
+
+  private async runLegacy(accountId: string, body: unknown, call: CalendarCall, lockHeld = false) {
     const batch = validateImportBatch(body);
-    if (this.running.has(accountId)) throw new CalendarTestError('正在导入，请等待当前操作完成。', 409);
-    this.running.add(accountId);
+    if (!lockHeld && this.running.has(accountId)) throw new CalendarTestError('正在导入，请等待当前操作完成。', 409);
+    if (!lockHeld) this.running.add(accountId);
     const results: { id: string; status: 'created' | 'skipped' | 'failed'; error?: string }[] = [];
     const calendars: CategoryCalendar[] = [];
     try {
@@ -177,7 +227,7 @@ export class FeishuCalendarImport {
           try {
             const found = await this.findEvent(calendar.id, entry, call);
             if (found) {
-              this.store.setValue('import_ledger', key, { ...entry, status: 'complete', eventId: found });
+              this.store.setValue('import_ledger', key, { ...entry, status: 'complete', eventId: found }, accountId);
               results.push({ id: record.id, status: 'skipped' });
               continue;
             }
@@ -186,7 +236,7 @@ export class FeishuCalendarImport {
               throw new CalendarTestError('上次日程创建结果仍未确认，已保留记录，稍后重试核查。');
             }
             entry.status = 'pending';
-            this.store.setValue('import_ledger', key, entry);
+            this.store.setValue('import_ledger', key, entry, accountId);
             const data = await call(`calendars/${encodeURIComponent(calendar.id)}/events?idempotency_key=${entry.requestId}`, 'POST', {
               summary: entry.record.title, description: `${entry.record.note}${entry.record.note ? '\n\n' : ''}[LumosTime:log:${record.id}]`,
               start_time: { timestamp: String(Math.floor(entry.record.startTime / 1000)), timezone: entry.timezone },
@@ -194,18 +244,18 @@ export class FeishuCalendarImport {
               free_busy_status: 'free', visibility: 'private', need_notification: false, color: -1, reminders: []
             });
             if (!data.event?.event_id) throw new CalendarTestError('日程创建结果尚未确认。');
-            this.store.setValue('import_ledger', key, { ...entry, status: 'complete', eventId: data.event.event_id });
+            this.store.setValue('import_ledger', key, { ...entry, status: 'complete', eventId: data.event.event_id }, accountId);
             results.push({ id: record.id, status: 'created' });
           } catch (error) {
             const stored = this.store.getValue<ImportLedgerEntry>('import_ledger', key);
             if (stored?.status === 'pending') this.store.setValue('import_ledger', key, { ...stored,
-              status: error instanceof CalendarTestError && error.rejected ? 'failed' : 'unknown' });
+              status: error instanceof CalendarTestError && error.rejected ? 'failed' : 'unknown' }, accountId);
             if (error instanceof CalendarTestError && [401, 429].includes(error.status)) throw error;
             results.push({ id: record.id, status: 'failed', error: error instanceof CalendarTestError ? error.message : '导入未完成，请稍后重试。' });
           }
         }
       }
       return { results, calendars };
-    } finally { this.running.delete(accountId); }
+    } finally { if (!lockHeld) this.running.delete(accountId); }
   }
 }

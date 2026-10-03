@@ -2,7 +2,8 @@
  * @file oauthStore.ts
  * @input Persistent SQLite path and a server-only 32-byte encryption key.
  * @output Encrypted connections, single-use OAuth states, category mappings and import ledger.
- * @pos Feishu service persistence; never imported by the app.
+ * @updated 2026-10-03: Provides account-filtered encrypted ledger entries for legacy sync-index migration.
+ * @pos Feishu execution persistence, used by the server or Electron main process; never by the renderer.
  */
 import { DatabaseSync } from 'node:sqlite';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
@@ -21,6 +22,8 @@ export interface UserConnection {
   refreshToken?: string;
   accessExpiresAt?: number;
   refreshExpiresAt?: number;
+  application?: { id: string; secret: string };
+  device?: { code: string; stage: 'create' | 'authorize'; expires: number; nextPoll: number; interval: number; url: string };
 }
 
 export const SESSION_MAX_AGE = 30 * 86400;
@@ -120,6 +123,11 @@ export class OAuthStore {
   listValues<T>(kind: string, owner: string): T[] {
     return this.db.prepare('SELECT id, payload FROM integration_values WHERE kind = ? AND owner = ?').all(kind, owner)
       .map((row) => this.decrypt<T>(String(row.payload), `${kind}:${row.id}`));
+  }
+
+  listValueEntries<T>(kind: string, owner: string): { id: string; value: T }[] {
+    return this.db.prepare("SELECT id, payload FROM integration_values WHERE kind = ? AND (owner = ? OR owner = '')").all(kind, owner)
+      .map((row) => ({ id: String(row.id), value: this.decrypt<T>(String(row.payload), `${kind}:${row.id}`) }));
   }
 
   private cleanup(): void {

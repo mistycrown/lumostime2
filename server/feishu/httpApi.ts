@@ -1,7 +1,7 @@
 /**
  * @file httpApi.ts
  * @input HTTP requests, trusted app origins and the configured OAuth service.
- * @output Cookie-bound authorization/session APIs and a token-free callback page.
+ * @output Cookie-bound authorization/session APIs, personal device-flow polling and a legacy token-free callback page.
  * @pos Unified service HTTP boundary.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -81,7 +81,7 @@ export function createFeishuHandler(service: FeishuOAuthService | null, allowedO
         res.end(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LumosTime 飞书授权</title><h1>${success ? '飞书连接成功' : '飞书连接未完成'}</h1><p>请返回 LumosTime ${success ? '测试或导入记录。' : '查看连接状态并重新授权。'}</p></html>`);
         return;
       }
-      if (action === 'status') { json(200, service.status(token)); return; }
+      if (action === 'status') { json(200, await service.readStatus(token)); return; }
       const body = await readBody(req, action === 'import' ? 256 * 1024 : 4096);
       if (action === 'connect') {
         const ip = req.socket.remoteAddress || 'unknown';
@@ -91,7 +91,7 @@ export function createFeishuHandler(service: FeishuOAuthService | null, allowedO
         if (limit.count >= 100) throw new CalendarTestError('连接请求过于频繁，请稍后重试。', 429);
         limit.count++;
         starts.set(ip, limit);
-        const connection = service.connect(token);
+        const connection = await service.startConnection(token);
         setCookie(connection.sessionToken);
         json(200, { authorizeUrl: connection.authorizeUrl });
       } else if (action === 'disconnect') {

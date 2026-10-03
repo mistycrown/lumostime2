@@ -94,6 +94,7 @@ export default defineConfig(({ mode, command, isPreview }) => {
           entry: 'electron/main.ts',
           vite: {
             define: { 'process.env.LUMOS_FEISHU_SERVICE_URL': JSON.stringify(feishuServiceRoot) },
+            build: { rollupOptions: { external: ['node:sqlite'] } },
           },
         },
         preload: {

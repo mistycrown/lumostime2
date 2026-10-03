@@ -28,3 +28,13 @@ it('offers reconnect after failure/expiry and disconnect after successful author
   expect(render({ configured: true, status: 'connected', userName: '测试用户' })).toContain('断开连接');
   expect(render({ configured: true, status: 'pending' })).toContain('等待飞书授权');
 });
+
+it('guides private app creation and then calendar authorization without a configuration form', () => {
+  const markup = (phase: 'create' | 'authorize') => renderToStaticMarkup(<FeishuConnectionPanel
+    connection={{ configured: true, status: 'pending', phase, authorizationUrl: 'https://open.feishu.cn/page/launcher' }}
+    busy={false} onConnect={() => {}} onDisconnect={() => {}} onContinue={() => {}} />);
+  expect(markup('create')).toContain('打开飞书确认页');
+  expect(markup('create')).toContain('确认创建专属应用');
+  expect(markup('authorize')).toContain('授权飞书日历</button>');
+  expect(markup('authorize')).not.toContain('<input');
+});

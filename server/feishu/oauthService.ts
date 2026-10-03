@@ -2,11 +2,12 @@
  * @file oauthService.ts
  * @input Feishu application configuration, encrypted persistence and per-user sessions.
  * @output OAuth authorization, safe connection status and user-triggered calendar imports.
- * @updated 2026-10-02: Added manual category imports, explicit consent and the current v3 token endpoint.
+ * @updated 2026-10-03: Requests primary-calendar read access alongside calendar writes and reports safe permission codes.
  * @pos Unified Feishu connection service.
+ * @updated 2026-10-03: Reconciles category metadata and confirmed calendar deletions.
  */
 import { createHash } from 'node:crypto';
-import { CalendarTestError, FEISHU_AUTH_ERROR_CODES, FEISHU_PERMISSION_ERROR_CODES, runCalendarTest, validateTestRequest } from './calendarTest.ts';
+import { CalendarTestError, calendarResourceError, FEISHU_AUTH_ERROR_CODES, FEISHU_PERMISSION_ERROR_CODES, runCalendarTest, validateTestRequest } from './calendarTest.ts';
 import { OAuthStore, opaqueToken, tokenHash, type UserConnection } from './oauthStore.ts';
 import { FeishuCalendarImport, validateCategory } from './calendarImport.ts';
 
@@ -18,12 +19,13 @@ export interface OAuthConfig {
 }
 const API = 'https://open.feishu.cn/open-apis';
 const OAUTH_TOKEN_URL = 'https://accounts.feishu.cn/oauth/v3/token';
-const SCOPES = 'calendar:calendar offline_access';
+// calendar:calendar permits writes but is not accepted by calendars/primary.
+export const FEISHU_CALENDAR_SCOPES = 'calendar:calendar calendar:calendar:readonly offline_access';
 
 export class FeishuOAuthService {
   private config: OAuthConfig;
-  private store: OAuthStore;
-  private fetchFn: typeof fetch;
+  protected store: OAuthStore;
+  protected fetchFn: typeof fetch;
   private refreshing = new Map<string, Promise<UserConnection>>();
   private importer: FeishuCalendarImport;
 
@@ -52,7 +54,7 @@ export class FeishuOAuthService {
     const url = new URL('https://accounts.feishu.cn/open-apis/authen/v1/authorize');
     url.search = new URLSearchParams({
       client_id: this.config.appId, response_type: 'code', redirect_uri: this.config.redirectUri, prompt: 'consent',
-      scope: this.config.scopes || SCOPES, state, code_challenge_method: 'S256',
+      scope: this.config.scopes || FEISHU_CALENDAR_SCOPES, state, code_challenge_method: 'S256',
       code_challenge: createHash('sha256').update(verifier).digest('base64url')
     }).toString();
     return { sessionToken, authorizeUrl: url.href };
@@ -68,6 +70,10 @@ export class FeishuOAuthService {
     const payload = await response.json().catch(() => null);
     if (response.status === 429) throw new CalendarTestError('飞书请求过于频繁，请稍后重试。', 429, true);
     if (!response.ok || !payload || (payload.code !== undefined && payload.code !== 0) || payload.error) {
+      if (url.startsWith(`${API}/calendar/v4/`)) {
+        const missing = calendarResourceError(url.slice(`${API}/calendar/v4/`.length), response.status, payload?.code);
+        if (missing) throw missing;
+      }
       const unauthorized = response.status === 401 || FEISHU_AUTH_ERROR_CODES.includes(payload?.code) || payload?.error === 'invalid_grant';
       if ([20009, 20010].includes(payload?.code)) {
         throw new CalendarTestError('当前飞书账号尚未开通 LumosTime，请在飞书申请使用或联系企业管理员。', 403, true);
@@ -76,7 +82,8 @@ export class FeishuOAuthService {
         throw new CalendarTestError('飞书连接暂未开通，请稍后再试。', 503, true);
       }
       if (response.status === 403 || FEISHU_PERMISSION_ERROR_CODES.includes(payload?.code)) {
-        throw new CalendarTestError('飞书日历权限不足，请确认应用权限已发布并重新授权。', 403, true);
+        const code = typeof payload?.code === 'number' ? `（飞书错误码 ${payload.code}）` : '';
+        throw new CalendarTestError(`飞书日历授权范围不足${code}，请重新连接并同意日历读取与写入权限。`, 403, true);
       }
       throw new CalendarTestError(unauthorized ? '飞书授权已失效，请重新连接。' : '飞书授权或日历访问失败，请检查授权权限后重试。', unauthorized ? 401 : 502,
         response.status < 500 && Boolean(payload && (payload.error || typeof payload.code === 'number' && payload.code !== 0)));
@@ -84,11 +91,15 @@ export class FeishuOAuthService {
     return payload.data ?? payload;
   }
 
-  private async tokens(body: Record<string, string>): Promise<Pick<UserConnection, 'accessToken' | 'refreshToken' | 'accessExpiresAt' | 'refreshExpiresAt'>> {
+  protected async tokens(body: Record<string, string>, application?: UserConnection['application']): Promise<Pick<UserConnection, 'accessToken' | 'refreshToken' | 'accessExpiresAt' | 'refreshExpiresAt'>> {
     const data = await this.call(OAUTH_TOKEN_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client_id: this.config.appId, client_secret: this.config.appSecret, ...body })
+      body: JSON.stringify({ client_id: application?.id || this.config.appId, client_secret: application?.secret || this.config.appSecret, ...body })
     });
+    return this.parseTokens(data);
+  }
+
+  protected parseTokens(data: any): Pick<UserConnection, 'accessToken' | 'refreshToken' | 'accessExpiresAt' | 'refreshExpiresAt'> {
     if (typeof data.access_token !== 'string' || !data.access_token || typeof data.refresh_token !== 'string' || !data.refresh_token
       || !Number.isFinite(data.expires_in) || data.expires_in <= 0 || !Number.isFinite(data.refresh_token_expires_in) || data.refresh_token_expires_in <= 0) {
       throw new CalendarTestError('飞书未返回完整授权，请确认应用已开通离线授权权限。');
@@ -100,11 +111,47 @@ export class FeishuOAuthService {
     };
   }
 
-  private api(path: string, token: string, method = 'GET', body?: unknown): Promise<any> {
+  protected api(path: string, token: string, method = 'GET', body?: unknown): Promise<any> {
     return this.call(`${API}/${path}`, {
       method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
+  }
+
+  async startConnection(oldToken?: string): Promise<{ sessionToken: string; authorizeUrl: string }> { return this.connect(oldToken); }
+
+  async readStatus(token?: string) { return this.status(token); }
+
+  protected async completeConnection(id: string, credentials: Pick<UserConnection, 'accessToken' | 'refreshToken' | 'accessExpiresAt' | 'refreshExpiresAt'>,
+    application?: UserConnection['application']): Promise<void> {
+    const token = credentials.accessToken!;
+    const user = await this.api('authen/v1/user_info', token);
+    if (typeof user.open_id !== 'string' || !user.open_id) throw new CalendarTestError('无法确认飞书账号，请重新授权。');
+    const primary = await this.api('calendar/v4/calendars/primary', token, 'POST', {});
+    const personalPrimary = primary.calendars?.[0]?.calendar;
+    if (application && (typeof personalPrimary?.calendar_id !== 'string' || !personalPrimary.calendar_id || personalPrimary.role !== 'owner')) {
+      throw new CalendarTestError('无法确认你的主日历，请重新授权飞书日历。', 403);
+    }
+    const calendars: { id: string; name: string }[] = [];
+    const add = (calendar: any) => {
+      if (typeof calendar?.calendar_id === 'string' && ['owner', 'writer'].includes(calendar.role)
+        && !calendars.some((item) => item.id === calendar.calendar_id)) calendars.push({ id: calendar.calendar_id, name: String(calendar.summary || '飞书日历') });
+    };
+    add(primary.calendars?.[0]?.calendar);
+    let pageToken = '';
+    for (let page = 0; page < 100; page++) {
+      const list = await this.api(`calendar/v4/calendars?page_size=100${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ''}`, token);
+      (list.calendar_list ?? []).forEach(add);
+      if (!list.has_more) break;
+      if (!list.page_token || list.page_token === pageToken || page === 99) throw new CalendarTestError('飞书日历列表无效，请重新连接。');
+      pageToken = list.page_token;
+    }
+    if (!calendars.length) throw new CalendarTestError('当前账号没有可写入的日历，请检查飞书授权权限。', 403);
+    if (!this.store.save(id, { status: 'connected', ...credentials, application, calendars, calendarId: calendars[0].id,
+      userName: String(user.name || '飞书用户'), accountId: application
+        ? tokenHash(`feishu-primary:${personalPrimary.calendar_id}`) : tokenHash(`${user.tenant_key || ''}:${user.open_id}`) })) {
+      throw new CalendarTestError('连接已取消，请返回应用重新连接。', 400);
+    }
   }
 
   async callback(params: URLSearchParams): Promise<void> {
@@ -158,7 +205,7 @@ export class FeishuOAuthService {
       this.store.save(tokenHash(token!), connection);
     }
     if (connection.status === 'connected' && (connection.refreshExpiresAt || 0) < Date.now()) {
-      this.store.save(tokenHash(token!), { status: 'expired', error: '飞书授权已到期，请重新连接。' });
+      this.store.save(tokenHash(token!), { status: 'expired', error: '飞书授权已到期，请重新连接。', application: connection.application });
       return { configured: true, status: 'expired' as const, error: '飞书授权已到期，请重新连接。' };
     }
     return {
@@ -182,14 +229,14 @@ export class FeishuOAuthService {
     const operation = (async () => {
       try {
         if ((connection.refreshExpiresAt || 0) <= Date.now()) throw new CalendarTestError('飞书授权已到期，请重新连接。', 401);
-        const credentials = await this.tokens({ grant_type: 'refresh_token', refresh_token: connection.refreshToken! });
+        const credentials = await this.tokens({ grant_type: 'refresh_token', refresh_token: connection.refreshToken! }, connection.application);
         const updated = { ...connection, ...credentials };
         // A disconnect while refreshing must never recreate credentials.
         if (!this.store.save(id, updated)) throw new CalendarTestError('连接已取消，请重新连接。', 401);
         return updated;
       } catch (error) {
         if (error instanceof CalendarTestError && error.status === 401) {
-          this.store.save(id, { status: 'expired', error: error.message });
+          this.store.save(id, { status: 'expired', error: error.message, application: connection.application });
         }
         throw error;
       }
@@ -208,7 +255,7 @@ export class FeishuOAuthService {
       data = await this.api(`calendar/v4/calendars/${encodeURIComponent(calendarId)}`, connection.accessToken!);
     } catch (error) {
       if (error instanceof CalendarTestError && error.status === 401) {
-        this.store.save(tokenHash(token!), { status: 'expired', error: error.message });
+        this.store.save(tokenHash(token!), { status: 'expired', error: error.message, application: connection.application });
       }
       throw error;
     }
@@ -231,7 +278,7 @@ export class FeishuOAuthService {
       return await runCalendarTest(request, { userAccessToken: connection.accessToken, calendarId }, this.fetchFn);
     } catch (error) {
       if (error instanceof CalendarTestError && error.status === 401) {
-        this.store.save(tokenHash(token!), { status: 'expired', error: error.message });
+        this.store.save(tokenHash(token!), { status: 'expired', error: error.message, application: connection.application });
       }
       throw error;
     }
@@ -247,7 +294,7 @@ export class FeishuOAuthService {
         return this.api(`calendar/v4/${path}`, current.accessToken!, method, data);
       });
     } catch (error) {
-      if (error instanceof CalendarTestError && error.status === 401) this.store.save(tokenHash(token!), { status: 'expired', error: error.message });
+      if (error instanceof CalendarTestError && error.status === 401) this.store.save(tokenHash(token!), { status: 'expired', error: error.message, application: connection.application });
       throw error;
     }
   }

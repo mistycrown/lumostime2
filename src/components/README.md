@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-10-03: `FeishuConnectionPanel.tsx` shows personal-app creation and calendar authorization as separate pending stages, with buttons to reopen the official confirmation page. It requests no application credentials.
+
 - Update 2026-10-02: `FeishuConnectionPanel.tsx` keeps the OAuth connection button visible while status loads, the service is unavailable, or the account is disconnected; pending and connected states expose cancellation/disconnection.
 
 - Update 2026-09-30: `MainLayout.tsx` includes Scene in the shared transparent-title background path, allowing its header and content to use one continuous navigation image.
