@@ -3,7 +3,8 @@
  * @input Cookie-bound Feishu connection, local logs/categories and back navigation callback.
  * @output User authorization, category calendars, explicit test/Log imports and eight-digit date range.
  * @pos Settings / Data and Sync.
- * @description Polls authorization status only while waiting; never automatically imports events.
+ * @description Hosts authorization and manual historical import; automatic scheduling runs globally after explicit opt-in.
+ * @updated 2026-10-03: Exposes automatic sync settings and broadcasts ignored-category changes to the global queue.
  * @updated 2026-10-03: Manually synchronizes updates, deletions and category moves from a complete hydrated log snapshot.
  * @updated 2026-10-03: Persists multi-select ignored categories beside the date fields and preserves their existing events.
  * @updated 2026-10-03: Opens Android authorization externally while retaining the local connection session.
@@ -24,6 +25,8 @@ import { useCategoryScope } from '../../contexts/CategoryScopeContext';
 import { useData } from '../../contexts/DataContext';
 import { FeishuConnectionPanel } from '../../components/FeishuConnectionPanel';
 import { CustomSelect } from '../../components/CustomSelect';
+import { FeishuAutoSyncPanel } from '../../components/FeishuAutoSyncPanel';
+import { publishFeishuEvent } from '../../services/feishuAutoSyncStore';
 
 const PENDING_KEY = 'lumos_feishu_pending_test';
 const IGNORED_CATEGORIES_KEY = 'lumos_feishu_ignored_categories';
@@ -59,6 +62,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
 
   useEffect(() => {
     try { localStorage.setItem(IGNORED_CATEGORIES_KEY, JSON.stringify(ignoredCategoryIds)); } catch { /* Keep session choices if storage is unavailable. */ }
+    publishFeishuEvent();
   }, [ignoredCategoryIds]);
 
   useEffect(() => {
@@ -266,6 +270,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
         <FeishuConnectionPanel connection={connection} busy={busy} onConnect={connect} onContinue={continueAuthorization} onDisconnect={() => void perform(async () => {
           await requestFeishu('disconnect'); clearTest(); setImportSummary(null); if (mounted.current) setConnection(await getFeishuConnection());
         })} />
+        <FeishuAutoSyncPanel connection={connection} ready={logsReady && categoriesReady && !usesFallbackSeedData} busy={busy} />
         {connection?.status === 'connected' && (
           <>
             <p className="text-sm text-stone-600">按活动分类自动创建日历，并使用分类颜色。</p>

@@ -1,5 +1,6 @@
 /**
  * @file feishuCalendarClient.ts
+ * @updated 2026-10-03: Coordinates manual/automatic mutations and exposes typed transport failures for safe retry scheduling.
  * @input Desktop/Android local execution or a cookie-bound Web connection service.
  * @output OAuth status, category calendars, test events and manual Log batch import results.
  * @pos App integration client; Feishu credentials never enter UI responses.
@@ -11,6 +12,12 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type { FeishuImportBatch } from '../utils/feishuLogImport';
 import type { FeishuImportedReference } from '../utils/feishuSyncPlan';
+import { withFeishuLock } from './feishuSyncLock';
+
+export class FeishuClientError extends Error {
+  constructor(message: string, public status = 0) { super(message); this.name = 'FeishuClientError'; }
+}
+let lastConnectionIdentity = '';
 
 export interface FeishuTestRequest { requestId: string; startTime: number; timezone: string; category?: FeishuImportBatch['categories'][number] }
 export interface FeishuTestResult {
@@ -64,7 +71,7 @@ export function getFeishuServiceEndpoint(action: FeishuAction): string {
   return `${url.origin}/api/feishu/${action}`;
 }
 
-export async function requestFeishu(action: FeishuAction, body?: unknown): Promise<any> {
+async function requestFeishuUnlocked(action: FeishuAction, body?: unknown): Promise<any> {
   const method = action === 'status' ? 'GET' : 'POST';
   let status: number;
   let data: any;
@@ -102,22 +109,26 @@ export async function requestFeishu(action: FeishuAction, body?: unknown): Promi
     }
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('飞书连接服务')) throw error;
-    throw new Error(action === 'test'
+    throw new FeishuClientError(action === 'test'
       ? '无法确认测试导入结果，请检查网络后重试；将复用原请求编号。'
       : action === 'import' ? '无法确认导入结果，请稍后重试核查；已导入记录会保留。'
       : '无法连接飞书服务，请稍后再试。');
   }
   if (!data || typeof data !== 'object') {
-    throw new Error(action === 'test' ? '无法确认测试导入结果，请稍后使用原请求重试。'
+    throw new FeishuClientError(action === 'test' ? '无法确认测试导入结果，请稍后使用原请求重试。'
       : action === 'import' ? '无法确认导入结果，请稍后重试核查；已导入记录会保留。'
       : '飞书连接服务暂不可用，请稍后再试。');
   }
-  if (status < 200 || status >= 300) throw new Error(typeof data?.error === 'string' ? data.error : '飞书连接服务暂时不可用。');
+  if (status < 200 || status >= 300) throw new FeishuClientError(typeof data?.error === 'string' ? data.error : '飞书连接服务暂时不可用。', status);
   return data;
 }
 
-export async function getFeishuConnection(): Promise<FeishuConnectionStatus> {
-  const data = await requestFeishu('status');
+export function requestFeishu(action: FeishuAction, body?: unknown): Promise<any> {
+  return withFeishuLock('calendar', () => requestFeishuUnlocked(action, body));
+}
+
+export async function getFeishuConnection(request = requestFeishu): Promise<FeishuConnectionStatus> {
+  const data = await request('status');
   if (typeof data?.configured !== 'boolean' || !['disconnected', 'pending', 'connected', 'error', 'expired'].includes(data.status)) {
     throw new Error('飞书服务未返回有效的连接状态。');
   }
@@ -131,6 +142,11 @@ export async function getFeishuConnection(): Promise<FeishuConnectionStatus> {
   if (data.categoryCalendars !== undefined && (!Array.isArray(data.categoryCalendars)
     || data.categoryCalendars.some((item: any) => !item || typeof item.categoryId !== 'string' || typeof item.id !== 'string' || typeof item.name !== 'string'))) {
     throw new Error('飞书服务未返回有效的分类日历。');
+  }
+  const identity = `${data.status}:${data.accountId || ''}`;
+  if (identity !== lastConnectionIdentity) {
+    lastConnectionIdentity = identity;
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') window.dispatchEvent(new Event('lumostime:feishu-connection-changed'));
   }
   return data;
 }
@@ -161,8 +177,8 @@ export interface FeishuImportResult {
   calendars: NonNullable<FeishuConnectionStatus['categoryCalendars']>;
 }
 
-export async function importFeishuLogs(batch: FeishuImportBatch): Promise<FeishuImportResult> {
-  const data = await requestFeishu('import', batch);
+export async function importFeishuLogs(batch: FeishuImportBatch, request = requestFeishu): Promise<FeishuImportResult> {
+  const data = await request('import', batch);
   const expected = new Set([...batch.records.map((record) => record.id), ...(batch.deleteIds || [])]);
   const deletes = new Set(batch.deleteIds || []);
   if (expected.size !== batch.records.length + (batch.deleteIds?.length || 0)
@@ -175,12 +191,12 @@ export async function importFeishuLogs(batch: FeishuImportBatch): Promise<Feishu
   return data;
 }
 
-export async function getFeishuImportedLogs(range: FeishuImportBatch['range']): Promise<FeishuImportedReference[]> {
+export async function getFeishuImportedLogs(range: FeishuImportBatch['range'], request = requestFeishu): Promise<FeishuImportedReference[]> {
   const records: FeishuImportedReference[] = [];
   const seen = new Set<string>();
   let after: string | undefined;
   for (let page = 0; page < 1000; page++) {
-    const data = await requestFeishu('import', { operation: 'catalog', range, ...(after ? { after } : {}) });
+    const data = await request('import', { operation: 'catalog', range, ...(after ? { after } : {}) });
     if (!Array.isArray(data?.records) || data.records.length > 200 || data.records.some((record: any) => {
       if (!record || typeof record.id !== 'string' || !/^[\w-]{1,128}$/.test(record.id)
         || !Number.isSafeInteger(record.startTime) || seen.has(record.id)
@@ -197,4 +213,17 @@ export async function getFeishuImportedLogs(range: FeishuImportBatch['range']): 
     after = data.after;
   }
   throw new Error('已同步记录过多，已停止同步。');
+}
+
+export interface FeishuCalendarSession {
+  connection(): Promise<FeishuConnectionStatus>;
+  catalog(range: FeishuImportBatch['range']): Promise<FeishuImportedReference[]>;
+  sync(batch: FeishuImportBatch): Promise<FeishuImportResult>;
+}
+export function withFeishuCalendarSession<T>(run: (session: FeishuCalendarSession) => Promise<T>): Promise<T> {
+  return withFeishuLock('calendar', () => run({
+    connection: () => getFeishuConnection(requestFeishuUnlocked),
+    catalog: (range) => getFeishuImportedLogs(range, requestFeishuUnlocked),
+    sync: (batch) => importFeishuLogs(batch, requestFeishuUnlocked)
+  }));
 }

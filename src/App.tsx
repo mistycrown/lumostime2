@@ -1,5 +1,6 @@
 /**
  * @file App.tsx
+ * @updated 2026-10-03: Runs Feishu synchronization in the main app and marks dataset resets as replacements.
  * @updated 2026-10-02: Routes settings transfers through the shared sync coordinator and blocks editing during cloud application.
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
  * @output Main UI Render, State Management, Data Persistence (JSON in localStorage)
@@ -85,6 +86,8 @@ import { useTodoManager } from './hooks/useTodoManager';
 import { useGoalManager } from './hooks/useGoalManager';
 import { useReviewManager } from './hooks/useReviewManager';
 import { useSyncManager } from './hooks/useSyncManager';
+import { useFeishuAutoSync } from './hooks/useFeishuAutoSync';
+import { markFeishuLogReplacement } from './services/feishuAutoSyncStore';
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { useSearchManager } from './hooks/useSearchManager';
 import { useDeepLink } from './hooks/useDeepLink';
@@ -406,6 +409,7 @@ const AppContent: React.FC = () => {
     logs,
     todos,
     todoCategories,
+    usesFallbackSeedData,
     collections,
     collectionEntries,
     setLogs,
@@ -535,6 +539,7 @@ const AppContent: React.FC = () => {
   const goalManager = useGoalManager();
   const reviewManager = useReviewManager();
   const syncManager = useSyncManager(); // This handles visibility sync too
+  useFeishuAutoSync(!desktopWindowType && !usesFallbackSeedData);
   const searchManager = useSearchManager();
   const { isHeaderScrolled } = useAppLifecycle();
   useHardwareBackButton();
@@ -1327,6 +1332,7 @@ const AppContent: React.FC = () => {
           <SettingsView
             onClose={() => setIsSettingsOpen(false)}
             onReset={() => {
+              markFeishuLogReplacement(INITIAL_LOGS);
               setLogs(INITIAL_LOGS);
               setTodos(INITIAL_TODOS);
               setCategories(CATEGORIES);
@@ -1355,7 +1361,9 @@ const AppContent: React.FC = () => {
               setIsSettingsOpen(false);
             }}
             onClearData={() => {
-              setLogs([]);
+              const clearedLogs: Log[] = [];
+              markFeishuLogReplacement(clearedLogs);
+              setLogs(clearedLogs);
               setTodos([]);
               setGoals([]);
               setMajorGoals([]);

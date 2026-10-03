@@ -1,7 +1,7 @@
 /**
  * @file FeishuCalendarSettingsView.test.tsx
  * @input Feishu settings view with hydrated logs and saved category preferences.
- * @output Regression coverage for connection, date text fields and multi-select filtering preview.
+ * @output Regression coverage for connection, opt-in automatic sync, date text fields and multi-select filtering preview.
  * @pos Settings UI tests.
  */
 import React from 'react';
@@ -19,6 +19,10 @@ it('renders a visible connection entry and numeric text dates before connection 
   const markup = renderToStaticMarkup(<FeishuCalendarSettingsView onBack={() => undefined} />);
   expect(markup).toContain('连接飞书</button>');
   expect(markup).toContain('同步到飞书日历');
+  expect(markup).toContain('自动同步');
+  expect(markup).toContain('role="switch"');
+  expect(markup).toContain('立即同步');
+  expect(markup).not.toContain('checked=""');
   expect(markup).not.toContain('type="date"');
   expect(markup.match(/type="text" inputMode="numeric" maxLength="8" pattern="\[0-9\]\{8\}"/g)).toHaveLength(2);
   expect(markup.match(/value="\d{8}"/g)).toHaveLength(2);

@@ -1,5 +1,6 @@
 ﻿/**
  * @file dataRepository.ts
+ * @updated 2026-10-03: Commits logs with the Feishu outbox and notifies the scheduler after dependent datasets persist.
  * @input Legacy localStorage keys, IndexedDB-backed storage repository, application defaults
  * @output Unified domain repository for heavy core data and one-time localStorage migration
  * @pos Repository (Application Data)
@@ -52,6 +53,7 @@ import {
 import { normalizeDailyReviews, normalizeMonthlyReviews, normalizeWeeklyReviews } from '../utils/checkItemNormalizer';
 import { normalizeAchievementRedemptionRecordFunding, normalizeAchievementStarValue } from '../utils/achievementUtils';
 import { storageRepository, StorageRepository } from './storageRepository';
+import { FeishuAutoSyncStore, publishFeishuEvent, FEISHU_DATA_SAVED_EVENT } from '../services/feishuAutoSyncStore';
 
 const CORE_DATA_MIGRATION_META_KEY = 'core-data-migration-v2';
 
@@ -252,7 +254,7 @@ export class DataRepository {
   private initPromise: Promise<void> | null = null;
 
   constructor(
-    private readonly repository: Pick<StorageRepository, 'getData' | 'setData' | 'getMeta' | 'setMeta'> = storageRepository,
+    private readonly repository: Pick<StorageRepository, 'getData' | 'setData' | 'getMeta' | 'setMeta'> & Partial<Pick<StorageRepository, 'setBatch'>> = storageRepository,
     private readonly legacyStorage: LegacyStorageAdapter = storage
   ) {}
 
@@ -475,12 +477,18 @@ export class DataRepository {
 
   async saveLogs(logs: Log[]): Promise<void> {
     await this.initialize();
-    await this.repository.setData(REPOSITORY_KEYS.LOGS, logs);
+    if (this.repository.setBatch) {
+      await new FeishuAutoSyncStore({ getMeta: this.repository.getMeta.bind(this.repository), setBatch: this.repository.setBatch.bind(this.repository) }).saveLogs(logs);
+    } else {
+      await this.repository.setData(REPOSITORY_KEYS.LOGS, logs);
+    }
+    publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
 
   async saveTodos(todos: TodoItem[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.TODOS, todos);
+    publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
 
   async saveTodoCategories(todoCategories: TodoCategory[]): Promise<void> {
@@ -506,6 +514,7 @@ export class DataRepository {
   async saveCategories(categories: Category[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.CATEGORIES, categories);
+    publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
 
   async getScopes(): Promise<Scope[]> {
@@ -516,6 +525,7 @@ export class DataRepository {
   async saveScopes(scopes: Scope[]): Promise<void> {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.SCOPES, scopes);
+    publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
 
   async saveGoals(goals: Goal[]): Promise<void> {
