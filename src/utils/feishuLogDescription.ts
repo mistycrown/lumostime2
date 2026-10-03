@@ -1,8 +1,8 @@
 /**
  * @file feishuLogDescription.ts
  * @input A saved log, its category/activity definitions and linked todo/scope names.
- * @output Plain-text calendar descriptions with readable sections and complete record metadata.
- * @pos Feishu export formatting; excludes images and comments.
+ * @output Plain-text calendar descriptions with notes, attributes, ratings and compact @/%/# references.
+ * @pos Feishu export formatting; the sync layer appends the sole Log ID marker.
  */
 import type { Activity, Category, Log, Scope, TodoItem } from '../types';
 
@@ -15,7 +15,7 @@ export const FEISHU_LOG_DESCRIPTION_LIMIT = 12000;
 const text = (value: string) => value.replace(/\r\n?/g, '\n').trim();
 const bullet = (value: string) => `• ${value.replace(/\n/g, '\n  ')}`;
 
-export function formatFeishuLogDescription(log: Log, category: Category, activity?: Activity,
+export function formatFeishuLogDescription(log: Log, _category: Category, activity?: Activity,
   context: FeishuLogDescriptionContext = {}): string {
   const sections: string[] = [];
   if (log.note?.trim()) sections.push(`【备注】\n${text(log.note)}`);
@@ -48,18 +48,17 @@ export function formatFeishuLogDescription(log: Log, category: Category, activit
   const links: string[] = [];
   if (log.linkedTodoId) {
     const todo = context.todos?.find((item) => item.id === log.linkedTodoId);
-    links.push(`关联待办：${text(todo?.title || '已删除或不可用')}\n待办 ID：${log.linkedTodoId}`);
+    links.push(`@${text(todo?.title || '已删除或不可用')}`);
   }
   if (log.scopeIds?.length) {
-    links.push(`关联领域：\n${[...new Set(log.scopeIds)].map((id) => {
+    links.push(...[...new Set(log.scopeIds)].map((id) => {
       const scope = context.scopes?.find((item) => item.id === id);
-      return bullet(`${text(scope?.name || '已删除或不可用')}（ID：${id}）`);
-    }).join('\n')}`);
+      return `%${text(scope?.name || '已删除或不可用')}`;
+    }));
   }
+  if (activity?.name.trim()) links.push(`#${text(activity.name)}`);
   if (typeof log.progressIncrement === 'number' && Number.isFinite(log.progressIncrement)) links.push(`本次进度：${log.progressIncrement}`);
-  if (links.length) sections.push(`【关联】\n${links.join('\n\n')}`);
-
-  sections.push(`【记录来源】\nLumosTime\n分类：${text(category.name)}${activity ? `\n标签：${text(activity.name)}` : ''}\nLog ID：${log.id}`);
+  if (links.length) sections.push(links.join('\n'));
   const description = sections.join('\n\n');
   if (description.length > FEISHU_LOG_DESCRIPTION_LIMIT) {
     throw new Error(`记录“${log.title?.trim() || activity?.name || log.id}”的日历备注超过 ${FEISHU_LOG_DESCRIPTION_LIMIT} 字符，请缩短备注或属性后导入。`);

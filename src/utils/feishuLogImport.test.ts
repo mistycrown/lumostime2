@@ -1,7 +1,7 @@
 /**
  * @file feishuLogImport.test.ts
  * @input Actual/planned log fixtures, category colors and eight-digit date bounds.
- * @output Coverage for complete description metadata, excluded assets and inclusive date filtering.
+ * @output Coverage for compact descriptions, excluded assets and inclusive date filtering.
  * @pos Feishu import utility tests.
  */
 import { expect, it } from 'vitest';
@@ -29,7 +29,8 @@ it('excludes plans, invalid durations, duplicate IDs and missing categories with
   expect(JSON.stringify(selected)).not.toMatch(/secret-image|secret-comment|images|comments/);
   expect(selected.records[0]).toMatchObject({ title: '标题' });
   expect(selected.records[0].note).toContain('【备注】\n备注');
-  expect(selected.records[0].note).toContain('Log ID：log-1');
+  expect(selected.records[0].note).toContain('#阅读');
+  expect(selected.records[0].note).not.toContain('log-1');
 });
 
 it('rejects incomplete, impossible and reversed eight-digit dates', () => {
