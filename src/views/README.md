@@ -1,5 +1,7 @@
 # Views Layer
 
+- Update 2026-10-03: `TagDetailView.tsx` only shows the keyword palette action and modal after redemption verification; linked sticker sets no longer bypass this requirement.
+
 - Update 2026-09-26: `SceneCard.tsx`, loose-mode cards in `TodoView.tsx`, and daily/weekly/monthly cards in `ReviewHubView.tsx` share the configurable synchronized card-background images.
 
 - Update 2026-09-26: `TagsView.tsx` and `ScopeView.tsx` no longer add a separate translucent mask over shared custom backgrounds in transparent-title-bar mode.

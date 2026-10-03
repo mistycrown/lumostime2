@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-10-03: Requires verified sponsorship for the keyword palette action and modal, including tags with sticker sets.
  * @updated 2026-10-02: Adds linked tag sticker settings, per-keyword selection, and calendar appearance.
  * @updated 2026-09-20: Renames the tag detail attribute analytics tab to statistics to reflect all tag statistic cards.
  * @updated 2026-09-20: Places the unlocked keyword color sequence action beside the title and opens a centered modal.
@@ -674,7 +675,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
                            <div className="mt-1 flex items-center gap-2">
                               <h2 className="text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
-                              {(isSponsorshipUnlocked || tagStickerSets.length > 0) && (
+                              {isSponsorshipUnlocked && (
                                  <button
                                     type="button"
                                     onClick={() => setIsKeywordSequenceModalOpen(true)}
@@ -736,7 +737,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      </div>
                   </section>
                   <KeywordColorSequenceModal
-                     isOpen={isKeywordSequenceModalOpen}
+                     isOpen={isSponsorshipUnlocked && isKeywordSequenceModalOpen}
                      activity={activity}
                      customSequences={customSequences}
                      effectiveSequenceId={effectiveKeywordSequenceId}
