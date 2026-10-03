@@ -1,5 +1,9 @@
 # 图片优化脚本使用说明
 
+## check-feishu-auto-smoke.mjs
+
+`node scripts/check-feishu-auto-smoke.mjs` 在隔离、隐藏的 Electron 中检查飞书自动同步页面及真实 IndexedDB 持久化，使用模拟 API。覆盖首次安装数据初始化与演示数据保护、开关、事务回滚、新增修改删除、离线重开恢复及暂停后继续。
+
 ## run-feishu-server.mjs
 
 2026-10-03：默认服务改为专属应用设备流程，不再要求公共 App ID/Secret 或授权回调。开发服务自动保存固定加密密钥；生产仍需维护者提供持久化存储和加密密钥。Electron 本机主进程直连无需该服务。`check-feishu-personal.mjs` 可检查真实注册入口，只输出阶段和官方网页来源，不打印设备码或创建应用；运行 `node --experimental-sqlite --experimental-strip-types scripts/check-feishu-personal.mjs`。下方 2026-10-02 的公共应用配置仅用于旧模式兼容。

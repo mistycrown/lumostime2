@@ -1,7 +1,7 @@
 /**
  * @file feishu-auto-smoke.cjs
  * @input Built-in Electron Chromium, Vite and the UTF-8 renderer fixture.
- * @output UI/IndexedDB/lifecycle smoke checks and optional captured settings screenshot.
+ * @output First-install/UI/IndexedDB/lifecycle smoke checks and optional captured settings screenshot.
  * @pos Isolated verification; all API responses are simulated and all windows remain hidden.
  */
 const { app, BrowserWindow } = require('electron');
@@ -70,8 +70,16 @@ app.whenReady().then(async () => {
     if (event.level === 'error') { errors.push(event.message); console.error('[renderer]', event.message); }
   });
   console.log('Smoke: loading isolated settings fixture');
-  await Promise.race([window.loadURL(`http://127.0.0.1:${address.port}/__feishu-auto-smoke`),
+  const fixtureUrl = `http://127.0.0.1:${address.port}/__feishu-auto-smoke`;
+  await Promise.race([window.loadURL(`${fixtureUrl}?fresh=1`),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Smoke fixture load timed out')), 30000))]);
+  console.log('Smoke: verifying first-install persistence');
+  await waitFor(() => evaluate('Boolean(window.smoke?.ready)'), 'first-install readiness');
+  await waitFor(() => evaluate('window.smoke.persisted().then(s => Array.isArray(s.logs) && Array.isArray(s.todos))'), 'missing datasets initialized');
+  assert.equal(await evaluate('window.smoke.usesFallbackSeedData'), true, 'seed data must remain protected during the first launch');
+  assert.equal(calls.length, 0, 'initializing a fresh install must not write to Feishu');
+  await evaluate('window.smoke.prepareEmptyDataset()');
+  await window.loadURL(fixtureUrl);
   console.log('Smoke: waiting for providers');
   await waitFor(() => evaluate('Boolean(window.smoke?.ready && document.querySelector("#feishu-auto-sync") && !document.querySelector("#feishu-auto-sync").disabled)'), 'settings readiness');
   assert.match(await evaluate('document.body.innerText'), /自动同步/);
@@ -113,7 +121,7 @@ app.whenReady().then(async () => {
   await waitFor(() => evaluate('document.querySelector("#feishu-auto-sync").checked'), 'reenabled switch');
   await waitFor(() => references.has('paused-record'), 'resume disabled queue');
   assert.deepEqual(errors.filter((message) => /Uncaught|TypeError|ReferenceError/.test(message)), []);
-  console.log(JSON.stringify({ result: 'PASS', checks: ['settings switch', 'atomic IndexedDB rollback', 'create outside settings', 'edit', 'delete', 'IndexedDB offline queue', 'reload recovery', 'disable/resume'], batches: calls.length }));
+  console.log(JSON.stringify({ result: 'PASS', checks: ['first-install persistence', 'seed protection', 'settings switch', 'atomic IndexedDB rollback', 'create outside settings', 'edit', 'delete', 'IndexedDB offline queue', 'reload recovery', 'disable/resume'], batches: calls.length }));
 }).catch(async (error) => {
   console.error(error);
   if (window && !window.isDestroyed()) {

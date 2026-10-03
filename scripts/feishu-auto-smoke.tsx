@@ -1,7 +1,7 @@
 /**
  * @file feishu-auto-smoke.tsx
  * @input Isolated Chromium storage and a local simulated Feishu API.
- * @output Mounted settings view, real providers, root scheduler and deterministic test controls.
+ * @output Mounted settings view, first-install hydration, real providers, root scheduler and deterministic test controls.
  * @pos Browser smoke-test fixture; excluded from product build.
  */
 import React, { useState } from 'react';
@@ -16,9 +16,10 @@ import type { Log } from '../src/types';
 import '../src/index.css';
 
 async function mount() {
+  const fresh = new URLSearchParams(location.search).has('fresh');
   if (await storageRepository.getData('logs') === null) {
     await storageRepository.setBatch([
-      { namespace: 'data', key: 'logs', value: [] }, { namespace: 'data', key: 'todos', value: [] },
+      ...(!fresh ? [{ namespace: 'data' as const, key: 'logs', value: [] }, { namespace: 'data' as const, key: 'todos', value: [] }] : []),
       { namespace: 'data', key: 'categories', value: [{ id: 'work', name: '工作', themeColor: '#336699', activities: [{ id: 'write', name: '写作', icon: '📝' }] }] },
       { namespace: 'data', key: 'scopes', value: [] }, { namespace: 'meta', key: 'core-data-migration-v2', value: true }
     ]);
@@ -30,6 +31,11 @@ async function mount() {
     useFeishuAutoSync(isReady && categoriesReady && !usesFallbackSeedData);
     Object.assign(window, { smoke: {
       ready: isReady && categoriesReady,
+      usesFallbackSeedData,
+      persisted: async () => ({ logs: await storageRepository.getData('logs'), todos: await storageRepository.getData('todos') }),
+      prepareEmptyDataset: () => storageRepository.setBatch([
+        { namespace: 'data', key: 'logs', value: [] }, { namespace: 'data', key: 'todos', value: [] }
+      ]),
       add: (id: string, title: string) => {
         const startTime = Date.now() - 120000;
         const log: Log = { id, title, categoryId: 'work', activityId: 'write', startTime, endTime: startTime + 60000, duration: 60 };

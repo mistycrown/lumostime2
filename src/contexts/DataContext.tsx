@@ -1,6 +1,6 @@
 /**
  * @file DataContext.tsx
- * @updated 2026-10-03: Does not rewrite the hydration snapshot as an edit, preventing stale windows from generating calendar deletions.
+ * @updated 2026-10-03: Initializes missing logs once but does not rewrite persisted hydration snapshots, preventing stale-window calendar deletions.
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
  * @updated 2026-07-30: Normalizes hydrated recurring auto-Plan settings alongside Maybe dates.
  * @updated 2026-05-23: Broadcasts desktop todo sync events after persisted todo writes and rehydrates todos from external desktop-window edits so Electron widgets and the main app stay aligned.
@@ -112,7 +112,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
             : undefined
         }));
-        hydratedLogsRef.current = snapshot.logs;
+        hydratedLogsRef.current = snapshot.hasStoredLogs ? snapshot.logs : null;
         setLogs(snapshot.logs);
         setTodos(normalizedTodos);
         setTodoCategories(snapshot.todoCategories);
