@@ -1,0 +1,10 @@
+# Only service code enters the image build context. No secrets or user data.
+**
+!package.json
+!scripts/
+!scripts/run-feishu-server.mjs
+!scripts/feishu-server-env.mjs
+!server/
+!server/feishu/
+!server/feishu/*.ts
+server/feishu/*.test.ts

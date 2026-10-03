@@ -1,5 +1,7 @@
 # Components Directory
 
+- Update 2026-10-02: `FeishuConnectionPanel.tsx` keeps the OAuth connection button visible while status loads, the service is unavailable, or the account is disconnected; pending and connected states expose cancellation/disconnection.
+
 - Update 2026-09-30: `MainLayout.tsx` includes Scene in the shared transparent-title background path, allowing its header and content to use one continuous navigation image.
 
 - Update 2026-09-28: `NavigationDecorationDebugger.tsx` and `BottomNavigation.tsx` provide a persisted 10–300% vertical-stretch control for new navigation background images, while legacy navigation decorations remain unchanged.
@@ -397,3 +399,4 @@ Components for theme and appearance customization.
 - `ScopeAssociation.tsx` and `TodoAssociation.tsx`: Support title-free embedding in compact settings editors such as Routine steps.
 - `ActivityAttributeStatistics.tsx`: Uses the app-wide `--accent-color` theme for attribute statistics and type-specific visualizations.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.
+- Update 2026-10-02: `TagStickerGroupSection.tsx` manages tag sticker previews capped at 96px, create/ZIP import actions, and a shared contextual usage hint. `StickerSetEditModal.tsx` reuses `TagAssociation.tsx` to associate groups with tags; `KeywordColorSequenceModal.tsx` enables linked tag stickers; `DetailTimelineCard.tsx` centers the first available daily sticker with a small bottom-right gray date overlay, gray keyword calendar dates, heatmap-style empty cells, and color fallback. `TagStickerCalendar.test.tsx` covers calendar and settings rendering.

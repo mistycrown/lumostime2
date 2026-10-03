@@ -240,3 +240,4 @@ The views are designed as "dumb" or "presentational" components where possible, 
 - `FocusDetailView.tsx`: Updated progress display logic to dynamically show progress increments.
 - `TimelineView.tsx`, `TagDetailView.tsx`: Display ID-based activity attributes beneath notes and use activity theme color for attribute statistics.
 - Update 2026-07-30: `TimelineView.tsx` sizes and resizes split sidebars as persisted 26%-70% workspace ratios, so mobile screens do not inherit fixed desktop pixel constraints.
+- Update 2026-10-02: `SponsorshipView.tsx` adds tag-specific sticker groups, ZIP imports, and tag associations through the existing category/tag picker. `TagDetailView.tsx` configures the tag sticker switch and per-keyword sticker assignments for the detail calendar.

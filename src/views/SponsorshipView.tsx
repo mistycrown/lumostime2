@@ -26,6 +26,8 @@
  * @updated 2026-09-28: Lets package-theme deletion retain user-selectable resources and resolves retained-resource reimports.
  * @updated 2026-09-29: Added global scalable floating-button image background settings to the style tab.
  * @updated 2026-09-30: Moved default sticker selection into the Icon tab's compact Sticker picker.
+ * @updated 2026-10-02: Adds separately managed tag sticker ZIP imports, groups, and tag associations.
+ * @updated 2026-10-02: Passes full categories into the existing tag association picker for sticker groups.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Fish, Check, X, Plus, Upload, Trash2 } from 'lucide-react';
@@ -62,6 +64,7 @@ import { userStatsService, UserStats } from '../services/userStatsService';
 import { stickerService } from '../services/stickerService';
 import { IconRenderer } from '../components/IconRenderer';
 import { StickerSetEditModal } from '../components/StickerSetEditModal';
+import { TagStickerGroupSection } from '../components/TagStickerGroupSection';
 import { imageService } from '../services/imageService';
 import { buildCustomStickerViewSets } from '../services/customStickerAssetService';
 import { parseCustomStickerZip } from '../services/customStickerZipService';
@@ -515,6 +518,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [isEditingStickerSet, setIsEditingStickerSet] = useState(false);
     const [editingStickerSetId, setEditingStickerSetId] = useState<string | null>(null);
     const [stickerSetName, setStickerSetName] = useState('');
+    const [stickerSetPurpose, setStickerSetPurpose] = useState<'mood' | 'tag'>('mood');
+    const [stickerSetActivityId, setStickerSetActivityId] = useState('');
     const [editingSelectorGroupId, setEditingSelectorGroupId] = useState<string | null>(null);
     const [isSelectorGroupEditorOpen, setIsSelectorGroupEditorOpen] = useState(false);
     const [isDefaultSelectorSheetOpen, setIsDefaultSelectorSheetOpen] = useState(false);
@@ -535,6 +540,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     const [customUIIconThemes, setCustomUIIconThemes] = useState(() => uiIconService.getCustomThemeEntries());
     const [pendingUIIconZipImport, setPendingUIIconZipImport] = useState<PendingUIIconZipImport | null>(null);
     const stickerZipInputRef = useRef<HTMLInputElement>(null);
+    const tagStickerZipInputRef = useRef<HTMLInputElement>(null);
     const uiIconZipInputRef = useRef<HTMLInputElement>(null);
     const themePackageInputRef = useRef<HTMLInputElement>(null);
 
@@ -547,14 +553,17 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
     });
     const allPresets = React.useMemo(() => [...THEME_PRESETS, ...customPresets], [customPresets]);
     
-    const customStickerViewSets = buildCustomStickerViewSets(customStickerSets, customStickers, { includeEmptySets: true });
+    const allCustomStickerViewSets = buildCustomStickerViewSets(customStickerSets, customStickers, { includeEmptySets: true, purpose: 'all' });
+    const customStickerViewSets = allCustomStickerViewSets.filter((set) => customStickerSets.find((record) => record.id === set.id)?.purpose !== 'tag');
+    const tagStickerViewSets = allCustomStickerViewSets.filter((set) => customStickerSets.find((record) => record.id === set.id)?.purpose === 'tag');
+    const stickerActivityOptions = categories.flatMap((category) => category.activities.map((activity) => ({ id: activity.id, name: `${category.name} / ${activity.name}` })));
     const editingStickerSet = React.useMemo(() => {
         if (!editingStickerSetId) {
             return null;
         }
 
-        return customStickerViewSets.find((set) => set.id === editingStickerSetId) || null;
-    }, [customStickerViewSets, editingStickerSetId]);
+        return allCustomStickerViewSets.find((set) => set.id === editingStickerSetId) || null;
+    }, [allCustomStickerViewSets, editingStickerSetId]);
     const presetStickerSets = React.useMemo(
         () => stickerService.getAllStickerSets().filter((set) => !set.isCustom),
         [customStickerSets, customStickers]
@@ -572,8 +581,17 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
             counts.set(filename, (counts.get(filename) || 0) + 1);
         });
 
+        const stickersById = new Map(customStickers.map((sticker) => [sticker.id, sticker]));
+        categories.forEach((category) => category.activities.forEach((activity) => {
+            (activity.keywords || []).forEach((keyword) => {
+                if (typeof keyword === 'string' || !keyword.stickerId) return;
+                const sticker = stickersById.get(keyword.stickerId);
+                if (sticker) counts.set(sticker.imageFilename, (counts.get(sticker.imageFilename) || 0) + 1);
+            });
+        }));
+
         return counts;
-    }, [dailyReviews]);
+    }, [dailyReviews, categories, customStickers]);
 
     // Handle save current settings as preset
     const handleSaveCurrentSettings = (name: string) => {
@@ -855,6 +873,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsEditingStickerSet(false);
         setEditingStickerSetId(null);
         setStickerSetName('');
+        setStickerSetPurpose('mood');
+        setStickerSetActivityId('');
     };
 
     const selectorSourceSets = React.useMemo(
@@ -1101,6 +1121,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                     ? {
                         ...set,
                         name: trimmedName,
+                        purpose: stickerSetPurpose,
+                        activityId: stickerSetPurpose === 'tag' ? stickerSetActivityId || undefined : undefined,
                         description: undefined,
                         updatedAt: now
                     }
@@ -1115,6 +1137,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 {
                     id: newSetId,
                     name: trimmedName,
+                    purpose: stickerSetPurpose,
+                    activityId: stickerSetPurpose === 'tag' ? stickerSetActivityId || undefined : undefined,
                     description: undefined,
                     stickerIds: [],
                     status: 'active',
@@ -1137,6 +1161,15 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         setIsEditingStickerSet(true);
         setEditingStickerSetId(setId);
         setStickerSetName(currentSet.name);
+        setStickerSetPurpose(currentSet.purpose || 'mood');
+        setStickerSetActivityId(currentSet.activityId || '');
+    };
+
+    const handleStickerSetActivityChange = (activityId: string) => {
+        setStickerSetActivityId(activityId);
+        if (editingStickerSetId) {
+            setCustomStickerSets((previous) => previous.map((set) => set.id === editingStickerSetId ? { ...set, activityId: activityId || undefined, updatedAt: Date.now() } : set));
+        }
     };
 
     const getUniqueStickerSetName = (baseName: string, usedNames: Set<string>): string => {
@@ -1153,7 +1186,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
         return candidate;
     };
 
-    const handleStickerZipChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleStickerZipChange = async (event: React.ChangeEvent<HTMLInputElement>, purpose: 'mood' | 'tag' = 'mood') => {
         const zipFile = event.target.files?.[0];
         event.target.value = '';
 
@@ -1203,6 +1236,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                     importedSets.push({
                         id: setId,
                         name: setName,
+                        purpose,
                         description: undefined,
                         stickerIds: stickerRecords.map((sticker) => sticker.id),
                         status: 'active',
@@ -1885,6 +1919,22 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                         </div>
                                     </div>
 
+                                    <TagStickerGroupSection
+                                        sets={tagStickerViewSets}
+                                        activities={stickerActivityOptions}
+                                        isImporting={isImportingStickerZip}
+                                        onCreate={() => {
+                                            setIsEditingStickerSet(true);
+                                            setEditingStickerSetId(null);
+                                            setStickerSetName('');
+                                            setStickerSetPurpose('tag');
+                                            setStickerSetActivityId('');
+                                        }}
+                                        onImport={() => tagStickerZipInputRef.current?.click()}
+                                        onEdit={handleEditStickerSet}
+                                    />
+                                    <input ref={tagStickerZipInputRef} type="file" accept=".zip,application/zip,application/x-zip-compressed" className="hidden" onChange={(event) => void handleStickerZipChange(event, 'tag')} />
+
                                     {/* Sticker 集部分 */}
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-medium text-stone-600">Sticker 集</h4>
@@ -1897,6 +1947,8 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                     setIsEditingStickerSet(true);
                                                     setEditingStickerSetId(null);
                                                     setStickerSetName('');
+                                                    setStickerSetPurpose('mood');
+                                                    setStickerSetActivityId('');
                                                 }}
                                                 className="relative rounded-lg border-2 border-dashed border-stone-200 overflow-hidden bg-white transition-all hover:border-stone-300"
                                                 style={{ aspectRatio: '1/1' }}
@@ -1929,7 +1981,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                                 type="file"
                                                 accept=".zip,application/zip,application/x-zip-compressed"
                                                 className="hidden"
-                                                onChange={handleStickerZipChange}
+                                                onChange={(event) => void handleStickerZipChange(event)}
                                             />
 
                                             {customStickerViewSets.map((setView) => (
@@ -2099,6 +2151,9 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                                             onUploadToSlot={handleUploadStickerToSlot}
                                             onRemoveSticker={handleRequestDeleteSticker}
                                             onDeleteSet={handleRequestDeleteStickerSet}
+                                            categories={stickerSetPurpose === 'tag' ? categories : undefined}
+                                            activityId={stickerSetActivityId}
+                                            onActivityChange={handleStickerSetActivityChange}
                                         />
 
                                         <ConfirmModal

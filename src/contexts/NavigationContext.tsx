@@ -1,5 +1,6 @@
 /**
  * @file NavigationContext.tsx
+ * @updated 2026-10-02: Added the Feishu calendar test settings submenu.
  * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
  * @updated 2026-08-09: Added daily-check overview/detail navigation state.
  * @updated 2026-08-10: Added an explicit return target for daily-check overview launches from Settings or Timeline.
@@ -16,6 +17,7 @@ export type SettingsSubmenu =
     | 'data'
     | 'cloud'
     | 's3'
+    | 'feishu'
     | 'ai'
     | 'preferences'
     | 'guide'

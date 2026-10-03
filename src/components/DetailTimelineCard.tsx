@@ -1,5 +1,9 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
+ * @updated 2026-10-02: Centers only the day's first available sticker at full cell size and overlays the date in the bottom-right corner.
+ * @updated 2026-10-02: Matches keyword calendar empty cells and date colors to the theme-aware heatmap treatment.
+ * @updated 2026-10-02: Uses neutral gray dates in keyword/sticker calendars while retaining theme colors in heatmaps.
  * @input Filtered logs, display date, entity info
  * @output Timeline UI with detail-page month heatmap duration captions, stats, history, and shared custom timeline styling with per-day rail termination, English day-total duration labels, plus month-based quick navigation in all-record mode
  * @pos Component (Shared Detail View UI)
@@ -38,6 +42,7 @@ import {
     DetailTimelineViewMode,
 } from '../utils/detailTimelineGrouping';
 import { getDefaultKeywordColor, getDetailTimelineKeywords, getDetailTimelineKeywordRecords, getLogMatchedDetailTimelineKeywords } from '../utils/detailTimelineKeywordUtils';
+import { getKeywordStickerMap, getTagStickerSets } from '../utils/tagStickerUtils';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
@@ -121,6 +126,7 @@ interface DetailTimelineCardProps {
     // 自定义选项
     customScale?: { min: number; max: number }; // 可选的热图刻度
     entityInfo: {                     // 实体信息（用于显示标签）
+        id?: string;
         icon?: string;
         name: string;
         type: 'category' | 'activity' | 'scope' | 'other';
@@ -144,6 +150,7 @@ interface DetailTimelineCardProps {
     keywords?: Array<string | ActivityKeyword>;
     keywordRecords?: ActivityKeyword[];
     keywordAttribute?: ActivityAttributeDefinition;
+    tagStickerEnabled?: boolean;
     
     // 专注分数支持
     enableFocusScore?: boolean;
@@ -174,20 +181,27 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     keywords = [],
     keywordRecords,
     keywordAttribute,
+    tagStickerEnabled = false,
     enableFocusScore = false,
     enableMoodScore = false,
     progressTracking
 }) => {
     const { collections, collectionEntries } = useData();
     const { isPrivacyMode } = usePrivacy();
-    const { timelineStyleTheme, timelineStyleConfigs } = useSettings();
+    const { timelineStyleTheme, timelineStyleConfigs, customStickerSets, customStickers } = useSettings();
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
     const [viewMode, setViewMode] = React.useState<DetailTimelineViewMode>(defaultViewMode);
-    const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>('heatmap');
+    const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>(tagStickerEnabled ? 'keywords' : 'heatmap');
     const timelineKeywordRecords = useMemo(
         () => keywordRecords || getDetailTimelineKeywordRecords(keywords),
         [keywordRecords, keywords]
     );
+    const tagStickerSets = useMemo(() => entityInfo.type === 'activity' && entityInfo.id ? getTagStickerSets(entityInfo.id, customStickerSets, customStickers) : [], [entityInfo.type, entityInfo.id, customStickerSets, customStickers]);
+    const useTagStickers = tagStickerEnabled && tagStickerSets.length > 0;
+    const keywordStickerMap = useMemo(() => getKeywordStickerMap(timelineKeywordRecords, tagStickerSets), [timelineKeywordRecords, tagStickerSets]);
+    React.useEffect(() => {
+        if (useTagStickers) setCalendarViewMode('keywords');
+    }, [useTagStickers]);
     const timelineKeywords = useMemo(
         () => keywordRecords ? keywordRecords.map((keyword) => keyword.label) : getDetailTimelineKeywords(keywords, keywordAttribute),
         [keywordAttribute, keywordRecords, keywords]
@@ -576,7 +590,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             ? 'bg-white text-stone-900 shadow-sm'
                                             : 'text-stone-400 hover:text-stone-600'
                                     }`}
-                                    title="关键字"
+                                    title={useTagStickers ? '标签贴纸' : '关键字'}
+                                    aria-label={useTagStickers ? '标签贴纸' : '关键字'}
                                 >
                                     <Hash size={14} />
                                 </button>
@@ -624,7 +639,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                         const dayLogs = countableMonthLogs.filter(l => {
                                             const d = new Date(l.startTime);
                                             return d.getDate() === day;
-                                        });
+                                        }).sort((first, second) => first.startTime - second.startTime);
                                         
                                         // 找到匹配的关键字
                                         const matchedKeywords = new Set<string>();
@@ -632,6 +647,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                             getLogMatchedDetailTimelineKeywords(log, timelineKeywordRecords, keywordAttribute)
                                                 .forEach((keyword) => matchedKeywords.add(keyword));
                                         });
+                                        const firstStickerKeyword = Array.from(matchedKeywords).find((keyword) => keywordStickerMap.has(keyword));
+                                        const firstSticker = firstStickerKeyword ? keywordStickerMap.get(firstStickerKeyword) : undefined;
                                         
                                         cells.push(
                                             <div
@@ -640,9 +657,14 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                 onClick={() => handleDayClick(new Date(year, month, day))}
                                             >
                                                 {matchedKeywords.size === 0 ? (
-                                                    // 无匹配关键字：灰色
-                                                    <div className="w-full h-full bg-stone-100 flex items-center justify-center">
-                                                        <span className="text-sm font-medium text-stone-400">{day}</span>
+                                                    // 无匹配关键字：沿用热力图的空日期样式
+                                                    <div className="detail-heatmap-cell w-full h-full bg-stone-50 flex items-center justify-center">
+                                                        <span className="text-sm font-medium leading-none" style={{ color: '#a8a29e' }}>{day}</span>
+                                                    </div>
+                                                ) : useTagStickers && firstSticker ? (
+                                                    <div className="detail-heatmap-cell relative flex h-full w-full items-center justify-center bg-stone-50 p-0.5" title={Array.from(matchedKeywords).join('、')}>
+                                                        <IconRenderer icon={`image:${firstSticker.path}`} size="100%" alt={firstStickerKeyword} />
+                                                        <span className="pointer-events-none absolute bottom-1 right-1 z-10 text-[8px] font-medium leading-none" style={{ color: '#a8a29e' }}>{day}</span>
                                                     </div>
                                                 ) : (
                                                     // 有匹配关键字：分割颜色
@@ -654,7 +676,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                                 style={getKeywordColor(kw)}
                                                             />
                                                         ))}
-                                                        <span className="absolute inset-0 flex items-center justify-center text-sm font-medium text-stone-700">
+                                                        <span className="absolute inset-0 flex items-center justify-center text-sm font-medium" style={{ color: '#a8a29e' }}>
                                                             {day}
                                                         </span>
                                                     </div>
@@ -987,12 +1009,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         <div className="mt-4 pt-3 border-t border-stone-100">
                             <div className="flex flex-wrap gap-2 justify-center">
                                 <div className="flex items-center gap-1.5">
-                                    <div className="w-2.5 h-2.5 rounded bg-stone-100"></div>
+                                    <div className="w-2.5 h-2.5 rounded bg-stone-50"></div>
                                     <span className="text-[10px] text-stone-400">Unmatched</span>
                                 </div>
                                 {timelineKeywords.map(kw => (
                                     <div key={kw} className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded" style={getKeywordColor(kw)}></div>
+                                        {useTagStickers && keywordStickerMap.has(kw) ? <IconRenderer icon={`image:${keywordStickerMap.get(kw)!.path}`} size={20} alt={kw} /> : <div className="w-2.5 h-2.5 rounded" style={getKeywordColor(kw)}></div>}
                                         <span className="text-[10px] text-stone-500">{kw}</span>
                                     </div>
                                 ))}

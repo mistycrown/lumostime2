@@ -3,6 +3,7 @@
  * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
  * @updated 2026-09-21: Adds stacked time-series charts for single-choice statistics.
  * @updated 2026-09-23: Adds weekly/monthly duration rhythm chart card types and range support.
+ * @updated 2026-10-02: Adds tag-specific sticker groups and keyword sticker assignments.
  * @updated 2026-09-20: Adds per-tag keyword color sequence settings for newly created keywords.
  * @updated 2026-09-17: Added activity statistic card sources and per-card chart configuration.
  * @updated 2026-09-20: Added activity-level statistic palette groups.
@@ -85,6 +86,7 @@ export interface ActivityAttributeDefinition {
 export interface ActivityKeyword {
   label: string;
   color?: string;
+  stickerId?: string;
   source: 'manual' | 'attribute';
   attributeId?: string;
   optionId?: string;
@@ -150,6 +152,7 @@ export interface Activity {
   enableMoodScore?: boolean; // Override parent setting for mood tracking
   keywords?: Array<string | ActivityKeyword>; // Keywords for finer classification; strings are legacy-compatible
   keywordColorSequenceEnabled?: boolean;
+  tagStickerEnabled?: boolean;
   keywordColorSequenceId?: ActivityStatisticPaletteId;
   noteTemplates?: NoteTemplate[];
   attributes?: ActivityAttributeDefinition[];
@@ -1256,6 +1259,8 @@ export interface CustomStickerRecord {
 export interface CustomStickerSetRecord {
   id: string;
   name: string;
+  purpose?: 'mood' | 'tag';
+  activityId?: string;
   description?: string;
   stickerIds: string[];
   status: CustomStickerStatus;

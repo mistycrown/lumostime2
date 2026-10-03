@@ -1,5 +1,6 @@
 /**
  * @file lazyViews.ts
+ * @updated 2026-10-02: Added lazy loading for the Feishu calendar test settings page.
  * @input Dynamic import loaders for lazily rendered views
  * @output Preloadable lazy view components and app-level preload scheduler
  * @pos Utility Layer (View Loading)
@@ -49,6 +50,7 @@ const loadFiltersSettingsView = () => import('../views/settings/FiltersSettingsV
 const loadCollectionSettingsView = () => import('../views/settings/CollectionSettingsView').then((module) => ({ default: module.CollectionSettingsView }));
 const loadReviewOverviewView = () => import('../views/settings/ReviewOverviewView').then((module) => ({ default: module.ReviewOverviewView }));
 const loadCloudSyncSettingsView = () => import('../views/settings/CloudSyncSettingsView').then((module) => ({ default: module.CloudSyncSettingsView }));
+const loadFeishuCalendarSettingsView = () => import('../views/settings/FeishuCalendarSettingsView').then((module) => ({ default: module.FeishuCalendarSettingsView }));
 const loadS3SyncSettingsView = () => import('../views/settings/S3SyncSettingsView').then((module) => ({ default: module.S3SyncSettingsView }));
 const loadDataManagementView = () => import('../views/settings/DataManagementView').then((module) => ({ default: module.DataManagementView }));
 const loadWidgetSettingsView = () => import('../views/settings/WidgetSettingsView').then((module) => ({ default: module.WidgetSettingsView }));
@@ -80,6 +82,7 @@ export const FiltersSettingsViewLazy = lazyWithPreload(loadFiltersSettingsView);
 export const CollectionSettingsViewLazy = lazyWithPreload(loadCollectionSettingsView);
 export const ReviewOverviewViewLazy = lazyWithPreload(loadReviewOverviewView);
 export const CloudSyncSettingsViewLazy = lazyWithPreload(loadCloudSyncSettingsView);
+export const FeishuCalendarSettingsViewLazy = lazyWithPreload(loadFeishuCalendarSettingsView);
 export const S3SyncSettingsViewLazy = lazyWithPreload(loadS3SyncSettingsView);
 export const DataManagementViewLazy = lazyWithPreload(loadDataManagementView);
 export const WidgetSettingsViewLazy = lazyWithPreload(loadWidgetSettingsView);

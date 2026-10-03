@@ -4,10 +4,15 @@
  * @input setId (string|null), setName (string), stickers (CustomStickerViewItem[]), isOpen, onClose, onSaveName, onUpload, onRemoveSticker
  * @output 弹窗交互事件
  * @updated 2026-04-19: Added fixed-slot uploads so empty positions stay stable while editing a sticker set, moved the modal to a centered dialog, added direct set deletion support, and limited uploads to one image per slot action.
+ * @updated 2026-10-02: Adds an optional tag association selector for tag-specific sticker groups.
+ * @updated 2026-10-02: Reuses TagAssociation for category and tag selection in the group editor.
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { IconRenderer } from './IconRenderer';
+import { TagAssociation } from './TagAssociation';
+import { getActiveActivities } from '../utils/archiveUtils';
+import type { Category } from '../types';
 
 const MAX_SLOTS = 16;
 
@@ -28,6 +33,9 @@ interface StickerSetEditModalProps {
   onUploadToSlot: (setId: string, slotIndex: number, file: File) => void;
   onRemoveSticker: (stickerId: string) => void;
   onDeleteSet?: (setId: string) => void;
+  categories?: Category[];
+  activityId?: string;
+  onActivityChange?: (activityId: string) => void;
 }
 
 export const StickerSetEditModal: React.FC<StickerSetEditModalProps> = ({
@@ -40,8 +48,13 @@ export const StickerSetEditModal: React.FC<StickerSetEditModalProps> = ({
   onUploadToSlot,
   onRemoveSticker,
   onDeleteSet,
+  categories,
+  activityId,
+  onActivityChange,
 }) => {
   const [name, setName] = useState(initialName);
+  const getAssociatedCategoryId = () => categories?.find((category) => category.activities.some((activity) => activity.id === activityId))?.id || categories?.find((category) => getActiveActivities(category).length > 0)?.id || '';
+  const [selectedCategoryId, setSelectedCategoryId] = useState(getAssociatedCategoryId);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 当前点击的是哪个槽位（如果已有贴纸则会触发删除确认，如果是空槽位则触发上传）
   const [uploadingSlotIndex, setUploadingSlotIndex] = useState<number | null>(null);
@@ -50,8 +63,14 @@ export const StickerSetEditModal: React.FC<StickerSetEditModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setName(initialName);
+      setSelectedCategoryId(getAssociatedCategoryId());
     }
-  }, [isOpen, initialName]);
+  }, [isOpen, initialName, setId]);
+
+  useEffect(() => {
+    const category = categories?.find((item) => item.activities.some((activity) => activity.id === activityId));
+    if (isOpen && category) setSelectedCategoryId(category.id);
+  }, [isOpen, activityId, categories]);
 
   if (!isOpen) return null;
 
@@ -125,6 +144,17 @@ export const StickerSetEditModal: React.FC<StickerSetEditModalProps> = ({
           </div>
 
           {/* 保存按钮 */}
+          {categories && onActivityChange && (
+            <TagAssociation
+              title="关联标签"
+              categories={categories}
+              selectedCategoryId={selectedCategoryId}
+              selectedActivityId={activityId || ''}
+              onCategorySelect={setSelectedCategoryId}
+              onActivitySelect={onActivityChange}
+              onClear={() => onActivityChange('')}
+            />
+          )}
           <button
             onClick={handleSave}
             disabled={!name.trim()}

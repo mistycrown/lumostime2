@@ -90,6 +90,7 @@ CODE_OBFUSCATION_GUIDE.md
 .env
 .env.local
 .env.*.local
+.feishu-data/
 
 # 版权源代码
 SourceCode_For_Copyright.txt

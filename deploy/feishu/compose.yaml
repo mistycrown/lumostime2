@@ -1,0 +1,48 @@
+# @file compose.yaml
+# @input An existing server/domain and private .env.local supplied by the maintainer.
+# @output One API instance, automatic HTTPS and persistent service/certificate volumes.
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/feishu/Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      FEISHU_HOST: 0.0.0.0
+      FEISHU_PORT: 3003
+      FEISHU_DATABASE_PATH: /data/oauth.sqlite
+    volumes:
+      - feishu-data:/data
+    networks:
+      - feishu
+    security_opt:
+      - no-new-privileges:true
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      FEISHU_SERVICE_DOMAIN: ${FEISHU_SERVICE_DOMAIN:?Set FEISHU_SERVICE_DOMAIN in the private --env-file}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - feishu
+    depends_on:
+      api:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+networks:
+  feishu:
+volumes:
+  feishu-data:
+  caddy-data:
+  caddy-config:

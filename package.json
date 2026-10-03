@@ -8,6 +8,9 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
+    "feishu:dev": "node --experimental-sqlite --experimental-strip-types scripts/run-feishu-server.mjs",
+    "feishu:start": "node --experimental-sqlite --experimental-strip-types scripts/run-feishu-server.mjs --production",
+    "feishu:test": "node --experimental-sqlite node_modules/vitest/vitest.mjs run --config vitest.feishu.config.ts",
     "dev": "node scripts/run-vite.js",
     "build": "node scripts/run-vite.js build",
     "preview": "node scripts/run-vite.js preview",

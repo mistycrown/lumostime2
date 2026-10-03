@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-02: Added the manual Feishu calendar connection/test-event entry under Data and Sync.
  * @updated 2026-10-02: Delegates all provider transfers to the shared versioned sync coordinator.
  * @input User Settings, Sync Data, AI Config, App State
  * @output Configuration Updates, Data Sync Actions, Navigation
@@ -114,6 +115,7 @@ import {
     CheckTemplateManageViewLazy as CheckTemplateManageView,
     CollectionSettingsViewLazy as CollectionSettingsView,
     CloudSyncSettingsViewLazy as CloudSyncSettingsView,
+    FeishuCalendarSettingsViewLazy as FeishuCalendarSettingsView,
     DataManagementViewLazy as DataManagementView,
     DesktopWidgetSettingsViewLazy as DesktopWidgetSettingsView,
     EmojiSettingsViewLazy as EmojiSettingsView,
@@ -860,6 +862,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
         );
     }
 
+    if (activeSubmenu === 'feishu') {
+        return renderLazySettingsSubview(
+            <FeishuCalendarSettingsView onBack={handleBackToMain} />,
+            '正在加载飞书日历...'
+        );
+    }
+
     if (activeSubmenu === 'cloud') {
         return renderLazySettingsSubview(
             <CloudSyncSettingsView
@@ -1384,6 +1393,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                             icon={<Database size={18} className="text-orange-500" />}
                             label="S3 云同步"
                             onClick={() => openSettingsSubmenu('s3')}
+                        />
+                        <MenuItem
+                            icon={<Link size={18} />}
+                            label="飞书日历"
+                            onClick={() => openSettingsSubmenu('feishu')}
                         />
                         <MenuItem
                             icon={<FileSpreadsheet size={18} className="text-blue-500" />}

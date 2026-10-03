@@ -1,5 +1,9 @@
 # Services Architecture
 
+Update 2026-10-02: `feishuCalendarClient.ts` starts per-user OAuth, reads cookie-bound category-calendar metadata and submits explicit test/Log imports. Web uses credentialed fetch, Electron uses the main-process bridge, and Android uses Capacitor native HTTP. Feishu tokens remain on the server; test retries preserve their identity, and formal batches validate per-record results.
+
+Update 2026-10-02: Empty/HTML API responses now report an unavailable connection service instead of a generic network error. Native and browser imports still preserve unknown-result retry handling; ordinary users receive no service configuration forms.
+
 Update 2026-09-20: `backgroundService.ts` now keeps custom background image bytes out of `localStorage`, hydrates native file-backed URLs at runtime, and cleans legacy Base64 records during migration.
 
 Update 2026-09-22: `preferencesBackupService.ts` now snapshots user-facing preferences and Memoir filters for export/cloud restore while excluding sync-provider credentials; custom background and TimePal files continue to use the protected canonical image manifest.
@@ -157,3 +161,4 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 
 > ⚠️ Once the folder I belong to changes, please update me.
 > ⚠️ 本文档最后更新：2026-09-25
+- Update 2026-10-02: `customStickerAssetService.ts` separates tag sticker groups from general mood sticker pickers while preserving shared storage, synchronization, and image reference protection.

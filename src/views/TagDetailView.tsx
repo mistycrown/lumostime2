@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-10-02: Adds linked tag sticker settings, per-keyword selection, and calendar appearance.
  * @updated 2026-09-20: Renames the tag detail attribute analytics tab to statistics to reflect all tag statistic cards.
  * @updated 2026-09-20: Places the unlocked keyword color sequence action beside the title and opens a centered modal.
  * @updated 2026-09-20: Adds shared, unlock-aware keyword color sequences without changing existing keyword colors.
@@ -49,6 +50,7 @@ import { createDefaultStatisticCard, normalizeStatisticCards } from '../utils/ac
 import { getChartPalette } from '../utils/chartPalette';
 import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
 import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
+import { getKeywordStickerMap, getTagStickerSets } from '../utils/tagStickerUtils';
 
 
 interface TagDetailViewProps {
@@ -84,7 +86,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [category, setCategory] = useState<Category | undefined>(initialCategory);
    
    // 获取当前 UI 图标主题
-   const { uiIconTheme } = useSettings();
+   const { uiIconTheme, customStickerSets, customStickers } = useSettings();
    const isCustomThemeEnabled = uiIconTheme !== 'default';
 
    // State
@@ -95,6 +97,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const [newKeyword, setNewKeyword] = useState(''); // New State for adding keyword
    const [keywordColorTarget, setKeywordColorTarget] = useState<string | null>(null);
    const [keywordColorDraft, setKeywordColorDraft] = useState<string | null>(null);
+   const [keywordStickerDraft, setKeywordStickerDraft] = useState<string | undefined>(undefined);
    const [isKeywordSequenceModalOpen, setIsKeywordSequenceModalOpen] = useState(false);
    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false); // State for category dropdown
    const customColors = useCustomColors();
@@ -113,6 +116,9 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    )), [activity?.attributes]);
 
    const keywordRecords = useMemo(() => syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || [], getNewKeywordColor), [activity?.attributes, activity?.keywords, keywordSequence.colors, activity?.keywordColorSequenceEnabled]);
+   const tagStickerSets = useMemo(() => getTagStickerSets(tagId, customStickerSets, customStickers), [tagId, customStickerSets, customStickers]);
+   const keywordStickerMap = useMemo(() => getKeywordStickerMap(keywordRecords, tagStickerSets), [keywordRecords, tagStickerSets]);
+   const useTagStickers = Boolean(activity?.tagStickerEnabled && tagStickerSets.length > 0);
 
    useEffect(() => {
       if (!activity) return;
@@ -137,6 +143,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             activity.isArchived !== initialActivity.isArchived ||
             activity.keywordColorSequenceEnabled !== initialActivity.keywordColorSequenceEnabled ||
             activity.keywordColorSequenceId !== initialActivity.keywordColorSequenceId ||
+            activity.tagStickerEnabled !== initialActivity.tagStickerEnabled ||
             JSON.stringify(activity.keywords) !== JSON.stringify(initialActivity.keywords) ||
             JSON.stringify(activity.noteTemplates || []) !== JSON.stringify(initialActivity.noteTemplates || []) ||
             JSON.stringify(activity.attributes || []) !== JSON.stringify(initialActivity.attributes || []) ||
@@ -356,7 +363,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
    const handleKeywordColorChange = (label: string, color: string) => {
       if (!activity) return;
       const currentKeywords = normalizeActivityKeywords(activity.keywords || []);
-      setActivity({ ...activity, keywords: currentKeywords.map((keyword) => keyword.label === label ? { ...keyword, color } : keyword) });
+      setActivity({ ...activity, keywords: currentKeywords.map((keyword) => keyword.label === label ? { ...keyword, color, stickerId: keywordStickerDraft } : keyword) });
       setKeywordColorTarget(null);
    };
 
@@ -364,6 +371,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
       const target = keywordRecords.find((keyword) => keyword.label === label);
       setKeywordColorTarget(label);
       setKeywordColorDraft(target?.color || getDefaultKeywordColor(label));
+      setKeywordStickerDraft(target?.stickerId);
    };
 
    const confirmKeywordColor = () => {
@@ -666,12 +674,12 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">05 / Keywords</p>
                            <div className="mt-1 flex items-center gap-2">
                               <h2 className="text-xl font-semibold tracking-tight text-stone-900">关键字</h2>
-                              {isSponsorshipUnlocked && (
+                              {(isSponsorshipUnlocked || tagStickerSets.length > 0) && (
                                  <button
                                     type="button"
                                     onClick={() => setIsKeywordSequenceModalOpen(true)}
                                     className={`inline-flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
-                                       activity.keywordColorSequenceEnabled
+                                       activity.keywordColorSequenceEnabled || useTagStickers
                                           ? 'bg-stone-100 text-stone-800'
                                           : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
                                     }`}
@@ -693,7 +701,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         <div className="flex flex-wrap gap-2">
                            {keywordRecords.map((keyword) => (
                               <div key={`${keyword.source}-${keyword.attributeId || ''}-${keyword.optionId || keyword.label}`} className="inline-flex items-stretch overflow-hidden rounded-lg border text-[11px] font-medium" style={{ backgroundColor: getKeywordSoftColor(getKeywordColor(keyword)), borderColor: getKeywordColor(keyword), color: getKeywordColor(keyword) }}>
-                                 <button type="button" onClick={() => openKeywordColorPicker(keyword.label)} className="max-w-[120px] truncate px-3 py-1.5 text-left hover:brightness-90" title="修改颜色">{keyword.label}</button>
+                                 <button type="button" onClick={() => openKeywordColorPicker(keyword.label)} className="flex max-w-[160px] items-center gap-1.5 px-3 py-1.5 text-left hover:brightness-90" title="修改颜色或贴纸">{useTagStickers && keywordStickerMap.has(keyword.label) && <IconRenderer icon={`image:${keywordStickerMap.get(keyword.label)!.path}`} size={20} />}<span className="truncate">{keyword.label}</span></button>
                                  {keyword.source === 'manual' && <button type="button" onClick={() => handleRemoveKeyword(keyword.label)} className="border-l px-1.5 text-current opacity-55 hover:opacity-100" style={{ borderColor: getKeywordColor(keyword) }} title="删除关键字"><X size={10} /></button>}
                               </div>
                            ))}
@@ -733,6 +741,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      customSequences={customSequences}
                      effectiveSequenceId={effectiveKeywordSequenceId}
                      unlocked={isSponsorshipUnlocked}
+                     hasTagStickerSets={tagStickerSets.length > 0}
                      onChange={setActivity}
                      onClose={() => setIsKeywordSequenceModalOpen(false)}
                   />
@@ -740,13 +749,26 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                      const target = keywordRecords.find((keyword) => keyword.label === keywordColorTarget);
                      if (!target) return null;
                      return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) { setKeywordColorTarget(null); setKeywordColorDraft(null); } }}>
-                        <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" role="dialog" aria-modal="true" aria-label="选择关键字颜色">
-                           <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-stone-800">选择颜色</h3><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="p-1 text-stone-400 hover:text-stone-800" title="关闭"><X size={16} /></button></div>
+                        <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-xl bg-white p-5 shadow-xl" role="dialog" aria-modal="true" aria-label="选择关键字颜色或贴纸">
+                           <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-stone-800">选择颜色或贴纸</h3><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="p-1 text-stone-400 hover:text-stone-800" title="关闭"><X size={16} /></button></div>
                            <div className="grid grid-cols-8 gap-2">
                               {COLOR_OPTIONS.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.hex)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.hex ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.hex }} aria-label={option.label} />)}
                               {customColors.map((option) => <button key={option.id} type="button" onClick={() => setKeywordColorDraft(option.color)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === option.color ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: option.color }} aria-label="自定义颜色" />)}
                               {activity.keywordColorSequenceEnabled && keywordSequence.colors.map((color, index) => <button key={`sequence-${index}-${color}`} type="button" onClick={() => setKeywordColorDraft(color)} className={`h-7 w-7 rounded-full border border-white shadow-sm ring-1 ring-stone-200 ${keywordColorDraft === color ? 'ring-2 ring-stone-800' : ''}`} style={{ backgroundColor: color }} aria-label={`${keywordSequence.label} ${index + 1}`} />)}
                            </div>
+                           {tagStickerSets.length > 0 && (
+                              <div className="mt-5 space-y-3 border-t border-stone-100 pt-4">
+                                 <div className="flex items-center justify-between"><h4 className="text-xs font-medium text-stone-600">标签贴纸</h4><button type="button" onClick={() => setKeywordStickerDraft(undefined)} aria-pressed={!keywordStickerDraft} className={`text-xs ${keywordStickerDraft ? 'text-stone-400' : 'font-medium text-stone-800'}`}>不使用贴纸</button></div>
+                                 {tagStickerSets.map((set) => (
+                                    <div key={set.id}>
+                                       <p className="mb-2 text-xs text-stone-400">{set.name}</p>
+                                       <div className="grid grid-cols-4 gap-2">
+                                          {set.stickers.map((sticker) => <button key={sticker.id} type="button" onClick={() => setKeywordStickerDraft(sticker.id)} aria-label={`选择贴纸 ${sticker.label || sticker.slotIndex + 1}`} aria-pressed={keywordStickerDraft === sticker.id} className={`flex aspect-square items-center justify-center rounded-lg border p-2 ${keywordStickerDraft === sticker.id ? 'border-stone-800 bg-stone-100 ring-1 ring-stone-800' : 'border-stone-100 hover:bg-stone-50'}`}><IconRenderer icon={`image:${sticker.path}`} size="100%" alt={sticker.label} /></button>)}
+                                       </div>
+                                    </div>
+                                 ))}
+                              </div>
+                           )}
                            <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => { setKeywordColorTarget(null); setKeywordColorDraft(null); }} className="rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-50">取消</button><button type="button" onClick={confirmKeywordColor} className="rounded-lg bg-stone-800 px-3 py-2 text-xs font-medium text-white hover:bg-stone-700">确定</button></div>
                         </div>
                      </div>;
@@ -765,6 +787,7 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                         : undefined
                   }
                   entityInfo={{
+                     id: activity.id,
                      icon: activity.icon,
                      name: activity.name,
                      type: 'activity'
@@ -774,6 +797,8 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
                   todos={todos}
                   keywords={keywordRecords}
                   keywordRecords={keywordRecords}
+                  keywordAttribute={keywordAttribute}
+                  tagStickerEnabled={useTagStickers}
                   enableFocusScore={activity.enableFocusScore ?? category?.enableFocusScore ?? false}
                   enableMoodScore={activity.enableMoodScore ?? category?.enableMoodScore ?? false}
                   renderLogMetadata={(log, { collectionNames }) => {

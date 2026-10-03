@@ -1,0 +1,4 @@
+# A real domain pointing to this server is required for automatic HTTPS.
+{$FEISHU_SERVICE_DOMAIN} {
+  reverse_proxy api:3003
+}

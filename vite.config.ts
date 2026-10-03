@@ -43,7 +43,7 @@ const copyPublicAssetsWithoutGit = (): Plugin => {
   };
 };
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command, isPreview }) => {
   const env = loadEnv(mode, '.', '');
   const isProduction = mode === 'production';
   const appVersion = JSON.parse(readFileSync(path.resolve(__dirname, 'version.json'), 'utf8')).version as string;
@@ -51,12 +51,18 @@ export default defineConfig(({ mode }) => {
   const shouldUploadSentrySourceMaps = Boolean(
     env.SENTRY_AUTH_TOKEN && env.SENTRY_ORG && env.SENTRY_PROJECT
   );
+  const feishuDevPort = env.FEISHU_PORT || '3003';
+  const feishuServiceRoot = env.VITE_FEISHU_SERVICE_URL || (command === 'serve' && !isPreview ? `http://127.0.0.1:${feishuDevPort}` : '');
   
   return {
     server: {
       port: 3002,
       host: '0.0.0.0',
       proxy: {
+        '/api/feishu': {
+          target: `http://127.0.0.1:${feishuDevPort}`,
+          changeOrigin: true,
+        },
         '/uv/jianguoyun': {
           target: 'https://dav.jianguoyun.com/dav/',
           changeOrigin: true,
@@ -86,6 +92,9 @@ export default defineConfig(({ mode }) => {
         main: {
           // Shortcut of `build.lib.entry`
           entry: 'electron/main.ts',
+          vite: {
+            define: { 'process.env.LUMOS_FEISHU_SERVICE_URL': JSON.stringify(feishuServiceRoot) },
+          },
         },
         preload: {
           // Shortcut of `build.rollupOptions.input`
