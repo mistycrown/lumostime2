@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { FeishuCalendarImport, validateImportBatch } from './calendarImport';
 import { OAuthStore } from './oauthStore';
 import { CalendarTestError } from './calendarTest';
+import { prepareFeishuLogImport } from '../../src/utils/feishuLogImport';
 
 const category = { id: 'work', name: '工作', color: '#336699' };
 const record = { id: 'log-1', categoryId: 'work', title: '读文献', note: '笔记', startTime: 1780000000000, endTime: 1780003600000 };
@@ -38,9 +39,41 @@ it('creates one private calendar per category with the RGB color, subscribes and
   const event = call.mock.calls.at(-1)!;
   expect(event[0]).toContain('work-calendar/events?idempotency_key=');
   expect(event[2]).toMatchObject({ summary: '读文献', color: -1, free_busy_status: 'free', need_notification: false, reminders: [] });
-  expect(event[2].description).toBe('笔记\n[LumosTime:log:log-1]');
+  expect(event[2].description).toBe('笔记\n\n[LumosTime:log:log-1]');
   expect(importer.mappings('alice')).toHaveLength(1);
   expect(importer.mappings('bob')).toEqual([]);
+});
+
+it('sends formatted log metadata intact and reconciles its source marker without duplicate events', async () => {
+  const longNote = '这是完整的原始备注。'.repeat(250);
+  const prepared = prepareFeishuLogImport([{ ...record, activityId: 'read', duration: 3600, note: longNote,
+    focusScore: 4, moodScore: 3, linkedTodoId: 'todo-1', scopeIds: ['growth'],
+    attributeValues: [{ attributeId: 'pages', value: 0 }] }], [{ ...category, icon: '', themeColor: category.color,
+    activities: [{ id: 'read', name: '阅读', icon: '', color: 'bg-blue-100', attributes: [
+      { id: 'pages', name: '页数', type: 'number', unit: '页', order: 0, createdAt: 1, updatedAt: 1 }
+    ] }] }], { startDate: '20260528', endDate: '20260530' }, {
+    todos: [{ id: 'todo-1', title: '完成阅读' }], scopes: [{ id: 'growth', name: '个人成长' }]
+  });
+  const request = { ...prepared, timezone: 'Asia/Shanghai' };
+  initialCalendar();
+  call.mockResolvedValueOnce({ items: [], has_more: false }).mockResolvedValueOnce({ event: { event_id: 'metadata-event' } });
+  expect((await importer.run('alice', request, call)).results[0].status).toBe('created');
+  const description = call.mock.calls.at(-1)![2].description;
+  for (const content of [longNote, '页数：0 页', '专注度：4 / 5', '情绪度：3 / 5', '完成阅读', '个人成长', 'Log ID：log-1']) {
+    expect(description).toContain(content);
+  }
+  expect(description.endsWith('\n\n[LumosTime:log:log-1]')).toBe(true);
+  // Another installation has no local ledger; the readable layout must keep remote deduplication working.
+  const otherStore = new OAuthStore(':memory:', randomBytes(32).toString('base64'));
+  try {
+    const mapping = importer.mappings('alice')[0];
+    call.mockResolvedValueOnce({ calendar_list: [{ calendar_id: mapping.id, role: 'owner', description: call.mock.calls[1][2].description }], has_more: false })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ items: [{ event_id: 'metadata-event', description, status: 'confirmed' }], has_more: false });
+    expect((await new FeishuCalendarImport(otherStore).run('alice', request, call)).results[0].status).toBe('skipped');
+    expect(call.mock.calls.filter(([path, method]) => path.includes('/events?') && method === 'POST')).toHaveLength(1);
+  } finally { otherStore.close(); }
+  expect(() => validateImportBatch({ ...request, records: [{ ...prepared.records[0], note: '文'.repeat(12001) }] })).toThrow();
 });
 
 it('reuses a category ID despite renaming, and skips imported IDs across service instances', async () => {

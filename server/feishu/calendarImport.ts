@@ -2,6 +2,7 @@
  * @file calendarImport.ts
  * @input Validated category descriptors and small batches of actual log records.
  * @output Category calendars, durable import results and safe reconciliation of uncertain writes.
+ * @updated 2026-10-03: Preserves structured descriptions up to 12000 characters and separates the source marker.
  * @pos Feishu server import service; all writes require an explicit user action.
  */
 import { randomUUID } from 'node:crypto';
@@ -44,7 +45,7 @@ export function validateImportBatch(body: any): { categories: ImportCategory[]; 
     if (!record || typeof record.id !== 'string' || !/^[\w-]{1,128}$/.test(record.id) || seen.has(record.id)
       || !categories.some((category: ImportCategory) => category.id === record.categoryId)
       || typeof record.title !== 'string' || !record.title.trim() || record.title.length > 200
-      || typeof record.note !== 'string' || record.note.length > 2000
+      || typeof record.note !== 'string' || record.note.length > 12000
       || !Number.isSafeInteger(record.startTime) || !Number.isSafeInteger(record.endTime)
       || record.startTime < body.range.startTime || record.startTime >= body.range.endTimeExclusive
       || Math.floor(record.endTime / 1000) <= Math.floor(record.startTime / 1000)) {
@@ -187,7 +188,7 @@ export class FeishuCalendarImport {
             entry.status = 'pending';
             this.store.setValue('import_ledger', key, entry);
             const data = await call(`calendars/${encodeURIComponent(calendar.id)}/events?idempotency_key=${entry.requestId}`, 'POST', {
-              summary: entry.record.title, description: `${entry.record.note}${entry.record.note ? '\n' : ''}[LumosTime:log:${record.id}]`,
+              summary: entry.record.title, description: `${entry.record.note}${entry.record.note ? '\n\n' : ''}[LumosTime:log:${record.id}]`,
               start_time: { timestamp: String(Math.floor(entry.record.startTime / 1000)), timezone: entry.timezone },
               end_time: { timestamp: String(Math.floor(entry.record.endTime / 1000)), timezone: entry.timezone },
               free_busy_status: 'free', visibility: 'private', need_notification: false, color: -1, reminders: []
