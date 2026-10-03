@@ -5,6 +5,7 @@
  * @pos Component (Modal)
  * @description Uses the shared centered modal treatment for keyword color sequence settings.
  * @updated 2026-09-20: Added a reusable modal for keyword color sequence settings.
+ * @updated 2026-10-02: Adds a tag sticker switch enabled only when a linked sticker group exists.
  */
 import React from 'react';
 import { createPortal } from 'react-dom';
@@ -18,6 +19,7 @@ interface KeywordColorSequenceModalProps {
   customSequences: CustomChartPaletteSequence[];
   effectiveSequenceId: ActivityStatisticPaletteId;
   unlocked: boolean;
+  hasTagStickerSets?: boolean;
   onChange: (activity: Activity) => void;
   onClose: () => void;
 }
@@ -28,6 +30,7 @@ export const KeywordColorSequenceModal: React.FC<KeywordColorSequenceModalProps>
   customSequences,
   effectiveSequenceId,
   unlocked,
+  hasTagStickerSets = false,
   onChange,
   onClose
 }) => {
@@ -52,6 +55,10 @@ export const KeywordColorSequenceModal: React.FC<KeywordColorSequenceModalProps>
             <input type="checkbox" checked={Boolean(activity.keywordColorSequenceEnabled)} onChange={(event) => onChange({ ...activity, keywordColorSequenceEnabled: event.target.checked || undefined, keywordColorSequenceId: activity.keywordColorSequenceId || 'default' })} className="h-4 w-4 accent-stone-800" />
           </label>
           {activity.keywordColorSequenceEnabled && <ChartPaletteSelector value={effectiveSequenceId} onChange={(keywordColorSequenceId) => onChange({ ...activity, keywordColorSequenceId })} customSequences={customSequences} unlocked={unlocked} />}
+          <label className={`flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3 ${hasTagStickerSets ? '' : 'opacity-50'}`}>
+            <span className="text-sm font-medium text-stone-700">使用标签贴纸</span>
+            <input type="checkbox" aria-label="使用标签贴纸" disabled={!hasTagStickerSets} checked={Boolean(activity.tagStickerEnabled && hasTagStickerSets)} onChange={(event) => onChange({ ...activity, tagStickerEnabled: event.target.checked || undefined })} className="h-4 w-4 accent-stone-800" />
+          </label>
         </div>
         <div className="flex justify-end border-t border-stone-100 bg-white p-5"><button type="button" onClick={onClose} className="rounded-2xl bg-stone-800 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-stone-900">完成</button></div>
       </div>

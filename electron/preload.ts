@@ -4,6 +4,7 @@
  * @output IPC Bridge
  * @pos Electron Preload
  * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
+ * @updated 2026-10-02: Exposes action-only Feishu service requests without renderer access to session cookies.
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openTimer() 和 closeTimer() 以支持桌面计时器小组件（timer widget）的启用与停用。
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openQuick() 和 closeQuick() 方法以支持小事清单小组件的打开与关闭。并在 DesktopWidgetMainAction 中新增了 add_quick_todo 动作支持。
  * @updated 2026-05-18: Added desktop AI widget bridge methods plus edge-hide state subscriptions so the Electron quick-chat window can dock into a compact handle without touching raw IPC in React.
@@ -13,6 +14,10 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { ipcRenderer, contextBridge } from 'electron'
+
+contextBridge.exposeInMainWorld('feishuConnection', {
+    request: (action: string, body?: unknown) => ipcRenderer.invoke('feishu:request', action, body)
+});
 
 type DesktopWidgetMainAction =
     | { type: 'open_todo'; todoId: string }

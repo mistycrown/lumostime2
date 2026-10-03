@@ -4,6 +4,12 @@
 
 ## Updates
 
+- 2026-10-02: The Feishu page always shows the connection entry, uses the unified service OAuth flow, and automatically creates/reuses one calendar per activity category with its initial category color. Users can test a selected category and explicitly import actual records; there are no service URL or credential fields.
+
+- 2026-10-02: `FeishuCalendarSettingsView.tsx` uses eight-digit numeric text dates with 本周/本月/上周/上月 presets, validates real/reversed dates, previews eligible records/categories and imports five records per batch with progress and created/skipped/failed totals.
+
+- 2026-10-02: `FeishuCalendarSettingsView.tsx` adds the manual calendar connectivity/test-block action; credentials stay on the server and test results are shown in the settings page.
+
 - 2026-09-08: `ReviewOverviewQuestionVisibilityView.tsx` adds per-question display toggles grouped by review template; hidden questions are filtered from Review Overview counts and details without changing review data.
 
 - 2026-08-09: `ReviewOverviewView.tsx` adds a `回顾总览` settings subpage that groups Daily/Weekly/Monthly review answers by template group and question, with newest-first answer detail.

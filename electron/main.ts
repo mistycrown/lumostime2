@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-10-02: Added cookie-protected unified Feishu OAuth service requests for the main renderer.
  * @updated 2026-06-14: Changed Windows login-item startup to open the main renderer instead of stopping in tray-only mode, so data hydration and desktop widgets initialize immediately.
  * @updated 2026-05-19: Added blur event handler to AI widget window so it auto-docks to edge when the window loses focus.
  * @updated 2026-05-18: Added a dedicated desktop AI widget window with persisted compact bounds, edge-hide handle mode, and preload bridge events for the always-on-top quick-chat shell.
@@ -27,6 +28,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { registerFeishuConnection } from './feishuConnection';
 
 type DesktopWidgetMainAction =
   | { type: 'open_todo'; todoId: string }
@@ -1455,6 +1457,8 @@ async function createTodoQuickEditorWindow() {
 }
 
 app.whenReady().then(() => {
+  registerFeishuConnection(() => mainWindow, process.env.LUMOS_FEISHU_SERVICE_URL || VITE_DEV_SERVER_URL || '',
+    buildRendererUrl());
   createTray();
   if (didLaunchFromLoginItem && process.platform === 'win32') {
     console.info('[Electron] Started from login item; opening main window for renderer hydration and widget restore.');

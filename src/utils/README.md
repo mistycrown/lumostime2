@@ -1,5 +1,9 @@
 # Utils Architecture
 
+> Update 2026-10-02: `feishuImportRange.ts` accepts eight-digit dates, resolves Monday-based week/full-month presets and validates inclusive local dates as half-open timestamp bounds. `feishuLogImport.ts` filters actual records and prepares minimal category descriptors and event data for explicit import.
+
+> Update 2026-10-02: `lazyViews.ts` adds the Feishu calendar test settings subpage without preloading or triggering any calendar requests.
+
 > Update 2026-09-20: `detailTimelineKeywordUtils.ts` accepts a caller-provided generator when keyword-source attribute options need a shared color sequence.
 
 Contains pure utility functions for data processing and business logic calculations.
@@ -107,3 +111,4 @@ Contains pure utility functions for data processing and business logic calculati
 Update 2026-07-30: `timelineSidebarRatioUtils.ts` centralizes Chronicle todo-sidebar ratio bounds, defaults, and migration from the former pixel-width preference.
 Update 2026-08-09: `detailTimelineGrouping.ts` centralizes detail timeline date grouping so month views exclude cross-month and planned-only headings while all-record views retain existing timeline records.
 - Update 2026-08-26: `archiveUtils.ts` now treats category archive state as a first-class, backward-compatible flag, hides child activities from active selectors for archived categories, and provides the shared category-to-activity cascade helper.
+- Update 2026-10-02: `tagStickerUtils.ts` resolves active groups associated with a tag and valid keyword sticker assignments, providing color fallback after sticker removal or group reassignment. `tagStickerUtils.test.ts` covers tag isolation, legacy mood groups, asset protection, and attribute option renaming.

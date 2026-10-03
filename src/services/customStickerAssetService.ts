@@ -4,6 +4,7 @@
  * @output helper functions for custom sticker sets and protected image filenames
  * @description Centralizes custom sticker metadata parsing, slot normalization, and image reference calculation for picker rendering, sync manifests, and image cleanup.
  * @updated 2026-04-19: Added slot index metadata, normalization for legacy custom sticker state, and optional empty-set inclusion for the sticker set editor.
+ * @updated 2026-10-02: Separates tag sticker groups from the general mood sticker picker while preserving shared assets.
  */
 
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview } from '../types';
@@ -24,12 +25,14 @@ export interface CustomStickerViewSet {
   id: string;
   name: string;
   description?: string;
+  activityId?: string;
   isCustom: true;
   stickers: CustomStickerViewItem[];
 }
 
 interface BuildCustomStickerViewSetsOptions {
   includeEmptySets?: boolean;
+  purpose?: 'mood' | 'tag' | 'all';
 }
 
 const safeParse = <T,>(value: string | null, fallback: T): T => {
@@ -152,7 +155,7 @@ export const buildCustomStickerViewSets = (
   customStickers: CustomStickerRecord[],
   options: BuildCustomStickerViewSetsOptions = {}
 ): CustomStickerViewSet[] => {
-  const { includeEmptySets = false } = options;
+  const { includeEmptySets = false, purpose = 'mood' } = options;
   const stickersBySetId = new Map<string, CustomStickerRecord[]>();
 
   customStickers.forEach((sticker) => {
@@ -166,7 +169,7 @@ export const buildCustomStickerViewSets = (
   });
 
   return customStickerSets
-    .filter((set) => set.status === 'active')
+    .filter((set) => set.status === 'active' && (purpose === 'all' || (set.purpose || 'mood') === purpose))
     .map((set) => {
       const stickers = (stickersBySetId.get(set.id) || [])
         .sort((first, second) => first.sortOrder - second.sortOrder || first.createdAt - second.createdAt)
@@ -181,6 +184,7 @@ export const buildCustomStickerViewSets = (
       return {
         id: set.id,
         name: set.name,
+        activityId: set.activityId,
         isCustom: true as const,
         stickers
       };

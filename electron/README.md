@@ -6,6 +6,7 @@ The `electron/` directory contains the main process and preload scripts for runn
 
 *   **main.ts**: The entry point. Controls the application lifecycle, creates the browser window, and manages native desktop integrations (if any beyond standard navigation).
 *   **preload.ts**: The bridge between the Node.js context (Main Process) and the Browser context (Renderer Process). It uses `contextBridge` to expose safe APIs (like `ipcRenderer`) to the frontend.
+*   **feishuConnection.ts**: Restricts Feishu IPC to the main app frame and predefined actions at the configured service origin. Requests use the Electron session cookie jar; responses never include cookie headers. OAuth opens in the existing system-browser link handler.
 
 ## Key Features
 

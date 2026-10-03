@@ -25,6 +25,9 @@ type DesktopAIWidgetBridgeState = {
 };
 
 interface Window {
+  feishuConnection?: {
+    request: (action: 'status' | 'connect' | 'calendar' | 'test' | 'import' | 'disconnect', body?: unknown) => Promise<{ status: number; data: any }>;
+  };
   ipcRenderer?: {
     on: (...args: any[]) => any;
     off: (...args: any[]) => any;

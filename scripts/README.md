@@ -1,5 +1,9 @@
 # 图片优化脚本使用说明
 
+## run-feishu-server.mjs
+
+2026-10-02：`npm run dev` 通过 `feishu-dev-service.mjs` 自动准备本机飞书 API（默认 3003）：复用已运行的服务，或启动并清理自己创建的子进程。配置远端服务时不启动本地 API，构建/预览也不会启动。`npm run feishu:dev` 可单独联调，`npm run feishu:start` 强制生产配置校验并支持托管平台 `PORT`。需要 Node 22.12+、维护者注册的飞书应用及持久化加密 SQLite。服务未配置时只返回未开通状态，不生成假的授权链接。部署配置见 [飞书日历授权说明](../docs/feishu-calendar-test.md)。
+
 ## optimize-images.js
 
 自动优化 PNG 图片为 WebP 格式，减小安装包体积。
