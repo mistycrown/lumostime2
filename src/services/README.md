@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-03: Android now uses `feishuNativeConnection.ts` and the same `feishu/` execution core as Electron, with native HTTP, Keystore-encrypted snapshots and external-browser consent. No remote service URL is required on Android. Credentials remain private to execution memory and encrypted storage, never UI responses or browser persistence. Web continues to use the personal connection service.
+
 Update 2026-10-02: `feishuCalendarClient.ts` starts per-user OAuth, reads cookie-bound category-calendar metadata and submits explicit test/Log imports. Web uses credentialed fetch, Electron uses the main-process bridge, and Android uses Capacitor native HTTP. Feishu tokens remain on the server; test retries preserve their identity, and formal batches validate per-record results.
 
 Update 2026-10-02: Empty/HTML API responses now report an unavailable connection service instead of a generic network error. Native and browser imports still preserve unknown-result retry handling; ordinary users receive no service configuration forms.
@@ -162,3 +164,6 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 > ⚠️ Once the folder I belong to changes, please update me.
 > ⚠️ 本文档最后更新：2026-09-25
 - Update 2026-10-02: `customStickerAssetService.ts` separates tag sticker groups from general mood sticker pickers while preserving shared storage, synchronization, and image reference protection.
+2026-10-03：飞书客户端通过现有 import 入口分页读取账号同步清单，提交明确的删除 ID 和更新记录，校验各操作结果及全部 ID；不在网络失败后自动重发写请求。
+
+2026-10-03：同步清单必须包含来源分类 ID，分类过滤提交给执行端再次校验；不以“被忽略”推断已删除。

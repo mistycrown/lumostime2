@@ -48,6 +48,7 @@ it('starts OAuth with random state and PKCE; a pending user cannot import', asyn
   expect(url.searchParams.get('prompt')).toBe('consent');
   expect(url.searchParams.get('code_challenge')).toHaveLength(43);
   expect(url.searchParams.get('scope')).toContain('offline_access');
+  expect(url.searchParams.get('scope')?.split(' ')).toContain('calendar:calendar:readonly');
   expect(authorizeUrl).not.toContain('app-secret');
   expect(service.status(sessionToken).status).toBe('pending');
   await expect(service.test(sessionToken, input())).rejects.toMatchObject({ status: 401 });

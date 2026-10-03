@@ -4,7 +4,11 @@
 
 ## Updates
 
+- 2026-10-03: Feishu test categories use the shared themed `CustomSelect`, category color dots and a portal dropdown. Archived/removed selections fall back to the same active category that the test uses; with no active categories, the main calendar is used.
+
 - 2026-10-03: Feishu imports resolve linked todo/scope names from hydrated local data and include notes, attributes, focus/mood scores, progress and Log IDs in sectioned calendar descriptions. Existing imported events remain deduplicated rather than overwritten.
+
+- 2026-10-03: Feishu now guides users to create their own app on Feishu, then authorize calendars from the second consent button. Electron uses the local main-process executor; Web/Android use the personal execution service. Existing test/import and numeric dates remain explicit user actions.
 
 - 2026-10-02: The Feishu page always shows the connection entry, uses the unified service OAuth flow, and automatically creates/reuses one calendar per activity category with its initial category color. Users can test a selected category and explicitly import actual records; there are no service URL or credential fields.
 
@@ -68,3 +72,8 @@
 - Each subview receives `onBack` so it can return to the main settings page.
 - Shared state is still passed through props from `SettingsView.tsx`.
 - Keep visual language consistent with the rest of settings: full-screen layout, soft stone palette, and minimal controls.
+2026-10-03：飞书日历页引导用户在官方网页创建专属应用，再点击“授权飞书日历”；按阶段重新打开确认网页。创建和授权阶段都不导入日程。保留已连接后的测试、分类日历、八位数字日期和手动正式导入。
+
+2026-10-03：手动同步增加更新、删除和分类迁移计数；删除由完整本地快照与账号账本比对，空范围仍可同步。日期变化或数据重新加载时停止后续批次，避免把尚未加载的记录判成删除。
+
+2026-10-03：日期下方增加紧凑的“忽略分类”多选按钮，不显示分类色点，选中用深色背景和小勾表示。本机记住选择，并更新导入数量预览。忽略分类的记录不新增、更新、迁移或删除；来源分类也被忽略的迁移记录保留原日程，取消勾选后恢复同步。

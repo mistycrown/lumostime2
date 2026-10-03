@@ -81,10 +81,12 @@ it('reuses a category ID despite renaming, and skips imported IDs across service
   call.mockResolvedValueOnce({ items: [], has_more: false }).mockResolvedValueOnce({ event: { event_id: 'event-1' } });
   await importer.run('alice', batch(), call);
   const restarted = new FeishuCalendarImport(store);
-  call.mockResolvedValueOnce({ calendar_id: 'work-calendar', role: 'owner' }); // Real GET response is flat.
+  call.mockResolvedValueOnce({ calendar_id: 'work-calendar', role: 'owner', summary: 'LumosTime · 工作' }) // Real GET response is flat.
+    .mockResolvedValueOnce({ calendar: { calendar_id: 'work-calendar', summary: 'LumosTime · 工作改名' } });
   const changed = { ...batch(), categories: [{ ...category, name: '工作改名' }], records: [{ ...record, title: '修改标题' }] };
   expect((await restarted.run('alice', changed, call)).results[0].status).toBe('skipped');
   expect(call.mock.calls.filter(([, method]) => method === 'POST')).toHaveLength(3);
+  expect(call.mock.calls.at(-1)).toEqual(['calendars/work-calendar', 'PATCH', { summary: 'LumosTime · 工作改名' }]);
 });
 
 it('recovers a timed-out event from its source marker without issuing another create', async () => {

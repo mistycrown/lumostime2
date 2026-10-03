@@ -11,6 +11,22 @@ import { getFeishuRequestUrl, registerFeishuConnection } from './feishuConnectio
 
 beforeEach(() => vi.clearAllMocks());
 
+it('runs personal connection locally only after caller and payload validation', async () => {
+  const frame = { url: 'file:///app/index.html' };
+  const sender = { mainFrame: frame, session: { fetch: vi.fn() } };
+  const execute = vi.fn().mockResolvedValue({ status: 200, data: { configured: true, status: 'disconnected', connectionMode: 'personal' } });
+  const factory = vi.fn(() => execute);
+  registerFeishuConnection(() => ({ webContents: sender }) as any, '', frame.url, factory);
+  const handle = vi.mocked(ipcMain.handle).mock.calls[0][1];
+  await expect(handle({ sender: {}, senderFrame: frame } as any, 'status')).rejects.toThrow('Unauthorized');
+  expect(factory).not.toHaveBeenCalled();
+  expect((await handle({ sender, senderFrame: frame } as any, 'status')).data).toMatchObject({ connectionMode: 'personal' });
+  await handle({ sender, senderFrame: frame } as any, 'status');
+  expect(factory).toHaveBeenCalledTimes(1);
+  expect(sender.session.fetch).not.toHaveBeenCalled();
+  await expect(handle({ sender, senderFrame: frame } as any, 'test', { value: 'x'.repeat(5000) })).rejects.toThrow('too large');
+});
+
 it('restricts the bridge to the configured service origin and known actions', () => {
   expect(getFeishuRequestUrl('https://connect.example', 'test')).toBe('https://connect.example/api/feishu/test');
   for (const root of ['', 'http://remote.example', 'https://user:password@example.com', 'https://example.com/other']) {

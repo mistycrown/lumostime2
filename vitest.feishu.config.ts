@@ -10,6 +10,6 @@ export default defineConfig({
   test: {
     environment: 'node',
     execArgv: ['--experimental-sqlite'],
-    include: ['server/feishu/*.test.ts', 'scripts/feishu*.test.ts', 'electron/feishuConnection.test.ts', 'src/services/feishuCalendarClient.test.ts', 'src/utils/feishu*.test.ts', 'src/components/FeishuConnectionPanel.test.tsx', 'src/views/settings/FeishuCalendarSettingsView.test.tsx']
+    include: ['server/feishu/*.test.ts', 'scripts/feishu*.test.ts', 'electron/feishu*.test.ts', 'src/services/feishu*.test.ts', 'src/services/feishu/*.test.ts', 'src/utils/feishu*.test.ts', 'src/components/FeishuConnectionPanel.test.tsx', 'src/views/settings/FeishuCalendarSettingsView.test.tsx']
   }
 });

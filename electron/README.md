@@ -19,3 +19,5 @@ The `electron/` directory contains the main process and preload scripts for runn
 *   **Security**: Disables Web Security (`webSecurity: false`) to allow WebDAV access across origins (critical for the Sync feature).
 *   **IPC**: Sets up handlers for inter-process communication, including desktop-widget action forwarding back into the main renderer (toggling tasks, opening details, and launching timer focus using the `start_focus` action), widget open/close routes, and the dedicated quick-editor open/close plus payload-sync bridge used by the transparent external todo editor window.
 *   **Obsidian Export Helpers**: Writes Markdown files and copies referenced log images into the user-selected Obsidian attachments folder on desktop builds.
+
+2026-10-03: `feishuPersonalConnection.ts` runs private-app registration, device authorization and calendar imports locally in the main process. The trusted IPC bridge never returns application secrets or access/refresh tokens. AES-GCM SQLite uses a random key encrypted by OS-backed `safeStorage`; insecure storage is refused. Packaged desktop connections no longer require a public application or a remote service root.

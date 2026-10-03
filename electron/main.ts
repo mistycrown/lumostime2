@@ -20,6 +20,7 @@
  * @updated 2026-05-17: Added a dedicated desktop today-widget and monthly-widget windows with persisted bounds, main-renderer action forwarding, and widget open/close IPC handlers for Electron builds.
  * @updated 2026-04-09: Added Obsidian image attachment export IPC handler for desktop builds.
  *
+ * @updated 2026-10-03: Runs personal Feishu app creation and calendar authorization in the main process with OS-protected local persistence.
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { app, BrowserWindow, Menu, Tray, ipcMain, screen, shell, type MenuItemConstructorOptions } from 'electron';
@@ -29,6 +30,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFeishuConnection } from './feishuConnection';
+import { createPersonalFeishuExecutor } from './feishuPersonalConnection';
+
+// Personal Feishu connections execute in the main process with encrypted local persistence.
 
 type DesktopWidgetMainAction =
   | { type: 'open_todo'; todoId: string }
@@ -1458,7 +1462,7 @@ async function createTodoQuickEditorWindow() {
 
 app.whenReady().then(() => {
   registerFeishuConnection(() => mainWindow, process.env.LUMOS_FEISHU_SERVICE_URL || VITE_DEV_SERVER_URL || '',
-    buildRendererUrl());
+    buildRendererUrl(), createPersonalFeishuExecutor);
   createTray();
   if (didLaunchFromLoginItem && process.platform === 'win32') {
     console.info('[Electron] Started from login item; opening main window for renderer hydration and widget restore.');

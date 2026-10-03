@@ -2,6 +2,8 @@
 
 ## run-feishu-server.mjs
 
+2026-10-03：默认服务改为专属应用设备流程，不再要求公共 App ID/Secret 或授权回调。开发服务自动保存固定加密密钥；生产仍需维护者提供持久化存储和加密密钥。Electron 本机主进程直连无需该服务。`check-feishu-personal.mjs` 可检查真实注册入口，只输出阶段和官方网页来源，不打印设备码或创建应用；运行 `node --experimental-sqlite --experimental-strip-types scripts/check-feishu-personal.mjs`。下方 2026-10-02 的公共应用配置仅用于旧模式兼容。
+
 2026-10-02：`npm run dev` 通过 `feishu-dev-service.mjs` 自动准备本机飞书 API（默认 3003）：复用已运行的服务，或启动并清理自己创建的子进程。配置远端服务时不启动本地 API，构建/预览也不会启动。`npm run feishu:dev` 可单独联调，`npm run feishu:start` 强制生产配置校验并支持托管平台 `PORT`。需要 Node 22.12+、维护者注册的飞书应用及持久化加密 SQLite。服务未配置时只返回未开通状态，不生成假的授权链接。部署配置见 [飞书日历授权说明](../docs/feishu-calendar-test.md)。
 
 ## optimize-images.js

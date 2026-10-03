@@ -2,7 +2,8 @@
  * @file feishuLogImport.ts
  * @input Ready actual logs, activity categories, linked todos/scopes and an inclusive local date range.
  * @output Category-routed import records with formatted notes, attributes, ratings, links and Log IDs.
- * @updated 2026-10-03: Includes human-readable metadata in calendar descriptions without silent truncation.
+ * @updated 2026-10-03: Includes complete metadata and previously imported IDs whose edited time left the selected range.
+ * @updated 2026-10-03: Excludes selected categories before formatting or preparing uploads.
  * @pos Feishu import candidate selection.
  */
 import type { Category, Log } from '../types';
@@ -23,16 +24,21 @@ export interface FeishuImportBatch {
   records: FeishuImportRecord[];
   timezone: string;
   range: { startTime: number; endTimeExclusive: number };
+  sync?: boolean;
+  deleteIds?: string[];
+  ignoredCategoryIds?: string[];
 }
 
-export function prepareFeishuLogImport(logs: Log[], categories: Category[], range: FeishuImportRange, context: FeishuLogDescriptionContext = {}) {
+export function prepareFeishuLogImport(logs: Log[], categories: Category[], range: FeishuImportRange,
+  context: FeishuLogDescriptionContext & { includeLogIds?: ReadonlySet<string>; ignoredCategoryIds?: ReadonlySet<string> } = {}) {
   const bounds = getFeishuImportRangeBounds(range);
   const categoryMap = new Map(categories.map((category) => [category.id, category]));
   const seen = new Set<string>();
   const records: FeishuImportRecord[] = [];
   let excluded = 0;
   for (const log of logs) {
-    if (!Number.isFinite(log.startTime) || log.startTime < bounds.startTime || log.startTime >= bounds.endTimeExclusive) continue;
+    if (context.ignoredCategoryIds?.has(log.categoryId)) continue;
+    if (!Number.isFinite(log.startTime) || (log.startTime < bounds.startTime || log.startTime >= bounds.endTimeExclusive) && !context.includeLogIds?.has(log.id)) continue;
     const category = categoryMap.get(log.categoryId);
     if (log.isPlanned || !Number.isSafeInteger(log.startTime) || !Number.isSafeInteger(log.endTime)
       || Math.floor(log.endTime / 1000) <= Math.floor(log.startTime / 1000) || !category

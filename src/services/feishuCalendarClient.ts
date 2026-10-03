@@ -1,12 +1,16 @@
 /**
  * @file feishuCalendarClient.ts
- * @input Build-time service address and cookie-bound user connection.
+ * @input Desktop/Android local execution or a cookie-bound Web connection service.
  * @output OAuth status, category calendars, test events and manual Log batch import results.
- * @pos App integration client; Feishu tokens stay exclusively on the server.
- * @updated 2026-10-02: Distinguishes unavailable API responses from transport failures without asking users to configure services.
+ * @pos App integration client; Feishu credentials never enter UI responses.
+ * @updated 2026-10-03: Accepts private-app creation and device consent pages without exposing application credentials.
+ * @updated 2026-10-03: Reads complete sync catalogs and validates explicit update, move and deletion results.
+ * @updated 2026-10-03: Requires source-category metadata before planning filtered synchronization.
+ * @updated 2026-10-03: Uses local personal authorization on Android without a remote service address.
  */
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type { FeishuImportBatch } from '../utils/feishuLogImport';
+import type { FeishuImportedReference } from '../utils/feishuSyncPlan';
 
 export interface FeishuTestRequest { requestId: string; startTime: number; timezone: string; category?: FeishuImportBatch['categories'][number] }
 export interface FeishuTestResult {
@@ -25,7 +29,21 @@ export interface FeishuConnectionStatus {
   userName?: string;
   calendars?: { id: string; name: string }[];
   calendarId?: string;
+  connectionMode?: 'personal';
+  phase?: 'create' | 'authorize';
+  authorizationUrl?: string;
+  applicationId?: string;
   categoryCalendars?: { categoryId: string; categoryName: string; id: string; name: string; color: string }[];
+}
+
+export function validateFeishuAuthorizationUrl(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('飞书服务未返回有效的授权地址。');
+  const url = new URL(value);
+  const personalPage = url.origin === 'https://open.feishu.cn' && ['/page/launcher', '/page/cli'].includes(url.pathname);
+  const authorization = url.origin === 'https://accounts.feishu.cn'
+    && (url.pathname === '/open-apis/authen/v1/authorize' || url.pathname.startsWith('/oauth/'));
+  if ((!personalPage && !authorization) || url.username || url.password) throw new Error('飞书服务未返回有效的授权地址。');
+  return url.href;
 }
 export type FeishuAction = 'status' | 'connect' | 'calendar' | 'test' | 'import' | 'disconnect';
 
@@ -53,6 +71,11 @@ export async function requestFeishu(action: FeishuAction, body?: unknown): Promi
   try {
     if (window.feishuConnection) {
       const response = await window.feishuConnection.request(action, body);
+      status = response.status;
+      data = response.data;
+    } else if (Capacitor.getPlatform() === 'android') {
+      const { requestNativeFeishu } = await import('./feishuNativeConnection');
+      const response = await requestNativeFeishu(action, body);
       status = response.status;
       data = response.data;
     } else {
@@ -98,6 +121,8 @@ export async function getFeishuConnection(): Promise<FeishuConnectionStatus> {
   if (typeof data?.configured !== 'boolean' || !['disconnected', 'pending', 'connected', 'error', 'expired'].includes(data.status)) {
     throw new Error('飞书服务未返回有效的连接状态。');
   }
+  if (data.authorizationUrl !== undefined) validateFeishuAuthorizationUrl(data.authorizationUrl);
+  if (data.phase !== undefined && !['create', 'authorize'].includes(data.phase)) throw new Error('飞书服务未返回有效的连接阶段。');
   if (data.status === 'connected' && (typeof data.accountId !== 'string' || typeof data.calendarId !== 'string'
     || !Array.isArray(data.calendars) || !data.calendars.some((item: any) => item?.id === data.calendarId)
     || data.calendars.some((item: any) => !item || typeof item.id !== 'string' || typeof item.name !== 'string'))) {
@@ -112,14 +137,13 @@ export async function getFeishuConnection(): Promise<FeishuConnectionStatus> {
 
 export async function startFeishuAuthorization(): Promise<string> {
   const data = await requestFeishu('connect');
-  const url = new URL(data.authorizeUrl);
-  if (url.origin !== 'https://accounts.feishu.cn' || url.pathname !== '/open-apis/authen/v1/authorize' || url.username || url.password) {
-    throw new Error('飞书服务未返回有效的授权地址。');
-  }
+  const url = validateFeishuAuthorizationUrl(data.authorizeUrl);
   if ((await getFeishuConnection()).status !== 'pending') {
-    throw new Error('无法保存连接会话，请允许此站点的 Cookie 后重新连接。');
+    throw new Error(Capacitor.getPlatform() === 'android' || window.feishuConnection
+      ? '无法保存飞书本机连接，请检查系统安全存储后重新连接。'
+      : '无法保存连接会话，请允许此站点的 Cookie 后重新连接。');
   }
-  return url.href;
+  return url;
 }
 
 export async function testFeishuCalendar(request: FeishuTestRequest): Promise<FeishuTestResult> {
@@ -133,16 +157,44 @@ export async function testFeishuCalendar(request: FeishuTestRequest): Promise<Fe
 }
 
 export interface FeishuImportResult {
-  results: { id: string; status: 'created' | 'skipped' | 'failed'; error?: string }[];
+  results: { id: string; status: 'created' | 'updated' | 'moved' | 'deleted' | 'skipped' | 'failed'; error?: string }[];
   calendars: NonNullable<FeishuConnectionStatus['categoryCalendars']>;
 }
 
 export async function importFeishuLogs(batch: FeishuImportBatch): Promise<FeishuImportResult> {
   const data = await requestFeishu('import', batch);
-  const expected = new Set(batch.records.map((record) => record.id));
-  if (!Array.isArray(data?.results) || data.results.length !== batch.records.length || !Array.isArray(data.calendars)
-    || data.results.some((item: any) => !item || !expected.delete(item.id) || !['created', 'skipped', 'failed'].includes(item.status))) {
+  const expected = new Set([...batch.records.map((record) => record.id), ...(batch.deleteIds || [])]);
+  const deletes = new Set(batch.deleteIds || []);
+  if (expected.size !== batch.records.length + (batch.deleteIds?.length || 0)
+    || !Array.isArray(data?.results) || data.results.length !== expected.size || !Array.isArray(data.calendars)
+    || data.results.some((item: any) => !item || !expected.delete(item.id)
+      || !(batch.sync ? deletes.has(item.id) ? ['deleted', 'failed'] : ['created', 'updated', 'moved', 'skipped', 'failed']
+        : ['created', 'skipped', 'failed']).includes(item.status))) {
     throw new Error('导入结果未确认，请稍后重试核查。');
   }
   return data;
+}
+
+export async function getFeishuImportedLogs(range: FeishuImportBatch['range']): Promise<FeishuImportedReference[]> {
+  const records: FeishuImportedReference[] = [];
+  const seen = new Set<string>();
+  let after: string | undefined;
+  for (let page = 0; page < 1000; page++) {
+    const data = await requestFeishu('import', { operation: 'catalog', range, ...(after ? { after } : {}) });
+    if (!Array.isArray(data?.records) || data.records.length > 200 || data.records.some((record: any) => {
+      if (!record || typeof record.id !== 'string' || !/^[\w-]{1,128}$/.test(record.id)
+        || !Number.isSafeInteger(record.startTime) || seen.has(record.id)
+        || !Array.isArray(record.categoryIds) || !record.categoryIds.length
+        || record.categoryIds.some((id: unknown) => typeof id !== 'string' || !/^[\w-]{1,128}$/.test(id))
+        || new Set(record.categoryIds).size !== record.categoryIds.length) return true;
+      seen.add(record.id); return false;
+    }) || data.after !== undefined && (typeof data.after !== 'string' || !/^[\w-]{1,128}$/.test(data.after)
+      || !data.records.length || data.after !== data.records.at(-1).id || after && data.after <= after)) {
+      throw new Error('已同步记录清单不完整，已停止同步。');
+    }
+    records.push(...data.records);
+    if (data.after === undefined) return records;
+    after = data.after;
+  }
+  throw new Error('已同步记录过多，已停止同步。');
 }
