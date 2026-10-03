@@ -4,7 +4,7 @@
  * @output User authorization, category calendars, explicit test/Log imports and eight-digit date range.
  * @pos Settings / Data and Sync.
  * @description Polls authorization status only while waiting; never automatically imports events.
- * @updated 2026-10-02: Always-visible OAuth entry, automatic category calendars, manual Log import and eight-digit date inputs.
+ * @updated 2026-10-03: Exports log attributes, ratings and resolved todo/scope names in calendar descriptions.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -22,8 +22,8 @@ import { FeishuConnectionPanel } from '../../components/FeishuConnectionPanel';
 const PENDING_KEY = 'lumos_feishu_pending_test';
 
 export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { categories, isReady: categoriesReady } = useCategoryScope();
-  const { logs, isReady: logsReady, usesFallbackSeedData } = useData();
+  const { categories, scopes, isReady: categoriesReady } = useCategoryScope();
+  const { logs, todos, isReady: logsReady, usesFallbackSeedData } = useData();
   const [connection, setConnection] = useState<FeishuConnectionStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -147,7 +147,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
   const handleImport = () => void perform(async () => {
     if (connection?.status !== 'connected') throw new Error('请先连接飞书。');
     if (!logsReady || !categoriesReady || usesFallbackSeedData) throw new Error('本地记录尚未准备好，请稍后重试。');
-    const candidates = prepareFeishuLogImport(logs, categories, importRange);
+    const candidates = prepareFeishuLogImport(logs, categories, importRange, { todos, scopes });
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
     const summary = { created: 0, skipped: 0, failed: 0, processed: 0, total: candidates.records.length, errors: [] as string[] };
     setImportSummary({ ...summary });
@@ -170,7 +170,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
 
   let rangeError = '';
   let importCandidates: ReturnType<typeof prepareFeishuLogImport> | null = null;
-  try { getFeishuImportRangeBounds(importRange); importCandidates = prepareFeishuLogImport(logs, categories, importRange); }
+  try { getFeishuImportRangeBounds(importRange); importCandidates = prepareFeishuLogImport(logs, categories, importRange, { todos, scopes }); }
   catch (failure) { rangeError = failure instanceof Error ? failure.message : '请选择有效的日期范围。'; }
   const timeLabel = (time: number) => new Date(time).toLocaleString('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: result?.timezone

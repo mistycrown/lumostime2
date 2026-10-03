@@ -1,5 +1,7 @@
 # Utils Architecture
 
+> Update 2026-10-03: `feishuLogDescription.ts` formats calendar notes into note/attribute/rating/link/source sections, resolves saved options and linked entity names, preserves deleted references by ID, and rejects descriptions over 12000 characters without truncation. `feishuLogImport.ts` includes this metadata for new calendar events while excluding images/comments.
+
 > Update 2026-10-02: `feishuImportRange.ts` accepts eight-digit dates, resolves Monday-based week/full-month presets and validates inclusive local dates as half-open timestamp bounds. `feishuLogImport.ts` filters actual records and prepares minimal category descriptors and event data for explicit import.
 
 > Update 2026-10-02: `lazyViews.ts` adds the Feishu calendar test settings subpage without preloading or triggering any calendar requests.
