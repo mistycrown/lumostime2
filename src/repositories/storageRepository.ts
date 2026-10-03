@@ -4,13 +4,16 @@
  * @output Unified async storage repository for structured application data
  * @pos Repository (Persistence Infrastructure)
  * @description Provides a single async key-value storage abstraction backed by IndexedDB, with localStorage fallback for unsupported environments.
+ * @updated 2026-10-03: Atomically saves data with synchronization metadata; fallback batches recover from a write-ahead journal.
  */
 export type StorageNamespace = 'data' | 'meta';
+export interface StorageWrite { namespace: StorageNamespace; key: string; value: unknown }
 
 export interface AsyncStorageRepository {
   get<T>(namespace: StorageNamespace, key: string): Promise<T | null>;
   set<T>(namespace: StorageNamespace, key: string, value: T): Promise<void>;
   remove(namespace: StorageNamespace, key: string): Promise<void>;
+  setBatch(writes: StorageWrite[]): Promise<void>;
 }
 
 const DB_NAME = 'lumostime_app_storage';
@@ -18,6 +21,7 @@ const DB_VERSION = 1;
 const DATA_STORE = 'app_data';
 const META_STORE = 'app_meta';
 const LOCAL_FALLBACK_PREFIX = 'lumostime_repo';
+const BATCH_JOURNAL_KEY = `${LOCAL_FALLBACK_PREFIX}:batch-journal`;
 
 const buildFallbackKey = (namespace: StorageNamespace, key: string): string =>
   `${LOCAL_FALLBACK_PREFIX}:${namespace}:${key}`;
@@ -137,14 +141,42 @@ export class IndexedDbStorageRepository implements AsyncStorageRepository {
       };
     });
   }
+
+  async setBatch(writes: StorageWrite[]): Promise<void> {
+    if (!writes.length) return;
+    const db = await this.openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction([...new Set(writes.map((write) => this.getStoreName(write.namespace)))], 'readwrite');
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = transaction.onabort = () => reject(transaction.error || new Error('Batch persistence failed'));
+      try {
+        for (const write of writes) transaction.objectStore(this.getStoreName(write.namespace)).put({ key: write.key, value: write.value });
+      } catch (error) {
+        // Synchronous structured-clone errors do not automatically abort earlier queued puts.
+        transaction.abort();
+        reject(error);
+      }
+    });
+  }
 }
 
 export class LocalStorageFallbackRepository implements AsyncStorageRepository {
+  private recoverBatch(): void {
+    const raw = localStorage.getItem(BATCH_JOURNAL_KEY);
+    if (!raw) return;
+    const writes = JSON.parse(raw) as StorageWrite[];
+    if (!Array.isArray(writes) || writes.some((write) => !write || !['data', 'meta'].includes(write.namespace) || typeof write.key !== 'string')) {
+      throw new Error('Invalid persistence journal');
+    }
+    for (const write of writes) localStorage.setItem(this.buildKey(write.namespace, write.key), JSON.stringify(write.value));
+    localStorage.removeItem(BATCH_JOURNAL_KEY);
+  }
   private buildKey(namespace: StorageNamespace, key: string): string {
     return buildFallbackKey(namespace, key);
   }
 
   async get<T>(namespace: StorageNamespace, key: string): Promise<T | null> {
+    this.recoverBatch();
     const raw = localStorage.getItem(this.buildKey(namespace, key));
     if (!raw) {
       return null;
@@ -159,11 +191,20 @@ export class LocalStorageFallbackRepository implements AsyncStorageRepository {
   }
 
   async set<T>(namespace: StorageNamespace, key: string, value: T): Promise<void> {
+    this.recoverBatch();
     localStorage.setItem(this.buildKey(namespace, key), JSON.stringify(value));
   }
 
   async remove(namespace: StorageNamespace, key: string): Promise<void> {
+    this.recoverBatch();
     localStorage.removeItem(this.buildKey(namespace, key));
+  }
+
+  async setBatch(writes: StorageWrite[]): Promise<void> {
+    this.recoverBatch();
+    // Persist the whole intent before touching either dataset. Readers finish interrupted batches.
+    localStorage.setItem(BATCH_JOURNAL_KEY, JSON.stringify(writes));
+    this.recoverBatch();
   }
 }
 
@@ -263,6 +304,11 @@ export class StorageRepository {
 
   async removeMeta(key: string): Promise<void> {
     await this.runWithFallback((backend) => backend.remove('meta', key));
+  }
+
+  async setBatch(writes: StorageWrite[]): Promise<void> {
+    // Never split an existing IndexedDB dataset across backends after a failed transaction.
+    await this.getBackend().setBatch(writes);
   }
 }
 

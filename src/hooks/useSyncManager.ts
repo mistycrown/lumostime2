@@ -1,5 +1,6 @@
 /**
  * @file useSyncManager.ts
+ * @updated 2026-10-03: Marks restored log snapshots so automatic calendar sync cannot infer mass deletions.
  * @input Live application contexts, cloud provider configuration, and data/lifecycle events
  * @output Versioned cloud handoff, manual overrides, conflict choices, and sync status
  * @pos Hook (System Integration)
@@ -21,6 +22,7 @@ import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
 import { assistantBackupService } from '../services/assistantBackupService';
 import { aiChatStorageService } from '../services/aiChatStorageService';
+import { markFeishuLogReplacement } from '../services/feishuAutoSyncStore';
 import { appearanceBackupService } from '../services/appearanceBackupService';
 import { MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT } from '../services/moodCalendarBackgroundService';
 import {
@@ -199,7 +201,10 @@ export const useSyncManager = () => {
                 currentView
             });
 
-            if (hasField('logs')) setLogs(data.logs);
+            if (hasField('logs')) {
+                markFeishuLogReplacement(data.logs);
+                setLogs(data.logs);
+            }
             if (hasField('categories')) setCategories(data.categories);
             if (hasField('todos')) setTodos(data.todos);
             if (hasField('todoCategories')) setTodoCategories(data.todoCategories);

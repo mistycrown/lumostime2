@@ -1,5 +1,7 @@
 # Settings Views
 
+2026-10-03：飞书日历页增加本机、按账号保存的自动同步开关、队列状态与立即同步；历史手动同步保留，忽略分类偏好同时影响全局自动调度。
+
 `src/views/settings/` contains full-screen settings subviews extracted from the main `SettingsView.tsx`.
 
 ## Updates
