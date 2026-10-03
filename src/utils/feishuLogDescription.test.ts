@@ -1,7 +1,7 @@
 /**
  * @file feishuLogDescription.test.ts
  * @input Saved logs with text/choice/numeric attributes, ratings and linked entities.
- * @output Description completeness, readable layout and deleted-reference/length regressions.
+ * @output Compact references without entity IDs, preserved metadata and deleted-reference/length regressions.
  * @pos Feishu calendar formatting tests.
  */
 import { expect, it } from 'vitest';
@@ -32,25 +32,26 @@ it('exports every requested field with readable names, units and section spacing
     '【备注】\n读完第二章。\n明天继续。',
     '【属性】\n• 书名：设计心理学\n• 阅读方式：纸质书\n• 主题：设计、心理学\n• 阅读页数：12 页',
     '【状态】\n专注度：4 / 5\n情绪度：5 / 5',
-    '【关联】\n关联待办：读完这本书\n待办 ID：todo-1\n\n关联领域：\n• 个人成长（ID：growth）\n• 健康（ID：health）\n\n本次进度：12',
-    '【记录来源】\nLumosTime\n分类：工作\n标签：阅读\nLog ID：log-1'
+    '@读完这本书\n%个人成长\n%健康\n#阅读\n本次进度：12'
   ].join('\n\n'));
 });
 
-it('keeps missing and archived references traceable and preserves numeric zero', () => {
+it('labels missing references without exposing their IDs and preserves archived attributes and numeric zero', () => {
   const result = formatFeishuLogDescription({ ...log, linkedTodoId: 'removed-todo', scopeIds: ['removed-scope', 'removed-scope'],
     attributeValues: [{ attributeId: 'pages', value: 0 }, { attributeId: 'mode', optionId: 'removed-option' }, { attributeId: 'removed-attribute', value: '旧内容' }] }, category, category.activities[0]);
   expect(result).toContain('阅读页数：0 页');
   expect(result).toContain('阅读方式：选项（removed-option）');
   expect(result).toContain('属性（removed-attribute）：旧内容');
-  expect(result).toContain('关联待办：已删除或不可用\n待办 ID：removed-todo');
-  expect(result.match(/ID：removed-scope/g)).toHaveLength(1);
+  expect(result).toContain('@已删除或不可用');
+  expect(result.match(/%已删除或不可用/g)).toHaveLength(1);
+  expect(result).not.toMatch(/removed-todo|removed-scope|Log ID|记录来源/);
 });
 
 it('omits empty sections and invalid ratings without inventing missing scores or links', () => {
   const result = formatFeishuLogDescription({ ...log, note: '  ', focusScore: 0, moodScore: NaN,
     attributeValues: [{ attributeId: 'book', value: '' }, { attributeId: 'pages', value: Infinity }] }, category, category.activities[0]);
-  expect(result).toBe('【记录来源】\nLumosTime\n分类：工作\n标签：阅读\nLog ID：log-1');
+  expect(result).toBe('#阅读');
+  expect(formatFeishuLogDescription(log, category)).toBe('');
 });
 
 it('keeps long notes beyond the old 2000-character cap and rejects oversized descriptions without truncating metadata', () => {
@@ -58,6 +59,6 @@ it('keeps long notes beyond the old 2000-character cap and rejects oversized des
   const result = formatFeishuLogDescription({ ...log, note, moodScore: 3, linkedTodoId: 'todo-1' }, category, category.activities[0]);
   expect(result).toContain(note);
   expect(result).toContain('情绪度：3 / 5');
-  expect(result).toContain('Log ID：log-1');
+  expect(result).not.toContain(log.id);
   expect(() => formatFeishuLogDescription({ ...log, note: '文'.repeat(FEISHU_LOG_DESCRIPTION_LIMIT) }, category)).toThrow('超过 12000 字符');
 });

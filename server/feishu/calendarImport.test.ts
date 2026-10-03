@@ -59,10 +59,12 @@ it('sends formatted log metadata intact and reconciles its source marker without
   call.mockResolvedValueOnce({ items: [], has_more: false }).mockResolvedValueOnce({ event: { event_id: 'metadata-event' } });
   expect((await importer.run('alice', request, call)).results[0].status).toBe('created');
   const description = call.mock.calls.at(-1)![2].description;
-  for (const content of [longNote, '页数：0 页', '专注度：4 / 5', '情绪度：3 / 5', '完成阅读', '个人成长', 'Log ID：log-1']) {
+  for (const content of [longNote, '页数：0 页', '专注度：4 / 5', '情绪度：3 / 5', '@完成阅读', '%个人成长', '#阅读']) {
     expect(description).toContain(content);
   }
   expect(description.endsWith('\n\n[LumosTime:log:log-1]')).toBe(true);
+  expect(description.match(/log-1/g)).toHaveLength(1);
+  expect(description).not.toMatch(/todo-1|growth|待办 ID|关联待办|关联领域|记录来源|Log ID/);
   // Another installation has no local ledger; the readable layout must keep remote deduplication working.
   const otherStore = new OAuthStore(':memory:', randomBytes(32).toString('base64'));
   try {
