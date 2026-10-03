@@ -1,6 +1,6 @@
 ﻿/**
  * @file dataRepository.ts
- * @updated 2026-10-03: Commits logs with the Feishu outbox and notifies the scheduler after dependent datasets persist.
+ * @updated 2026-10-03: Commits logs with the Feishu outbox, distinguishes first-install snapshots, and notifies after dependent datasets persist.
  * @input Legacy localStorage keys, IndexedDB-backed storage repository, application defaults
  * @output Unified domain repository for heavy core data and one-time localStorage migration
  * @pos Repository (Application Data)
@@ -119,6 +119,7 @@ const MIGRATION_DEFINITIONS: MigrationDefinition[] = [
 
 export interface DataContextSnapshot {
   logs: Log[];
+  hasStoredLogs: boolean;
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   collections: DataCollection[];
@@ -321,6 +322,7 @@ export class DataRepository {
 
     return {
       logs,
+      hasStoredLogs: storedLogs !== null,
       todos,
       todoCategories,
       collections,

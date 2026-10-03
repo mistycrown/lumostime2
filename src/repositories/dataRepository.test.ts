@@ -88,6 +88,7 @@ describe('DataRepository', () => {
     const snapshot = await dataRepository.loadDataContextSnapshot();
 
     expect(snapshot.logs).toEqual(logs);
+    expect(snapshot.hasStoredLogs).toBe(true);
     expect(snapshot.todos).toEqual(todos);
     expect(snapshot.todoCategories).toEqual(todoCategories);
     expect(snapshot.usesFallbackSeedData).toBe(false);
@@ -133,6 +134,7 @@ describe('DataRepository', () => {
     const snapshot = await dataRepository.loadDataContextSnapshot();
 
     expect(snapshot.logs).toEqual(existingLogs);
+    expect(snapshot.hasStoredLogs).toBe(true);
     expect(snapshot.usesFallbackSeedData).toBe(true);
     expect(await repository.getData(REPOSITORY_KEYS.LOGS)).toEqual(existingLogs);
   });
@@ -145,6 +147,7 @@ describe('DataRepository', () => {
 
     expect(snapshot.usesFallbackSeedData).toBe(true);
     expect(snapshot.logs.length).toBeGreaterThan(0);
+    expect(snapshot.hasStoredLogs).toBe(false);
     expect(snapshot.todos.length).toBeGreaterThan(0);
     expect(snapshot.collections).toEqual([]);
     expect(snapshot.collectionEntries).toEqual([]);

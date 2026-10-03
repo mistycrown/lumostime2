@@ -26,4 +26,4 @@ npm run build
 npx cap sync android
 ```
 
-页面冒烟运行隐藏、隔离的 Electron Chromium 和模拟 API，使用真实 React 设置页、DataProvider、IndexedDB 及全局调度。覆盖开关、IndexedDB 批量写入失败整体回滚、离开设置后的新增、编辑、删除、离线落盘、刷新恢复和关闭/重开。没有使用真实账号写日历，真实飞书与 Android 实机验收仍需实际操作。
+页面冒烟运行隐藏、隔离的 Electron Chromium 和模拟 API，使用真实 React 设置页、DataProvider、IndexedDB 及全局调度。覆盖首次安装数据初始化与演示数据保护、开关、IndexedDB 批量写入失败整体回滚、离开设置后的新增、编辑、删除、离线落盘、刷新恢复和关闭/重开。没有使用真实账号写日历，真实飞书与 Android 实机验收仍需实际操作。
