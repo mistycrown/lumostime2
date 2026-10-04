@@ -3,6 +3,7 @@
  * @input Renderer integration scenarios and in-memory cloud objects
  * @output Observable React contexts and isolated cloud/service adapters
  * @pos Test Support (Cloud Sync)
+ * @updated 2026-10-04: Models SettingsProvider reloading sticker metadata during appearance restoration.
  */
 import { useSyncExternalStore } from 'react';
 
@@ -83,6 +84,10 @@ export const appearanceBackupService = {
   buildBackupPayload: () => ({ storage: { theme: localStorage.getItem('test-theme') } }),
   applyBackupPayload: (data: any) => {
     if (data.storage?.theme) localStorage.setItem('test-theme', data.storage.theme);
+    update('settings', {
+      customStickerSets: JSON.parse(localStorage.getItem('lumostime_custom_sticker_sets_v2') || '[]'),
+      customStickers: JSON.parse(localStorage.getItem('lumostime_custom_stickers_v2') || '[]')
+    });
     window.dispatchEvent(new Event('color-scheme-changed'));
   },
   getReferencedImageFilenames: () => []

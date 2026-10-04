@@ -10,6 +10,7 @@
  * @updated 2026-09-27: Resolves the first packaged UI icon from both declared and archived asset paths for theme-card previews.
  * @updated 2026-09-27: Registers a package-owned card-background group on import so it shares the image sync lifecycle.
  * @updated 2026-09-27: Migrates stable theme sticker IDs to replacement image filenames during package updates.
+ * @updated 2026-10-04: Registers imported sticker resources without applying theme or picker preferences.
  * @updated 2026-09-28: Retains package images that remain referenced by independent user settings during deletion or replacement.
  * @updated 2026-09-30: Passes packaged font Blobs with their archive filenames to avoid Android synthetic File metadata failures.
  * @updated 2026-09-28: Supports retaining package resources after deleting a theme and resolving same-package reimports.
@@ -20,6 +21,7 @@ import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK } from './achievementBottleIconPac
 import { fontService } from './fontService';
 import { imageService } from './imageService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
+import { getStoredCustomStickerState } from './customStickerAssetService';
 import {
   parseThemePackage,
   type ThemePackageManifest
@@ -750,12 +752,18 @@ export const themePackageImportService = {
       }
 
       const registeredCardBackground = registerPackageCardBackgroundGroup(record);
+      const stickerState = getStoredCustomStickerState();
+      const registeredStickers = Array.isArray(record.manifest.config.stickers) && record.manifest.config.stickers.length > 0;
+      if (registeredStickers) {
+        storage.setJSON(CUSTOM_STICKER_SETS_KEY, stickerState.customStickerSets);
+        storage.setJSON(CUSTOM_STICKERS_KEY, stickerState.customStickers);
+      }
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(THEME_PACKAGE_IMPORTED_EVENT, {
           detail: { packageId: record.id, version: record.version }
         }));
-        if (existingRecord) {
+        if (existingRecord || registeredStickers) {
           window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
           window.dispatchEvent(new Event('stickerSetsChanged'));
           window.dispatchEvent(new Event('imageListChanged'));

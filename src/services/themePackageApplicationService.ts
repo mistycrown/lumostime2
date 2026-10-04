@@ -9,6 +9,7 @@
  * @updated 2026-09-27: Applies a single-image Memoir calendar background from theme packages.
  * @updated 2026-09-26: Applies achievement-bottle and other appearance settings from their manifest sections.
  * @updated 2026-09-26: Applies nested navigation icons, live background opacity, and refreshes packaged stickers.
+ * @updated 2026-10-04: Shares sticker resource construction with import and synchronization recovery.
  * @updated 2026-09-28: Applies complete 01-96 numbered UIIcon directories from theme packages.
  * @updated 2026-09-28: Scopes asset-based UIIcon IDs for retained-resource package copies.
  * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
@@ -34,7 +35,7 @@ import { navigationDecorationService } from './navigationDecorationService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { themePackageImportService, type ImportedThemePackageRecord } from './themePackageImportService';
 import { getUIIconTypeByNumber, uiIconService } from './uiIconService';
-import { normalizeCustomStickerState } from './customStickerAssetService';
+import { buildThemePackageStickerState, normalizeCustomStickerState } from './customStickerAssetService';
 import type { CustomStickerRecord, CustomStickerSetRecord } from '../types';
 import { CUSTOM_TIMEPAL_PREFIX } from '../constants/timePalConfig';
 import {
@@ -353,52 +354,12 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
   const config = record.manifest.config.stickers;
   if (!Array.isArray(config)) return;
 
-  const now = Date.now();
   const current = normalizeCustomStickerState(
     readArray<CustomStickerSetRecord>(CUSTOM_STICKER_SETS_KEY),
     readArray<CustomStickerRecord>(CUSTOM_STICKERS_KEY)
   );
-  const importedSetIds = new Set<string>();
-  const importedSets: CustomStickerSetRecord[] = [];
-  const importedStickers: CustomStickerRecord[] = [];
-
-  config.forEach((rawSet, setIndex) => {
-    if (!rawSet || typeof rawSet !== 'object') return;
-    const set = rawSet as Record<string, unknown>;
-    const setId = getNamespacedId(record, `sticker-set-${String(set.id || setIndex)}`);
-    importedSetIds.add(setId);
-
-    const items = Array.isArray(set.items) ? set.items : [];
-    const stickers = items.slice(0, 16).flatMap((rawItem, itemIndex) => {
-      if (!rawItem || typeof rawItem !== 'object') return [];
-      const item = rawItem as Record<string, unknown>;
-      const imageFilename = getAssetFilename(record, item.file);
-      if (!imageFilename) return [];
-
-      return [{
-        id: getNamespacedId(record, `sticker-${String(set.id || setIndex)}-${String(item.id || itemIndex)}`),
-        setId,
-        imageFilename,
-        thumbnailFilename: `thumb_${imageFilename}`,
-        label: typeof item.name === 'string' ? item.name : undefined,
-        sortOrder: itemIndex,
-        status: 'active' as const,
-        createdAt: now,
-        updatedAt: now
-      }];
-    });
-
-    importedSets.push({
-      id: setId,
-      name: typeof set.name === 'string' ? set.name : record.name,
-      description: undefined,
-      stickerIds: stickers.map((item) => item.id),
-      status: 'active',
-      createdAt: now,
-      updatedAt: now
-    });
-    importedStickers.push(...stickers);
-  });
+  const { customStickerSets: importedSets, customStickers: importedStickers } = buildThemePackageStickerState(record);
+  const importedSetIds = new Set(importedSets.map(set => set.id));
 
   const otherSets = current.customStickerSets.filter((set) => !importedSetIds.has(set.id));
   const otherStickers = current.customStickers.filter((sticker) => !importedSetIds.has(sticker.setId));

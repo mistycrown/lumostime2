@@ -2,6 +2,7 @@
  * @file useSyncManager.ts
  * @updated 2026-10-03: Marks restored log snapshots so automatic calendar sync cannot infer mass deletions.
  * @updated 2026-10-04: Tracks modern navigation mode, background, and transparency changes for auto sync.
+ * @updated 2026-10-04: Persists restored sticker metadata before appearance listeners reload settings.
  * @input Live application contexts, cloud provider configuration, and data/lifecycle events
  * @output Versioned cloud handoff, manual overrides, conflict choices, and sync status
  * @pos Hook (System Integration)
@@ -223,8 +224,16 @@ export const useSyncManager = () => {
             if (hasField('onThisDayEntries')) setOnThisDayEntries(data.onThisDayEntries);
             if (hasField('customNarrativeTemplates')) setCustomNarrativeTemplates(data.customNarrativeTemplates);
             if (hasField('userPersonalInfo')) setUserPersonalInfo(data.userPersonalInfo ?? '');
-            if (hasField('customStickerSets')) setCustomStickerSets(data.customStickerSets ?? []);
-            if (hasField('customStickers')) setCustomStickers(data.customStickers ?? []);
+            if (hasField('customStickerSets')) {
+                const restoredSets = data.customStickerSets ?? [];
+                localStorage.setItem('lumostime_custom_sticker_sets_v2', JSON.stringify(restoredSets));
+                setCustomStickerSets(restoredSets);
+            }
+            if (hasField('customStickers')) {
+                const restoredStickers = data.customStickers ?? [];
+                localStorage.setItem('lumostime_custom_stickers_v2', JSON.stringify(restoredStickers));
+                setCustomStickers(restoredStickers);
+            }
             if (hasField('filters')) setFilters(normalizeFiltersOrder(data.filters));
             if (hasField('memoirFilterConfig') && data.memoirFilterConfig && typeof data.memoirFilterConfig === 'object') {
                 setMemoirFilterConfig((previous) => ({

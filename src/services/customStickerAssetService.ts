@@ -5,9 +5,12 @@
  * @description Centralizes custom sticker metadata parsing, slot normalization, and image reference calculation for picker rendering, sync manifests, and image cleanup.
  * @updated 2026-04-19: Added slot index metadata, normalization for legacy custom sticker state, and optional empty-set inclusion for the sticker set editor.
  * @updated 2026-10-02: Separates tag sticker groups from the general mood sticker picker while preserving shared assets.
+ * @updated 2026-10-04: Includes resources from every imported theme without requiring theme application.
  */
 
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview } from '../types';
+import { THEME_KEYS } from '../constants/storageKeys';
+import type { ImportedThemePackageRecord } from './themePackageImportService';
 
 const CUSTOM_STICKER_SETS_KEY = 'lumostime_custom_sticker_sets_v2';
 const CUSTOM_STICKERS_KEY = 'lumostime_custom_stickers_v2';
@@ -142,13 +145,68 @@ export const normalizeCustomStickerState = (
   };
 };
 
+export const buildThemePackageStickerState = (record: ImportedThemePackageRecord): {
+  customStickerSets: CustomStickerSetRecord[];
+  customStickers: CustomStickerRecord[];
+} => {
+  const customStickerSets: CustomStickerSetRecord[] = [];
+  const customStickers: CustomStickerRecord[] = [];
+  const config = record?.manifest?.config?.stickers;
+  if (typeof record?.id !== 'string' || !Array.isArray(config)) {
+    return { customStickerSets, customStickers };
+  }
+  const timestamp = record.updatedAt || record.importedAt || 0;
+  config.forEach((rawSet, setIndex) => {
+    if (!rawSet || typeof rawSet !== 'object') return;
+    const set = rawSet as Record<string, unknown>;
+    const setKey = String(set.id || setIndex);
+    const setId = `theme:${record.id}:sticker-set-${setKey}`;
+    const items = Array.isArray(set.items) ? set.items : [];
+    const stickers: CustomStickerRecord[] = items.slice(0, MAX_CUSTOM_STICKER_SLOTS).flatMap((rawItem, itemIndex) => {
+      if (!rawItem || typeof rawItem !== 'object') return [];
+      const item = rawItem as Record<string, unknown>;
+      const imageFilename = typeof item.file === 'string' ? record.imageAssets?.[item.file] : undefined;
+      if (!imageFilename) return [];
+      return [{
+        id: `theme:${record.id}:sticker-${setKey}-${String(item.id || itemIndex)}`,
+        setId, imageFilename, thumbnailFilename: `thumb_${imageFilename}`,
+        label: typeof item.name === 'string' ? item.name : undefined,
+        sortOrder: itemIndex, status: 'active' as const, createdAt: timestamp, updatedAt: timestamp
+      }];
+    });
+    customStickerSets.push({
+      id: setId, name: typeof set.name === 'string' ? set.name : record.name,
+      stickerIds: stickers.map(item => item.id), status: 'active', createdAt: timestamp, updatedAt: timestamp
+    });
+    customStickers.push(...stickers);
+  });
+  return { customStickerSets, customStickers };
+};
+
 export const getStoredCustomStickerState = (): {
   customStickerSets: CustomStickerSetRecord[];
   customStickers: CustomStickerRecord[];
-} => normalizeCustomStickerState(
-  safeParse<CustomStickerSetRecord[]>(localStorage.getItem(CUSTOM_STICKER_SETS_KEY), []),
-  safeParse<CustomStickerRecord[]>(localStorage.getItem(CUSTOM_STICKERS_KEY), [])
-);
+} => {
+  const current = normalizeCustomStickerState(
+    safeParse<CustomStickerSetRecord[]>(localStorage.getItem(CUSTOM_STICKER_SETS_KEY), []),
+    safeParse<CustomStickerRecord[]>(localStorage.getItem(CUSTOM_STICKERS_KEY), [])
+  );
+  const packages = safeParse<ImportedThemePackageRecord[]>(localStorage.getItem(THEME_KEYS.IMPORTED_THEME_PACKAGES), []);
+  const existingSetIds = new Set(current.customStickerSets.map(set => set.id));
+  if (Array.isArray(packages)) {
+    packages.forEach(record => {
+      const resources = buildThemePackageStickerState(record);
+      resources.customStickerSets.forEach(set => {
+        // Existing sets may contain user edits; only recover sets that were never registered.
+        if (existingSetIds.has(set.id)) return;
+        existingSetIds.add(set.id);
+        current.customStickerSets.push(set);
+        current.customStickers.push(...resources.customStickers.filter(sticker => sticker.setId === set.id));
+      });
+    });
+  }
+  return normalizeCustomStickerState(current.customStickerSets, current.customStickers);
+};
 
 export const buildCustomStickerViewSets = (
   customStickerSets: CustomStickerSetRecord[],
