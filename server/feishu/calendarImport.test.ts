@@ -3,6 +3,7 @@
  * @input Provider fixtures, actual log batches and encrypted SQLite persistence.
  * @output Coverage for category colors, reuse, cross-device dedupe and uncertain-write recovery.
  * @pos Formal Feishu import tests.
+ * @updated 2026-10-03: Verifies same-ID calendar renaming while preserving imported event deduplication.
  */
 import { randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

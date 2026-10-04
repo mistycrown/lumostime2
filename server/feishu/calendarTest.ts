@@ -40,7 +40,7 @@ export function calendarResourceError(path: string, status: number, code: unknow
   if ([191000, 191003].includes(code as number)) return new CalendarTestError('飞书分类日历已删除或不存在。', 404, true, 'calendar');
   if ([193001, 193003].includes(code as number)) return new CalendarTestError('飞书日程已删除或不存在。', 404, true, 'event');
   if (status === 404) return new CalendarTestError('飞书日历或日程已不存在。', 404, true,
-    /^calendars\/[^/?]+(?:\?|$)/.test(path) ? 'calendar' : 'event');
+    /^calendars\/[^/?]+(?:\/events)?(?:\?|$)/.test(path) ? 'calendar' : 'event');
   return null;
 }
 
@@ -89,7 +89,7 @@ export async function runCalendarTest(
     } catch {
       throw new CalendarTestError(stage === '创建'
         ? '日历已连通，但创建结果尚未确认。请使用原请求重试。'
-        : '无法连接飞书，请检查网络后重试。');
+        : '无法连接飞书，请检查服务端网络。');
     }
     const data = await response.json().catch(() => null);
     if (response.status === 429) throw new CalendarTestError('飞书请求过于频繁，请稍后重试。', 429, true);

@@ -265,6 +265,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
             <li>测试成功后，在飞书日历中查看测试日程。</li>
             <li>填写八位数字日期或选择快捷范围，点击“同步到飞书日历”，新增、更新、删除和分类迁移会一并处理。如果历史数据过多，建议先小批次实验，然后分批次导入，避免卡顿。</li>
             <li>可以在飞书日历中更改每一个日历分类的颜色，这样显示更清晰。</li>
+            <li>开启自动同步后，会从现在开始记录每一次log修改，但不会涉及历史记录</li>
           </ol>
         </details>
         <FeishuConnectionPanel connection={connection} busy={busy} onConnect={connect} onContinue={continueAuthorization} onDisconnect={() => void perform(async () => {
@@ -273,7 +274,7 @@ export const FeishuCalendarSettingsView: React.FC<{ onBack: () => void }> = ({ o
         <FeishuAutoSyncPanel connection={connection} ready={logsReady && categoriesReady && !usesFallbackSeedData} busy={busy} />
         {connection?.status === 'connected' && (
           <>
-            <p className="text-sm text-stone-600">按活动分类自动创建日历，并使用分类颜色。</p>
+            <p className="text-sm text-stone-600">按活动分类自动创建日历</p>
             <CustomSelect label="测试分类" value={selectedTestCategory?.id || ''} disabled={busy} renderDropdownInPortal
               options={testCategories.length ? testCategories.map((category) => ({
                 value: category.id, label: category.name,

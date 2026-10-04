@@ -8,7 +8,6 @@
  */
 import { CalendarTestError, isMissingCalendar } from './calendarTest.ts';
 import { OAuthStore, tokenHash } from './oauthStore.ts';
-
 import type { CalendarCall, CategoryCalendar, ImportCategory, ImportLedgerEntry, ImportRecord } from './calendarImport.ts';
 
 interface Location { calendarId: string; entry: ImportLedgerEntry }
@@ -66,7 +65,12 @@ export class FeishuCalendarSync {
     }
     // Remove the binding last. A restart at any earlier step can safely repeat cleanup.
     for (const calendar of this.dependencies.mappings(accountId)) {
-      if (calendar.id === calendarId) this.store.removeValue('category_calendars', tokenHash(`category:${accountId}:${calendar.categoryId}`));
+      if (calendar.id === calendarId) {
+        const key = tokenHash(`category:${accountId}:${calendar.categoryId}`);
+        // The saved calendar ID proves the previous creation finished, including an interrupted checkpoint.
+        this.store.removeValue('category_uncertain', key);
+        this.store.removeValue('category_calendars', key);
+      }
     }
   }
 

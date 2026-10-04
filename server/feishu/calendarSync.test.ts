@@ -3,6 +3,7 @@
  * @input Encrypted SQLite and a stateful calendar provider with injected failures.
  * @output Coverage for updates, explicit deletions, account isolation and resumable category migrations.
  * @pos Manual synchronization regression tests; no live Feishu writes.
+ * @updated 2026-10-03: Seeds canonical category calendar names for metadata reconciliation.
  */
 import { randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
