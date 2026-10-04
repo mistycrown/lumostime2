@@ -2,6 +2,7 @@
  * @file AIBackfillChatModal.tsx
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
+ * @updated 2026-10-04: Reuses background-created conversations after the user-active chat is deleted.
  * @pos Component (AI Integration)
  * @description Provides the shared AI workspace for chat, backfill, and todo creation. Sessions persist locally, persona style is configurable per session, and recent context can be toggled into the formal AI request path.
  * @updated 2026-09-21: Connects the homepage composer plus action to the shortcut options and recent-session context toggle.
@@ -100,7 +101,7 @@ import {
   formatAssistantLocalDateTime,
   normalizeAssistantDateTime
 } from '../utils/assistantTime';
-import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
+import { resolveAssistantBackgroundSession, resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import {
   ASSISTANT_CHAT_RESTORED_EVENT,
   notifyAIBackupDataChanged,
@@ -904,11 +905,13 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   } = useAIBackfillChatConversationHistory({ sessions, personas, personaMap });
 
   const reloadPersistedChatSessions = () => {
-    setSessions(normalizePersistedSessions(
+    const nextSessions = normalizePersistedSessions(
       aiChatStorageService.getSessions(),
       personas,
       getLocalDateStr
-    ));
+    );
+    setSessions(nextSessions);
+    return nextSessions;
   };
 
   useEffect(() => {
@@ -1005,7 +1008,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     try {
       const result = await AssistantAgent.listDiagnostics();
       const normalizedEntries = normalizeAssistantNativeDiagnostics(result.entries);
-      const backgroundTargetSessionId = resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id;
+      const backgroundTargetSessionId = resolveAssistantBackgroundSession(sessions)?.id;
       setAssistantNativeDiagnostics(normalizedEntries);
 
       const hydrationResult = assistantOrchestratorService.hydrateNativeCompletedReplies(normalizedEntries, {
@@ -1066,7 +1069,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, []);
 
   const getBackgroundTargetSession = useCallback((): AIChatSession | undefined => (
-    resolveLatestOrdinaryAssistantBackgroundSession(sessions)
+    resolveAssistantBackgroundSession(sessions)
   ), [sessions]);
 
   const buildAssistantReminderSummary = useCallback((): string | undefined => {

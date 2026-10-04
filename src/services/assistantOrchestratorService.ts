@@ -4,6 +4,7 @@
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
  * @description Orchestrates Android-first assistant system turns by loading structured memory, assembling a prompt, calling the existing AI service, and applying the resulting silent/message/reminder/memory actions back into local state.
+ * @updated 2026-10-04: Creates a conversation when background delivery loses its target and records the actual destination in call history.
  * @updated 2026-09-25: Returns persisted session/message targets with surfaced replies so unread AI entry points can navigate directly to the new message.
  * @updated 2026-09-14: Resolves notification display names directly from the configured persona name.
  * @updated 2026-09-04: Executes structured AI reminder removal actions in Web and native-background hydration paths.
@@ -60,7 +61,7 @@ import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
 import { dreamService } from './dreamService';
 import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
-import { resolveLatestOrdinaryAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
+import { resolveAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
 import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
@@ -228,20 +229,26 @@ const loadPersistedPersonaNameMap = (): Map<string, string> => {
 };
 
 const resolvePersistedTargetSession = (
-  targetSessionId?: string
+  targetSessionId?: string,
+  createIfMissing = false
 ): PersistedSessionResolution | null => {
-  const persistedSessions = loadPersistedSessions();
-  const sessions = persistedSessions.length > 0
-    ? persistedSessions
-    : [createFallbackPersistedSession()];
+  const sessions = loadPersistedSessions();
   const resolvedTargetSessionId = (
     targetSessionId
     && sessions.some((session) => session.id === targetSessionId)
   )
     ? targetSessionId
-    : resolveLatestOrdinaryAssistantBackgroundSession(sessions)?.id;
+    : resolveAssistantBackgroundSession(sessions)?.id;
   if (!resolvedTargetSessionId) {
-    return null;
+    if (!createIfMissing) {
+      return null;
+    }
+
+    const fallbackSession = createFallbackPersistedSession();
+    return {
+      sessions: [...sessions, fallbackSession],
+      resolvedTargetSessionId: fallbackSession.id
+    };
   }
 
   return {
@@ -629,7 +636,7 @@ const persistAssistantMessage = (
     return null;
   }
 
-  const resolved = resolvePersistedTargetSession(targetSessionId);
+  const resolved = resolvePersistedTargetSession(targetSessionId, true);
   if (!resolved) {
     return null;
   }
@@ -686,7 +693,7 @@ const persistUserMessage = (
     return null;
   }
 
-  const resolved = resolvePersistedTargetSession(targetSessionId);
+  const resolved = resolvePersistedTargetSession(targetSessionId, true);
   if (!resolved) {
     return null;
   }
@@ -1148,7 +1155,9 @@ export const assistantOrchestratorService = {
       ...(request.trigger.id ? { triggerId: request.trigger.id } : {}),
       triggerType: request.trigger.type,
       triggerText: request.trigger.text,
-      ...(request.targetSessionId ? { targetSessionId: request.targetSessionId } : {}),
+      ...((surfacedMessageLocation?.sessionId || request.targetSessionId)
+        ? { targetSessionId: surfacedMessageLocation?.sessionId || request.targetSessionId }
+        : {}),
       requestedAt: debug.requestedAt,
       completedAt: debug.completedAt,
       status: 'completed',
