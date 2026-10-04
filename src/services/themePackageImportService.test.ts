@@ -11,10 +11,12 @@
  * @updated 2026-09-28: Covers retaining package resources and resolving later same-package imports.
  * @updated 2026-09-30: Covers rollback when a packaged custom font cannot be registered.
  * @updated 2026-09-30: Ensures packaged fonts bypass Android's synthetic File constructor behavior.
+ * @updated 2026-10-04: Covers sticker registration on import without applying a theme.
  */
 
 import JSZip from 'jszip';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { THEME_KEYS } from '../constants/storageKeys';
 
 const {
   saveImage,
@@ -185,6 +187,24 @@ describe('themePackageImportService', () => {
     saveDailyReviews.mockClear();
     getSettingsReferencedImages.mockReset();
     getSettingsReferencedImages.mockReturnValue(new Set<string>());
+  });
+
+  it('registers sticker resources and refreshes the list without changing the active theme or picker defaults', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    saveImage.mockImplementation(async (blob: Blob) => `image-${await blob.text()}.webp`);
+    localStorage.setItem(THEME_KEYS.CURRENT_PRESET, 'default');
+    localStorage.setItem('lumostime_default_selector_page', 'emoji');
+    const { themePackageImportService } = await import('./themePackageImportService');
+    await themePackageImportService.importPackage(await createStickerPackage('1.0.0'));
+    const sets = JSON.parse(localStorage.getItem('lumostime_custom_sticker_sets_v2') || '[]');
+    const stickers = JSON.parse(localStorage.getItem('lumostime_custom_stickers_v2') || '[]');
+    expect(sets).toMatchObject([{ id: 'theme:sticker-upgrade:sticker-set-garden' }]);
+    expect(stickers).toMatchObject([{ imageFilename: 'image-sticker-1.0.0.webp' }]);
+    expect(localStorage.getItem(THEME_KEYS.CURRENT_PRESET)).toBe('default');
+    expect(localStorage.getItem('lumostime_default_selector_page')).toBe('emoji');
+    expect(localStorage.getItem('lumostime_sticker_selector_config')).toBeNull();
+    expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: 'stickerSetsChanged' }));
   });
 
   it('overwrites an existing package ID and removes its old image assets', async () => {

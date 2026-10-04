@@ -14,6 +14,7 @@
  * @updated 2026-09-22: Rehydrates persisted preference and Memoir filter state from cloud/export restore events.
  * @updated 2026-09-25: Added persisted new sticker selector layout configuration.
  * @updated 2026-09-26: Rehydrates custom sticker state after appearance restoration.
+ * @updated 2026-10-04: Loads all imported theme sticker resources independently of the selected theme.
  */
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import {
@@ -67,7 +68,7 @@ import {
     isLocalDataTimestampUpdateLocked,
     updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
-import { normalizeCustomStickerState } from '../services/customStickerAssetService';
+import { getStoredCustomStickerState } from '../services/customStickerAssetService';
 import {
     normalizeImmersiveTimerOrientation,
     type ImmersiveTimerOrientation
@@ -309,13 +310,7 @@ const buildInitialCustomStickerState = (): {
     customStickers: CustomStickerRecord[];
 } => {
     try {
-        const storedSets = localStorage.getItem('lumostime_custom_sticker_sets_v2');
-        const storedStickers = localStorage.getItem('lumostime_custom_stickers_v2');
-
-        return normalizeCustomStickerState(
-            storedSets ? JSON.parse(storedSets) : [],
-            storedStickers ? JSON.parse(storedStickers) : []
-        );
+        return getStoredCustomStickerState();
     } catch (error) {
         console.error('[SettingsContext] Failed to parse stored custom sticker state', error);
         return {

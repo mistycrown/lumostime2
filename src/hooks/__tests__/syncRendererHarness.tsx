@@ -4,6 +4,7 @@
  * @output Machine-readable integration results for the Electron test runner
  * @pos Test (Cloud Sync Renderer)
  * @updated 2026-10-04: Verifies modern navigation events schedule appearance uploads.
+ * @updated 2026-10-04: Verifies appearance restoration preserves synchronized sticker metadata.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -95,13 +96,21 @@ async function run() {
   check(state.data.logs[0].note === 'keep-local-edit', 'restore overwrote a new local edit');
   passed.push('restore aborts when local data changes during preparation');
 
-  cloud.files.set('lumostime_backup.json', { ...main(), logs: [{ id: 'cloud', startTime: 1, endTime: 2, note: 'remote-newer' }], syncRevision: 'remote-newer' });
+  const restoredStickerSets = [{ id: 'theme:unused:sticker-set-garden', name: 'Garden', stickerIds: ['flower'], status: 'active', createdAt: 1, updatedAt: 1 }];
+  const restoredStickers = [{ id: 'flower', setId: restoredStickerSets[0].id, imageFilename: 'flower.webp', sortOrder: 0, status: 'active', createdAt: 1, updatedAt: 1 }];
+  cloud.files.set('lumostime_backup.json', {
+    ...main(), logs: [{ id: 'cloud', startTime: 1, endTime: 2, note: 'remote-newer' }], syncRevision: 'remote-newer',
+    customStickerSets: restoredStickerSets, customStickers: restoredStickers
+  });
   await manager.handleConflictDownload();
   await until(() => manager.syncConflictModalState.isOpen, 'rechecked conflict');
   check(state.data.logs[0].note === 'keep-local-edit', 'stale conflict choice was applied');
   await waitIdle();
   await manager.handleConflictDownload();
   await until(() => state.data.logs[0].note === 'remote-newer' && !state.settings.isSyncing, 'restore committed');
+  check(JSON.stringify(state.settings.customStickerSets) === JSON.stringify(restoredStickerSets), 'appearance restore overwrote synchronized sticker sets');
+  check(JSON.stringify(state.settings.customStickers) === JSON.stringify(restoredStickers), 'appearance restore overwrote synchronized sticker images');
+  passed.push('appearance restoration preserves synchronized sticker metadata');
   const before = uploads();
   await delay(250);
   check(uploads() === before, 'restored data was uploaded again');

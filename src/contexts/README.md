@@ -3,3 +3,5 @@
 Contexts hydrate product state from repositories before enabling persistence. `DataContext.tsx` owns logs and todos; `CategoryScopeContext.tsx` owns categories and associated definitions.
 
 2026-10-03: Persisted log hydration is not written back as a user edit. Missing logs are initialized once on a fresh install. Subsequent changes use the repository's atomic log/outbox persistence path, avoiding automatic-calendar deletion intentions from a stale window's bootstrap snapshot.
+
+2026-10-04: `SettingsContext` initializes and rehydrates sticker state through the shared resource reader, including missing sets from every imported theme package. Cloud restore writes sticker metadata before triggering appearance rehydration, so incoming sets survive the refresh.
