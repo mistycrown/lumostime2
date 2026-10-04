@@ -3,6 +3,7 @@
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
+ * @updated 2026-10-04: Captures the quick-actions sheet height when opening the fixed-height main-task picker.
  * @updated 2026-10-04: Adds a main-task association shortcut beside duplicate with category and search selection.
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
  * @updated 2026-08-27: Clamp non-editing quick-actions titles to two lines so long task names do not push the action list down the sheet.
@@ -104,6 +105,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
+  const [parentPickerHeight, setParentPickerHeight] = useState(0);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
@@ -115,6 +117,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const isNoteCancelRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const noteInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const quickActionsSheetRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setIsDeleteConfirming(false);
@@ -485,6 +488,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       onClick={handleBackdropClick}
     >
       <div
+        ref={quickActionsSheetRef}
         className="w-full max-w-[26rem] overflow-y-auto overscroll-contain rounded-[2rem] border border-stone-200 bg-[#faf9f6] shadow-[0_26px_70px_rgba(15,23,42,0.14)]"
         style={{ maxHeight: 'calc(100vh - var(--app-safe-area-top) - env(safe-area-inset-bottom) - 4rem)' }}
         onPointerDown={(event) => event.stopPropagation()}
@@ -701,7 +705,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
                 {canLinkParent && (
                   <button
                     type="button"
-                    onClick={withActionGuard(() => setIsParentPickerOpen(true))}
+                    onClick={withActionGuard(() => {
+                      if (!quickActionsSheetRef.current) return;
+                      setParentPickerHeight(quickActionsSheetRef.current.getBoundingClientRect().height);
+                      setIsParentPickerOpen(true);
+                    })}
                     className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
                   >
                     <Link size={15} className="shrink-0 text-stone-400" />
@@ -791,6 +799,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           todo={todo}
           todos={todos}
           todoCategories={todoCategories}
+          sheetHeight={parentPickerHeight}
           onSelect={onLinkParent}
           onClose={() => setIsParentPickerOpen(false)}
         />

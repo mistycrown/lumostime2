@@ -3,6 +3,7 @@
  * @input Real quick-actions sheet, picker and save hook in an isolated renderer
  * @output Interaction regression results and narrow-screen capture checkpoints
  * @pos Test (Renderer)
+ * @updated 2026-10-04: Verifies the mobile picker shares the quick-actions sheet's bottom edge and keeps its height across filtering.
  * @updated 2026-10-04: Exercises category/search selection, cancellation, back and latest-data association.
  */
 import React from 'react';
@@ -70,13 +71,16 @@ async function run() {
   await capture('quick-actions');
   await click('关联到主任务');
   check(dialog()?.textContent?.includes('汉语拼音研究'), 'Main tasks missing');
+  const initialPickerHeight = dialog()!.getBoundingClientRect().height;
   await capture('parent-picker');
   await click('读书');
   check(!dialog()?.textContent?.includes('汉语拼音研究') && dialog()?.textContent?.includes('阅读计划'), 'Category filter failed');
   await search('拼音');
   check(dialog()?.textContent?.includes('未找到匹配的主任务'), 'Empty search state missing');
+  check(Math.abs(dialog()!.getBoundingClientRect().height - initialPickerHeight) < 1, 'Empty search results changed picker height');
   await click('全部');
   check(dialog()?.textContent?.includes('汉语拼音研究') && !dialog()?.textContent?.includes('阅读计划'), 'Cross-category search failed');
+  check(Math.abs(dialog()!.getBoundingClientRect().height - initialPickerHeight) < 1, 'Category switching changed picker height');
   passed.push('Category switching, Chinese search, empty results and all-category search');
 
   check(runRegisteredHardwareBackHandler(), 'Back was not consumed');
@@ -101,7 +105,10 @@ async function run() {
   check(Math.abs(a.top - b.top) < 1 && b.left >= a.right, 'Narrow-screen shortcuts are not on the same row');
   const bounds = dialog()!.getBoundingClientRect();
   check(bounds.left >= 0 && bounds.right <= window.innerWidth && bounds.bottom <= window.innerHeight, 'Picker exceeds viewport');
-  passed.push('Narrow-screen adjacent shortcut layout and bounded dialog');
+  const sheetBounds = duplicateButton.closest('[style]')!.getBoundingClientRect();
+  check(Math.abs(bounds.bottom - sheetBounds.bottom) < 1, 'Mobile picker is not aligned with the quick-actions bottom edge');
+  check(Math.abs(bounds.height - sheetBounds.height) < 1, 'Picker does not match the outer quick-actions sheet height');
+  passed.push('Narrow-screen adjacent shortcuts and bottom-aligned picker matching the fixed outer-sheet height');
 
   todos = todos.map((todo) => todo.id === source.id ? { ...todo, note: '最新备注' } : todo);
   await render();

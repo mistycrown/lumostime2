@@ -1,9 +1,11 @@
 /**
  * @file TodoParentPickerModal.tsx
- * @input Current todo, todo collection, categories and selection callbacks
+ * @input Current todo, todo collection, categories, captured sheet height and selection callbacks
  * @output Searchable, category-filtered main-task selection dialog
  * @pos Component
  * @description Lets quick actions associate an existing leaf task with a valid main task.
+ * @updated 2026-10-04: Keeps the captured outer-sheet height fixed across category and search changes.
+ * @updated 2026-10-04: Aligns the mobile picker with the quick-actions bottom sheet and its safe-area spacing.
  * @updated 2026-10-04: Added the main-task picker with category switching, search and back dismissal.
  */
 import React, { useEffect, useMemo, useState } from 'react';
@@ -16,12 +18,13 @@ interface TodoParentPickerModalProps {
   todo: TodoItem;
   todos: TodoItem[];
   todoCategories: TodoCategory[];
+  sheetHeight: number;
   onSelect: (parentTodoId: string) => void;
   onClose: () => void;
 }
 
 export const TodoParentPickerModal: React.FC<TodoParentPickerModalProps> = ({
-  todo, todos, todoCategories, onSelect, onClose
+  todo, todos, todoCategories, sheetHeight, onSelect, onClose
 }) => {
   const [categoryId, setCategoryId] = useState('');
   const [search, setSearch] = useState('');
@@ -41,7 +44,7 @@ export const TodoParentPickerModal: React.FC<TodoParentPickerModalProps> = ({
 
   return (
     <div
-      className="absolute inset-0 z-[131] flex items-center justify-center bg-[rgba(15,23,42,0.08)] px-4 py-12"
+      className="absolute inset-0 z-[131] flex items-end justify-center bg-[rgba(15,23,42,0.08)] px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-12 md:items-center md:pb-4"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
@@ -58,9 +61,10 @@ export const TodoParentPickerModal: React.FC<TodoParentPickerModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="todo-parent-picker-title"
-        className="flex max-h-full w-full max-w-[26rem] flex-col rounded-[1.75rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]"
+        className="flex max-h-full w-full max-w-[26rem] flex-col rounded-[2rem] border border-stone-200 bg-[#faf9f6] p-4 shadow-[0_22px_60px_rgba(15,23,42,0.18)]"
+        style={{ height: sheetHeight, maxHeight: 'calc(100vh - var(--app-safe-area-top) - env(safe-area-inset-bottom) - 4rem)' }}
       >
-        <div className="mb-4 flex items-center justify-between gap-3 px-1">
+        <div className="mb-4 flex shrink-0 items-center justify-between gap-3 px-1">
           <div>
             <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Link Main Task</div>
             <h2 id="todo-parent-picker-title" className="mt-1 text-base font-medium text-stone-800">关联到主任务</h2>
@@ -98,7 +102,7 @@ export const TodoParentPickerModal: React.FC<TodoParentPickerModalProps> = ({
           ))}
         </div>
 
-        <div className="min-h-0 overflow-y-auto overscroll-contain border-t border-stone-200">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-stone-200">
           {candidates.map((candidate) => {
             const isCurrent = candidate.id === todo.parentTodoId;
             return (
@@ -120,7 +124,7 @@ export const TodoParentPickerModal: React.FC<TodoParentPickerModalProps> = ({
             );
           })}
           {candidates.length === 0 && (
-            <div className="py-10 text-center text-sm text-stone-400">{search.trim() ? '未找到匹配的主任务' : '暂无可关联的主任务'}</div>
+            <div className="flex h-full items-center justify-center py-10 text-center text-sm text-stone-400">{search.trim() ? '未找到匹配的主任务' : '暂无可关联的主任务'}</div>
           )}
         </div>
       </div>
