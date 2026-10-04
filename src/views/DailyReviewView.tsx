@@ -2,6 +2,7 @@
  * @file DailyReviewView.tsx
  * @input Daily Review Data, Logs, Templates
  * @output Updated Review Data, Generated Narrative
+ * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
  * @pos View (Review System)
  * @description The interface for conducting a daily review. Supports answering template questions (Data/Guide tabs) and generating/editing an AI-assisted narrative summary.
  * @updated 2026-07-30: Reused shared daily check template expansion so disabled template items stay excluded on reload.
@@ -38,6 +39,7 @@ import { normalizeCheckItem } from '../utils/checkItemNormalizer';
 import { buildCheckCategorySyncMap, buildDailyCheckItems } from '../utils/dailyCheckUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 
 interface DailyReviewViewProps {
     review: DailyReview;
@@ -83,7 +85,7 @@ const getCountMetrics = (item: CheckItem) => {
 };
 
 export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
-    review,
+    review: savedReview,
     date,
     initialTab,
     templates,
@@ -96,11 +98,12 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     dailyReviews,
     customNarrativeTemplates,
     onDelete,
-    onUpdateReview,
+    onUpdateReview: saveReview,
     onGenerateNarrative,
     addToast,
     onOpenNewspaper
 }) => {
+    const { value: review, update: onUpdateReview, commit: commitReview, discard: discardReview } = useBufferedRecord(savedReview, saveReview);
     const { setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate } = useNavigation();
     const { openAIChat } = useAIChatWindow();
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'check');
@@ -166,6 +169,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         setAnswers(review.answers || []);
         setSummary(review.summary || '');
         setNarrative(review.narrative || '');
+        setMoodEmoji(review.moodEmoji);
     }, [review]);
 
     useEffect(() => {
@@ -408,7 +412,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
         setAnswers(newAnswers);
 
-        // 实时保存
+        // 保存到页面草稿，退出时提交
         const updatedReview = {
             ...review,
             answers: newAnswers,
@@ -579,7 +583,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         }
     };
 
-    // 自动保存手动叙事
+    // 更新手动叙事草稿
     const handleSummaryChange = (value: string) => {
         setSummary(value);
         
@@ -637,7 +641,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
         onUpdateReview(updatedReview);
     };
 
-    // 自动保存 AI 叙事
+    // 更新 AI 叙事草稿
     const handleNarrativeChange = (value: string) => {
         setNarrative(value);
 
@@ -666,6 +670,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     };
 
     const handleGenerateNewspaper = () => {
+        commitReview();
         openAIChat({
             targetDate: date,
             initialInputText: `小报 ${review.date}`
@@ -723,7 +728,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                     </h1>
                 </div>
                 <button
-                    onClick={onDelete}
+                    onClick={() => { discardReview(); onDelete(); }}
                     className="text-stone-400 hover:text-red-600 p-1 transition-colors"
                 >
                     <Trash2 size={20} />

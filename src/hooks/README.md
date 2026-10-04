@@ -1,5 +1,8 @@
 # Custom Hooks
 
+> Update 2026-10-04: `useBufferedRecord.ts` keeps editor changes local until exit or backgrounding, merges edited fields into the latest saved record, supports discard before deletion/completion, and preserves late AI results after navigation. Verify with `node scripts/test-buffered-editors.mjs`.
+
+
 > Update 2026-10-02: `useSyncManager.ts` now uses destination-specific version/content checkpoints and one automatic queue. Native/DOM callbacks read current React snapshots; edits during transfer remain pending; cloud restore waits for a React commit, and settings transfers share the same coordinator. Timestamp/JSON-size direction rules described in older entries below are superseded. See `../utils/cloud-sync.md` and run `node scripts/test-sync-renderer.mjs` for real React lifecycle regressions.
 
 > Update 2026-08-26: `useLogManager.ts` atomically replaces a source record with two proportional-progress segments after a confirmed split.

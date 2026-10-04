@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Save scope drafts on exit/backgrounding instead of on each keystroke.
  * @file ScopeDetailView.tsx
  * @updated 2026-08-06: Added archive and restore control for domains.
  * @updated 2026-08-26: Displays explicit archive status text beside the domain archive/restore action.
@@ -11,6 +12,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import React, { useMemo, useState } from 'react';
 import { Scope, Log, Category, TodoItem, Goal, MajorGoal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
@@ -85,7 +87,11 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     const customColors = useCustomColors();
     const { isGoalBatchManaging, setIsGoalBatchManaging } = useNavigation();
     const [activeTab, setActiveTab] = useState('时间线');
-    const [scope, setScope] = useState(initialScope);
+    const scopeDraft = useBufferedRecord(initialScope, onUpdate);
+    const scope = scopeDraft.value;
+    const setScope = (next: Scope | ((current: Scope) => Scope)) => {
+        scopeDraft.update(typeof next === 'function' ? next(scope) : next);
+    };
     const [displayDate, setDisplayDate] = useState(new Date());
     const [showArchived, setShowArchived] = useState(false); // 是否显示归档目标
     const [newKeyword, setNewKeyword] = useState(''); // 添加关键字输入
@@ -97,28 +103,6 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     // Analysis State
     const [analysisRange, setAnalysisRange] = useState<RangeType>('Month');
     const [analysisDate, setAnalysisDate] = useState(new Date());
-
-    // 实时保存：当 scope 状态变化时自动保存
-    React.useEffect(() => {
-        if (scope && initialScope) {
-            // 检查是否有实际变化
-            const hasChanges = 
-                scope.name !== initialScope.name ||
-                scope.icon !== initialScope.icon ||
-                scope.uiIcon !== initialScope.uiIcon ||
-                scope.description !== initialScope.description ||
-                scope.themeColor !== initialScope.themeColor ||
-                scope.enableFocusScore !== initialScope.enableFocusScore ||
-                scope.enableMoodScore !== initialScope.enableMoodScore ||
-                scope.isArchived !== initialScope.isArchived ||
-                JSON.stringify(scope.keywords) !== JSON.stringify(initialScope.keywords) ||
-                JSON.stringify(scope.noteTemplates || []) !== JSON.stringify(initialScope.noteTemplates || []);
-            
-            if (hasChanges) {
-                onUpdate(scope);
-            }
-        }
-    }, [scope]); // 只监听 scope 变化
 
     // Filter logs for this scope
     const scopeLogs = useMemo(
@@ -350,7 +334,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                     <label className="mb-2 block text-sm font-semibold text-stone-600">描述</label>
                                     <textarea
                                         value={scope.description || ''}
-                                        onChange={(e) => setScope(prev => ({ ...prev, description: e.target.value }))}
+                                        onChange={(event) => setScope(prev => ({ ...prev, description: event.target.value }))}
                                         className="min-h-[100px] w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3 text-[13px] text-stone-800 outline-none transition-colors focus:border-stone-400"
                                         rows={3}
                                         placeholder="简要描述这个领域..."

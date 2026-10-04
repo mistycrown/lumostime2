@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
  * @updated 2026-10-03: Runs Feishu synchronization in the main app and marks dataset resets as replacements.
  * @updated 2026-10-02: Routes settings transfers through the shared sync coordinator and blocks editing during cloud application.
@@ -1234,6 +1235,7 @@ const AppContent: React.FC = () => {
           <LazyViewRecoveryBoundary fallback={<OverlayFallback label="专注详情加载失败，请刷新后重试" />}>
             <React.Suspense fallback={<OverlayFallback label="正在加载专注详情..." />}>
               <FocusDetailView
+                key={session.id}
                 session={session}
                 todos={todos}
                 categories={categories}

@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
  * @updated 2026-08-28: Refreshes daily-check auto states whenever logs or filter context changes.
  * @input Application view state, shared data contexts, and route-level handlers
@@ -691,6 +692,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
         const view = (
             <DailyReviewView
+                key={review.id}
                 review={review}
                 date={currentReviewDate}
                 templates={reviewTemplates}
@@ -767,6 +769,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
         const view = (
             <WeeklyReviewView
+                key={review.id}
                 review={review}
                 weekStartDate={currentWeeklyReviewStart}
                 weekEndDate={currentWeeklyReviewEnd}
@@ -822,6 +825,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
         const view = (
             <MonthlyReviewView
+                key={review.id}
                 review={review}
                 monthStartDate={currentMonthlyReviewStart}
                 monthEndDate={currentMonthlyReviewEnd}
@@ -1134,6 +1138,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 if (!selectedScope) return null;
                 return (
                     <ScopeDetailView
+                        key={selectedScope.id}
                         scope={selectedScope}
                         logs={logs}
                         categories={categories}
