@@ -5,8 +5,8 @@
  * @pos Feishu synchronization tests; no live account writes.
  */
 import { randomBytes } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FeishuCalendarImport as SharedImport } from './calendarImport';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
+import { FeishuCalendarImport as SharedImport, type CalendarCall } from './calendarImport';
 import { CalendarTestError as SharedError, calendarResourceError as sharedResourceError } from './calendarTest';
 import { NativeConnectionStore } from './nativeStore';
 import { tokenHash } from './crypto';
@@ -29,10 +29,12 @@ for (const core of [
     makeImport: (store: any) => new ServerImport(store), Error: ServerError, resourceError: serverResourceError }
 ]) describe(core.name, () => {
   let store: ConnectionStore;
-  let importer: SharedImport | ServerImport;
+  let importer: Pick<SharedImport, 'prepare' | 'mappings'> & {
+    run: (accountId: string, request: unknown, call: CalendarCall) => Promise<any>;
+  };
   let remote: Map<string, any>;
   let events: Map<string, any>;
-  let call: ReturnType<typeof vi.fn>;
+  let call: Mock<CalendarCall>;
   let sequence: number;
   let blocked: Error | null;
   let patchFailure: boolean;
@@ -187,6 +189,26 @@ for (const core of [
     expect(core.resourceError('calendars/old-calendar', 404, 191000)).toMatchObject({ resource: 'calendar' });
     expect(core.resourceError('calendars/old-calendar/events/event', 403, 193003)).toMatchObject({ resource: 'event' });
     expect(core.resourceError('calendars/old-calendar/events/event', 404, undefined)).toMatchObject({ resource: 'event' });
+    expect(core.resourceError('calendars/old-calendar/events?page_size=500', 404, undefined)).toMatchObject({ resource: 'calendar' });
     expect(core.resourceError('calendars/old-calendar', 403, 191002)).toBeNull();
+  });
+
+  it('keeps using the replacement if a formerly deleted calendar reappears in the remote list', async () => {
+    seed(); const old = remote.get('old-calendar'); remote.delete('old-calendar');
+    await importer.run('alice', body(), call);
+    const replacement = importer.mappings('alice')[0].id;
+    // Simulate a lost binding after recovery with an old calendar restored by the user.
+    const savedReplacement = remote.get(replacement);
+    remote.clear(); remote.set('old-calendar', old); remote.set(replacement, savedReplacement);
+    store.removeValue('category_calendars', calendarKey);
+    expect((await importer.prepare('alice', category, call)).id).toBe(replacement);
+    expect(calendarWrites()).toHaveLength(1);
+  });
+
+  it('clears an interrupted uncertainty flag when the saved calendar ID is confirmed deleted', async () => {
+    seed(); store.setValue('category_uncertain', calendarKey, true); remote.delete('old-calendar');
+    expect((await importer.run('alice', body(), call)).results[0].status).toBe('created');
+    expect(store.getValue('category_uncertain', calendarKey)).toBeNull();
+    expect(calendarWrites()).toHaveLength(1);
   });
 });

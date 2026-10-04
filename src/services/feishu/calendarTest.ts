@@ -41,7 +41,7 @@ export function calendarResourceError(path: string, status: number, code: unknow
   if ([191000, 191003].includes(code as number)) return new CalendarTestError('飞书分类日历已删除或不存在。', 404, true, 'calendar');
   if ([193001, 193003].includes(code as number)) return new CalendarTestError('飞书日程已删除或不存在。', 404, true, 'event');
   if (status === 404) return new CalendarTestError('飞书日历或日程已不存在。', 404, true,
-    /^calendars\/[^/?]+(?:\?|$)/.test(path) ? 'calendar' : 'event');
+    /^calendars\/[^/?]+(?:\/events)?(?:\?|$)/.test(path) ? 'calendar' : 'event');
   return null;
 }
 

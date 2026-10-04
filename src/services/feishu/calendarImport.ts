@@ -104,7 +104,7 @@ export class FeishuCalendarImport {
         calendar = data.calendar ?? data;
       } catch (error) {
         // A missing calendar GET is definitive; permission/network failures must retain the binding.
-        if (!(error instanceof CalendarTestError && error.status === 404)) throw error;
+        if (!(error instanceof CalendarTestError && error.status === 404 && error.resource !== 'event')) throw error;
         calendar = { is_deleted: true };
       }
       if (calendar?.is_deleted) {
@@ -128,7 +128,8 @@ export class FeishuCalendarImport {
     for (let page = 0; page < 100; page++) {
       const data = await call(`calendars?page_size=100${pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : ''}`);
       if (!Array.isArray(data.calendar_list)) throw new CalendarTestError('无法核查分类日历，请稍后重试。');
-      found = data.calendar_list.find((item: any) => String(item.description || '').includes(marker) && ['owner', 'writer'].includes(item.role) && !item.is_deleted);
+      found = data.calendar_list.find((item: any) => String(item.description || '').includes(marker) && ['owner', 'writer'].includes(item.role) && !item.is_deleted
+        && !this.store.getValue<boolean>('deleted_calendars', tokenHash(`deleted:${accountId}:${item.calendar_id}`)));
       if (found || !data.has_more) break;
       if (!data.page_token || data.page_token === pageToken || page === 99) throw new CalendarTestError('无法完整核查分类日历，请稍后重试。');
       pageToken = data.page_token;
