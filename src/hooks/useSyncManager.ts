@@ -1,6 +1,7 @@
 /**
  * @file useSyncManager.ts
  * @updated 2026-10-03: Marks restored log snapshots so automatic calendar sync cannot infer mass deletions.
+ * @updated 2026-10-04: Tracks modern navigation mode, background, and transparency changes for auto sync.
  * @input Live application contexts, cloud provider configuration, and data/lifecycle events
  * @output Versioned cloud handoff, manual overrides, conflict choices, and sync status
  * @pos Hook (System Integration)
@@ -656,6 +657,7 @@ export const useSyncManager = () => {
             'sceneGroupsUpdated', 'sceneTimeSlotsUpdated', 'principleLibraryChanged', 'selfBeliefLibraryChanged',
             'routinesUpdated', 'color-scheme-changed', 'ui-icon-theme-changed',
             'lumostime:background-changed', 'navigationDecorationChange', 'navigationIconChange',
+            'navigationBackgroundChange', 'navigationBackgroundModeChange', 'navigationTransparencyChange',
             'timepal-type-changed', 'timepal-click-switch-changed', 'timepal-stage-thresholds-changed',
             'timepal-custom-changed', 'achievement-bottle-icon-packs-changed',
             'achievement-bottle-icon-pack-selection-changed'

@@ -1,3 +1,10 @@
+/**
+ * @file settingsImageReferenceService.test.ts
+ * @input Persisted settings image filenames
+ * @output Regression coverage for settings image references used by sync and cleanup
+ * @pos Test (Image Management)
+ * @updated 2026-10-04: Covers selected and unused modern navigation backgrounds and thumbnails.
+ */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { TIMEPAL_KEYS } from '../constants/storageKeys';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
@@ -106,6 +113,23 @@ describe('getSettingsReferencedImages', () => {
       'theme-sticker.webp',
       'thumb_theme-background.webp',
       'thumb_theme-sticker.webp'
+    ]);
+  });
+
+  it('keeps every modern navigation background even when the mode is disabled', () => {
+    localStorage.setItem('navigation_new_mode_enabled', 'false');
+    localStorage.setItem('navigation_new_background_custom_list', JSON.stringify([
+      { imageFilename: 'modern-navigation.png', url: 'blob:old-device' },
+      { imageFilename: 'unused-navigation.webp' },
+      { imageFilename: '' },
+      { url: '/preset.webp' }
+    ]));
+
+    expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
+      'modern-navigation.png',
+      'thumb_modern-navigation.png',
+      'thumb_unused-navigation.webp',
+      'unused-navigation.webp'
     ]);
   });
 

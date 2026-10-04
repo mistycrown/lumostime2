@@ -3,6 +3,7 @@
  * @input Real React hook renders with isolated contexts and cloud adapter
  * @output Machine-readable integration results for the Electron test runner
  * @pos Test (Cloud Sync Renderer)
+ * @updated 2026-10-04: Verifies modern navigation events schedule appearance uploads.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -55,6 +56,13 @@ async function run() {
   await until(() => main().appearanceData.storage.theme === 'new-theme' && !state.settings.isSyncing, 'appearance');
   check(main().logs[0].note === 'first', 'long-lived appearance listener uploaded old logs');
   passed.push('long-lived callbacks read latest React data');
+
+  for (const event of ['navigationBackgroundChange', 'navigationBackgroundModeChange', 'navigationTransparencyChange']) {
+    localStorage.setItem('test-theme', event);
+    window.dispatchEvent(new Event(event));
+    await until(() => main().appearanceData.storage.theme === event && !state.settings.isSyncing, event);
+  }
+  passed.push('modern navigation appearance events trigger automatic uploads');
 
   update('category', { majorGoals: [{ id: 'goal-1', title: 'new goal' }] });
   await until(() => main().majorGoals.length === 1 && !state.settings.isSyncing, 'major goals');
