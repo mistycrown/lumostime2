@@ -15,6 +15,7 @@
  * @updated 2026-09-28: Includes transparent navigation, chart palettes, and custom UI-icon theme names.
  * @updated 2026-09-29: Includes the global floating-button image background and scale.
  * @updated 2026-10-01: Includes the TimePal card seconds-visibility preference.
+ * @updated 2026-10-04: Backs up modern navigation settings and images, then hydrates and refreshes navigation on restore.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { fontService } from './fontService';
@@ -22,6 +23,12 @@ import { UI_ICON_CUSTOM_ASSETS_KEY, UI_ICON_CUSTOM_THEME_NAMES_KEY, uiIconServic
 import { colorSchemeService } from './colorSchemeService';
 import { backgroundService } from './backgroundService';
 import { navigationDecorationService } from './navigationDecorationService';
+import {
+  NAVIGATION_BACKGROUND_CHANGE_EVENT,
+  NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
+  NAVIGATION_TRANSPARENCY_CHANGE_EVENT,
+  navigationBackgroundService
+} from './navigationBackgroundService';
 import { NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from './navigationIconService';
 import { moodCalendarBackgroundService } from './moodCalendarBackgroundService';
 import { ACHIEVEMENT_BOTTLE_CUSTOM_ICON_PACKS_KEY } from './achievementBottleIconPackService';
@@ -46,6 +53,10 @@ const APPEARANCE_STORAGE_KEYS = [
   THEME_KEYS.NAVIGATION_DECORATION,
   'navigation_decoration_custom_settings',
   'navigation_decoration_custom_list',
+  'navigation_new_mode_enabled',
+  'navigation_new_background',
+  'navigation_new_background_custom_list',
+  'navigation_new_background_settings',
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
@@ -165,6 +176,11 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
     customDecorations.forEach((item) => addImageReference(referenced, item?.imageFilename));
   }
 
+  const customNavigationBackgrounds = parseJsonValue(snapshot, 'navigation_new_background_custom_list');
+  if (Array.isArray(customNavigationBackgrounds)) {
+    customNavigationBackgrounds.forEach((item) => addImageReference(referenced, item?.imageFilename));
+  }
+
   const customNavigationIcons = parseJsonValue(snapshot, 'navigation_icon_custom_list_v1');
   if (Array.isArray(customNavigationIcons)) {
     customNavigationIcons.forEach((item) => addImageReference(referenced, item?.imageFilename));
@@ -209,10 +225,20 @@ export const appearanceBackupService = {
     navigationDecorationService.setCurrentDecoration(restoredStorage[THEME_KEYS.NAVIGATION_DECORATION] || 'default');
     void backgroundService.hydrateImageBackedCustomBackgrounds();
     void navigationDecorationService.hydrateImageBackedCustomDecorations();
+    void navigationBackgroundService.hydrateCustomBackgrounds();
     void navigationIconService.hydrateCustomIcons();
     void moodCalendarBackgroundService.hydrateCustomBackgrounds();
 
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, {
+        detail: { enabled: navigationBackgroundService.isEnabled() }
+      }));
+      window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, {
+        detail: { backgroundId: navigationBackgroundService.getCurrentBackground() }
+      }));
+      window.dispatchEvent(new CustomEvent(NAVIGATION_TRANSPARENCY_CHANGE_EVENT, {
+        detail: { enabled: navigationBackgroundService.isTransparentNavigationEnabled() }
+      }));
       window.dispatchEvent(new Event(APPEARANCE_RESTORED_EVENT));
       window.dispatchEvent(new Event('timepal-type-changed'));
       window.dispatchEvent(new Event('timepal-click-switch-changed'));
