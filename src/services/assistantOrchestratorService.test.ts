@@ -4,6 +4,7 @@
  * @output Regression coverage for background assistant orchestration and native result hydration
  * @pos Test (Assistant Orchestrator)
  * @description Verifies reply/silent decisions, side effects, history, notifications, and native background hydration.
+ * @updated 2026-10-04: Covers creating and reusing background conversations after deletion, notification navigation, and silent outcomes.
  * @updated 2026-09-04: Added coverage for structured AI reminder removal and memory synchronization.
  * @updated 2026-09-03: Updated assistant config fixtures after removing the base polling interval.
  */
@@ -67,6 +68,7 @@ import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
 import AssistantAgent from '../plugins/AssistantAgentPlugin';
+import { aiChatStorageService } from './aiChatStorageService';
 
 type LocalStorageMock = {
   getItem: (key: string) => string | null;
@@ -542,6 +544,110 @@ describe('assistantOrchestratorService', () => {
     expect(persistedSessions.find((session: any) => session.id === 'ordinary-session')?.messages[1]?.content).toBe('写完了回来告诉我。');
     expect(persistedSessions.find((session: any) => session.id === 'template-session')?.messages).toHaveLength(1);
     expect(persistedSessions.find((session: any) => session.id === 'assistant-only-session')?.messages).toHaveLength(1);
+  });
+
+  it.each([{ sessions: [] }, { sessions: [{
+    id: 'template', title: 'Review', createdAt: 1, updatedAt: 1,
+    personaId: 'builtin-default', contextCacheEnabled: true,
+    templateMeta: { templateType: 'weekly_review' },
+    messages: [{ id: 'user', role: 'user', content: 'Review', createdAt: 1 }]
+  }] }])('creates and reuses a conversation after the active target is deleted (%j)', async ({ sessions }) => {
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify(sessions));
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockResolvedValue({
+      output: { mode: 'background', outcome: 'reply', assistantReply: 'Reminder message', memoryAction: 'no_update' },
+      debug: debugExchange
+    });
+    const request = {
+      trigger: { id: 'deleted-target-reminder', type: 'reminder_due' as const, source: 'system' as const,
+        createdAt: '2026-04-27T10:00:00.000Z', text: 'Reminder due' },
+      targetSessionId: 'deleted-session', showSystemNotification: true,
+      currentDateTime: '2026-04-27T18:00:00+08:00', defaultDate: '2026-04-27', todayTimelineSummary: 'timeline'
+    };
+    const first = await assistantOrchestratorService.runSystemTurn(request);
+    const second = await assistantOrchestratorService.runSystemTurn({
+      ...request, trigger: { ...request.trigger, id: 'next-reminder' }
+    });
+    const persisted = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persisted).toHaveLength(sessions.length + 1);
+    expect(persisted.slice(0, sessions.length)).toEqual(sessions);
+    const created = persisted[sessions.length];
+    expect(created.id).not.toBe('deleted-session');
+    expect(created).toMatchObject({ title: '新对话', personaId: 'builtin-default', contextCacheEnabled: true });
+    expect(created.messages.map((message: any) => message.content)).toEqual(['Reminder message', 'Reminder message']);
+    expect(first.targetSessionId).toBe(created.id);
+    expect(second.targetSessionId).toBe(created.id);
+    expect(AssistantAgent.showAssistantNotification).toHaveBeenCalledWith(expect.objectContaining({
+      targetSessionId: created.id, targetMessageId: first.persistedMessageId
+    }));
+    expect(assistantOrchestratorService.listBackgroundCallHistory()[0]).toMatchObject({
+      targetSessionId: created.id, persistedMessageId: second.persistedMessageId
+    });
+  });
+
+  it('does not create a conversation for a silent turn or a persona-name lookup', async () => {
+    expect(assistantOrchestratorService.getBackgroundPersonaDisplayName('deleted-session')).toBe('AI');
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockResolvedValue({
+      output: { mode: 'background', outcome: 'silent', memoryAction: 'no_update' }, debug: debugExchange
+    });
+    await assistantOrchestratorService.runSystemTurn({
+      trigger: { id: 'silent-no-session', type: 'checkin', source: 'system',
+        createdAt: '2026-04-27T10:00:00.000Z', text: 'Check in' },
+      currentDateTime: '2026-04-27T18:00:00+08:00', defaultDate: '2026-04-27', todayTimelineSummary: 'timeline'
+    });
+    expect(localStorage.getItem('lumostime_ai_chat_sessions_v1')).toBeNull();
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+  });
+
+  it('creates a new destination if the targeted conversation is deleted while AI is responding', async () => {
+    aiChatStorageService.setSessions([{
+      id: 'in-flight-session', title: 'Chat', createdAt: 1, updatedAt: 1,
+      personaId: 'builtin-default', contextCacheEnabled: true, messages: []
+    }]);
+    vi.mocked(assistantTurnService.runUnifiedTurn).mockImplementation(async () => {
+      aiChatStorageService.setSessions([]);
+      return {
+        output: { mode: 'background', outcome: 'reply', assistantReply: 'Recovered reply', memoryAction: 'no_update' },
+        debug: debugExchange
+      };
+    });
+    const result = await assistantOrchestratorService.runSystemTurn({
+      trigger: { id: 'in-flight-trigger', type: 'checkin', source: 'system',
+        createdAt: '2026-04-27T10:00:00.000Z', text: 'Check in' },
+      targetSessionId: 'in-flight-session', showSystemNotification: true,
+      currentDateTime: '2026-04-27T18:00:00+08:00', defaultDate: '2026-04-27', todayTimelineSummary: 'timeline'
+    });
+    const persisted = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persisted).toHaveLength(1);
+    expect(result.targetSessionId).toBe(persisted[0].id);
+    expect(result.targetSessionId).not.toBe('in-flight-session');
+    expect(persisted[0].messages[0].content).toBe('Recovered reply');
+  });
+
+  it('hydrates native replies into a new conversation once after deletion', () => {
+    const entries: AssistantNativeDiagnosticEntry[] = [{
+      id: 'native-deleted', createdAt: '2026-04-27T10:00:01.000Z',
+      type: 'native_request_completed', level: 'success', message: 'Completed',
+      triggerId: 'native-deleted-trigger', triggerType: 'reminder_due',
+      context: { requestedAt: '2026-04-27T10:00:00.000Z', completedAt: '2026-04-27T10:00:01.000Z',
+        outcome: 'reply', assistantReply: 'Native reminder', nativeNotificationShown: true }
+    }];
+    const first = assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { targetSessionId: 'deleted-session' });
+    const second = assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { targetSessionId: 'deleted-session' });
+    const persisted = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].messages).toHaveLength(1);
+    expect(persisted[0].messages[0].content).toBe('Native reminder');
+    expect(first.surfacedMessageLocations[0].sessionId).toBe(persisted[0].id);
+    expect(second.surfacedMessages).toEqual([]);
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+  });
+
+  it('persists a submitted-log user message when its target no longer exists', () => {
+    const location = assistantOrchestratorService.persistBackgroundUserMessage('Completed a log', 'deleted-session');
+    const persisted = JSON.parse(localStorage.getItem('lumostime_ai_chat_sessions_v1') || '[]');
+    expect(persisted).toHaveLength(1);
+    expect(location?.sessionId).toBe(persisted[0].id);
+    expect(persisted[0].messages[0]).toMatchObject({ role: 'user', content: 'Completed a log' });
   });
 
   it('hydrates native completed replies into persisted chat sessions only once', () => {

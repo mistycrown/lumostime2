@@ -6,6 +6,7 @@
  * @description Keeps background execution synchronization and due-item dispatch out of the modal coordinator.
  * @updated 2026-09-22: Extracted background dispatch callbacks.
  * @updated 2026-09-23: Adds the required stable id to the native check-in trigger payload.
+ * @updated 2026-10-04: Allows due reminders to run without a surviving conversation so delivery can create one.
  */
 
 import { useCallback } from 'react';
@@ -217,16 +218,11 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
   
       processingDueReminderIdsRef.current.add(reminder.id);
       const targetSession = getBackgroundTargetSession();
-      if (!targetSession) {
-        processingDueReminderIdsRef.current.delete(reminder.id);
-        console.info('[AIBackfillChatModal] Skipping due reminder dispatch because no ordinary conversation has recent user activity', reminder.id);
-        return;
-      }
   
       const now = new Date();
       const attemptedAt = now.toISOString();
       assistantReminderQueueService.recordDispatchAttempt(reminder.id, attemptedAt);
-      const conversationHistory = conversationHistoryCache.get(targetSession.id) || [];
+      const conversationHistory = targetSession ? conversationHistoryCache.get(targetSession.id) || [] : [];
   
       void assistantOrchestratorService.runSystemTurn(buildBackgroundTurnRequest({
         trigger: buildReminderDueTrigger({
@@ -244,7 +240,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
         reloadPersistedChatSessions();
         if (result.surfacedMessage && !isOpenRef.current) {
           onUnreadAssistantMessage?.(1, {
-            targetSessionId: result.targetSessionId || targetSession.id,
+            targetSessionId: result.targetSessionId || targetSession?.id || '',
             ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
           });
           addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);

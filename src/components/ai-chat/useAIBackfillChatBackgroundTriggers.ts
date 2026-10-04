@@ -5,11 +5,13 @@
  * @pos Component Support (AI Integration)
  * @description Keeps system-trigger orchestration out of the modal coordinator.
  * @updated 2026-09-22: Extracted background trigger processing handlers.
+ * @updated 2026-10-04: Allows background messages and submitted logs to recover a deleted conversation target.
  */
 
 import { useCallback } from 'react';
 
 import type { AssistantSystemTrigger } from '../../types/assistant';
+import type { AIChatSession } from './AIBackfillChatShared';
 import type { AssistantLogSubmittedEventDetail } from '../../utils/assistantLogSubmissionTrigger';
 
 export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>) {
@@ -118,11 +120,6 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
       void refreshAssistantNativeDiagnostics();
   
       const targetSession = getBackgroundTargetSession();
-      if (!targetSession && trigger.type !== 'reminder_due') {
-        console.info('[AIBackfillChatModal] Skipping assistant system trigger because no ordinary conversation has recent user activity', trigger);
-        processingAssistantTriggerIdsRef.current.delete(triggerId);
-        return;
-      }
   
       const conversationHistory = targetSession
         ? conversationHistoryCache.get(targetSession.id) || []
@@ -244,11 +241,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
         return;
       }
   
-      const targetSession = getBackgroundTargetSession();
-      if (!targetSession) {
-        console.info('[AIBackfillChatModal] Skipping submitted-log assistant trigger because no ordinary conversation has recent user activity', submittedLog.id);
-        return;
-      }
+      let targetSession = getBackgroundTargetSession();
   
       const now = new Date();
       const nextLogs = upsertLogForAssistantContext(logs, submittedLog);
@@ -258,8 +251,12 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
         scopes,
         todos
       );
-      assistantOrchestratorService.persistBackgroundUserMessage(submittedLogUserMessage, targetSession.id);
-      reloadPersistedChatSessions();
+      const userMessageLocation = assistantOrchestratorService.persistBackgroundUserMessage(submittedLogUserMessage, targetSession?.id);
+      const nextSessions: AIChatSession[] = reloadPersistedChatSessions();
+      targetSession = nextSessions.find((session) => session.id === userMessageLocation?.sessionId);
+      if (!targetSession) {
+        return;
+      }
       const trigger = buildAssistantLogSubmissionTrigger({
         log: submittedLog,
         categories,
@@ -269,15 +266,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
       });
       const conversationHistory = buildConversationHistoryFromMessages(
         targetSession,
-        [
-          ...targetSession.messages,
-          {
-            id: crypto.randomUUID(),
-            role: 'user',
-            content: submittedLogUserMessage,
-            createdAt: Date.now()
-          }
-        ]
+        targetSession.messages
       );
   
       try {

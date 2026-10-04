@@ -1,7 +1,15 @@
+/**
+ * @file assistantBackgroundSessionUtils.test.ts
+ * @input Ordinary, template, and background-created chat fixtures
+ * @output Regression coverage for background conversation selection
+ * @pos Test (Assistant Background Sessions)
+ * @updated 2026-10-04: Covers background conversation reuse while prioritizing real user activity.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   getLatestAssistantBackgroundUserMessageAt,
   isOrdinaryAssistantBackgroundSession,
+  resolveAssistantBackgroundSession,
   resolveLatestOrdinaryAssistantBackgroundSession,
   type AssistantBackgroundSessionLike
 } from './assistantBackgroundSessionUtils';
@@ -14,6 +22,24 @@ const buildSession = (overrides: Partial<AssistantBackgroundSessionLike>): Assis
 });
 
 describe('assistantBackgroundSessionUtils', () => {
+  it('reuses background replies only when no user-active conversation remains', () => {
+    const background = buildSession({
+      id: 'background', updatedAt: 300,
+      messages: [{ role: 'assistant', createdAt: 300, backgroundDebugHistoryId: 'call-1' }]
+    });
+    const ordinary = buildSession({
+      id: 'ordinary', updatedAt: 100,
+      messages: [{ role: 'user', createdAt: 100 }]
+    });
+    expect(resolveAssistantBackgroundSession([background])).toBe(background);
+    expect(resolveAssistantBackgroundSession([background, ordinary])).toBe(ordinary);
+    expect(resolveAssistantBackgroundSession([
+      { ...background, templateMeta: { templateType: 'weekly_review' } },
+      buildSession({ id: 'empty' }),
+      buildSession({ id: 'assistant-only', messages: [{ role: 'assistant', createdAt: 500 }] })
+    ])).toBeUndefined();
+  });
+
   it('treats sessions without template metadata as ordinary conversations', () => {
     expect(isOrdinaryAssistantBackgroundSession(buildSession({}))).toBe(true);
     expect(isOrdinaryAssistantBackgroundSession(buildSession({
