@@ -4,6 +4,7 @@
  * @output Reusable AI chat model definitions, validation helpers, and small presentational components
  * @pos Component Support (AI Integration)
  * @description Centralizes the stable data model and low-risk helper/UI pieces used by AIBackfillChatModal so the main modal focuses on orchestration instead of carrying every type and validator inline.
+ * @updated 2026-10-04: Resolves built-in persona avatar paths relative to the app page for Electron file loading.
  * @updated 2026-09-03: Removed the legacy polling-frequency draft and validation from random check-in interval settings.
  * @updated 2026-07-05: Extended chat debug sections so foreground local-query rounds can persist structured text blocks alongside AI request exchanges.
  * @updated 2026-08-24: Persisted pre-turn reminder and memory snapshots so retry can restore every foreground side effect.
@@ -32,6 +33,7 @@ import type {
   DreamUpdateCard
 } from '../../types/assistant';
 import { normalizeAssistantDateTime } from '../../utils/assistantTime';
+import { resolveAssetPath } from '../../utils/assetPath';
 import { normalizeAssistantQuietHoursValue } from '../../utils/assistantQuietHours';
 import { parseMonthlyDayInput } from '../../utils/todoScheduleUtils';
 import type {
@@ -787,7 +789,9 @@ export const PersonaAvatar: React.FC<{
       };
     }
 
-    const imageRef = persona.avatarImage.startsWith('/') ? Promise.resolve(persona.avatarImage) : imageService.getImageUrl(persona.avatarImage);
+    const imageRef = persona.avatarImage.startsWith('/')
+      ? Promise.resolve(resolveAssetPath(persona.avatarImage))
+      : imageService.getImageUrl(persona.avatarImage);
     imageRef.then((url) => {
       if (!cancelled) {
         setSrc(url);
