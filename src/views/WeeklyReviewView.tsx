@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
  * @file WeeklyReviewView.tsx
  * @input WeeklyReview Data, Logs, Stats, Templates
  * @output Review Updates, Narrative Generation
@@ -36,6 +37,7 @@ import {
 } from '../utils/reviewStatsUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import { filterCountableLogs } from '../utils/statLogUtils';
 
 interface WeeklyReviewViewProps {
@@ -69,7 +71,7 @@ const StatsViewFallback: React.FC = () => (
 );
 
 export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
-    review,
+    review: savedReview,
     weekStartDate,
     weekEndDate,
     templates,
@@ -81,12 +83,13 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     dailyReviews,
     customNarrativeTemplates,
     onDelete,
-    onUpdateReview,
+    onUpdateReview: saveReview,
     onGenerateNarrative,
     onClose,
     addToast,
     initialTab
 }) => {
+    const { value: review, update: onUpdateReview, commit: commitReview, discard: discardReview } = useBufferedRecord(savedReview, saveReview);
     const {
         setCurrentWeeklyNewspaperStart,
         setCurrentWeeklyNewspaperEnd,
@@ -131,6 +134,12 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
             setActiveTab(initialTab);
         }
     }, [initialTab]);
+
+    useEffect(() => {
+        setAnswers(review.answers || []);
+        setSummary(review.summary || '');
+        setNarrative(review.narrative || '');
+    }, [review]);
 
     // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {
@@ -186,7 +195,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
 
         setAnswers(newAnswers);
 
-        // 实时保存
+        // 保存到页面草稿，退出时提交
         const updatedReview = {
             ...review,
             answers: newAnswers,
@@ -273,6 +282,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
     };
 
     const handleGenerateNewspaper = () => {
+        commitReview();
         openAIChat({
             initialInputText: `周小报 ${review.weekStartDate}`
         });
@@ -382,7 +392,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
         }
     };
 
-    // 自动保存手动叙事
+    // 更新手动叙事草稿
     const handleSummaryChange = (value: string) => {
         setSummary(value);
         
@@ -419,7 +429,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
         }
     };
 
-    // 自动保存 AI 叙事
+    // 更新 AI 叙事草稿
     const handleNarrativeChange = (value: string) => {
         setNarrative(value);
 
@@ -467,7 +477,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                     </h1>
                 </div>
                 <button
-                    onClick={onDelete}
+                    onClick={() => { discardReview(); onDelete(); }}
                     className="text-stone-400 hover:text-red-600 p-1 transition-colors"
                 >
                     <Trash2 size={20} />

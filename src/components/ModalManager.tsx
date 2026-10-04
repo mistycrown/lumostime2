@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file ModalManager.tsx
  * @input modal states, handlers, data
  * @output Unified Modal Management
@@ -125,6 +126,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
             {/* Focus Detail View */}
             {focusDetailSessionId && (
                 <FocusDetailView
+                    key={focusDetailSessionId}
                     session={activeSessions.find(s => s.id === focusDetailSessionId)!}
                     todos={todos}
                     categories={categories}

@@ -1,5 +1,8 @@
 # Components Directory
 
+> Update 2026-10-04: `BufferedTextarea.tsx` buffers long text locally and commits on blur, exit, or backgrounding. TimePal quotes and AI persona prompts use it; `ReviewView/ReviewNarrativeTab.tsx` delegates saving to review drafts and no longer allocates empty debounce timers.
+
+
 - Update 2026-10-03: `FeishuConnectionPanel.tsx` shows personal-app creation and calendar authorization as separate pending stages, with buttons to reopen the official confirmation page. It requests no application credentials.
 
 - Update 2026-10-02: `FeishuConnectionPanel.tsx` keeps the OAuth connection button visible while status loads, the service is unavailable, or the account is disconnected; pending and connected states expose cancellation/disconnection.

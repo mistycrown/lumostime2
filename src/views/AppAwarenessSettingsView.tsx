@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Commit long text fields on blur/exit instead of on each keystroke.
  * @file AppAwarenessSettingsView.tsx
  * @input App-awareness templates, bindings, Android installed-app list, and category/activity data
  * @output Workflow-template edits plus app-to-workflow binding updates
@@ -13,6 +14,7 @@
  * @updated 2026-08-12: Unified software and Android hardware back handling so nested workflow pages return to their immediate parent before Settings.
  * @updated 2026-09-08: Added routine-style tag, domain, and TODO associations to start-record options.
  */
+import { BufferedTextarea } from '../components/BufferedTextarea';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -805,11 +807,11 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
             </div>
             <div>
               <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-stone-400">模板说明</div>
-              <textarea
+              <BufferedTextarea draftKey={editingTemplate.id + ':description'}
                 value={editingTemplate.description || ''}
-                onChange={(event) => updateTemplate(editingTemplate.id, (template) => ({
+                onValueCommit={(value) => updateTemplate(editingTemplate.id, (template) => ({
                   ...template,
-                  description: event.target.value,
+                  description: value,
                   updatedAt: Date.now()
                 }))}
                 rows={3}
@@ -952,11 +954,10 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
                   {step.type === 'single_choice' && (
                     <label className="text-sm">
                       <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-stone-400">选项列表</div>
-                      <textarea
+                      <BufferedTextarea draftKey={editingTemplate.id + ':' + step.id + ':options'}
                         rows={4}
                         value={readStepFieldDraft(step.id, 'choiceOptions', serializeChoiceOptions(step.options))}
-                        onChange={(event) => {
-                          const value = event.target.value;
+                        onValueCommit={(value) => {
                           writeStepFieldDraft(step.id, 'choiceOptions', value);
                           updateTemplate(editingTemplate.id, (template) => ({
                             ...template,

@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Commit long text fields on blur/exit instead of on each keystroke.
  * @file TimePalSettings.tsx
  * @description 时光小友设置组件，可在多个页面复用。
  * @input categories: Category[] - 活动分类列表
@@ -7,6 +8,7 @@
  * @updated 2026-08-10: Reloads all TimePal controls after cloud or export settings restore.
  * @updated 2026-10-01: Added the card seconds-visibility setting.
  */
+import { BufferedTextarea } from './BufferedTextarea';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Plus, X } from 'lucide-react';
 import { Category } from '../types';
@@ -582,9 +584,9 @@ export const TimePalSettings: React.FC<TimePalSettingsProps> = ({ categories, on
 
                 {customQuotesEnabled && (
                     <div className="animate-in slide-in-from-top-2">
-                        <textarea
+                        <BufferedTextarea draftKey={'timepal-quotes'}
                             value={customQuotes}
-                            onChange={(e) => handleCustomQuotesChange(e.target.value)}
+                            onValueCommit={(value) => handleCustomQuotesChange(value)}
                             placeholder={'输入你的名言，每行一句\n例如：\n种一棵树最好的时间是十年前，其次是现在\n万物皆有裂痕，那是光照进来的地方'}
                             className="w-full h-32 bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-400 transition-all resize-none"
                         />

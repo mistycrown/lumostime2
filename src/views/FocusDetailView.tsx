@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Save focus-note drafts on blur/exit/background and discard after completion or cancellation.
  * @file FocusDetailView.tsx
  * @input Active Session Data, Todos, Categories, Scopes
  * @output Session Updates (Note, Association), Completion Event
@@ -14,6 +15,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule, Log } from '../types';
 import { X, Check, ChevronDown, TrendingUp, Plus, Minus, Lightbulb, CheckCircle2, Maximize2 } from 'lucide-react';
@@ -61,7 +63,11 @@ interface FocusDetailViewProps {
 
 export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, onUpdateActivity, logs = [], autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
-    const [note, setNote] = useState(session.note || '');
+    const noteDraft = useBufferedRecord(session, onUpdate);
+    const note = noteDraft.value.note || '';
+    const setNote = (value: string | ((current: string) => string)) => {
+        noteDraft.update({ ...noteDraft.value, note: typeof value === 'function' ? value(note) : value });
+    };
     const [attributeValues, setAttributeValues] = useState(session.attributeValues || []);
     const [isActivitySelectorOpen, setIsActivitySelectorOpen] = useState(false);
     const [completeLinkedTodoOnSubmit, setCompleteLinkedTodoOnSubmit] = useState(false);
@@ -340,7 +346,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Auto-save note - 使用 useRef 避免过时的闭包
+    // Immediate non-text session updates use the latest callback and session.
     const sessionRef = useRef(session);
     const onUpdateRef = useRef(onUpdate);
     
@@ -349,11 +355,6 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         onUpdateRef.current = onUpdate;
     });
     
-    useEffect(() => {
-        onUpdateRef.current({ ...sessionRef.current, note });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [note]); // 只依赖 note
-
     useEffect(() => {
         onUpdateRef.current({
             ...sessionRef.current,
@@ -399,6 +400,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     }, [reactions]);
 
     const handleComplete = () => {
+        noteDraft.discard();
         const linkedTodoIdToComplete = getCompletionModeTodoId(completeLinkedTodoOnSubmit, linkedTodo);
         const finalSession = {
             ...session,
@@ -420,6 +422,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     };
 
     const handleCancel = () => {
+        noteDraft.discard();
         if (onCancel) {
             onCancel(session.id);
         }
@@ -751,6 +754,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                         ref={noteRef}
                         value={note}
                         onChange={e => setNote(e.target.value)}
+                        onBlur={noteDraft.commit}
                         placeholder="Add a note..."
                         className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"
                     />

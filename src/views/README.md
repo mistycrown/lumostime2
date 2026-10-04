@@ -1,5 +1,8 @@
 # Views Layer
 
+> Update 2026-10-04: Daily/Weekly/Monthly Review, scope details, and review template editing save page drafts on exit/backgrounding instead of every keystroke. Focus notes save on blur/exit/backgrounding. App-awareness long text fields commit on blur/exit.
+
+
 - Update 2026-10-03: `TagDetailView.tsx` only shows the keyword palette action and modal after redemption verification; linked sticker sets no longer bypass this requirement.
 
 - Update 2026-09-26: `SceneCard.tsx`, loose-mode cards in `TodoView.tsx`, and daily/weekly/monthly cards in `ReviewHubView.tsx` share the configurable synchronized card-background images.

@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Commit long text fields on blur/exit instead of on each keystroke.
  * @file AIBackfillChatPersonaSettingsSection.tsx
  * @input Active persona state, user-avatar state, theme tokens, upload refs, and persona-management callbacks
  * @output Persona-settings branch for the AI settings overlay
@@ -11,6 +12,7 @@
  * @updated 2026-05-16: Added a separated custom-prompt-block editor with multi-item add/delete controls under persona settings.
  * @updated 2026-05-15: Extracted the persona settings branch from AIBackfillChatModal.
  */
+import { BufferedTextarea } from '../BufferedTextarea';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Loader2, Plus, RotateCcw, Sparkles, Trash2, Upload, X } from 'lucide-react';
@@ -477,9 +479,9 @@ export const AIBackfillChatPersonaSettingsSection: React.FC<AIBackfillChatPerson
             {!activePersona.isBuiltIn && (
               <label className="block">
                 <span className="mb-1 block text-xs font-medium text-stone-500">自定义提示词</span>
-                <textarea
+                <BufferedTextarea draftKey={activePersona.id}
                   value={activePersona.systemPrompt}
-                  onChange={(event) => onUpdateCurrentPersona({ systemPrompt: event.target.value })}
+                  onValueCommit={(value) => onUpdateCurrentPersona({ systemPrompt: value })}
                   className="min-h-[220px] w-full rounded-[0.85rem] border px-4 py-3 text-sm leading-7 outline-none"
                   style={{
                     borderColor: theme.chipBorder,

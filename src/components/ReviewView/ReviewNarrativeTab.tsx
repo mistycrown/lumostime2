@@ -1,11 +1,12 @@
 /**
+ * @updated 2026-10-04: Delegate draft saving to the review editor and remove empty per-keystroke timers.
  * @file ReviewNarrativeTab.tsx
  * @description Shared Narrative Tab component for Review Views with Reading/Editing modes
  * @updated 2026-07-21: Added a semantic dark-mode surface for the AI newspaper entry card.
  * @updated 2026-06-07: Made the newspaper row reusable for weekly and monthly reviews by allowing custom labels and empty-state copy while keeping the daily mood flow intact.
  * @updated 2026-05-16: Split the narrative page into summary, newspaper, and AI narrative sections with a single-line newspaper card.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { RefreshCw, Sparkles, Trash2, Smile } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -57,44 +58,6 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
   onDeleteNarrative
 }) => {
   const [isMoodModalOpen, setIsMoodModalOpen] = useState(false);
-  const summaryTimeoutRef = useRef<NodeJS.Timeout>();
-  const narrativeTimeoutRef = useRef<NodeJS.Timeout>();
-
-  const handleSummaryChange = (value: string) => {
-    onSummaryChange(value);
-
-    if (summaryTimeoutRef.current) {
-      clearTimeout(summaryTimeoutRef.current);
-    }
-
-    summaryTimeoutRef.current = setTimeout(() => {
-      // Autosave is handled upstream in onSummaryChange.
-    }, 500);
-  };
-
-  const handleNarrativeChange = (value: string) => {
-    onNarrativeChange(value);
-
-    if (narrativeTimeoutRef.current) {
-      clearTimeout(narrativeTimeoutRef.current);
-    }
-
-    narrativeTimeoutRef.current = setTimeout(() => {
-      // Autosave is handled upstream in onNarrativeChange.
-    }, 500);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (summaryTimeoutRef.current) {
-        clearTimeout(summaryTimeoutRef.current);
-      }
-      if (narrativeTimeoutRef.current) {
-        clearTimeout(narrativeTimeoutRef.current);
-      }
-    };
-  }, []);
-
   return (
     <div className="space-y-8 min-w-0 max-w-full">
       <div className="space-y-3">
@@ -130,7 +93,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
             <input
               type="text"
               value={summary}
-              onChange={(event) => handleSummaryChange(event.target.value)}
+              onChange={(event) => onSummaryChange(event.target.value)}
               className="h-[42px] min-w-0 max-w-full flex-1 rounded-xl border border-stone-200 bg-white px-4 py-2.5 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-colors focus:border-stone-400"
               placeholder="用一句话总结..."
             />
@@ -253,7 +216,7 @@ export const ReviewNarrativeTab: React.FC<ReviewNarrativeTabProps> = ({
         ) : (
           <textarea
             value={narrative}
-            onChange={(event) => handleNarrativeChange(event.target.value)}
+            onChange={(event) => onNarrativeChange(event.target.value)}
             className="block w-full min-w-0 max-w-full resize-none rounded-2xl border border-stone-200 bg-white p-6 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-colors focus:border-stone-400"
             rows={16}
             placeholder="在此开始写作..."

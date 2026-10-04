@@ -1,4 +1,5 @@
 /**
+ * @updated 2026-10-04: Save template drafts on editor exit/backgrounding instead of on each keystroke.
  * @file ReviewTemplateManageView.tsx
  * @input Existing Review Templates
  * @output Created/Updated/Deleted Templates
@@ -8,6 +9,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import React, { useState } from 'react';
 import { ReviewTemplate, ReviewQuestion, QuestionType } from '../types';
 import { DEFAULT_REVIEW_TEMPLATES, COLOR_OPTIONS } from '../constants';
@@ -58,6 +60,7 @@ export const ReviewTemplateManageView: React.FC<ReviewTemplateManageViewProps> =
             <div className="flex-1 overflow-y-auto pb-40">
                 {editingTemplateId ? (
                     <TemplateEditor
+                        key={editingTemplateId}
                         template={templates.find(t => t.id === editingTemplateId)!}
                         onUpdate={(updated) => {
                             onUpdateTemplates(templates.map(t => t.id === updated.id ? updated : t));
@@ -218,7 +221,8 @@ const TemplateEditor: React.FC<{
     template: ReviewTemplate,
     onUpdate: (t: ReviewTemplate) => void,
     onClose: () => void
-}> = ({ template, onUpdate }) => {
+}> = ({ template: savedTemplate, onUpdate: saveTemplate }) => {
+    const { value: template, update: onUpdate } = useBufferedRecord(savedTemplate, saveTemplate);
     const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
     const { uiIconTheme } = useSettings();
     

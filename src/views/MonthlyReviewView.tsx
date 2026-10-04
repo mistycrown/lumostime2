@@ -2,6 +2,7 @@
  * @file MonthlyReviewView.tsx
  * @input Month Log Data, Review Data, Templates
  * @output Update Review Data, Generate Narrative
+ * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
  * @pos View (Review System)
  * @description A comprehensive view for conducting monthly reviews. Includes tabs for statistical data, guided questions (Review Guide), and an AI-assisted narrative editor.
  * @updated 2026-06-07: Added monthly AI newspaper entry, one-tap chat generation, dedicated newspaper opening, and guarded delete flow inside the narrative tab.
@@ -35,6 +36,7 @@ import {
 } from '../utils/reviewStatsUtils';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
+import { useBufferedRecord } from '../hooks/useBufferedRecord';
 
 interface MonthlyReviewViewProps {
     review: MonthlyReview;
@@ -67,7 +69,7 @@ const StatsViewFallback: React.FC = () => (
 );
 
 export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
-    review,
+    review: savedReview,
     monthStartDate,
     monthEndDate,
     templates,
@@ -79,12 +81,13 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     dailyReviews,
     customNarrativeTemplates,
     onDelete,
-    onUpdateReview,
+    onUpdateReview: saveReview,
     onGenerateNarrative,
     addToast,
     onClose,
     initialTab
 }) => {
+    const { value: review, update: onUpdateReview, commit: commitReview, discard: discardReview } = useBufferedRecord(savedReview, saveReview);
     const {
         setCurrentMonthlyNewspaperStart,
         setCurrentMonthlyNewspaperEnd,
@@ -130,6 +133,13 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
             setActiveTab(initialTab);
         }
     }, [initialTab]);
+
+    useEffect(() => {
+        setAnswers(review.answers || []);
+        setSummary(review.summary || '');
+        setNarrative(review.narrative || '');
+        setCite(review.cite || '');
+    }, [review]);
 
     // 当切换到引导或叙事标签时，根据内容自动切换阅读/编辑模式（仅在标签切换时触发）
     useEffect(() => {
@@ -196,7 +206,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
 
         setAnswers(newAnswers);
 
-        // 实时保存
+        // 保存到页面草稿，退出时提交
         const updatedReview = {
             ...review,
             answers: newAnswers,
@@ -294,6 +304,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
     };
 
     const handleGenerateNewspaper = () => {
+        commitReview();
         openAIChat({
             initialInputText: `月小报 ${review.monthStartDate}`
         });
@@ -355,7 +366,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         }
     };
 
-    // 自动保存手动叙事
+    // 更新手动叙事草稿
     const handleSummaryChange = (value: string) => {
         setSummary(value);
         const updatedReview = {
@@ -391,7 +402,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
         }
     };
 
-    // 自动保存 AI 叙事
+    // 更新 AI 叙事草稿
     const handleNarrativeChange = (value: string) => {
         setNarrative(value);
         const updatedReview = {
@@ -440,7 +451,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                     </h1>
                 </div>
                 <button
-                    onClick={onDelete}
+                    onClick={() => { discardReview(); onDelete(); }}
                     className="p-2 text-stone-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                     title="删除此回顾"
                 >
