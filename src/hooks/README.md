@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> Update 2026-10-04: `useTodoQuickActions.ts` validates main-task association against the latest todos and saves inherited category/activity/scope settings through the existing todo pipeline.
+
 > Update 2026-10-04: `useBufferedRecord.ts` keeps editor changes local until exit or backgrounding, merges edited fields into the latest saved record, supports discard before deletion/completion, and preserves late AI results after navigation. Verify with `node scripts/test-buffered-editors.mjs`.
 
 

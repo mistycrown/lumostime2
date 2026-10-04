@@ -1,5 +1,7 @@
 # Components Directory
 
+> Update 2026-10-04: `TodoQuickActionsModal.tsx` pairs duplicate with main-task association. `TodoParentPickerModal.tsx` provides category filters, title/note search and back dismissal for eligible leaf tasks. Run `node scripts/test-todo-parent-link.mjs` after a production build to verify actual renderer interactions and narrow-screen layout.
+
 > Update 2026-10-04: `BufferedTextarea.tsx` buffers long text locally and commits on blur, exit, or backgrounding. TimePal quotes and AI persona prompts use it; `ReviewView/ReviewNarrativeTab.tsx` delegates saving to review drafts and no longer allocates empty debounce timers.
 
 

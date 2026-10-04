@@ -1,5 +1,6 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-04: Wires searchable main-task association into shared todo quick actions.
  * @updated 2026-07-21: Kept week-view date columns transparent in dark mode.
  * @updated 2026-07-22: Preserved custom background images behind readable dark-mode page overlays.
  * @input Todos, Categories, Scopes
@@ -1142,8 +1143,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete,
     handleQuickActionUpdateTitle,
-    handleQuickActionUpdateNote
-  } = useTodoQuickActions({ onSaveTodo, onEditTodo, onDeleteTodo });
+    handleQuickActionUpdateNote,
+    handleQuickActionLinkParent
+  } = useTodoQuickActions({ todos, onSaveTodo, onEditTodo, onDeleteTodo });
 
   // 濞?localStorage 閻犲洩顕цぐ鍥偨閵婏箑鐓曞☉鎾筹攻椤愬ジ鏌呮径瀣仴闁汇劌瀚～瀣炊閻愵儫浣割嚕?
   const [viewMode, setViewMode] = useState<'loose' | 'compact'>(() => {
@@ -2240,6 +2242,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     <TodoQuickActionsModal
       isOpen={quickActionTodo !== null}
       todo={quickActionTodo}
+      todos={todos}
       todoCategories={standardTodoCategories}
       onMoveDate={handleQuickActionMove}
       onClearDate={handleQuickActionClearDate}
@@ -2248,6 +2251,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onUndoComplete={handleQuickActionUndoComplete}
       onTogglePin={handleQuickActionTogglePin}
       onDuplicate={() => quickActionTodo && handleOpenDuplicateModal(quickActionTodo)}
+      onLinkParent={handleQuickActionLinkParent}
       onEditMaybeDates={handleQuickActionMaybeDates}
       onSkipNextRecurrence={handleQuickActionSkipNextRecurrence}
       onSkipToMaybeDate={handleQuickActionSkipToMaybeDate}

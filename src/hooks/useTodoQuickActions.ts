@@ -3,6 +3,7 @@
  * @input Todo save/edit callbacks from TodoView
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
+ * @updated 2026-10-04: Associates existing tasks with validated main tasks through the shared save pipeline.
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
  * @updated 2026-06-13: Added handleQuickActionUpdateTitle to support updating todo title directly from the quick actions modal on blur.
  * @updated 2026-08-24: Added inline note updates for the todo quick-actions sheet.
@@ -21,6 +22,7 @@ import { useRef, useState } from 'react';
 import { TodoItem } from '../types';
 import { formatDateKey, getNextRecurrenceOccurrenceDateKey, normalizeMaybeDates, normalizeSkipDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { isQuickTodo } from '../utils/todoKindUtils';
+import { buildTodoParentLink } from '../utils/todoParentLinkUtils';
 
 export const QUICK_ACTION_INTERACTION_GUARD_MS = 280;
 
@@ -82,12 +84,13 @@ export const getQuickActionTodoNote = (todo: TodoItem | null): string => (
 );
 
 interface UseTodoQuickActionsOptions {
+  todos: TodoItem[];
   onSaveTodo: (todo: TodoItem) => void;
   onEditTodo: (todo: TodoItem) => void;
   onDeleteTodo: (id: string) => void;
 }
 
-export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
+export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
   const [quickActionTodo, setQuickActionTodo] = useState<TodoItem | null>(null);
   const quickActionOpenedAtRef = useRef(0);
 
@@ -186,6 +189,15 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     }
 
     onSaveTodo(movedTodo);
+    closeQuickActions(true);
+  };
+
+  const handleQuickActionLinkParent = (parentTodoId: string) => {
+    const currentTodo = todos.find((todo) => todo.id === quickActionTodo?.id) || null;
+    const linkedTodo = buildTodoParentLink(currentTodo, todos, parentTodoId);
+    if (!linkedTodo) return;
+
+    onSaveTodo(linkedTodo);
     closeQuickActions(true);
   };
 
@@ -297,6 +309,7 @@ export const useTodoQuickActions = ({ onSaveTodo, onEditTodo, onDeleteTodo }: Us
     handleQuickActionSkipNextRecurrence,
     handleQuickActionSkipToMaybeDate,
     handleQuickActionMoveCategory,
+    handleQuickActionLinkParent,
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete,
     handleQuickActionUpdateTitle,

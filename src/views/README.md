@@ -1,5 +1,7 @@
 # Views Layer
 
+> Update 2026-10-04: `TodoView.tsx` passes the full todo collection and parent-association save handler to the shared quick-actions sheet for list and schedule entry points.
+
 > Update 2026-10-04: Daily/Weekly/Monthly Review, scope details, and review template editing save page drafts on exit/backgrounding instead of every keystroke. Focus notes save on blur/exit/backgrounding. App-awareness long text fields commit on blur/exit.
 
 

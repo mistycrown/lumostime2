@@ -3,6 +3,7 @@
  * @input TodoQuickActionsModal props
  * @output Regression coverage for quick category move visibility and Maybe-date summary rendering in the shared todo quick-actions sheet
  * @pos Test
+ * @updated 2026-10-04: Covers main-task association next to duplicate and hierarchy-based visibility.
  * @description Ensures the shared quick-actions modal only exposes category move for standalone todos, still offers quick-todo project upgrades through the shared category-picker flow, and summarizes Maybe dates as compact title metadata.
  * @updated 2026-08-27: Added coverage that long quick-actions titles use a two-line visual clamp without changing title-edit behavior.
  * @updated 2026-06-14: Added coverage for the quick-actions duplicate entry so the modal can reuse the row swipe duplicate flow.
@@ -58,6 +59,24 @@ const baseProps = {
 };
 
 describe('TodoQuickActionsModal category move', () => {
+  test('renders main-task association beside duplicate for eligible tasks', () => {
+    const todo = { id: 'leaf', title: 'Leaf', categoryId: 'cat-a', isCompleted: false } as any;
+    const html = renderToStaticMarkup(
+      <TodoQuickActionsModal {...baseProps} todo={todo} todos={[todo]} onLinkParent={vi.fn()} />
+    );
+    expect(html).toMatch(/创建副本[\s\S]*关联到主任务/);
+  });
+
+  test('hides main-task association when the source already has children', () => {
+    const todo = { id: 'parent', title: 'Parent', categoryId: 'cat-a', isCompleted: false } as any;
+    const child = { ...todo, id: 'child', parentTodoId: todo.id };
+    const html = renderToStaticMarkup(
+      <TodoQuickActionsModal {...baseProps} todo={todo} todos={[todo, child]} onLinkParent={vi.fn()} />
+    );
+    expect(html).toContain('创建副本');
+    expect(html).not.toContain('关联到主任务');
+  });
+
   test('clamps the displayed todo title to two lines', () => {
     const html = renderToStaticMarkup(
       <TodoQuickActionsModal

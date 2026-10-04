@@ -3,6 +3,7 @@
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
+ * @updated 2026-10-04: Adds a main-task association shortcut beside duplicate with category and search selection.
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
  * @updated 2026-08-27: Clamp non-editing quick-actions titles to two lines so long task names do not push the action list down the sheet.
  * @updated 2026-08-25: Made quick note editing a multi-line field; Enter saves while Shift+Enter adds a line break.
@@ -35,7 +36,7 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
@@ -43,6 +44,8 @@ import { getQuickActionTodoNote, isTodoQuickActionInteractionGuardActive } from 
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
+import { TodoParentPickerModal } from './TodoParentPickerModal';
+import { canTodoLinkToParent } from '../utils/todoParentLinkUtils';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
 
@@ -50,6 +53,8 @@ interface TodoQuickActionsModalProps {
   isOpen: boolean;
   todo: TodoItem | null;
   todoCategories: TodoCategory[];
+  todos?: TodoItem[];
+  onLinkParent?: (parentTodoId: string) => void;
   onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
@@ -75,6 +80,8 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   isOpen,
   todo,
   todoCategories,
+  todos = [],
+  onLinkParent,
   onMoveDate,
   onClearDate,
   onOpenDetail,
@@ -96,6 +103,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onUpdateNote
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+  const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
@@ -110,6 +118,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   useEffect(() => {
     setIsDeleteConfirming(false);
+    setIsParentPickerOpen(false);
     setCategoryPickerMode(null);
     setIsMaybePickerOpen(false);
     setIsSkipToPickerOpen(false);
@@ -127,6 +136,10 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     }
 
     return registerHardwareBackHandler(() => {
+      if (isParentPickerOpen) {
+        setIsParentPickerOpen(false);
+        return true;
+      }
       if (isMaybePickerOpen) {
         setIsMaybePickerOpen(false);
         return true;
@@ -176,7 +189,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -361,6 +374,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const showDetailShortcut = !isQuickTodo(todo);
   const isRecurringTodo = Boolean(todo.recurrenceRule);
   const canMoveCategory = !todo.parentTodoId && todoCategories.length > 1;
+  const canLinkParent = Boolean(onLinkParent && canTodoLinkToParent(todo, todos));
   const canUpgradeToProject = Boolean(showUpgradeToProject && onUpgradeToProject && isQuickTodo(todo) && todoCategories.length > 0);
   const formatQuickActionDate = (dateKey?: string) => {
     if (!dateKey) return null;
@@ -672,15 +686,29 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
             </button>
 
-            {onDuplicate && (
-              <button
-                type="button"
-                onClick={withActionGuard(onDuplicate)}
-                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
-              >
-                <Copy size={15} className="text-stone-400" />
-                <span>创建副本</span>
-              </button>
+            {(onDuplicate || canLinkParent) && (
+              <div className={onDuplicate && canLinkParent ? 'grid grid-cols-2 gap-2' : ''}>
+                {onDuplicate && (
+                  <button
+                    type="button"
+                    onClick={withActionGuard(onDuplicate)}
+                    className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                  >
+                    <Copy size={15} className="shrink-0 text-stone-400" />
+                    <span>创建副本</span>
+                  </button>
+                )}
+                {canLinkParent && (
+                  <button
+                    type="button"
+                    onClick={withActionGuard(() => setIsParentPickerOpen(true))}
+                    className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                  >
+                    <Link size={15} className="shrink-0 text-stone-400" />
+                    <span>关联到主任务</span>
+                  </button>
+                )}
+              </div>
             )}
 
             {(canMoveCategory || onUpdateNote) && (
@@ -757,6 +785,16 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           </div>
           </div>
       </div>
+
+      {isParentPickerOpen && onLinkParent && (
+        <TodoParentPickerModal
+          todo={todo}
+          todos={todos}
+          todoCategories={todoCategories}
+          onSelect={onLinkParent}
+          onClose={() => setIsParentPickerOpen(false)}
+        />
+      )}
 
       <TodoDatePickerModal
         isOpen={isMaybePickerOpen}
