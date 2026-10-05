@@ -11,6 +11,7 @@
  * @updated 2026-09-29: Covers packaged transparent title-bar preferences.
  * @updated 2026-09-30: Covers packaged labels below custom navigation icons.
  * @updated 2026-09-30: Covers packaged custom navigation icon size scales.
+ * @updated 2026-10-05: Includes pre-application navigation image hydration.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -235,7 +236,7 @@ describe('applyImportedThemePackage', () => {
       showLabelWithIcon: true,
       iconScale: 125
     });
-    expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
+    expect(hydrateNavigationIcons).toHaveBeenCalledTimes(2);
     expect(setNavigationEnabled).toHaveBeenCalledWith(true);
     const { backgroundService } = await import('./backgroundService');
     expect(backgroundService.setBackgroundOpacity).toHaveBeenCalledWith(0.3);

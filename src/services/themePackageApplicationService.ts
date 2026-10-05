@@ -18,6 +18,7 @@
  * @updated 2026-09-29: Applies packaged transparent title-bar preferences.
  * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  * @updated 2026-09-30: Applies packaged custom navigation icon size scales.
+ * @updated 2026-10-05: Waits for legacy navigation image compaction before writing package settings.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -661,6 +662,14 @@ export const applyImportedThemePackage = async (
 ): Promise<ThemePackageApplicationResult> => {
   const warnings: string[] = [];
   const appliedSections: string[] = [];
+
+  // Startup hydration may still be reading native files. Release legacy Base64
+  // copies before any package writes can exhaust the shared localStorage quota.
+  await Promise.all([
+    navigationIconService.hydrateCustomIcons(),
+    navigationBackgroundService.hydrateCustomBackgrounds(),
+    navigationDecorationService.hydrateImageBackedCustomDecorations()
+  ]);
 
   const sectionTasks: Array<[string, () => Promise<void>]> = [
     ['background', () => applyBackground(record, warnings)],
