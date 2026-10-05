@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-05: `cardBackgroundService.ts` defaults unset opacity to 40%, retains unrelated group edits during uploads, and selects the next group after deleting the active one. Saved-theme validation keeps card groups usable when only part of their image list is missing.
+
 Update 2026-10-05: `imageAssetListStorage.ts` keeps navigation icon/background/decoration URLs in memory, compacts legacy file-backed records, and merges hydration results with concurrent edits. Appearance backup/restore strips duplicate image URLs, including saved theme snapshots; mood-calendar hydration tolerates storage quota failures.
 
 Update 2026-10-03: Android now uses `feishuNativeConnection.ts` and the same `feishu/` execution core as Electron, with native HTTP, Keystore-encrypted snapshots and external-browser consent. No remote service URL is required on Android. Credentials remain private to execution memory and encrypted storage, never UI responses or browser persistence. Web continues to use the personal connection service.

@@ -3,6 +3,7 @@
  * @input Stored card background groups, settings, and uploaded image files
  * @output Regression coverage for persistence, carousel selection, alignment, and opacity
  * @updated 2026-09-28: Verifies active backgrounds share a subtle surface shadow.
+ * @updated 2026-10-05: Covers unset opacity, active-group deletion, missing-image candidates, and edits during uploads.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -41,11 +42,21 @@ describe('card background settings', () => {
   beforeEach(() => {
     vi.stubGlobal('localStorage', createLocalStorageMock());
     vi.stubGlobal('window', { dispatchEvent: vi.fn() });
-    saveImage.mockClear();
+    saveImage.mockReset().mockImplementation(async (file: File) => file.name);
     deleteImage.mockClear();
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it('uses the default opacity for absent, empty, and invalid settings while preserving explicit zero', () => {
+    expect(cardBackgroundService.getOpacity()).toBe(0.4);
+    for (const value of ['', ' ', 'invalid']) {
+      localStorage.setItem(CARD_BACKGROUND_OPACITY_KEY, value);
+      expect(cardBackgroundService.getOpacity()).toBe(0.4);
+    }
+    cardBackgroundService.setOpacity(0);
+    expect(cardBackgroundService.getOpacity()).toBe(0);
+  });
 
   it('cycles through group images by stable card order', () => {
     localStorage.setItem(CARD_BACKGROUND_GROUPS_KEY, JSON.stringify([{
@@ -57,6 +68,8 @@ describe('card background settings', () => {
     expect(cardBackgroundService.getBackgroundAt(1)).toEqual({ filename: 'two.webp', alignment: 'right-bottom' });
     expect(cardBackgroundService.getBackgroundAt(2)).toEqual({ filename: 'one.webp', alignment: 'right-bottom' });
     expect(cardBackgroundService.getBackgroundAt(-1)).toEqual({ filename: 'two.webp', alignment: 'right-bottom' });
+    expect(cardBackgroundService.getBackgroundCandidates(1).map((image) => image.filename)).toEqual(['two.webp', 'one.webp']);
+    expect(cardBackgroundService.getBackgroundAt(NaN)?.filename).toBe('one.webp');
   });
 
   it('maps alignment-specific image sizing and clamps opacity for the image overlay', () => {
@@ -116,5 +129,27 @@ describe('card background settings', () => {
     });
     expect(cardBackgroundService.getGroups()).toEqual([updated]);
     expect(deleteImage).toHaveBeenCalledWith('one.png');
+  });
+
+  it('selects the next group when the active group is deleted', async () => {
+    const first = await cardBackgroundService.addGroup('First', [new File(['one'], 'one.png', { type: 'image/png' })], 'right');
+    const second = await cardBackgroundService.addGroup('Second', [new File(['two'], 'two.png', { type: 'image/png' })], 'right');
+    await cardBackgroundService.deleteGroup(second.id);
+    expect(cardBackgroundService.getCurrentGroupId()).toBe(first.id);
+    await cardBackgroundService.deleteGroup(first.id);
+    expect(localStorage.getItem(CARD_BACKGROUND_CURRENT_KEY)).toBeNull();
+  });
+
+  it('preserves unrelated groups added during an image upload', async () => {
+    const initial = await cardBackgroundService.addGroup('Original', [new File(['one'], 'one.png', { type: 'image/png' })], 'right');
+    let completeUpload!: (filename: string) => void;
+    saveImage.mockImplementationOnce(() => new Promise<string>((resolve) => { completeUpload = resolve; }));
+    const update = cardBackgroundService.updateGroup(initial.id, 'Updated', initial.imageFilenames,
+      [new File(['two'], 'two.png', { type: 'image/png' })], 'right');
+    const added = { id: 'imported', name: 'Imported', imageFilenames: ['imported.webp'], alignment: 'right-top' };
+    localStorage.setItem(CARD_BACKGROUND_GROUPS_KEY, JSON.stringify([initial, added]));
+    completeUpload('two.png');
+    await update;
+    expect(cardBackgroundService.getGroups().map((group) => group.id)).toEqual([initial.id, added.id]);
   });
 });
