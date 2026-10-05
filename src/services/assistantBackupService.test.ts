@@ -4,6 +4,7 @@
  * @output Regression coverage for AI persona, prompt block, shortcut, and memory backup and live restore notifications
  * @pos Test (AI Backup)
  * @description Verifies that global AI chat state round-trips through the main backup and notifies mounted chat interfaces after restore.
+ * @updated 2026-10-05: Exercises real assistant config persistence to verify device-local enablement across backup and legacy restore.
  * @updated 2026-09-03: Added persona and long-term memory cloud-sync backup and restore regression coverage.
  * @updated 2026-09-21: Added independent shortcut backup and restore coverage.
  */
@@ -44,13 +45,6 @@ vi.mock('./aiService', () => ({
       name: 'Preset',
       config: { provider: 'openai', apiKey: 'secret', modelName: 'model-1' }
     }])
-  }
-}));
-
-vi.mock('./assistantAgentConfigService', () => ({
-  assistantAgentConfigService: {
-    getConfig: vi.fn(() => ({})),
-    saveConfig: vi.fn()
   }
 }));
 
@@ -103,6 +97,7 @@ import {
   type AssistantChatRestoredDetail
 } from '../utils/aiBackupChange';
 import { assistantMemoryService } from './assistantMemoryService';
+import { assistantAgentConfigService } from './assistantAgentConfigService';
 import { assistantBackupService } from './assistantBackupService';
 import { assistantOrchestratorService } from './assistantOrchestratorService';
 
@@ -130,6 +125,47 @@ describe('assistantBackupService AI chat state', () => {
     vi.mocked(assistantMemoryService.getMemory).mockReset().mockReturnValue({} as any);
     vi.mocked(assistantMemoryService.saveMemory).mockReset();
     vi.mocked(assistantOrchestratorService.listBackgroundCallHistory).mockReset().mockReturnValue([]);
+  });
+
+  it.each([true, false])('excludes local enablement (%s) while backing up other assistant settings', (enabled) => {
+    assistantAgentConfigService.saveConfig({ enabled, minCheckinMinutes: 30, letterEnabled: true });
+
+    const payload = assistantBackupService.buildBackupPayload();
+
+    expect(payload.assistant.agentConfig).not.toHaveProperty('enabled');
+    expect(payload.assistant.agentConfig).toEqual(expect.objectContaining({ minCheckinMinutes: 30, letterEnabled: true }));
+    expect(assistantAgentConfigService.getConfig().enabled).toBe(enabled);
+  });
+
+  it.each([true, false])('preserves local enablement (%s) when a legacy backup contains the opposite switch', async (enabled) => {
+    assistantAgentConfigService.saveConfig({ enabled });
+
+    await assistantBackupService.applyBackupPayload({
+      assistant: { agentConfig: { enabled: !enabled, minCheckinMinutes: 25, longTermMemoryEnabled: false } }
+    });
+
+    expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({
+      enabled, minCheckinMinutes: 25, longTermMemoryEnabled: false
+    }));
+  });
+
+  it('keeps a new device disabled when restoring an enabled legacy backup', async () => {
+    await assistantBackupService.applyBackupPayload({
+      assistant: { agentConfig: { enabled: true, letterFrequencyDays: 5 } }
+    });
+
+    expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({ enabled: false, letterFrequencyDays: 5 }));
+  });
+
+  it('round-trips shared settings between devices while preserving the receiving switch', async () => {
+    assistantAgentConfigService.saveConfig({ enabled: false, minCheckinMinutes: 25 });
+    const payload = assistantBackupService.buildBackupPayload();
+    localStorage.clear();
+    assistantAgentConfigService.saveConfig({ enabled: true });
+
+    await assistantBackupService.applyBackupPayload(payload);
+
+    expect(assistantAgentConfigService.getConfig()).toEqual(expect.objectContaining({ enabled: true, minCheckinMinutes: 25 }));
   });
 
   it('includes every global custom prompt block in the unified backup payload', () => {

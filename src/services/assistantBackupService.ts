@@ -4,6 +4,7 @@
  * @output Unified AI backup payloads plus restore helpers for export/import/cloud sync
  * @pos Service (AI Backup)
  * @description Centralizes all AI-related data that should travel inside the app's main backup JSON, while explicitly excluding API keys and preserving any compatible local keys during restore.
+ * @updated 2026-10-05: Excludes background assistant enablement from backups and preserves the local switch when restoring legacy payloads.
  * @updated 2026-09-03: Dispatches a dedicated chat-restore event with persona, prompt block, and memory state so mounted chat UIs cannot overwrite restored cloud data with stale state.
  * @updated 2026-09-14: Filters chat sessions and background history from unified backups when chat sync is disabled, without clearing local history on restore.
  * @updated 2026-07-04: Added assistant-letter export and restore so scheduled AI letters travel inside the unified backup payload.
@@ -252,7 +253,7 @@ export const assistantBackupService = {
         currentPresetId: currentPreset.id
       },
       assistant: {
-        agentConfig: assistantAgentConfigService.getConfig(),
+        agentConfig: assistantAgentConfigService.getSyncableConfig(),
         memory: assistantMemoryService.getMemory(),
         reminders: assistantReminderQueueService.listReminders(),
         scheduledTasks: assistantScheduledTaskService.listTasks(),
@@ -318,7 +319,10 @@ export const assistantBackupService = {
     if (payload.assistant && typeof payload.assistant === 'object') {
       const assistant = payload.assistant as Partial<AIBackupAssistantState>;
       if (hasOwn(assistant, 'agentConfig') && assistant.agentConfig && typeof assistant.agentConfig === 'object') {
-        assistantAgentConfigService.saveConfig(assistant.agentConfig);
+        assistantAgentConfigService.saveConfig({
+          ...assistant.agentConfig,
+          enabled: assistantAgentConfigService.getConfig().enabled
+        });
       }
       if (hasOwn(assistant, 'memory') && assistant.memory && typeof assistant.memory === 'object') {
         assistantMemoryService.saveMemory(assistant.memory as any);
