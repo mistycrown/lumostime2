@@ -14,6 +14,7 @@
  * @updated 2026-07-21: Added semantic create-template choice states for dark-mode outline selection.
  * @updated 2026-05-05: Rewrote the widget home guide copy to distinguish direct-add desktop widgets from configurable templates.
  * @updated 2026-09-02: Stores stable UI icon IDs for widget slots and tracking-calendar icons.
+ * @updated 2026-10-05: Handles Android back through widget overlays and template details before leaving widget settings.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Plus, Trash2 } from 'lucide-react';
@@ -77,6 +78,7 @@ import {
   updateWidgetTemplateSlots
 } from '../../services/widgetService';
 import { getWidgetSlotFillColor } from '../../utils/colorAdapterUtils';
+import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
 import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../../types';
 
 interface WidgetSettingsViewProps {
@@ -455,6 +457,37 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
     setIsDraftDirty(false);
   };
 
+  const handleInternalBack = (): boolean => {
+    if (deleteTarget) {
+      setDeleteTarget(null);
+      return true;
+    }
+    if (isCreateModalOpen) {
+      setIsCreateModalOpen(false);
+      return true;
+    }
+    if (editingSlotIndex !== null) {
+      setEditingSlotIndex(null);
+      return true;
+    }
+    if (isTrackingEditorOpen) {
+      setIsTrackingEditorOpen(false);
+      return true;
+    }
+    if (editingTemplateDraft) {
+      void closeEditor();
+      return true;
+    }
+    return false;
+  };
+
+  useEffect(() => {
+    if (!editingTemplateDraft && !isCreateModalOpen && !deleteTarget) {
+      return;
+    }
+    return registerHardwareBackHandler(handleInternalBack);
+  }, [editingTemplateDraft, isCreateModalOpen, deleteTarget, handleInternalBack]);
+
   const updateDraftName = (name: string) => {
     setEditingTemplateDraft((previousDraft) => {
       if (!previousDraft) {
@@ -771,11 +804,9 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
         <div className="flex items-center gap-3">
           <button
             onClick={() => {
-              if (editingTemplateDraft) {
-                void closeEditor();
-                return;
+              if (!handleInternalBack()) {
+                onBack();
               }
-              onBack();
             }}
             className="p-1 text-stone-400 hover:text-stone-600"
           >
