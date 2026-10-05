@@ -10,6 +10,7 @@
  * @updated 2026-09-28: Falls back from missing selected theme resources with user-facing warnings.
  * @updated 2026-09-28: Keeps an independently selected Memoir background active across ordinary theme switches.
  * @updated 2026-09-29: Captures and validates the global floating-button image background.
+ * @updated 2026-10-05: Keeps card-background groups active when at least one image is available and releases validation URLs.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS } from '../constants/storageKeys';
@@ -98,10 +99,11 @@ const getStoredArray = <T>(key: string): T[] => {
 
 const getMissingImageFilenames = async (filenames: Array<string | undefined>): Promise<string[]> => {
   const unique = [...new Set(filenames.filter((filename): filename is string => Boolean(filename?.trim())))];
-  const results = await Promise.all(unique.map(async (filename) => ({
-    filename,
-    available: Boolean(await imageService.getImageUrl(filename).catch(() => ''))
-  })));
+  const results = await Promise.all(unique.map(async (filename) => {
+    const url = await imageService.getImageUrl(filename).catch(() => '');
+    if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    return { filename, available: Boolean(url) };
+  }));
   return results.filter((result) => !result.available).map((result) => result.filename);
 };
 
@@ -155,7 +157,9 @@ const validateActiveThemeResources = async (
 
   const cardGroup = cardBackgroundService.getCurrentGroup();
   if (cardGroup) {
-    await validate('卡片背景', cardGroup.imageFilenames, () => cardBackgroundService.setCurrentGroup(null));
+    const missing = await getMissingImageFilenames(cardGroup.imageFilenames);
+    if (missing.length === new Set(cardGroup.imageFilenames).size) cardBackgroundService.setCurrentGroup(null);
+    appendMissingResourceWarning(warnings, '卡片背景', missing);
   }
 
   const floatingButtonBackground = floatingButtonBackgroundService.getSettings();

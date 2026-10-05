@@ -6,6 +6,7 @@
  * @description Ensures saved-theme snapshots preserve independently imported resource catalogs while applying selections.
  * @updated 2026-09-28: Covers Memoir background catalog preservation during theme switching.
  * @updated 2026-09-28: Keeps the selected standalone Memoir background across ordinary theme switches.
+ * @updated 2026-10-05: Preserves card groups with partially available images instead of disabling them.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -157,5 +158,25 @@ describe('themeSettingsSnapshot', () => {
     expect(navigationBackgroundService.setTransparentNavigationEnabled).toHaveBeenCalledWith(true);
     expect(cardBackgroundService.setCurrentGroup).toHaveBeenCalledWith(null);
     expect(warnings).toContain('卡片背景缺少资源：missing-card.webp');
+  });
+
+  it('keeps the selected card group when only some images are missing', async () => {
+    vi.stubGlobal('localStorage', makeLocalStorage());
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    const { cardBackgroundService } = await import('./cardBackgroundService');
+    const { imageService } = await import('./imageService');
+    vi.mocked(cardBackgroundService.getCurrentGroup).mockReturnValue({
+      id: 'partial', name: 'Partial', imageFilenames: ['missing.webp', 'available.webp'], alignment: 'right'
+    });
+    vi.mocked(cardBackgroundService.setCurrentGroup).mockClear();
+    vi.mocked(imageService.getImageUrl).mockImplementation(async (filename) => filename === 'available.webp' ? 'blob:available' : '');
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+
+    const { applyThemeSettingsSnapshot } = await import('./themeSnapshotService');
+    const warnings = await applyThemeSettingsSnapshot({ version: 1, storage: {} });
+    expect(cardBackgroundService.setCurrentGroup).not.toHaveBeenCalled();
+    expect(warnings).toContain('卡片背景缺少资源：missing.webp');
+    expect(revoke).toHaveBeenCalledWith('blob:available');
+    revoke.mockRestore();
   });
 });

@@ -3,6 +3,7 @@
  * @input User card-background groups, uploaded images, alignment and opacity controls
  * @output Selected synchronized card backgrounds and group management actions
  * @pos Component (Sponsorship Personalization)
+ * @updated 2026-10-05: Ignores stale preview requests and contains individual image-loading failures.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -48,8 +49,11 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
   const previewUrlsRef = useRef<Record<string, string>>({});
   const modalImageUrlsRef = useRef<Record<string, string>>({});
   const isMountedRef = useRef(false);
+  const previewRequestRef = useRef(0);
+  const modalRequestRef = useRef(0);
 
   const clearModalImageUrls = () => {
+    modalRequestRef.current += 1;
     Object.values(modalImageUrlsRef.current).forEach((url) => {
       if (url.startsWith('blob:')) URL.revokeObjectURL(url);
     });
@@ -58,16 +62,20 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
   };
 
   const reload = async () => {
+    const request = ++previewRequestRef.current;
     const nextGroups = cardBackgroundService.getGroups();
     setGroups(nextGroups);
     setCurrentId(cardBackgroundService.getCurrentGroupId());
     setOpacity(cardBackgroundService.getOpacity());
     const nextUrls: Record<string, string> = {};
     await Promise.all(nextGroups.map(async (group) => {
-      const url = await imageService.getImageUrl(group.imageFilenames[0], 'thumbnail');
+      const url = await imageService.getImageUrl(group.imageFilenames[0], 'thumbnail').catch((error) => {
+        console.warn('[CardBackgroundSelector] Failed to load group preview', group.id, error);
+        return '';
+      });
       if (url) nextUrls[group.id] = url;
     }));
-    if (!isMountedRef.current) {
+    if (!isMountedRef.current || request !== previewRequestRef.current) {
       Object.values(nextUrls).forEach((url) => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
       return;
     }
@@ -78,15 +86,19 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
 
   useEffect(() => {
     isMountedRef.current = true;
-    void reload();
-    window.addEventListener(CARD_BACKGROUND_CHANGED_EVENT, reload);
-    window.addEventListener(APPEARANCE_RESTORED_EVENT, reload);
+    const refresh = () => {
+      void reload().catch((error) => console.warn('[CardBackgroundSelector] Failed to refresh groups', error));
+    };
+    refresh();
+    window.addEventListener(CARD_BACKGROUND_CHANGED_EVENT, refresh);
+    window.addEventListener(APPEARANCE_RESTORED_EVENT, refresh);
     const updateOpacity = () => setOpacity(cardBackgroundService.getOpacity());
     window.addEventListener(CARD_BACKGROUND_OPACITY_EVENT, updateOpacity);
     return () => {
       isMountedRef.current = false;
-      window.removeEventListener(CARD_BACKGROUND_CHANGED_EVENT, reload);
-      window.removeEventListener(APPEARANCE_RESTORED_EVENT, reload);
+      previewRequestRef.current += 1;
+      window.removeEventListener(CARD_BACKGROUND_CHANGED_EVENT, refresh);
+      window.removeEventListener(APPEARANCE_RESTORED_EVENT, refresh);
       window.removeEventListener(CARD_BACKGROUND_OPACITY_EVENT, updateOpacity);
       Object.values(previewUrlsRef.current).forEach((url) => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
       clearModalImageUrls();
@@ -112,6 +124,7 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
 
   const openEditModal = async (group: CardBackgroundGroup) => {
     clearModalImageUrls();
+    const request = modalRequestRef.current;
     setEditingGroup(group);
     setGroupName(group.name);
     setAlignment(group.alignment);
@@ -121,10 +134,13 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
     setIsModalOpen(true);
     const urls: Record<string, string> = {};
     await Promise.all(group.imageFilenames.map(async (filename) => {
-      const url = await imageService.getImageUrl(filename, 'thumbnail');
+      const url = await imageService.getImageUrl(filename, 'thumbnail').catch((error) => {
+        console.warn('[CardBackgroundSelector] Failed to load editor image', filename, error);
+        return '';
+      });
       if (url) urls[filename] = url;
     }));
-    if (!isMountedRef.current) {
+    if (!isMountedRef.current || request !== modalRequestRef.current) {
       Object.values(urls).forEach((url) => { if (url.startsWith('blob:')) URL.revokeObjectURL(url); });
       return;
     }

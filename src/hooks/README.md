@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> Update 2026-10-05: `useCardBackground.ts` preloads images, falls back within partially available groups, ignores stale asynchronous loads, and applies the latest opacity after image reads. Verify real React effects and image decoding with `node scripts/test-card-background-renderer.mjs`.
+
 > Update 2026-10-05: `useCustomPresets.ts` compacts image URLs in existing saved theme snapshots and checks storage write results so quota failures do not appear as successful saves.
 
 > Update 2026-10-04: `useTodoQuickActions.ts` validates main-task association against the latest todos and saves inherited category/activity/scope settings through the existing todo pipeline.
