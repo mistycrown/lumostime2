@@ -1,5 +1,6 @@
 /**
  * @file errorReporting.ts
+ * @updated 2026-10-05: Adds searchable pseudonymous user IDs and waits for manual report delivery.
  * @input Optional Vite Sentry DSN and sanitized diagnostic contexts
  * @output Remote crash and startup diagnostic events when monitoring is configured
  * @pos Shared diagnostics service
@@ -7,12 +8,14 @@
  * @updated 2026-08-26: Captures a bounded, sanitized buffer of recent renderer errors and warnings for explicit user-triggered Sentry reporting.
  */
 import * as Sentry from '@sentry/react';
+import { getDiagnosticIdentity } from './diagnosticIdentityService';
+import { RedemptionService } from './redemptionService';
 
 type DiagnosticContext = Record<string, unknown>;
 type DiagnosticLevel = 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug';
 
 export type RecentConsoleReportResult =
-  | { status: 'sent'; eventId: string }
+  | { status: 'sent'; eventId: string; userId: string }
   | { status: 'disabled' | 'empty' | 'failed' };
 
 export interface RecentConsoleEntry {
@@ -108,13 +111,17 @@ export const initializeErrorReporting = (): boolean => {
     sendDefaultPii: false,
     tracesSampleRate: 0,
     beforeSend(event) {
-      delete event.user;
+      const identity = getDiagnosticIdentity();
+      event.user = { id: identity.id };
+      event.tags = { ...event.tags, user_id: identity.id, user_type: identity.type };
       delete event.request;
       return event;
     }
   });
 
   reportingEnabled = true;
+  // Restore the cached ID for older installations that only saved a redemption code.
+  void new RedemptionService().isVerified().catch(() => {});
   return true;
 };
 
@@ -175,18 +182,20 @@ export const getLatestCriticalDataError = (): CriticalDataErrorDetail | null => 
 
 export const getRecentConsoleEntries = (): RecentConsoleEntry[] => recentConsoleEntries.map((entry) => ({ ...entry }));
 
-export const reportRecentConsoleErrors = (): RecentConsoleReportResult => {
+export const reportRecentConsoleErrors = async (): Promise<RecentConsoleReportResult> => {
   if (!reportingEnabled) return { status: 'disabled' };
   if (recentConsoleEntries.length === 0) return { status: 'empty' };
   try {
+    await new RedemptionService().isVerified();
+    const identity = getDiagnosticIdentity();
     const serializedEntries = JSON.stringify(recentConsoleEntries).slice(0, MAX_REPORT_LENGTH);
     const eventId = Sentry.withScope((scope) => {
       scope.setLevel('error');
       scope.setContext('recent_console_errors', { count: recentConsoleEntries.length, entries: serializedEntries });
       return Sentry.captureMessage('User submitted recent console errors');
     });
-    void Sentry.flush(2_000);
-    return eventId ? { status: 'sent', eventId } : { status: 'failed' };
+    if (!eventId || !await Sentry.flush(5_000)) return { status: 'failed' };
+    return { status: 'sent', eventId, userId: identity.id };
   } catch {
     return { status: 'failed' };
   }

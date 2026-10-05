@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-05: Keeps delivered error-report IDs and user identifiers in a copyable receipt dialog.
  * @updated 2026-10-02: Added the manual Feishu calendar connection/test-event entry under Data and Sync.
  * @updated 2026-10-02: Delegates all provider transfers to the shared versioned sync coordinator.
  * @input User Settings, Sync Data, AI Config, App State
@@ -94,6 +95,7 @@ import { ToastType } from '../components/Toast';
 import { CloudService } from '../utils/syncUtils';
 
 import { ConfirmModal } from '../components/ConfirmModal';
+import { FeedbackReportModal } from '../components/FeedbackReportModal';
 import { AppView, ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate, Routine } from '../types';
 import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, TimelineQuickActionKey, TimelineSortOrder, useSettings } from '../contexts/SettingsContext';
 import { SettingsSubmenu, useNavigation } from '../contexts/NavigationContext';
@@ -270,14 +272,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
 
 
     const [isSendingErrorLogs, setIsSendingErrorLogs] = useState(false);
+    const [feedbackReceipt, setFeedbackReceipt] = useState<{ eventId: string; userId: string } | null>(null);
+    const sendingErrorLogsRef = useRef(false);
 
-    const handleSendErrorLogs = () => {
-        if (isSendingErrorLogs) return;
+    const handleSendErrorLogs = async () => {
+        if (sendingErrorLogsRef.current) return;
+        sendingErrorLogsRef.current = true;
         setIsSendingErrorLogs(true);
         try {
-            const result = reportRecentConsoleErrors();
+            const result = await reportRecentConsoleErrors();
             if (result.status === 'sent') {
-                onToast('success', `错误日志已发送（${result.eventId}）`);
+                setFeedbackReceipt({ eventId: result.eventId, userId: result.userId });
             } else if (result.status === 'empty') {
                 onToast('info', '暂无可发送的错误日志');
             } else if (result.status === 'disabled') {
@@ -286,6 +291,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                 onToast('error', '错误日志发送失败，请稍后重试');
             }
         } finally {
+            sendingErrorLogsRef.current = false;
             setIsSendingErrorLogs(false);
         }
     };
@@ -1442,6 +1448,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
 
             </div>
 
+            {feedbackReceipt && (
+                <FeedbackReportModal
+                    eventId={feedbackReceipt.eventId}
+                    userId={feedbackReceipt.userId}
+                    onClose={() => setFeedbackReceipt(null)}
+                />
+            )}
             {/* Update Available Modal */}
             {showUpdateModal && updateInfo && (
                 <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">

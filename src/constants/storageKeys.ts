@@ -1,5 +1,6 @@
 /**
  * @file storageKeys.ts
+ * @updated 2026-10-05: Stores a persistent anonymous diagnostics identifier.
  * @description localStorage 键名统一管理
  * @updated 2026-07-29: Added persistent Chronicle layout, todo-column state, and width preferences.
  * @updated 2026-07-30: Added persistent quick-color sidebar width alongside the existing timeline todo width.
@@ -195,6 +196,13 @@ export const SPONSORSHIP_KEYS = {
 } as const;
 
 /**
+ * 诊断反馈相关的本机存储键
+ */
+export const DIAGNOSTICS_KEYS = {
+    USER_ID: 'lumostime_diagnostics_user_id',
+} as const;
+
+/**
  * 所有存储键的集合（用于类型推断和工具函数）
  */
 export const STORAGE_KEYS = {
@@ -205,6 +213,7 @@ export const STORAGE_KEYS = {
     ...REVIEW_KEYS,
     ...SYNC_KEYS,
     ...SPONSORSHIP_KEYS,
+    ...DIAGNOSTICS_KEYS,
 } as const;
 
 /**
