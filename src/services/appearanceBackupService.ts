@@ -16,8 +16,10 @@
  * @updated 2026-09-29: Includes the global floating-button image background and scale.
  * @updated 2026-10-01: Includes the TimePal card seconds-visibility preference.
  * @updated 2026-10-04: Backs up modern navigation settings and images, then hydrates and refreshes navigation on restore.
+ * @updated 2026-10-05: Compacts file-backed image URLs in backups and restores, including saved theme snapshots.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
+import { sanitizeAppearanceImageStorage } from '../utils/imageAssetStorage';
 import { fontService } from './fontService';
 import { UI_ICON_CUSTOM_ASSETS_KEY, UI_ICON_CUSTOM_THEME_NAMES_KEY, uiIconService } from './uiIconService';
 import { colorSchemeService } from './colorSchemeService';
@@ -106,9 +108,9 @@ export interface AppearanceBackupPayload {
   storage: AppearanceStorage;
 }
 
-const readStorageSnapshot = (): AppearanceStorage => Object.fromEntries(
+const readStorageSnapshot = (): AppearanceStorage => sanitizeAppearanceImageStorage(Object.fromEntries(
   APPEARANCE_STORAGE_KEYS.map((key) => [key, localStorage.getItem(key)])
-);
+));
 
 const parseJsonValue = (storageSnapshot: AppearanceStorage, key: string): unknown => {
   const raw = storageSnapshot[key];
@@ -125,7 +127,7 @@ const isBuiltInFont = (fontId: string): boolean => (
 );
 
 const normalizeStorageForRestore = (snapshot: AppearanceStorage): AppearanceStorage => {
-  const next = { ...snapshot };
+  const next = sanitizeAppearanceImageStorage(snapshot);
   const savedFont = next.lumostime_font_family;
   if (savedFont && !isBuiltInFont(savedFont)) {
     next.lumostime_font_family = 'default';

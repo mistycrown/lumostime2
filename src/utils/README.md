@@ -1,5 +1,7 @@
 # Utils Architecture
 
+> Update 2026-10-05: `imageAssetStorage.ts` removes runtime image URLs from file-backed settings and appearance snapshots while preserving legacy assets that have no file reference.
+
 > Update 2026-10-04: `todoParentLinkUtils.ts` validates one-level main-task associations, filters searchable candidates and upgrades quick reminders to project subtasks while preserving task data.
 
 > Update 2026-10-03: `feishuLogDescription.ts` formats calendar notes into note/attribute/rating/link/source sections, resolves saved options and linked entity names, preserves deleted references by ID, and rejects descriptions over 12000 characters without truncation. `feishuLogImport.ts` includes this metadata for new calendar events while excluding images/comments.

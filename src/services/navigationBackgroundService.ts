@@ -9,9 +9,11 @@
  * @updated 2026-09-26: Added a built-in no-background option that restores the default navigation surface.
  * @updated 2026-09-28: Removed the packaged background image and migrate its saved selection to no background.
  * @updated 2026-09-28: Persists independent vertical stretching for new navigation backgrounds.
+ * @updated 2026-10-05: Stores file references only and keeps hydrated background images in memory.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
+import { ImageAssetListStorage } from './imageAssetListStorage';
 import type { NavigationDecorationOption } from './navigationDecorationService';
 
 export type NavigationBackgroundSettings = {
@@ -34,6 +36,7 @@ export const NAVIGATION_BACKGROUND_PREVIEW_EVENT = 'navigationBackgroundPreview'
 export const NAVIGATION_TRANSPARENCY_CHANGE_EVENT = 'navigationTransparencyChange';
 
 class NavigationBackgroundService {
+    private readonly customBackgrounds = new ImageAssetListStorage<NavigationDecorationOption>(CUSTOM_KEY);
     private readonly builtIn: NavigationDecorationOption[] = [
         {
             id: 'new-none',
@@ -82,36 +85,19 @@ class NavigationBackgroundService {
     }
 
     private loadCustomBackgrounds(): NavigationDecorationOption[] {
-        try {
-            const stored = localStorage.getItem(CUSTOM_KEY);
-            const parsed = stored ? JSON.parse(stored) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
+        return this.customBackgrounds.load();
     }
 
     private saveCustomBackgrounds(backgrounds: NavigationDecorationOption[]): void {
-        localStorage.setItem(CUSTOM_KEY, JSON.stringify(backgrounds));
+        this.customBackgrounds.save(backgrounds);
     }
 
-    async hydrateCustomBackgrounds(): Promise<void> {
-        const backgrounds = this.loadCustomBackgrounds();
-        let changed = false;
-        const hydrated = await Promise.all(backgrounds.map(async (background) => {
-            if (!background.imageFilename) return background;
-            const url = await imageService.getImageUrl(background.imageFilename);
-            if (!url || url === background.url) return background;
-            changed = true;
-            return { ...background, url, thumbnail: url };
-        }));
-
-        if (changed) {
-            this.saveCustomBackgrounds(hydrated);
-            window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, {
+    hydrateCustomBackgrounds(): Promise<void> {
+        return this.customBackgrounds.hydrate(() => {
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, {
                 detail: { backgroundId: this.getCurrentBackground() }
             }));
-        }
+        });
     }
 
     getAllBackgrounds(): NavigationDecorationOption[] {

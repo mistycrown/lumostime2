@@ -5,6 +5,7 @@
  * @pos Service (UI Customization)
  * @description Stores a single fill image for each Memoir mood-calendar background.
  * @updated 2026-09-29: Deduplicates hydration, keeps temporary URLs out of storage, and merges results without overwriting concurrent edits.
+ * @updated 2026-10-05: Avoids redundant storage writes and tolerates quota failures during startup hydration.
  */
 import { imageService } from './imageService';
 
@@ -99,7 +100,10 @@ class MoodCalendarBackgroundService {
                 thumbnail: this.isTemporaryUrl(background.thumbnail) ? '' : background.thumbnail
             };
         });
-        localStorage.setItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, JSON.stringify(persisted));
+        const serialized = JSON.stringify(persisted);
+        if (localStorage.getItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY) !== serialized) {
+            localStorage.setItem(MOOD_CALENDAR_BACKGROUND_CUSTOM_KEY, serialized);
+        }
     }
 
     private isDataUrl(value: unknown): value is string {
@@ -197,10 +201,14 @@ class MoodCalendarBackgroundService {
     }
 
     private persistLatestBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
-        this.saveCustomBackgrounds(backgrounds.map((background) => {
-            const runtimeUrl = this.getRuntimeImageUrl(background);
-            return runtimeUrl ? { ...background, url: runtimeUrl, thumbnail: runtimeUrl } : background;
-        }));
+        try {
+            this.saveCustomBackgrounds(backgrounds.map((background) => {
+                const runtimeUrl = this.getRuntimeImageUrl(background);
+                return runtimeUrl ? { ...background, url: runtimeUrl, thumbnail: runtimeUrl } : background;
+            }));
+        } catch (error) {
+            console.warn('[MoodCalendarBackgroundService] Failed to compact background metadata', error);
+        }
     }
 
     getAllBackgrounds(): MoodCalendarBackgroundOption[] {

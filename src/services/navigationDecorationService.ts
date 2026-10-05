@@ -15,12 +15,14 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-10: Added canonical image-list storage and restore hydration for custom navigation decorations.
  * @updated 2026-09-25: Registers custom navigation decoration uploads in the theme image manifest group.
+ * @updated 2026-10-05: Persists image references without Base64 and merges legacy migration with current metadata.
  */
 
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
+import { ImageAssetListStorage } from './imageAssetListStorage';
 
 export interface NavigationDecorationOption {
     id: string;
@@ -50,6 +52,7 @@ interface NavigationDecorationSettings {
 }
 
 class NavigationDecorationService {
+    private readonly customDecorations = new ImageAssetListStorage<NavigationDecorationOption>(CUSTOM_DECORATIONS_KEY);
     private isMigratingImageReferences = false;
     private decorations: NavigationDecorationOption[] = [
         { id: 'default', name: '默认', url: '', offsetY: 'bottom', offsetX: '0px', scale: 1, opacity: 0.6 },
@@ -93,24 +96,15 @@ class NavigationDecorationService {
     ].map(d => ({ ...d, type: d.type || 'preset' })) as NavigationDecorationOption[];
 
     constructor() {
-        void this.migrateLegacyImageReferences();
         void this.hydrateImageBackedCustomDecorations();
     }
 
     private loadStoredCustomDecorations(): NavigationDecorationOption[] {
-        try {
-            const stored = localStorage.getItem(CUSTOM_DECORATIONS_KEY);
-            if (!stored) return [];
-            const parsed = JSON.parse(stored);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            console.error('Failed to load custom decorations:', error);
-            return [];
-        }
+        return this.customDecorations.load();
     }
 
     private saveCustomDecorations(customDecorations: NavigationDecorationOption[]): void {
-        localStorage.setItem(CUSTOM_DECORATIONS_KEY, JSON.stringify(customDecorations));
+        this.customDecorations.save(customDecorations);
     }
 
     private async ensureDecorationDirectory(): Promise<void> {
@@ -226,30 +220,29 @@ class NavigationDecorationService {
                 }
             }));
 
-            if (changed) this.saveCustomDecorations(migrated);
+            if (changed) {
+                const latest = this.loadStoredCustomDecorations();
+                this.saveCustomDecorations(latest.map((decoration) => {
+                    const result = migrated.find((item) => item.id === decoration.id);
+                    return !decoration.imageFilename && result?.imageFilename && result.url === decoration.url
+                        ? { ...decoration, imageFilename: result.imageFilename }
+                        : decoration;
+                }));
+            }
+        } catch (error) {
+            console.warn('[NavigationDecorationService] Failed to persist legacy image references:', error);
         } finally {
             this.isMigratingImageReferences = false;
         }
     }
 
     async hydrateImageBackedCustomDecorations(): Promise<void> {
-        const decorations = this.loadStoredCustomDecorations();
-        let changed = false;
-        const hydrated = await Promise.all(decorations.map(async (decoration) => {
-            if (decoration.type !== 'custom' || !decoration.imageFilename) return decoration;
-
-            const url = await imageService.getImageUrl(decoration.imageFilename);
-            if (!url || decoration.url === url) return decoration;
-            changed = true;
-            return { ...decoration, url, thumbnail: url };
-        }));
-
-        if (changed) {
-            this.saveCustomDecorations(hydrated);
-            window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
+        await this.migrateLegacyImageReferences();
+        await this.customDecorations.hydrate(() => {
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('navigationDecorationChange', {
                 detail: { decorationId: this.getCurrentDecoration() }
             }));
-        }
+        });
     }
 
     getAllDecorations(): NavigationDecorationOption[] {
