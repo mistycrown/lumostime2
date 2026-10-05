@@ -4,12 +4,18 @@
  * @output Regression coverage for assistant config defaults, normalization, and migration
  * @pos Test (Assistant Agent Config)
  * @description Verifies that assistant scheduling, memory, log-trigger, and letter settings remain normalized and persistable.
+ * @updated 2026-10-05: Covers device-local enablement persistence and sync change notifications.
  * @updated 2026-09-09: Verifies that random check-in can be disabled independently from the background assistant config.
  * @updated 2026-09-03: Verifies that the removed base polling interval is ignored when migrating older persisted config.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { assistantAgentConfigService } from './assistantAgentConfigService';
+import { notifyAIBackupDataChanged } from '../utils/aiBackupChange';
+
+vi.mock('../utils/aiBackupChange', () => ({
+  notifyAIBackupDataChanged: vi.fn()
+}));
 
 type LocalStorageMock = {
   getItem: (key: string) => string | null;
@@ -37,10 +43,27 @@ const createLocalStorageMock = (): LocalStorageMock => {
 
 describe('assistantAgentConfigService', () => {
   beforeEach(() => {
+    vi.mocked(notifyAIBackupDataChanged).mockClear();
     Object.defineProperty(globalThis, 'localStorage', {
       value: createLocalStorageMock(),
       configurable: true
     });
+  });
+
+  it('persists local enablement without marking synced data as changed', () => {
+    assistantAgentConfigService.saveConfig({ enabled: true });
+    expect(assistantAgentConfigService.getConfig().enabled).toBe(true);
+    expect(assistantAgentConfigService.getSyncableConfig()).not.toHaveProperty('enabled');
+
+    assistantAgentConfigService.saveConfig({ enabled: false });
+    expect(assistantAgentConfigService.getConfig().enabled).toBe(false);
+    expect(notifyAIBackupDataChanged).not.toHaveBeenCalled();
+  });
+
+  it('marks shared setting changes as synced edits even when enablement changes too', () => {
+    assistantAgentConfigService.saveConfig({ enabled: true, minCheckinMinutes: 30 });
+    expect(assistantAgentConfigService.getSyncableConfig().minCheckinMinutes).toBe(30);
+    expect(notifyAIBackupDataChanged).toHaveBeenCalledTimes(1);
   });
 
   it('returns defaults for the new log-submission trigger config and letter config', () => {

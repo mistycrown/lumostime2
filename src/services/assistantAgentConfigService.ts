@@ -4,6 +4,7 @@
  * @output Persistent Android-first assistant agent config snapshots
  * @pos Service (Assistant Agent Config)
  * @description Stores the background assistant agent's runtime configuration, including random check-in scheduling and long-term-memory toggles, so the shared AI window and native plugin can stay in sync.
+ * @updated 2026-10-05: Keeps background assistant enablement device-local and only marks syncable config changes as backup edits.
  * @updated 2026-09-03: Removed the legacy base polling interval because random check-ins are now scheduled at their concrete alarm time.
  *
  * @updated 2026-07-04: Added assistant-letter scheduling config normalization, including frequency, time-window, and persisted next-send timestamps.
@@ -139,6 +140,8 @@ const safeParseJson = <T>(raw: string | null, fallback: T): T => {
   }
 };
 
+const toSyncableConfig = ({ enabled: _enabled, ...config }: AssistantAgentConfig): Omit<AssistantAgentConfig, 'enabled'> => config;
+
 export const assistantAgentConfigService = {
   getStorageKey(): string {
     return ASSISTANT_AGENT_CONFIG_KEY;
@@ -154,6 +157,10 @@ export const assistantAgentConfigService = {
     );
   },
 
+  getSyncableConfig(): Omit<AssistantAgentConfig, 'enabled'> {
+    return toSyncableConfig(assistantAgentConfigService.getConfig());
+  },
+
   saveConfig(config: Partial<AssistantAgentConfig>): AssistantAgentConfig {
     const current = assistantAgentConfigService.getConfig();
     const next = normalizeConfig({
@@ -161,7 +168,9 @@ export const assistantAgentConfigService = {
       ...config
     });
     localStorage.setItem(ASSISTANT_AGENT_CONFIG_KEY, JSON.stringify(next));
-    notifyAIBackupDataChanged();
+    if (JSON.stringify(toSyncableConfig(current)) !== JSON.stringify(toSyncableConfig(next))) {
+      notifyAIBackupDataChanged();
+    }
     return next;
   },
 
