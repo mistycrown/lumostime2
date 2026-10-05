@@ -1,6 +1,7 @@
 /**
  * @file UIIconSelector.tsx
  * @description UI 图标选择器组件 - 支持双图标系统
+ * @updated 2026-10-05: Refreshes both selectors when theme assets finish loading.
  * 
  * 新的双图标系统：
  * - 选择图标时，根据当前主题决定更新哪个字段
@@ -10,7 +11,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Check } from 'lucide-react';
-import { uiIconService, UIIconType, ICON_GROUPS } from '../services/uiIconService';
+import { uiIconService, UIIconType, ICON_GROUPS, useUIIconTheme } from '../services/uiIconService';
 
 interface UIIconSelectorProps {
     currentIcon: string;              // 当前 emoji 图标
@@ -47,7 +48,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
     className = ''
 }) => {
     const [selectedGroup, setSelectedGroup] = useState<keyof typeof ICON_GROUPS>('daily');
-    const currentTheme = uiIconService.getCurrentTheme();
+    const currentTheme = useUIIconTheme();
     
     // 解析当前图标
     const { isUIIcon: currentIsUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
@@ -172,7 +173,7 @@ export const UIIconSelector: React.FC<UIIconSelectorProps> = ({
                                 alt={label}
                                 className="w-full h-full object-contain"
                                 onError={(e) => {
-                                    if (e.currentTarget.src === primary) {
+                                    if (primary !== fallback && e.currentTarget.getAttribute('src') === primary) {
                                         e.currentTarget.src = fallback;
                                     }
                                 }}
@@ -210,7 +211,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
     onSelectDual,
     className = ''
 }) => {
-    const currentTheme = uiIconService.getCurrentTheme();
+    const currentTheme = useUIIconTheme();
     
     // 解析当前图标
     const { isUIIcon: currentIsUIIcon, value: currentIconType } = uiIconService.parseIconString(currentIcon);
@@ -309,7 +310,7 @@ export const UIIconSelectorCompact: React.FC<UIIconSelectorProps> = ({
                                 alt={label}
                                 className="w-full h-full object-contain"
                                 onError={(e) => {
-                                    if (e.currentTarget.src === primary) {
+                                    if (primary !== fallback && e.currentTarget.getAttribute('src') === primary) {
                                         e.currentTarget.src = fallback;
                                     }
                                 }}

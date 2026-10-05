@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-05: UI icon renderers, selectors, and theme previews subscribe to asset hydration as well as theme switches. Failed image state resets when the theme or resolved source changes.
+
 Update 2026-10-05: `CardBackgroundSelector.tsx` contains individual preview-loading failures and rejects stale group/editor requests after refresh, close, or unmount.
 
 > Update 2026-10-04: `TodoQuickActionsModal.tsx` pairs duplicate with main-task association. `TodoParentPickerModal.tsx` provides category filters, title/note search and back dismissal for eligible leaf tasks, using the same mobile bottom alignment, safe-area spacing and rounded corners as the quick-actions sheet. Its height is captured from the outer sheet on opening and stays fixed across filtering, with a scrollable results area. Run `node scripts/test-todo-parent-link.mjs` after a production build to verify actual renderer interactions and narrow-screen layout.

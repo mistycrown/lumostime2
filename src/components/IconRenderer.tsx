@@ -2,6 +2,7 @@
  * @file IconRenderer.tsx
  * @description 通用图标渲染组件 - 支持双图标系统（emoji + uiIcon）
  * @updated 2026-08-06: Added an explicit UI-icon precedence option for scene time-slot rendering while preserving emoji fallback data.
+ * @updated 2026-10-05: Refreshes loaded icons and clears failed-image state on theme or asset changes.
  * 
  * 新的双图标系统：
  * - icon: 始终保存 emoji（用于默认主题）
@@ -11,7 +12,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import twemoji from 'twemoji';
-import { uiIconService, UIIconType } from '../services/uiIconService';
+import { uiIconService, UIIconType, useUIIconTheme } from '../services/uiIconService';
 import { getDisplayIcon } from '../utils/iconUtils';
 import { resolveAssetPath } from '../utils/assetPath';
 import { useSettings } from '../contexts/SettingsContext';
@@ -59,21 +60,22 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     const emojiRef = useRef<HTMLSpanElement>(null);
     const { emojiStyle } = useSettings();
     
-    const currentTheme = uiIconService.getCurrentTheme();
+    const currentTheme = useUIIconTheme();
     
     // 使用工具函数获取应该显示的图标
     const displayIcon = preferUiIcon && uiIcon && currentTheme !== 'default'
         ? uiIcon
         : getDisplayIcon(icon, uiIcon, currentTheme);
+    const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
+    const uiIconPaths = isUIIcon
+        ? uiIconService.getIconPathWithFallback(value as UIIconType)
+        : { primary: '', fallback: '' };
     
     // 当图标变化时，重置错误状态
     React.useEffect(() => {
         setImageError(false);
         setHasFallbackAttempted(false);
-    }, [displayIcon]);
-    
-    // 解析显示的图标字符串
-    const { isUIIcon, value } = uiIconService.parseIconString(displayIcon);
+    }, [displayIcon, currentTheme, uiIconPaths.primary]);
     
     // 检查是否是自定义图片（格式：image:/path/to/image）
     const isCustomImage = displayIcon.startsWith('image:');
@@ -324,7 +326,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
     // 3. 如果使用 UI Icon，渲染图片
     if (shouldUseUIIcon) {
         const iconType = value as UIIconType;
-        const { primary, fallback } = uiIconService.getIconPathWithFallback(iconType);
+        const { primary, fallback } = uiIconPaths;
         
         const imageSize = getImageSize();
         const sizeStyle = { 
@@ -394,7 +396,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
  * ```
  */
 export const useIconRenderer = (icon: string, uiIcon?: string) => {
-    const currentTheme = uiIconService.getCurrentTheme();
+    const currentTheme = useUIIconTheme();
     
     // 使用工具函数获取应该显示的图标
     const displayIcon = getDisplayIcon(icon, uiIcon, currentTheme);
