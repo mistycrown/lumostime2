@@ -5,6 +5,7 @@
  * @pos Component (Appearance Settings)
  * @description Lets users manage reusable circular image schemes shared by every FloatingButton.
  * @updated 2026-09-29: Reworked the single-image control into a selectable scheme gallery.
+ * @updated 2026-10-05: Keeps selection badges outside the circular preview clipping layer.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -78,14 +79,14 @@ export const FloatingButtonBackgroundSelector: React.FC<FloatingButtonBackground
     <section className="rounded-2xl bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
       <h4 className="font-bold text-stone-700">悬浮按钮背景</h4>
       <div className="mt-4 grid grid-cols-5 gap-2">
-        <button type="button" onClick={() => floatingButtonBackgroundService.selectScheme(null)} aria-label="使用默认悬浮按钮背景" aria-pressed={!currentId} className={`relative aspect-square overflow-hidden rounded-full border-2 bg-[var(--floating-button-bg)] text-lg text-[var(--floating-button-icon)] ${!currentId ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
+        <button type="button" onClick={() => floatingButtonBackgroundService.selectScheme(null)} aria-label="使用默认悬浮按钮背景" aria-pressed={!currentId} className={`relative aspect-square overflow-visible rounded-full border-2 bg-[var(--floating-button-bg)] text-lg text-[var(--floating-button-icon)] ${!currentId ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
           +
-          {!currentId && <span className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-full bg-stone-800 text-white"><Check size={12} /></span>}
+          {!currentId && <span className="pointer-events-none absolute -right-1 -top-1 z-10 grid h-5 w-5 place-items-center rounded-full bg-stone-800 text-white"><Check size={12} /></span>}
         </button>
         {schemes.map((scheme) => (
-          <button key={scheme.id} type="button" onClick={() => floatingButtonBackgroundService.selectScheme(scheme.id)} aria-label="使用悬浮按钮方案" aria-pressed={scheme.id === currentId} className={`relative aspect-square overflow-hidden rounded-full border-2 bg-stone-100 ${scheme.id === currentId ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
-            {imageUrls[scheme.id] && <span aria-hidden="true" className="absolute inset-0 bg-center bg-no-repeat" style={{ backgroundImage: `url("${imageUrls[scheme.id].replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`, backgroundSize: `${scheme.scale}%` }} />}
-            {scheme.id === currentId && <span className="absolute right-0 top-0 grid h-5 w-5 place-items-center rounded-full bg-stone-800 text-white"><Check size={12} /></span>}
+          <button key={scheme.id} type="button" onClick={() => floatingButtonBackgroundService.selectScheme(scheme.id)} aria-label="使用悬浮按钮方案" aria-pressed={scheme.id === currentId} className={`relative aspect-square overflow-visible rounded-full border-2 bg-stone-100 ${scheme.id === currentId ? 'border-stone-500 ring-2 ring-stone-200' : 'border-stone-200 hover:border-stone-300'}`}>
+            {imageUrls[scheme.id] && <span aria-hidden="true" className="absolute inset-0 overflow-hidden rounded-full bg-center bg-no-repeat" style={{ backgroundImage: `url("${imageUrls[scheme.id].replace(/\\/g, '\\\\').replace(/"/g, '\\"')}")`, backgroundSize: `${scheme.scale}%` }} />}
+            {scheme.id === currentId && <span className="pointer-events-none absolute -right-1 -top-1 z-10 grid h-5 w-5 place-items-center rounded-full bg-stone-800 text-white"><Check size={12} /></span>}
           </button>
         ))}
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isSaving} aria-label="添加悬浮按钮方案" className="flex aspect-square items-center justify-center rounded-full border-2 border-dashed border-stone-300 text-stone-500 transition-colors hover:border-stone-500 hover:text-stone-800 disabled:opacity-50"><ImagePlus size={18} /></button>
