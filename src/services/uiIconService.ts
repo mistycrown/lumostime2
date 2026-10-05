@@ -14,6 +14,7 @@
  * - 图标文件格式: `/uiicon/{theme}/{编号}.webp` (带PNG降级)
  * @updated 2026-04-25: Added helpers to map packaged UI icon asset paths back to icon ids so widget editors can round-trip native icon selections.
  * @updated 2026-09-26: Added image-backed UIIcon themes imported from theme packages.
+ * @updated 2026-10-05: Separates stored filenames from hydrated URLs and refreshes consumers after asynchronous asset changes.
  * - 编号格式: 01-96 (两位数字，前导零)
  * 
  * ### 使用方式
@@ -427,39 +428,42 @@ class UIIconService {
     private currentTheme: UIIconTheme = 'default';
     private readonly STORAGE_KEY = 'lumostime_ui_icon_theme';
     private customThemeAssets: Record<string, Record<string, string>> = {};
+    private hydrationVersion = 0;
 
     constructor() {
-        this.loadCustomThemeAssets();
         this.loadTheme();
         void this.hydrateCustomThemeAssets();
     }
 
-    private loadCustomThemeAssets(): void {
-        try {
-            const raw = localStorage.getItem(UI_ICON_CUSTOM_ASSETS_KEY);
-            const parsed = raw ? JSON.parse(raw) : {};
-            this.customThemeAssets = parsed && typeof parsed === 'object' ? parsed : {};
-        } catch {
-            this.customThemeAssets = {};
-        }
-    }
-
-    private async hydrateCustomThemeAssets(): Promise<void> {
+    async hydrateCustomThemeAssets(): Promise<void> {
+        const version = ++this.hydrationVersion;
+        const stored = this.readStoredCustomThemeAssets();
         const hydrated: Record<string, Record<string, string>> = {};
-        for (const [theme, mapping] of Object.entries(this.customThemeAssets)) {
+        await Promise.all(Object.entries(stored).map(async ([theme, mapping]) => {
             const nextMapping: Record<string, string> = {};
-            for (const [iconType, filename] of Object.entries(mapping)) {
+            await Promise.all(Object.entries(mapping).map(async ([iconType, filename]) => {
                 const url = await imageService.getImageUrl(filename).catch(() => '');
                 if (url) {
                     nextMapping[iconType] = url;
                 }
-            }
+            }));
             hydrated[theme] = nextMapping;
+        }));
+        if (version !== this.hydrationVersion) {
+            Object.values(hydrated).forEach((mapping) => this.releaseAssetUrls(mapping));
+            return;
         }
+        Object.values(this.customThemeAssets).forEach((mapping) => this.releaseAssetUrls(mapping));
         this.customThemeAssets = hydrated;
-        if (this.currentTheme !== 'default' && typeof window !== 'undefined') {
+        if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('ui-icon-theme-changed', { detail: { theme: this.currentTheme } }));
         }
+    }
+
+    private releaseAssetUrls(mapping: Record<string, string>): void {
+        Object.values(mapping).forEach((url) => {
+            if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+        });
     }
 
     async registerCustomThemeAssets(theme: string, mapping: Record<string, string>, displayName?: string): Promise<void> {
@@ -471,7 +475,6 @@ class UIIconService {
             names[theme] = displayName;
             localStorage.setItem(UI_ICON_CUSTOM_THEME_NAMES_KEY, JSON.stringify(names));
         }
-        this.customThemeAssets = stored;
         await this.hydrateCustomThemeAssets();
         window.dispatchEvent(new CustomEvent(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT));
     }
@@ -496,7 +499,9 @@ class UIIconService {
         const names = this.readCustomThemeNames();
         delete names[theme];
         localStorage.setItem(UI_ICON_CUSTOM_THEME_NAMES_KEY, JSON.stringify(names));
+        this.releaseAssetUrls(this.customThemeAssets[theme] || {});
         delete this.customThemeAssets[theme];
+        void this.hydrateCustomThemeAssets();
         window.dispatchEvent(new CustomEvent(UI_ICON_CUSTOM_THEMES_CHANGED_EVENT));
     }
 
@@ -735,7 +740,7 @@ export const getUIIconStringFromAssetPath = (assetPath?: string | null): string 
  * React Hook - 获取 UI 图标路径
  */
 export const useUIIcon = (iconType: UIIconType) => {
-    const theme = uiIconService.getCurrentTheme();
+    const theme = useUIIconTheme();
     const isCustom = theme !== 'default';
     const paths = uiIconService.getIconPathWithFallback(iconType);
 
@@ -745,6 +750,18 @@ export const useUIIcon = (iconType: UIIconType) => {
         fallbackPath: paths.fallback,
         theme
     };
+};
+
+/** Subscribes to both theme switches and asset hydration, including same-theme updates. */
+export const useUIIconTheme = (): UIIconTheme => {
+    const [state, setState] = React.useState(() => ({ theme: uiIconService.getCurrentTheme() }));
+    React.useEffect(() => {
+        const refresh = () => setState({ theme: uiIconService.getCurrentTheme() });
+        window.addEventListener('ui-icon-theme-changed', refresh);
+        refresh();
+        return () => window.removeEventListener('ui-icon-theme-changed', refresh);
+    }, []);
+    return state.theme;
 };
 
 /**

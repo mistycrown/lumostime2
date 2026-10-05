@@ -4,10 +4,11 @@
  * @input theme: 主题名称, currentTheme: 当前主题, onThemeChange: 主题切换回调
  * @output 主题选择按钮
  * @pos Component
+ * @updated 2026-10-05: Refreshes asynchronous theme previews and attempts image fallback once.
  */
 import React from 'react';
 import { Check } from 'lucide-react';
-import { getUIIconTypeByNumber, uiIconService } from '../services/uiIconService';
+import { getUIIconTypeByNumber, uiIconService, useUIIconTheme } from '../services/uiIconService';
 
 interface UiThemeButtonProps {
     theme: string;
@@ -22,6 +23,7 @@ export const UiThemeButton: React.FC<UiThemeButtonProps> = ({
     onThemeChange,
     label
 }) => {
+    useUIIconTheme();
     const isSelected = currentTheme === theme;
     
     return (
@@ -49,7 +51,9 @@ export const UiThemeButton: React.FC<UiThemeButtonProps> = ({
                             alt={`icon-${num}`}
                             className="w-full h-full object-contain p-0.5"
                             onError={(e) => {
-                                e.currentTarget.src = paths.fallback;
+                                if (paths.primary !== paths.fallback && e.currentTarget.getAttribute('src') === paths.primary) {
+                                    e.currentTarget.src = paths.fallback;
+                                }
                             }}
                         />
                     </div>

@@ -1,11 +1,12 @@
 /**
  * @file UIIcon.tsx
  * @description 通用 UI 图标组件 - 支持主题切换和格式降级
+ * @updated 2026-10-05: Retries icons after same-theme asset hydration and stops repeated fallback failures.
  */
 
 import React, { useState, useEffect } from 'react';
 import { LucideIcon } from 'lucide-react';
-import { UIIconType, uiIconService } from '../services/uiIconService';
+import { UIIconType, useUIIcon } from '../services/uiIconService';
 
 interface UIIconProps {
     /** 图标类型 */
@@ -36,22 +37,9 @@ export const UIIcon: React.FC<UIIconProps> = ({
     customIconScale = 1.3,
     ...props
 }) => {
-    const [currentTheme, setCurrentTheme] = useState(uiIconService.getCurrentTheme());
+    const { theme: currentTheme, iconPath, fallbackPath } = useUIIcon(type);
     const [imageError, setImageError] = useState(false);
     const [imageSrc, setImageSrc] = useState('');
-
-    // 监听主题变更
-    useEffect(() => {
-        const handleThemeChange = (e: CustomEvent) => {
-            setCurrentTheme(e.detail.theme);
-            setImageError(false); // 重置错误状态
-        };
-
-        window.addEventListener('ui-icon-theme-changed', handleThemeChange as EventListener);
-        return () => {
-            window.removeEventListener('ui-icon-theme-changed', handleThemeChange as EventListener);
-        };
-    }, []);
 
     // 更新图片源
     useEffect(() => {
@@ -60,16 +48,14 @@ export const UIIcon: React.FC<UIIconProps> = ({
             return;
         }
 
-        const paths = uiIconService.getIconPathWithFallback(type);
-        setImageSrc(paths.primary);
+        setImageSrc(iconPath);
         setImageError(false);
-    }, [currentTheme, type]);
+    }, [currentTheme, type, iconPath, fallbackPath]);
 
     // 处理图片加载错误（降级到 PNG）
     const handleImageError = () => {
-        if (!imageError && imageSrc.endsWith('.webp')) {
-            const paths = uiIconService.getIconPathWithFallback(type);
-            setImageSrc(paths.fallback);
+        if (!imageError && imageSrc !== fallbackPath) {
+            setImageSrc(fallbackPath);
         } else {
             setImageError(true);
         }
