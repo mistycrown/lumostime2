@@ -1,5 +1,7 @@
 # Constants Directory
 
+Update 2026-10-05: `storageKeys.ts` adds the anonymous diagnostics user ID key.
+
 This directory contains application-wide constants, configuration, and static data.
 
 Update 2026-05-18: `achievementCollections.ts` now recognizes default bottle presets by id, preset name, and stale `.../bottle/NN.png` asset URLs so Electron desktop builds can repair broken bottle artwork after updates or restored old data.

@@ -1,5 +1,9 @@
 # 图片优化脚本使用说明
 
+## test-feedback-report-renderer.mjs
+
+`node scripts/test-feedback-report-renderer.mjs` 在隔离、隐藏的 Electron 中验证反馈弹窗持续显示、移动端布局、反馈 ID / 用户编号 / 合并复制、复制失败保留弹窗，以及关闭、Escape、硬件返回。先运行 `npm run build`；截图保存到临时目录。
+
 ## check-feishu-auto-smoke.mjs
 
 `node scripts/check-feishu-auto-smoke.mjs` 在隔离、隐藏的 Electron 中检查飞书自动同步页面及真实 IndexedDB 持久化，使用模拟 API。覆盖首次安装数据初始化与演示数据保护、开关、事务回滚、新增修改删除、离线重开恢复及暂停后继续。

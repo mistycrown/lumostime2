@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-05: `diagnosticIdentityService.ts` reuses sponsorship numbers as `lumos001` IDs or persists random numeric IDs. `errorReporting.ts` attaches searchable `user_id` / `user_type` tags to events, retains only the pseudonymous user ID, and waits for manual report transport flushing.
+
 Update 2026-10-05: `uiIconService.ts` hydrates custom themes from persisted filenames into a separate URL cache, discards stale reads, and notifies subscribed icon consumers after same-theme asset changes.
 
 Update 2026-10-05: `cardBackgroundService.ts` defaults unset opacity to 40%, retains unrelated group edits during uploads, and selects the next group after deleting the active one. Saved-theme validation keeps card groups usable when only part of their image list is missing.
