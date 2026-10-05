@@ -7,12 +7,14 @@
  * @updated 2026-09-26: Saves full appearance snapshots and removes editing operations.
  * @updated 2026-09-28: Adds optional modern-navigation and Memoir calendar selections for legacy built-in presets.
  * @updated 2026-09-28: Adds optional card-background and font selections for legacy built-in presets.
+ * @updated 2026-10-05: Compacts legacy snapshot image URLs on load/save and reports failed preset persistence.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
+import { sanitizeThemePresetsForStorage } from '../utils/imageAssetStorage';
 import type { AchievementBottleStyle } from '../services/achievementBottleStyleService';
 import type { AchievementBottleIconPack } from '../services/achievementBottleIconPackService';
 import type { NavigationIconMode } from '../services/navigationIconService';
@@ -71,8 +73,12 @@ export type ValidationError =
 const loadCustomPresets = (): ThemePreset[] => {
     try {
         const presets = storage.getJSON<ThemePreset[]>(THEME_KEYS.CUSTOM_PRESETS, []);
+        const compacted = sanitizeThemePresetsForStorage(presets);
+        if (JSON.stringify(compacted) !== JSON.stringify(presets)) {
+            storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, compacted);
+        }
         // Filter out invalid presets
-        return presets.filter(preset => validatePresetData(preset));
+        return compacted.filter(preset => validatePresetData(preset));
     } catch (error) {
         console.error('[useCustomPresets] Failed to load custom presets:', error);
         return [];
@@ -84,7 +90,9 @@ const loadCustomPresets = (): ThemePreset[] => {
  */
 const saveCustomPresets = (presets: ThemePreset[]): void => {
     try {
-        storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, presets);
+        if (!storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, sanitizeThemePresetsForStorage(presets))) {
+            throw new Error('Failed to persist custom presets');
+        }
     } catch (error) {
         console.error('[useCustomPresets] Failed to save custom presets:', error);
         throw new Error('保存失败，请重试');

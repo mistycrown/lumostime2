@@ -4,6 +4,7 @@
  * @output Regression coverage for navigation backup, image references, and restore hydration
  * @pos Test (Cloud Sync)
  * @updated 2026-10-04: Covers modern navigation backgrounds across devices and legacy backups.
+ * @updated 2026-10-05: Covers metadata-only backups and quota-safe restoration of legacy image URLs.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,7 +49,7 @@ const navigationStorage = {
   navigation_new_mode_enabled: 'true',
   navigation_new_background: 'modern-background',
   navigation_new_background_custom_list: JSON.stringify([
-    { id: 'modern-background', type: 'custom', imageFilename: 'navigation.webp', url: 'blob:source-device' }
+    { id: 'modern-background', type: 'custom', imageFilename: 'navigation.webp', url: '' }
   ]),
   navigation_new_background_settings: JSON.stringify({
     'modern-background': { offsetX: '8px', offsetY: '-4px', scale: 1.2, verticalStretch: 1.3, opacity: 0.7 }
@@ -107,6 +108,33 @@ describe('modern navigation appearance sync', () => {
       'navigation.webp', 'thumb_navigation.webp'
     ]);
     expect(localStorage.getItem('navigation_new_background_custom_list')).toBeNull();
+  });
+
+  it('removes large legacy image URLs before writing restored settings', () => {
+    const raw = JSON.stringify([{ id: 'legacy', imageFilename: 'legacy.png', url: `data:image/png;base64,${'A'.repeat(10000)}` }]);
+    const originalSetItem = localStorage.setItem;
+    vi.spyOn(localStorage, 'setItem').mockImplementation((key, value) => {
+      if (value.length > 2000) throw new DOMException('Storage full', 'QuotaExceededError');
+      originalSetItem(key, value);
+    });
+
+    appearanceBackupService.applyBackupPayload({ version: 1, storage: {
+      navigation_icon_custom_list_v1: raw,
+      lumostime_custom_presets: JSON.stringify([{ id: 'preset', snapshot: { version: 1, storage: { navigation_icon_custom_list_v1: raw } } }])
+    } });
+
+    const restored = appearanceBackupService.buildBackupPayload().storage;
+    expect(restored.navigation_icon_custom_list_v1).not.toContain('data:');
+    expect(restored.lumostime_custom_presets).not.toContain('data:');
+    expect(restored.lumostime_custom_presets).toContain('legacy.png');
+  });
+
+  it('keeps runtime image data out of newly captured backups', () => {
+    localStorage.setItem('navigation_icon_custom_list_v1', JSON.stringify([
+      { id: 'native', imageFilename: 'native.png', url: 'data:image/png;base64,AAAA' }
+    ]));
+    expect(JSON.parse(appearanceBackupService.buildBackupPayload().storage.navigation_icon_custom_list_v1 || '[]'))
+      .toEqual([{ id: 'native', imageFilename: 'native.png', url: '' }]);
   });
 
   it('uploads navigation files in the theme group and downloads them on a fresh device', async () => {

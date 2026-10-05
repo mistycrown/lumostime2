@@ -8,9 +8,11 @@
  * @updated 2026-09-26: Added persisted opt-in labels below image navigation icons.
  * @updated 2026-09-28: Removed the packaged pink icon set and migrate its saved selection to text.
  * @updated 2026-09-30: Added a normalized size scale for custom navigation images.
+ * @updated 2026-10-05: Keeps resolved image URLs in memory and compacts legacy metadata without quota failures.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
+import { ImageAssetListStorage } from './imageAssetListStorage';
 
 export type NavigationIconSlot = 'record' | 'todo' | 'timeline' | 'review' | 'index';
 export type NavigationIconMode = 'text' | 'custom';
@@ -58,6 +60,8 @@ export const getNavigationIconFallbackUrl = (url: string): string => (
 );
 
 class NavigationIconService {
+    private readonly customIcons = new ImageAssetListStorage<NavigationIconOption>(NAVIGATION_ICON_CUSTOM_KEY);
+
     constructor() {
         void this.hydrateCustomIcons();
     }
@@ -65,16 +69,11 @@ class NavigationIconService {
     getSlots(): NavigationIconSlot[] { return NAVIGATION_SLOTS; }
 
     private loadCustomIcons(): NavigationIconOption[] {
-        if (typeof localStorage === 'undefined') return [];
-        try {
-            const raw = localStorage.getItem(NAVIGATION_ICON_CUSTOM_KEY);
-            const parsed = raw ? JSON.parse(raw) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch { return []; }
+        return this.customIcons.load();
     }
 
     private saveCustomIcons(icons: NavigationIconOption[]): void {
-        if (typeof localStorage !== 'undefined') localStorage.setItem(NAVIGATION_ICON_CUSTOM_KEY, JSON.stringify(icons));
+        this.customIcons.save(icons);
     }
 
     private readStoredSelection(): Partial<NavigationIconSelection> {
@@ -106,17 +105,8 @@ class NavigationIconService {
         if (typeof localStorage !== 'undefined') localStorage.setItem(NAVIGATION_ICON_SCHEMES_KEY, JSON.stringify(schemes));
     }
 
-    async hydrateCustomIcons(): Promise<void> {
-        const icons = this.loadCustomIcons();
-        let changed = false;
-        const hydrated = await Promise.all(icons.map(async (icon) => {
-            if (!icon.imageFilename) return icon;
-            const url = await imageService.getImageUrl(icon.imageFilename).catch(() => '');
-            if (!url || url === icon.url) return icon;
-            changed = true;
-            return { ...icon, url };
-        }));
-        if (changed) { this.saveCustomIcons(hydrated); this.emitChange(); }
+    hydrateCustomIcons(): Promise<void> {
+        return this.customIcons.hydrate(() => this.emitChange());
     }
 
     getCustomIcons(): NavigationIconOption[] { return this.loadCustomIcons(); }

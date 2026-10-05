@@ -4,6 +4,7 @@
  * @output Regression coverage for selection, opacity, removal, and blob URL rehydration
  * @pos Test (UI Customization)
  * @updated 2026-09-29: Covers temporary URL persistence, hydration deduplication, concurrent list updates, and same-ID replacements.
+ * @updated 2026-10-05: Covers hydration when storage compaction exceeds the remaining quota.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -101,6 +102,24 @@ describe('mood calendar background persistence', () => {
 
     expect(moodCalendarBackgroundService.getBackgroundById(background.id)?.url).toBe('data:image/png;base64,AAAA');
     expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).not.toContain('data:image/png;base64,AAAA');
+  });
+
+  it('still displays hydrated images when metadata compaction fails', async () => {
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([
+      { id: 'quota-calendar', name: 'Calendar', type: 'custom', url: 'blob:expired', imageFilename: 'quota-calendar.png' }
+    ]));
+    imageServiceMocks.getImageUrl.mockResolvedValue('data:image/png;base64,calendar');
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage full', 'QuotaExceededError');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      await expect(moodCalendarBackgroundService.hydrateCustomBackgrounds()).resolves.toBeUndefined();
+      expect(moodCalendarBackgroundService.getBackgroundById('quota-calendar')?.url).toBe('data:image/png;base64,calendar');
+    } finally {
+      setItem.mockRestore();
+      warn.mockRestore();
+    }
   });
 
   it('shares one in-flight hydration task across concurrent callers', async () => {
