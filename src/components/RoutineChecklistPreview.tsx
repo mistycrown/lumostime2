@@ -1,5 +1,6 @@
 /**
  * @file RoutineChecklistPreview.tsx
+ * @updated 2026-10-06: Supports clickable nodes within checklist notes.
  * @input Markdown checklist text and compact display options
  * @output Read-only visual checklist rows for timeline surfaces
  * @pos Component (Timeline)
@@ -11,18 +12,21 @@
  */
 import React from 'react';
 import { Check } from 'lucide-react';
+import { NodeText } from './NodeText';
 import { isRoutineChecklistMarkdown, parseRoutineChecklist } from '../utils/routineChecklist';
 
 interface RoutineChecklistPreviewProps {
   markdown: string;
   compact?: boolean;
   className?: string;
+  highlightNodeName?: string;
 }
 
 export const RoutineChecklistPreview: React.FC<RoutineChecklistPreviewProps> = ({
   markdown,
   compact = false,
-  className = ''
+  className = '',
+  highlightNodeName
 }) => {
   if (!isRoutineChecklistMarkdown(markdown)) return null;
 
@@ -40,7 +44,7 @@ export const RoutineChecklistPreview: React.FC<RoutineChecklistPreviewProps> = (
             <Check size={compact ? 7 : 8} strokeWidth={3} />
           </span>
           <span className={`min-w-0 break-words ${entry.completed ? 'text-stone-400 line-through' : ''}`}>
-            {entry.text}
+            <NodeText text={entry.text} highlightName={highlightNodeName} />
           </span>
         </div>
       ))}

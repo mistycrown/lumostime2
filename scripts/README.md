@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+节点渲染验证：先运行 `npm run build`，再运行 `node scripts/test-nodes-renderer.mjs`。测试使用隐藏的独立 Electron 配置，验证详情、备注草稿提示、别名编辑、重命名、持久化和返回；截图显式加载微软雅黑，保存在系统临时目录，不访问用户日常应用数据。
+
 ## test-ai-log-attributes-renderer.mjs
 
 `node scripts/test-ai-log-attributes-renderer.mjs` 在隔离、隐藏的 Electron 中验证 AI 补记四种属性的结果卡显示、实时编辑、清空、撤销和旧消息兼容性。先运行 `npm run build`；明确加载已验证的微软雅黑字体，桌面及手机宽度截图保存在临时目录，不访问用户数据。

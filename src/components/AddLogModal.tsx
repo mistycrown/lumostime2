@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-06: Shows opt-in node name/alias suggestions directly below the note draft.
  * @updated 2026-10-01: Sends the current record's full attachment list to the shared preview so swiping, download, and deletion stay on the active image.
  * @updated 2026-09-17: Uses an adaptive equal-sided time grid so the start/end inputs and center separator stay horizontally and vertically aligned across modal widths.
  * @updated 2026-09-05: Shows a linked todo's pre-record progress when editing an existing progress log.
@@ -44,6 +45,7 @@ import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
+import { NodeNoteSuggestions } from './NodeNoteSuggestions';
 import {
   getTodoProgressDisplayCompletedUnits,
   getTodoProgressSnapshot,
@@ -1174,6 +1176,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
               } as React.CSSProperties}
               placeholder="Add a note..."
             />
+
+            <NodeNoteSuggestions note={formState.note} onChange={(note) => { updateField('note', note); focusNoteInput(); }} />
 
             <RecommendedNoteTemplates
               templates={recommendedNoteTemplates}

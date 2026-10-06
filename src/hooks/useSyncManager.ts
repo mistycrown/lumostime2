@@ -1,5 +1,6 @@
 /**
  * @file useSyncManager.ts
+ * @updated 2026-10-06: Includes node metadata in backup payloads, restores and change tracking.
  * @updated 2026-10-03: Marks restored log snapshots so automatic calendar sync cannot infer mass deletions.
  * @updated 2026-10-04: Tracks modern navigation mode, background, and transparency changes for auto sync.
  * @updated 2026-10-04: Persists restored sticker metadata before appearance listeners reload settings.
@@ -90,6 +91,7 @@ export const useSyncManager = () => {
     // Access Contexts at the top level
     const {
         logs, setLogs,
+        nodes, setNodes,
         todos, setTodos,
         todoCategories, setTodoCategories,
         collections, setCollections,
@@ -212,6 +214,7 @@ export const useSyncManager = () => {
             if (hasField('todoCategories')) setTodoCategories(data.todoCategories);
             if (hasField('collections')) setCollections(data.collections);
             if (hasField('collectionEntries')) setCollectionEntries(data.collectionEntries);
+            if (hasField('nodes')) setNodes(data.nodes ?? []);
             if (hasField('scopes')) setScopes(data.scopes);
             if (hasField('goals')) setGoals(data.goals);
             if (hasField('majorGoals')) setMajorGoals(data.majorGoals);
@@ -353,7 +356,7 @@ export const useSyncManager = () => {
         const customColorGroup = customColorGroupService.getGroup();
 
         const localData = {
-            logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
+            logs, nodes, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
             autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
             monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
             memoirFilterConfig,
@@ -613,7 +616,7 @@ export const useSyncManager = () => {
     useEffect(() => {
         trackRef.current();
     }, [
-        logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
+        logs, nodes, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
         autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews, monthlyReviews,
         onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers,
         filters, memoirFilterConfig, buildAchievementBackupPayload

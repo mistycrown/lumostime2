@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-06: Adds the node directory entry to the Content group.
  * @updated 2026-10-05: Keeps delivered error-report IDs and user identifiers in a copyable receipt dialog.
  * @updated 2026-10-02: Added the manual Feishu calendar connection/test-event entry under Data and Sync.
  * @updated 2026-10-02: Delegates all provider transfers to the shared versioned sync coordinator.
@@ -107,6 +108,7 @@ import { usePrivacy } from '../contexts/PrivacyContext';
 import { RedemptionService } from '../services/redemptionService';
 import { SceneSettingsView } from './SceneSettingsView';
 import { RoutineSettingsView } from './RoutineSettingsView';
+
 import { startFloatingWindowWithGuards, type FloatingWindowStartupResult } from '../utils/floatingWindowStartup';
 import {
     AISettingsViewLazy as AISettingsView,
@@ -140,6 +142,8 @@ import { NARRATIVE_TEMPLATES } from '../constants';
 import { reportRecentConsoleErrors } from '../services/errorReporting';
 import type { NavigationModuleVisibility } from '../contexts/SettingsContext';
 
+
+const NodesSettingsView = React.lazy(() => import('./settings/NodesSettingsView').then((module) => ({ default: module.NodesSettingsView })));
 
 interface SettingsViewProps {
     onClose: () => void;
@@ -806,6 +810,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
         );
     }
 
+    if (activeSubmenu === 'nodes') {
+        return renderLazySettingsSubview(<NodesSettingsView onBack={handleBackToMain} />, '正在加载节点…');
+    }
+
     if (activeSubmenu === 'collections') {
         return renderLazySettingsSubview(
             <CollectionSettingsView
@@ -1291,6 +1299,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                             icon={<Hash size={18} className="text-amber-500" />}
                             label="自定义筛选器"
                             onClick={() => openSettingsSubmenu('filters')}
+                        />
+                        <MenuItem
+                            icon={<Star size={18} className="text-stone-500" />}
+                            label="节点"
+                            onClick={() => openSettingsSubmenu('nodes')}
                         />
                         <MenuItem
                             icon={<Star size={18} className="text-stone-500" />}

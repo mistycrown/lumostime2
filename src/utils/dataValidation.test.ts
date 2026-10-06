@@ -1,3 +1,9 @@
+/**
+ * @file dataValidation.test.ts
+ * @input Modern and legacy backup payloads
+ * @output Regression coverage for optional backup blocks
+ * @updated 2026-10-06: Validates node metadata and rejects malformed or duplicate node identities.
+ */
 import { describe, expect, it } from 'vitest';
 
 import { validateAndFixData, validateLocalData } from './dataValidation';
@@ -9,6 +15,22 @@ const createValidPayload = () => ({
 });
 
 describe('dataValidation achievementData support', () => {
+  it('preserves valid nodes and accepts legacy backups that omit them', () => {
+    const nodes = [{ id: 'n', name: '小林', aliases: ['林林'], description: '朋友', createdAt: 1, updatedAt: 2 }];
+    const payload = { ...createValidPayload(), nodes };
+    expect(validateAndFixData(payload).data.nodes).toEqual(nodes);
+    expect(validateLocalData(payload).isValid).toBe(true);
+    expect(validateLocalData(createValidPayload()).isValid).toBe(true);
+  });
+
+  it('rejects malformed and duplicate node metadata before restore', () => {
+    const node = { id: 'n', name: '小林', aliases: ['林林'], description: '', createdAt: 1, updatedAt: 2 };
+    expect(validateLocalData({ ...createValidPayload(), nodes: {} }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodes: [{ ...node, aliases: '林林' }] }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodes: [node, { ...node, id: 'n2' }] }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodes: [{ ...node, name: '[[小林]]' }] }).isValid).toBe(false);
+  });
+
   it('accepts optional Android widget templates and keeps old backups compatible', () => {
     const widgetTemplateResult = validateLocalData({
       ...createValidPayload(),

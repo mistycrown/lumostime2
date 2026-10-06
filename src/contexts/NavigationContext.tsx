@@ -1,5 +1,6 @@
 /**
  * @file NavigationContext.tsx
+ * @updated 2026-10-06: Added the node directory settings submenu.
  * @updated 2026-10-02: Added the Feishu calendar test settings submenu.
  * @updated 2026-05-12: Added nested todo-detail history state so detail-to-detail navigation can unwind back to the previous task page instead of closing straight to the root view.
  * @updated 2026-08-09: Added daily-check overview/detail navigation state.
@@ -33,6 +34,7 @@ export type SettingsSubmenu =
     | 'memoir_filter'
     | 'batch_manage'
     | 'collections'
+    | 'nodes'
     | 'sponsorship_preview'
     | 'scene'
     | 'routine'
