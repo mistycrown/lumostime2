@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-06: `RecordStatistics.tsx` reuses statistic cards for filter/scope details with only record duration and notes. `ActivityAttributeStatistics.tsx` shares chart-specific range validation, supports all-time summary/rhythm cards, preserves explicitly empty card lists, and allocates weekday/hour heatmaps across elapsed hours.
+
 Update 2026-10-05: `FeedbackReportModal.tsx` keeps feedback and user IDs visible until closed, supports individual/combined copying, and handles keyboard focus plus Android hardware back.
 
 Update 2026-10-05: UI icon renderers, selectors, and theme previews subscribe to asset hydration as well as theme switches. Failed image state resets when the theme or resolved source changes.

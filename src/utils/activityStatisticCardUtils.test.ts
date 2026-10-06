@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.test.ts
+ * @updated 2026-10-06: Covers persisted all-time capability rules and record-duration sources.
  * @input Activity statistic card configurations.
  * @output Regression coverage for default card migration and source capabilities.
  */
@@ -31,10 +32,35 @@ describe('activity statistic cards', () => {
     expect(normalizeStatisticCards(activity(remaining))).toHaveLength(3);
   });
 
-  it('uses a bounded default range and migrates legacy all-time cards', () => {
+  it('uses a bounded default range and preserves supported all-time cards', () => {
     const first = ensureStatisticCards(activity());
     expect(first.every((card) => card.range === '30d')).toBe(true);
-    expect(normalizeStatisticCards(activity([{ ...first[0], range: 'all' }]))[0]?.range).toBe('30d');
+    expect(normalizeStatisticCards(activity([{ ...first[0], range: 'all' }]))[0]?.range).toBe('all');
+  });
+
+  it('round-trips all-time summary cards for notes, attributes, categories, and record collections', () => {
+    const cards: ActivityStatisticCard[] = [
+      { id: 'notes', source: { type: 'note' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 0 },
+      { id: 'numeric', source: { type: 'attribute', attributeId: 'weight' }, chartType: 'numberKpi', range: 'all', metric: 'average', order: 1 },
+      { id: 'choices', source: { type: 'attribute', attributeId: 'kind' }, chartType: 'choiceDonut', range: 'all', metric: 'duration', order: 2 },
+      { id: 'multi', source: { type: 'attribute', attributeId: 'parts' }, chartType: 'choiceBar', range: 'all', metric: 'count', order: 3 },
+      { id: 'tags', source: { type: 'categoryActivity' }, chartType: 'choiceTreemap', range: 'all', metric: 'count', order: 4 },
+      { id: 'duration', source: { type: 'recordDuration' }, chartType: 'numberKpi', range: 'all', metric: 'count', order: 5 },
+      { id: 'rhythm', source: { type: 'recordDuration' }, chartType: 'tagDurationPetalTimeline', range: 'all', metric: 'count', timelineStyle: 'histogram', order: 6 }
+    ];
+    const saved = normalizeStatisticCards(activity(JSON.parse(JSON.stringify(cards))));
+    expect(saved).toEqual(cards);
+    expect(getChartTypesForSource({ type: 'recordDuration' }, [])).toEqual(getChartTypesForSource({ type: 'tagDuration' }, []));
+  });
+
+  it('migrates unsupported all-time calendars, trends, stacked bars, and boxplots to supported ranges', () => {
+    const types = ['numberArea', 'numberCalendar', 'tagDurationBoxplot'] as const;
+    const cards: ActivityStatisticCard[] = types.map((chartType, order) => ({
+      id: chartType, source: { type: 'tagDuration' }, chartType, range: 'all', metric: 'count', order
+    }));
+    cards.push({ id: 'heatmap', source: { type: 'categoryActivity' }, chartType: 'choiceHeatmap', range: 'all', metric: 'count', order: 3 });
+    cards.push({ id: 'stacked', source: { type: 'categoryActivity' }, chartType: 'choiceStacked', range: 'all', metric: 'count', order: 4 });
+    expect(normalizeStatisticCards(activity(cards)).map((card) => card.range)).toEqual(['30d', 'year', 'year', '30d', '30d']);
   });
 
   it('keeps heatmap metrics on counts', () => {

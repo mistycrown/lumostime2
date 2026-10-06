@@ -1,5 +1,7 @@
 # Utils Architecture
 
+> Update 2026-10-06: `hourlyDurationUtils.ts` splits effective record duration across actual local hours with period clipping and pause scaling, shared by weekday/hour heatmaps and rhythm charts. `activityStatisticCardUtils.ts` adds record-duration sources and chart-specific all-time capability rules.
+
 > Update 2026-10-05: `imageAssetStorage.ts` removes runtime image URLs from file-backed settings and appearance snapshots while preserving legacy assets that have no file reference.
 
 > Update 2026-10-04: `todoParentLinkUtils.ts` validates one-level main-task associations, filters searchable candidates and upgrades quick reminders to project subtasks while preserving task data.

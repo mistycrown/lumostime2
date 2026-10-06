@@ -1,5 +1,7 @@
 # Views Layer
 
+> Update 2026-10-06: `FilterDetailView.tsx` and `ScopeDetailView.tsx` add a statistics tab beside the timeline, using complete matching/linked actual records and independent duration/note card settings. Filters persist immediately; scopes retain buffered exit/background saving.
+
 > Update 2026-10-05: `SettingsView.tsx` waits for manual diagnostics transport flushing and displays feedback IDs plus user numbers in a persistent copyable dialog.
 
 > Update 2026-10-04: `TodoView.tsx` passes the full todo collection and parent-association save handler to the shared quick-actions sheet for list and schedule entry points.

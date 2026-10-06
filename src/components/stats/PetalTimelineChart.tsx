@@ -1,5 +1,6 @@
 /**
  * @file PetalTimelineChart.tsx
+ * @updated 2026-10-06: Supports all-time rhythm and shares hourly allocation with weekday heatmaps.
  * @input Duration logs, a calendar range, and an activity chart palette.
  * @output A radial rhythm chart rendered as petals or hourly histogram sectors.
  * @pos Component (Activity Statistics)
@@ -9,9 +10,9 @@
 import React, { useMemo } from 'react';
 import type { ActivityTimelineStyle, Log } from '../../types';
 import type { ChartPalette } from '../../utils/chartPalette';
-import { getLogDurationSeconds } from '../../utils/scopeStatsUtils';
+import { forEachHourlyDurationSegment, getHourlyDurationRange } from '../../utils/hourlyDurationUtils';
 
-export type RhythmRange = 'week' | 'month' | 'year';
+export type RhythmRange = 'week' | 'month' | 'year' | 'all';
 
 export interface HourBucket {
   hour: number;
@@ -24,54 +25,23 @@ export interface HourBucketSummary {
   activeDays: number;
 }
 
-const MINUTE_MS = 60 * 1000;
-
 const getLocalDateKey = (timestamp: number): string => {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export const getRhythmRangeBounds = (range: RhythmRange, now = new Date()) => {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  if (range === 'year') {
-    start.setMonth(0, 1);
-  } else if (range === 'month') {
-    start.setDate(1);
-  } else {
-    const day = start.getDay();
-    start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
-  }
-  return { start: start.getTime(), end: now.getTime() };
-};
+export const getRhythmRangeBounds = getHourlyDurationRange;
 
 export const aggregateHourBuckets = (
   logs: Array<Pick<Log, 'duration' | 'startTime' | 'endTime'>>,
   range: RhythmRange,
   now = new Date()
 ): HourBucketSummary => {
-  const { start: rangeStart, end: rangeEnd } = getRhythmRangeBounds(range, now);
   const minutesByHour = Array.from({ length: 24 }, () => 0);
   const activeDays = new Set<string>();
-  logs.forEach((log) => {
-    const logStart = Math.min(log.startTime, log.endTime);
-    const logEnd = Math.max(log.startTime, log.endTime);
-    const overlapStart = Math.max(logStart, rangeStart);
-    const overlapEnd = Math.min(logEnd, rangeEnd);
-    if (overlapEnd <= overlapStart) return;
-    const elapsedSeconds = Math.max(0, (logEnd - logStart) / 1000);
-    const durationScale = elapsedSeconds > 0 ? getLogDurationSeconds(log) / elapsedSeconds : 1;
-    let cursor = overlapStart;
-    while (cursor < overlapEnd) {
-      const cursorDate = new Date(cursor);
-      const nextHour = new Date(cursorDate);
-      nextHour.setMinutes(0, 0, 0);
-      nextHour.setHours(nextHour.getHours() + 1);
-      const segmentEnd = Math.min(nextHour.getTime(), overlapEnd);
-      minutesByHour[cursorDate.getHours()] += ((segmentEnd - cursor) / MINUTE_MS) * durationScale;
-      activeDays.add(getLocalDateKey(cursor));
-      cursor = segmentEnd;
-    }
+  forEachHourlyDurationSegment(logs, getRhythmRangeBounds(range, now), (timestamp, seconds) => {
+    minutesByHour[new Date(timestamp).getHours()] += seconds / 60;
+    activeDays.add(getLocalDateKey(timestamp));
   });
   const buckets = minutesByHour.map((minutes, hour) => ({ hour, minutes }));
   return { buckets, totalMinutes: minutesByHour.reduce((sum, minutes) => sum + minutes, 0), activeDays: activeDays.size };
@@ -93,7 +63,7 @@ export interface PetalTimelineChartProps {
   timelineStyle?: ActivityTimelineStyle;
 }
 
-const rangeLabel = (range: RhythmRange) => range === 'week' ? '本周' : range === 'month' ? '本月' : '本年';
+const rangeLabel = (range: RhythmRange) => range === 'all' ? '全部' : range === 'week' ? '本周' : range === 'month' ? '本月' : '本年';
 
 const polarPoint = (center: number, radius: number, angle: number) => ({
   x: center + radius * Math.cos(angle),

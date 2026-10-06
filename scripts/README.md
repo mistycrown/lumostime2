@@ -1,5 +1,9 @@
 # 图片优化脚本使用说明
 
+## test-detail-statistics-renderer.mjs
+
+`node scripts/test-detail-statistics-renderer.mjs` 在隔离、隐藏的 Electron 中验证筛选器和领域统计的来源限制、历史数据、卡片/配色保存、编辑表达式、清空和恢复卡片，以及跨午夜时长热力图。先运行 `npm run build`；使用已验证的微软雅黑字体，桌面及窄屏截图保存到临时目录。
+
 ## test-feedback-report-renderer.mjs
 
 `node scripts/test-feedback-report-renderer.mjs` 在隔离、隐藏的 Electron 中验证反馈弹窗持续显示、移动端布局、反馈 ID / 用户编号 / 合并复制、复制失败保留弹窗，以及关闭、Escape、硬件返回。先运行 `npm run build`；截图保存到临时目录。

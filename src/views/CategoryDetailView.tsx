@@ -1,5 +1,6 @@
 /**
  * @file CategoryDetailView.tsx
+ * @updated 2026-10-06: Distinguishes unset statistic cards from intentionally empty saved lists.
  * @input Category ID, Logs, Associated Todos/Scopes
  * @output Detailed Category Analysis
  * @pos View (Detail Page)
@@ -89,7 +90,7 @@ export const CategoryDetailView: React.FC<CategoryDetailViewProps> = ({ category
     const catLogs = useMemo(() => logs.filter(l => l.categoryId === categoryId), [logs, categoryId]);
     const countableCatLogs = useMemo(() => filterCountableLogs(catLogs), [catLogs]);
     const categoryActivityOptions = useMemo(() => category.activities.map((activity) => ({ id: activity.id, label: activity.name })), [category.activities]);
-    const categoryStatisticCards = useMemo(() => (category.statisticCards || []).map((card) => (
+    const categoryStatisticCards = useMemo(() => category.statisticCards?.map((card) => (
         card.source.type === 'tagDuration'
             ? { ...card, source: { type: 'categoryDuration' as const } }
             : card

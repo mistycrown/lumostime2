@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-06: Adds safe all-time ranges, record-duration sources, and elapsed-hour heatmaps.
  * @input One Activity and its actual Logs.
  * @output Tag-wide statistic cards with type-specific distributions and condition-aware trend visualizations.
  * @pos Activity detail analytics component
@@ -39,7 +40,8 @@ import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
 import { formatDuration } from '../utils/chartUtils';
 import { getTextTerms } from '../utils/textSegmentation';
-import { ensureStatisticCards, getChartTypesForSource, getStatisticCardLabel, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
+import { ensureStatisticCards, getChartTypesForSource, getDefaultStatisticRange, getStatisticCardLabel, getStatisticRangesForCard, isDurationStatisticSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
+import { aggregateWeekHourDurations } from '../utils/hourlyDurationUtils';
 import { getChartPalette } from '../utils/chartPalette';
 import type { ChartPalette } from '../utils/chartPalette';
 import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
@@ -55,20 +57,6 @@ type StatisticMode = 'count' | 'duration';
 const RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
   { key: '7d', label: '近 7 天' },
   { key: '30d', label: '近 30 天' },
-  { key: 'month', label: '本月' },
-  { key: 'year', label: '本年' }
-];
-
-const CHOICE_STACKED_RANGE_OPTIONS = RANGE_OPTIONS.filter((option) => option.key !== 'year');
-
-const TAG_DURATION_RANGE_OPTIONS: Array<{ key: RangeKey; label: string }> = [
-  { key: 'all', label: '全部' },
-  { key: 'month', label: '本月' },
-  { key: 'year', label: '本年' }
-];
-
-const TAG_DURATION_RHYTHM_RANGE_OPTIONS: Array<{ key: RhythmRange; label: string }> = [
-  { key: 'week', label: '本周' },
   { key: 'month', label: '本月' },
   { key: 'year', label: '本年' }
 ];
@@ -358,7 +346,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
             if (attribute.type === 'number') {
               const numbers = values.flatMap((value) => 'value' in value && typeof value.value === 'number' ? [value.value] : []);
               if (numbers.length === 0) return null;
-              const isDurationNumber = attribute.id === '__tag-duration__' || attribute.id === '__category-duration__';
+              const isDurationNumber = attribute.id === '__tag-duration__' || attribute.id === '__category-duration__' || attribute.id === '__record-duration__';
               const formatNumericValue = (value: number) => isDurationNumber ? formatHoursMinutes(value) : formatNumber(value);
               const numericUnit = isDurationNumber ? '' : attribute.unit ? ` ${attribute.unit}` : '';
               const sum = numbers.reduce((total, value) => total + value, 0);
@@ -370,8 +358,8 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               }));
               const trend: TrendPoint[] = [...trendMap.entries()].sort((left, right) => left[0].localeCompare(right[0])).slice(-14).map(([key, value]) => ({ key, value }));
               const trendMax = Math.max(...trend.map((point) => point.value), 1);
-              const histogramMin = Math.min(...numbers);
-              const histogramMax = Math.max(...numbers);
+              const histogramMin = numbers.reduce((minimum, value) => Math.min(minimum, value), Infinity);
+              const histogramMax = numbers.reduce((maximum, value) => Math.max(maximum, value), -Infinity);
               const histogramBinCount = Math.min(8, Math.max(3, Math.ceil(Math.sqrt(numbers.length))));
               const histogramWidth = histogramMax - histogramMin || 1;
               const histogramBins = Array.from({ length: histogramBinCount }, (_, index) => {
@@ -465,8 +453,8 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     {[
                       ['合计', `${formatNumericValue(sum)}${numericUnit}`],
                       ['平均', `${formatNumericValue(sum / numbers.length)}${numericUnit}`],
-                      ['最小', `${formatNumericValue(Math.min(...numbers))}${numericUnit}`],
-                      ['最大', `${formatNumericValue(Math.max(...numbers))}${numericUnit}`]
+                      ['最小', `${formatNumericValue(histogramMin)}${numericUnit}`],
+                      ['最大', `${formatNumericValue(histogramMax)}${numericUnit}`]
                     ].map(([label, value]) => <div key={label} className="border-stone-200 px-3 py-3 odd:border-r sm:border-r sm:last:border-r-0"><div className="text-[10px] text-stone-400">{label}</div><div className="mt-1 font-mono text-base" style={{ color: statisticAccent }}>{value}</div></div>)}
                   </div>}
                   {chartVariant !== 'numberKpi' && trend.length > 0 && (
@@ -523,7 +511,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '标签时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationPetalTimeline: '时序图'
+  textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationPetalTimeline: '时序图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   textCloud: Type,
@@ -697,9 +685,9 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
   const getY = (value: number) => chartBottom - (value / maximum) * chartRange;
   const getX = (month: number) => chartLeft + month * ((chartWidth - chartLeft - chartRight) / 11);
   const formatMinutes = (seconds: number) => String(Math.round(seconds / 60));
-  if (!dailyTotals.size) return <p className="py-8 text-center text-xs text-[#aa9b8b]">本年暂无标签时长数据</p>;
+  if (!dailyTotals.size) return <p className="py-8 text-center text-xs text-[#aa9b8b]">本年暂无时长数据</p>;
   return <div>
-    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.24/1] w-full" role="img" aria-label="标签时长年度箱线图">
+    <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[2.24/1] w-full" role="img" aria-label="时长年度箱线图">
       {[0, 0.25, 0.5, 0.75, 1].map((ratio) => <g key={ratio}><line x1={chartLeft} y1={getY(maximum * ratio)} x2={chartWidth - chartRight} y2={getY(maximum * ratio)} stroke={ratio === 0 ? '#d8cdc0' : '#eee8e1'} strokeWidth={ratio === 0 ? 1.2 : 1} /><text x={chartLeft - 9} y={getY(maximum * ratio) + 3} textAnchor="end" fill="#9d8d7d" fontSize="9" fontVariant="tabular-nums">{formatMinutes(maximum * ratio)}</text></g>)}
       {monthly.map((item) => {
         const x = getX(item.month);
@@ -715,26 +703,16 @@ const TagDurationBoxplotPreview: React.FC<{ logs: Log[]; palette: ChartPalette }
 };
 
 const TagDurationWeekHourHeatmap: React.FC<{ logs: Log[]; range: RangeKey; palette: ChartPalette }> = ({ logs, range, palette }) => {
-  const filteredLogs = useMemo(() => filterLogsByRange(logs, range), [logs, range]);
-  const buckets = new Map<string, { duration: number; count: number }>();
-  filteredLogs.forEach((log) => {
-    const date = new Date(log.startTime);
-    const weekday = (date.getDay() + 6) % 7;
-    const key = `${weekday}-${date.getHours()}`;
-    const current = buckets.get(key) || { duration: 0, count: 0 };
-    current.duration += getLogDurationSeconds(log);
-    current.count += 1;
-    buckets.set(key, current);
-  });
+  const buckets = useMemo(() => aggregateWeekHourDurations(logs, range), [logs, range]);
   const weekLabels = ['一', '二', '三', '四', '五', '六', '日'];
-  const activeHours = filteredLogs.map((log) => new Date(log.startTime).getHours());
+  const activeHours = [...buckets.keys()].map((key) => Number(key.split('-')[1]));
   const minHour = activeHours.length > 0 ? Math.min(...activeHours) : 0;
   const maxHour = activeHours.length > 0 ? Math.max(...activeHours) : 0;
   const hours = Array.from({ length: maxHour - minHour + 1 }, (_, index) => minHour + index);
   const minGridWidth = 22 + hours.length * 18;
   const maxDuration = Math.max(...[...buckets.values()].map((bucket) => bucket.duration), 1);
   const heatColor = palette.accent;
-  if (filteredLogs.length === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无标签时长数据</p>;
+  if (buckets.size === 0) return <p className="py-8 text-center text-xs text-[#aa9b8b]">当前范围暂无时长数据</p>;
   return <div className="overflow-x-auto pb-1">
     <div className="grid gap-1 text-[10px] text-[#8f7f70]" style={{ gridTemplateColumns: `22px repeat(${hours.length}, minmax(18px, 1fr))`, minWidth: `${minGridWidth}px` }}>
       <span />
@@ -901,13 +879,13 @@ const getInitialStatisticCards = (
   sourceChoices: Array<{ key: string; source: ActivityStatisticCardSource; label: string }>,
   allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>
 ) => {
-  if (!allowedSourceTypes) return activity.statisticCards?.length ? normalizeStatisticCards(activity) : ensureStatisticCards(activity);
-  const existing = normalizeStatisticCards(activity).filter((card) => sourceChoices.some((item) => item.source.type === card.source.type && (item.source.type !== 'attribute' || ('attributeId' in item.source && item.source.attributeId === card.source.attributeId))));
-  if (existing.length > 0 || sourceChoices.length === 0) return existing;
+  if (!allowedSourceTypes) return activity.statisticCards !== undefined ? normalizeStatisticCards(activity) : ensureStatisticCards(activity);
+  const existing = normalizeStatisticCards(activity).filter((card) => sourceChoices.some((item) => item.source.type === card.source.type && (item.source.type !== 'attribute' || (card.source.type === 'attribute' && item.source.attributeId === card.source.attributeId))));
+  if (activity.statisticCards !== undefined || sourceChoices.length === 0) return existing;
   return sourceChoices.map((item, index) => ({
     id: `${activity.id}-stat-${item.key}`,
     source: item.source,
-    chartType: getChartTypesForSource(item.source, activity.attributes || [])[0] || 'textCloud',
+    chartType: item.source.type === 'recordDuration' ? 'numberKpi' as const : getChartTypesForSource(item.source, activity.attributes || [])[0] || 'textCloud',
     range: '30d' as const,
     metric: item.source.type === 'tagDuration' ? 'value' as const : 'count' as const,
     order: index
@@ -920,6 +898,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     const choices = [
       ...attributes.map((attribute) => ({ key: `attribute:${attribute.id}`, source: { type: 'attribute', attributeId: attribute.id } as ActivityStatisticCardSource, label: attribute.name })),
       ...(allowedSourceTypes?.includes('categoryDuration') ? [{ key: 'categoryDuration', source: { type: 'categoryDuration' } as ActivityStatisticCardSource, label: '分类时长' }] : []),
+      ...(allowedSourceTypes?.includes('recordDuration') ? [{ key: 'recordDuration', source: { type: 'recordDuration' } as ActivityStatisticCardSource, label: '记录时长' }] : []),
       { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
       ...(allowedSourceTypes?.includes('tagDuration') || !allowedSourceTypes ? [{ key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }] : []),
       ...(allowedSourceTypes?.includes('categoryActivity') ? [{ key: 'categoryActivity', source: { type: 'categoryActivity' } as ActivityStatisticCardSource, label: '二级标签' }] : [])
@@ -954,29 +933,18 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     }
     // Persistence can update the parent one render after a local edit; keep the edited cards visible.
     if (!activityChanged && userEditedCardsRef.current) return;
-    const useDefaultCards = !userEditedCardsRef.current && (!activity.statisticCards || activity.statisticCards.length === 0);
-    const next = useDefaultCards
-      ? getInitialStatisticCards(activity, availableSourceChoices, allowedSourceTypes)
-      : getInitialStatisticCards({ ...activity, statisticCards: activity.statisticCards || [] }, availableSourceChoices, allowedSourceTypes);
+    const next = getInitialStatisticCards(activity, availableSourceChoices, allowedSourceTypes);
     setCards(next);
     if (JSON.stringify(next) !== JSON.stringify(activity.statisticCards || [])) onChange?.({ ...activity, statisticCards: next });
   }, [activity.id, activity.attributes, activity.statisticCards, availableSourceChoices, allowedSourceTypes]);
 
   const sourceChoices = availableSourceChoices;
-  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'note' ? 'note' : value.type === 'tagDuration' ? 'tagDuration' : value.type === 'categoryDuration' ? 'categoryDuration' : value.type === 'categoryActivity' ? 'categoryActivity' : `attribute:${value.attributeId}`;
+  const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'attribute' ? `attribute:${value.attributeId}` : value.type;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
-  const selectedRangeOptions = selectedCard?.chartType === 'choiceStacked'
-    ? CHOICE_STACKED_RANGE_OPTIONS
-    : selectedCard?.source.type === 'tagDuration' || selectedCard?.source.type === 'categoryDuration'
-    ? selectedCard.chartType === 'tagDurationBoxplot'
-      ? [{ key: 'year' as const, label: '本年' }]
-      : selectedCard.chartType === 'tagDurationWeekHourHeatmap'
-        ? TAG_DURATION_RANGE_OPTIONS
-        : selectedCard.chartType === 'tagDurationPetalTimeline'
-          ? TAG_DURATION_RHYTHM_RANGE_OPTIONS
-        : RANGE_OPTIONS
-    : RANGE_OPTIONS;
+  const selectedRangeOptions = selectedCard
+    ? getStatisticRangesForCard(selectedCard.chartType).map((key) => ({ key, label: getRangeLabel(key) }))
+    : [];
 
   React.useEffect(() => {
     if (!manageOpen) return;
@@ -995,45 +963,41 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (!next) return;
     const types = getChartTypesForSource(next.source, attributes);
     const nextType = types.includes(selectedCard.chartType) ? selectedCard.chartType : types[0];
-    const nextRange = nextType === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
-      : nextType === 'tagDurationBoxplot' ? 'year'
-      : nextType === 'tagDurationWeekHourHeatmap' ? 'all'
-      : nextType === 'tagDurationPetalTimeline' ? 'week'
-        : nextType === 'numberCalendar' ? 'year' : selectedCard.range;
+    const nextRange = getStatisticRangesForCard(nextType).includes(selectedCard.range)
+      ? selectedCard.range : getDefaultStatisticRange(nextType);
     updateSelectedCard({
       source: next.source,
       chartType: nextType || 'textCloud',
       ...(nextType === 'tagDurationPetalTimeline' ? { timelineStyle: selectedCard.timelineStyle || 'petal' } : {}),
       range: nextRange,
-        metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' || nextType === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
+      metric: nextType === 'numberArea' || nextType === 'numberHistogram' || nextType === 'numberCalendar' || nextType === 'numberKpi' ? 'value' : nextType === 'choiceBar' || nextType === 'choiceDonut' || nextType === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count'
     });
   };
 
   const changeExistingType = (type: ActivityStatisticCardType) => {
     if (!selectedCard) return;
-    const nextRange = type === 'choiceStacked' && selectedCard.range === 'year' ? '30d'
-      : type === 'tagDurationBoxplot' ? 'year'
-      : type === 'tagDurationWeekHourHeatmap' ? 'all'
-      : type === 'tagDurationPetalTimeline' ? 'week'
-        : type === 'numberCalendar' ? 'year' : selectedCard.range;
+    const nextRange = getStatisticRangesForCard(type).includes(selectedCard.range)
+      ? selectedCard.range : getDefaultStatisticRange(type);
     updateSelectedCard({ chartType: type, range: nextRange, ...(type === 'tagDurationPetalTimeline' ? { timelineStyle: selectedCard.timelineStyle || 'petal' } : {}), metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
   };
 
   const renderCard = (card: ActivityStatisticCard) => {
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
-    if (card.source.type === 'tagDuration' || card.source.type === 'categoryDuration') {
+    if (isDurationStatisticSource(card.source)) {
       const durationAttribute = card.source.type === 'categoryDuration'
         ? { ...TAG_DURATION_ATTRIBUTE, id: '__category-duration__', name: '分类时长' }
-        : TAG_DURATION_ATTRIBUTE;
+        : card.source.type === 'recordDuration'
+          ? { ...TAG_DURATION_ATTRIBUTE, id: '__record-duration__', name: '记录时长' }
+          : TAG_DURATION_ATTRIBUTE;
       if (card.chartType === 'tagDurationBoxplot') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">DURATION BOXPLOT / 每日汇总</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">本年</span></div><TagDurationBoxplotPreview logs={filterLogsByRange(logs, 'year')} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationWeekHourHeatmap') {
-        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TAG DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
+        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">DURATION / 星期 × 小时</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><TagDurationWeekHourHeatmap logs={logs} range={card.range} palette={chartPalette} /></section>;
       }
       if (card.chartType === 'tagDurationPetalTimeline') {
-        const rhythmRange: RhythmRange = card.range === 'month' ? 'month' : card.range === 'year' ? 'year' : 'week';
+        const rhythmRange: RhythmRange = card.range === 'all' ? 'all' : card.range === 'month' ? 'month' : card.range === 'year' ? 'year' : 'week';
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TIME RHYTHM / {card.timelineStyle === 'histogram' ? '24 HOUR BARS' : '12 PETALS'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><PetalTimelineChart logs={logs} range={rhythmRange} palette={chartPalette} timelineStyle={card.timelineStyle || 'petal'} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
@@ -1119,7 +1083,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
                 </div>
               ))}
             </div>
-            <button type="button" onClick={() => commit(ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>
+            <button type="button" onClick={() => commit(allowedSourceTypes ? getInitialStatisticCards({ ...activity, statisticCards: undefined }, sourceChoices, allowedSourceTypes) : ensureStatisticCards({ ...activity, statisticCards: cards }))} className="mt-5 text-xs text-[#9b5c3f] underline-offset-2 hover:underline">恢复默认卡片</button>
           </div>
         </div>
       )}

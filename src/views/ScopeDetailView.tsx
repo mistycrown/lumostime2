@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Save scope drafts on exit/backgrounding instead of on each keystroke.
  * @file ScopeDetailView.tsx
+ * @updated 2026-10-06: Adds independently persisted record-duration/note statistic cards.
  * @updated 2026-08-06: Added archive and restore control for domains.
  * @updated 2026-08-26: Displays explicit archive status text beside the domain archive/restore action.
  * @input Scope Data, Logs, Associated Todos/Goals/MajorGoals
@@ -38,6 +39,7 @@ import { getNormalizedScopeIds } from '../utils/scopeStatsUtils';
 import { NoteTemplateManager } from '../components/NoteTemplateManager';
 import { AssociatedTodoList } from '../components/AssociatedTodoList';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { RecordStatistics } from '../components/RecordStatistics';
 
 interface ScopeDetailViewProps {
     scope: Scope;
@@ -201,7 +203,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
         return KEYWORD_COLORS[colorIndex];
     };
 
-    const tabs = ['细节', '时间线', '关联', '目标'];
+    const tabs = ['细节', '时间线', '统计', '关联', '目标'];
 
     // Matrix Stats
     const matrixStats = useMemo(() => {
@@ -263,6 +265,13 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
 
     const renderContent = () => {
         switch (activeTab) {
+            case '统计':
+                return <RecordStatistics
+                    entity={scope}
+                    logs={countableScopeLogs}
+                    title="领域统计"
+                    onChange={(settings) => setScope((current) => ({ ...current, ...settings }))}
+                />;
             case '关联':
                 return (
                     <div className="space-y-6">
