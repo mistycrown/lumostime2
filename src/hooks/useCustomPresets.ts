@@ -8,6 +8,7 @@
  * @updated 2026-09-28: Adds optional modern-navigation and Memoir calendar selections for legacy built-in presets.
  * @updated 2026-09-28: Adds optional card-background and font selections for legacy built-in presets.
  * @updated 2026-10-05: Compacts legacy snapshot image URLs on load/save and reports failed preset persistence.
+ * @updated 2026-10-06: Marks persisted edits immediately, refreshes restored lists, and mutates the latest stored presets.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -15,6 +16,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { sanitizeThemePresetsForStorage } from '../utils/imageAssetStorage';
+import { markLocalDataEdited } from '../utils/localDataTimestamp';
+import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
 import type { AchievementBottleStyle } from '../services/achievementBottleStyleService';
 import type { AchievementBottleIconPack } from '../services/achievementBottleIconPackService';
 import type { NavigationIconMode } from '../services/navigationIconService';
@@ -65,7 +68,21 @@ export type ValidationError =
     | 'NAME_TOO_LONG'
     | 'DUPLICATE_NAME'
     | 'INVALID_DATA'
+    | 'STORAGE_ERROR'
     | null;
+
+export const CUSTOM_PRESETS_CHANGED_EVENT = 'lumostime:custom-presets-changed';
+
+const notifyPresetsChanged = (): void => {
+    // The durable edit marker also protects saves made before the first sync audit.
+    // A notification failure must not turn an already persisted save into a failed save.
+    try {
+        markLocalDataEdited();
+    } catch (error) {
+        console.error('[useCustomPresets] Failed to mark preset edit for sync:', error);
+    }
+    window.dispatchEvent(new Event(CUSTOM_PRESETS_CHANGED_EVENT));
+};
 
 /**
  * Load custom presets from LocalStorage
@@ -88,11 +105,13 @@ const loadCustomPresets = (): ThemePreset[] => {
 /**
  * Save custom presets to LocalStorage
  */
-const saveCustomPresets = (presets: ThemePreset[]): void => {
+const saveCustomPresets = (presets: ThemePreset[]): ThemePreset[] => {
     try {
-        if (!storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, sanitizeThemePresetsForStorage(presets))) {
+        const compacted = sanitizeThemePresetsForStorage(presets);
+        if (!storage.setJSON(THEME_KEYS.CUSTOM_PRESETS, compacted)) {
             throw new Error('Failed to persist custom presets');
         }
+        return compacted;
     } catch (error) {
         console.error('[useCustomPresets] Failed to save custom presets:', error);
         throw new Error('保存失败，请重试');
@@ -161,6 +180,8 @@ export const getValidationErrorMessage = (error: ValidationError): string => {
             return '方案名称已存在，请使用其他名称';
         case 'INVALID_DATA':
             return '方案数据不完整，请重试';
+        case 'STORAGE_ERROR':
+            return '方案保存失败，请重试';
         default:
             return '';
     }
@@ -174,11 +195,26 @@ export const useCustomPresets = () => {
     const [customPresets, setCustomPresets] = useState<ThemePreset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Load custom presets on mount
+    // Restores and other mounted instances can replace the persisted list.
     useEffect(() => {
-        const presets = loadCustomPresets();
-        setCustomPresets(presets);
-        setIsLoading(false);
+        const reload = () => {
+            setCustomPresets(loadCustomPresets());
+            setIsLoading(false);
+        };
+        const onStorage = (event: StorageEvent) => {
+            if (event.storageArea === localStorage && (event.key === THEME_KEYS.CUSTOM_PRESETS || event.key === null)) {
+                reload();
+            }
+        };
+        reload();
+        window.addEventListener(APPEARANCE_RESTORED_EVENT, reload);
+        window.addEventListener(CUSTOM_PRESETS_CHANGED_EVENT, reload);
+        window.addEventListener('storage', onStorage);
+        return () => {
+            window.removeEventListener(APPEARANCE_RESTORED_EVENT, reload);
+            window.removeEventListener(CUSTOM_PRESETS_CHANGED_EVENT, reload);
+            window.removeEventListener('storage', onStorage);
+        };
     }, []);
 
     /**
@@ -188,7 +224,7 @@ export const useCustomPresets = () => {
         const timestamp = Date.now();
         
         return {
-            id: `custom_${timestamp}`,
+            id: `custom_${timestamp}_${crypto.randomUUID()}`,
             name: name.trim(),
             description: '自定义方案',
             icon: '',
@@ -212,51 +248,55 @@ export const useCustomPresets = () => {
      * Add a new custom preset
      */
     const addCustomPreset = useCallback((name: string): { success: boolean; error?: ValidationError; preset?: ThemePreset } => {
-        // Validate name
-        const validationError = validatePresetName(name, customPresets);
-        if (validationError) {
-            return { success: false, error: validationError };
-        }
-
         try {
+            // Do not overwrite a restore or another save with an old React closure.
+            const latestPresets = loadCustomPresets();
+            const validationError = validatePresetName(name, latestPresets);
+            if (validationError) {
+                return { success: false, error: validationError };
+            }
             const newPreset = createCustomPreset(name);
-            const updatedPresets = [...customPresets, newPreset];
+            if (!validatePresetData(newPreset)) {
+                return { success: false, error: 'INVALID_DATA' };
+            }
+            const updatedPresets = saveCustomPresets([...latestPresets, newPreset]);
             
-            saveCustomPresets(updatedPresets);
             setCustomPresets(updatedPresets);
+            notifyPresetsChanged();
             
             return { success: true, preset: newPreset };
         } catch (error) {
             console.error('[useCustomPresets] Failed to add preset:', error);
-            return { success: false, error: 'INVALID_DATA' };
+            return { success: false, error: 'STORAGE_ERROR' };
         }
-    }, [customPresets, createCustomPreset]);
+    }, [createCustomPreset]);
 
     /**
      * Delete a custom preset
      */
     const deleteCustomPreset = useCallback((presetId: string): boolean => {
         try {
-            const updatedPresets = customPresets.filter(preset => preset.id !== presetId);
+            const latestPresets = loadCustomPresets();
+            const deleted = latestPresets.find((preset) => preset.id === presetId);
+            if (!deleted) return false;
+            const updatedPresets = saveCustomPresets(latestPresets.filter(preset => preset.id !== presetId));
             
-            saveCustomPresets(updatedPresets);
             setCustomPresets(updatedPresets);
-
-            const deleted = customPresets.find((preset) => preset.id === presetId);
-            if (deleted?.snapshot) void deleteUnusedSnapshotImages(deleted.snapshot);
             
             // If deleted preset was current, clear current preset ID
             const currentPresetId = storage.get(THEME_KEYS.CURRENT_PRESET);
             if (currentPresetId === presetId) {
                 storage.remove(THEME_KEYS.CURRENT_PRESET);
             }
+            notifyPresetsChanged();
+            if (deleted.snapshot) void deleteUnusedSnapshotImages(deleted.snapshot);
             
             return true;
         } catch (error) {
             console.error('[useCustomPresets] Failed to delete preset:', error);
             return false;
         }
-    }, [customPresets]);
+    }, []);
 
     /**
      * Check if a preset name is valid

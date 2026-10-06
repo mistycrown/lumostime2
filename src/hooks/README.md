@@ -1,5 +1,7 @@
 # Custom Hooks
 
+> Update 2026-10-06: `useCustomPresets.ts` immediately marks successful saves/deletions for cloud sync, refreshes lists after appearance restores and storage changes, and reads the latest persisted list before mutations. Newly saved data is validated before writing. Run `node scripts/test-custom-presets-renderer.mjs` for real React save/reopen, restore, concurrent-callback, storage-failure, and first-sync regressions.
+
 > Update 2026-10-05: `useCardBackground.ts` preloads images, falls back within partially available groups, ignores stale asynchronous loads, and applies the latest opacity after image reads. Verify real React effects and image decoding with `node scripts/test-card-background-renderer.mjs`.
 
 > Update 2026-10-05: `useCustomPresets.ts` compacts image URLs in existing saved theme snapshots and checks storage write results so quota failures do not appear as successful saves.
