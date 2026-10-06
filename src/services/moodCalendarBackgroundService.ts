@@ -6,6 +6,7 @@
  * @description Stores a single fill image for each Memoir mood-calendar background.
  * @updated 2026-09-29: Deduplicates hydration, keeps temporary URLs out of storage, and merges results without overwriting concurrent edits.
  * @updated 2026-10-05: Avoids redundant storage writes and tolerates quota failures during startup hydration.
+ * @updated 2026-10-06: Preserves legacy image bytes until file-backed hydration succeeds.
  */
 import { imageService } from './imageService';
 
@@ -41,6 +42,7 @@ const normalizeSettings = (settings: MoodCalendarBackgroundSettings | undefined)
 interface RuntimeMoodCalendarImage {
     url: string;
     imageFilename?: string;
+    resolved: boolean;
 }
 
 class MoodCalendarBackgroundService {
@@ -72,15 +74,19 @@ class MoodCalendarBackgroundService {
 
             return parsed.map((background) => {
                 if (this.isDataUrl(background.url) && !this.getRuntimeImageUrl(background)) {
-                    this.setRuntimeImage(background, background.url);
+                    this.setRuntimeImage(background, background.url, false);
                 }
                 if (this.isDataUrl(background.thumbnail) && !this.getRuntimeImageUrl(background)) {
-                    this.setRuntimeImage(background, background.thumbnail);
+                    this.setRuntimeImage(background, background.thumbnail, false);
                 }
                 const runtimeUrl = this.getRuntimeImageUrl(background);
                 const url = runtimeUrl || (this.isTemporaryUrl(background.url) ? '' : background.url);
                 const thumbnail = runtimeUrl || (this.isTemporaryUrl(background.thumbnail) ? '' : background.thumbnail);
-                return { ...background, url, thumbnail };
+                return {
+                    ...background,
+                    url,
+                    ...(Object.prototype.hasOwnProperty.call(background, 'thumbnail') ? { thumbnail } : {})
+                };
             });
         } catch {
             return [];
@@ -89,10 +95,19 @@ class MoodCalendarBackgroundService {
 
     private saveCustomBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
         const persisted = backgrounds.map((background) => {
-            if (this.isTemporaryUrl(background.url)) this.setRuntimeImage(background, background.url);
+            const previous = this.runtimeImages.get(background.id);
+            if (this.isTemporaryUrl(background.url)) {
+                const resolved = previous?.imageFilename === background.imageFilename && previous.url === background.url
+                    ? previous.resolved : true;
+                this.setRuntimeImage(background, background.url, resolved);
+            }
             if (this.isTemporaryUrl(background.thumbnail) && !this.getRuntimeImageUrl(background)) {
                 this.setRuntimeImage(background, background.thumbnail);
             }
+
+            // A legacy data URL can be the only usable copy of a missing file.
+            if (!background.imageFilename || (this.runtimeImages.get(background.id)?.resolved === false
+                && (this.isDataUrl(background.url) || this.isDataUrl(background.thumbnail)))) return background;
 
             return {
                 ...background,
@@ -122,9 +137,10 @@ class MoodCalendarBackgroundService {
 
     private setRuntimeImage(
         background: Pick<MoodCalendarBackgroundOption, 'id' | 'imageFilename'>,
-        url: string
+        url: string,
+        resolved = true
     ): void {
-        this.runtimeImages.set(background.id, { url, imageFilename: background.imageFilename });
+        this.runtimeImages.set(background.id, { url, imageFilename: background.imageFilename, resolved });
     }
 
     hydrateCustomBackgrounds(): Promise<void> {
@@ -144,7 +160,8 @@ class MoodCalendarBackgroundService {
         while (true) {
             const backgrounds = this.loadCustomBackgrounds();
             const pendingBackgrounds = backgrounds.filter((background) => {
-                if (!background.imageFilename || this.getRuntimeImageUrl(background)) return false;
+                if (!background.imageFilename || (this.getRuntimeImageUrl(background)
+                    && this.runtimeImages.get(background.id)?.resolved)) return false;
                 return !attemptedAssets.has(`${background.id}\u0000${background.imageFilename}`);
             });
             if (pendingBackgrounds.length === 0) break;
@@ -203,6 +220,7 @@ class MoodCalendarBackgroundService {
     private persistLatestBackgrounds(backgrounds: MoodCalendarBackgroundOption[]): void {
         try {
             this.saveCustomBackgrounds(backgrounds.map((background) => {
+                if (!background.imageFilename || !this.runtimeImages.get(background.id)?.resolved) return background;
                 const runtimeUrl = this.getRuntimeImageUrl(background);
                 return runtimeUrl ? { ...background, url: runtimeUrl, thumbnail: runtimeUrl } : background;
             }));

@@ -236,7 +236,7 @@ describe('applyImportedThemePackage', () => {
       showLabelWithIcon: true,
       iconScale: 125
     });
-    expect(hydrateNavigationIcons).toHaveBeenCalledTimes(2);
+    expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
     expect(setNavigationEnabled).toHaveBeenCalledWith(true);
     const { backgroundService } = await import('./backgroundService');
     expect(backgroundService.setBackgroundOpacity).toHaveBeenCalledWith(0.3);
