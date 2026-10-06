@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.test.tsx
+ * @updated 2026-10-06: Verifies all-time rhythm includes historical records and matches heatmap allocation.
  * @input Text attribute values.
  * @output Regression coverage for text-term extraction used by attribute statistics.
  * @updated 2026-10-01: Covers hour/minute duration formatting used by duration statistic cards.
@@ -8,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
 import { filterLogsForAttribute, filterLogsByRange, formatHoursMinutes, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
 import { aggregateHourBuckets } from './stats/PetalTimelineChart';
+import { aggregateWeekHourDurations } from '../utils/hourlyDurationUtils';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 
 describe('getTextTerms', () => {
@@ -80,6 +82,10 @@ describe('filterLogsForAttribute', () => {
 });
 
 describe('filterLogsByRange', () => {
+  it('keeps historical notes and values when selecting all-time', () => {
+    const logs = [{ id: 'old', startTime: new Date(2020, 0, 1).getTime(), note: '历史备注' }];
+    expect(filterLogsByRange(logs as never, 'all')).toBe(logs);
+  });
   it('keeps the full local calendar year while excluding prior-year and future logs', () => {
     const now = new Date(2026, 8, 21, 15, 57, 0);
     const logs = [
@@ -90,6 +96,22 @@ describe('filterLogsByRange', () => {
     ];
 
     expect(filterLogsByRange(logs as never, 'year', now).map((log) => log.id)).toEqual(['new-year', 'current']);
+  });
+});
+
+describe('all-time shared hourly allocation', () => {
+  it('uses the same elapsed-hour totals for rhythm and weekday heatmaps across years', () => {
+    const startTime = new Date(2020, 0, 1, 23, 30).getTime();
+    const endTime = new Date(2020, 0, 2, 1, 30).getTime();
+    const logs = [{ startTime, endTime, duration: 3600 }];
+    const rhythm = aggregateHourBuckets(logs, 'all');
+    const heatmap = aggregateWeekHourDurations(logs, 'all');
+    expect(rhythm.totalMinutes).toBe(60);
+    expect(rhythm.activeDays).toBe(2);
+    rhythm.buckets.forEach((bucket) => {
+      const seconds = [...heatmap.entries()].filter(([key]) => Number(key.split('-')[1]) === bucket.hour).reduce((sum, [, value]) => sum + value.duration, 0);
+      expect(bucket.minutes * 60).toBe(seconds);
+    });
   });
 });
 

@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.ts
+ * @updated 2026-10-06: Shares chart-specific ranges and supports record-duration cards.
  * @input Activity attribute definitions and persisted statistic card settings.
  * @output Normalized card settings, default cards, and chart capability helpers.
  * @pos Utility (Activity Statistics)
@@ -34,7 +35,7 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
   if (source.type === 'note') return ['textCloud'];
-  if (source.type === 'tagDuration' || source.type === 'categoryDuration') return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
+  if (isDurationStatisticSource(source)) return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
   if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked'];
   const attribute = attributes.find((item) => item.id === source.attributeId);
   if (!attribute) return [];
@@ -44,12 +45,33 @@ export const getChartTypesForSource = (source: ActivityStatisticCardSource, attr
   return ['choiceBar', 'choiceHeatmap'];
 };
 
+export const isDurationStatisticSource = (source: ActivityStatisticCardSource): source is Extract<ActivityStatisticCardSource, { type: 'tagDuration' | 'categoryDuration' | 'recordDuration' }> => (
+  source.type === 'tagDuration' || source.type === 'categoryDuration' || source.type === 'recordDuration'
+);
+
+/** Keep editor choices and persisted range validation on the same capability rules. */
+export const getStatisticRangesForCard = (chartType: ActivityStatisticCardType): ActivityStatisticRange[] => {
+  if (chartType === 'tagDurationBoxplot') return ['year'];
+  if (chartType === 'tagDurationWeekHourHeatmap') return ['all', 'month', 'year'];
+  if (chartType === 'tagDurationPetalTimeline') return ['week', 'month', 'year', 'all'];
+  if (chartType === 'choiceStacked') return ['7d', '30d', 'month'];
+  const ranges: ActivityStatisticRange[] = ['7d', '30d', 'month', 'year'];
+  return chartType === 'numberArea' || chartType === 'numberCalendar' || chartType === 'choiceHeatmap' ? ranges : [...ranges, 'all'];
+};
+
+export const getDefaultStatisticRange = (chartType: ActivityStatisticCardType): ActivityStatisticRange => (
+  chartType === 'numberCalendar' || chartType === 'tagDurationBoxplot' ? 'year'
+    : chartType === 'tagDurationWeekHourHeatmap' ? 'all'
+      : chartType === 'tagDurationPetalTimeline' ? 'week' : '30d'
+);
+
 const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
   if (!value || typeof value !== 'object') return false;
   const source = value as Record<string, unknown>;
   return source.type === 'note'
     || source.type === 'tagDuration'
     || source.type === 'categoryDuration'
+    || source.type === 'recordDuration'
     || source.type === 'categoryActivity'
     || (source.type === 'attribute' && typeof source.attributeId === 'string' && source.attributeId.length > 0);
 };
@@ -80,17 +102,12 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
   if (!allowedTypes.includes(chartType)) return null;
   const rawRange = RANGES.includes(item.range as ActivityStatisticRange)
     ? item.range as ActivityStatisticRange
-    : chartType === 'numberCalendar' || chartType === 'tagDurationBoxplot' ? 'year'
-      : chartType === 'tagDurationWeekHourHeatmap' ? 'all'
-        : chartType === 'tagDurationPetalTimeline' ? 'week'
-        : '30d';
-  const range = chartType === 'tagDurationPetalTimeline' && rawRange !== 'week' && rawRange !== 'month' && rawRange !== 'year'
-    ? 'week'
-    : chartType === 'choiceStacked' && rawRange === 'year'
-    ? '30d'
-    : rawRange === 'all' && source.type !== 'tagDuration' && source.type !== 'categoryDuration' ? '30d' : rawRange;
+    : getDefaultStatisticRange(chartType);
+  const allowedRanges = getStatisticRangesForCard(chartType);
+  const range = allowedRanges.includes(rawRange) ? rawRange
+    : getDefaultStatisticRange(chartType);
   const metric = METRICS.includes(item.metric as ActivityStatisticMetric) ? item.metric as ActivityStatisticMetric : 'count';
-  const timelineStyle = chartType === 'tagDurationPetalTimeline' && (source.type === 'tagDuration' || source.type === 'categoryDuration')
+  const timelineStyle = chartType === 'tagDurationPetalTimeline' && isDurationStatisticSource(source)
     ? (TIMELINE_STYLES.includes(item.timelineStyle as ActivityTimelineStyle) ? item.timelineStyle as ActivityTimelineStyle : 'petal')
     : undefined;
   const normalizedMetric = source.type === 'attribute' && sourceAttribute?.type === 'number'
@@ -142,9 +159,11 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
       ? '标签时长'
       : card.source.type === 'categoryDuration'
         ? '分类时长'
-        : card.source.type === 'categoryActivity'
-          ? '二级标签'
-      : attributes.find((attribute) => attribute.id === attributeId)?.name || '已删除属性';
+        : card.source.type === 'recordDuration'
+          ? '记录时长'
+          : card.source.type === 'categoryActivity'
+            ? '二级标签'
+            : attributes.find((attribute) => attribute.id === attributeId)?.name || '已删除属性';
   const labels: Record<ActivityStatisticCardType, string> = {
     textCloud: '词云',
     numberArea: '数值面积趋势',
@@ -156,7 +175,7 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     choiceHeatmap: '选项热力图',
     choiceTreemap: '选项矩形图',
     choiceStacked: '选项堆叠图',
-    tagDurationBoxplot: '标签时长箱线图',
+    tagDurationBoxplot: '时长箱线图',
     tagDurationWeekHourHeatmap: '星期 × 小时热力图',
     tagDurationPetalTimeline: '时序图'
   };

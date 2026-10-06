@@ -1,5 +1,6 @@
 /**
  * @file FilterDetailView.tsx
+ * @updated 2026-10-06: Adds persisted record-duration/note statistic cards beside the timeline.
  * @input Filter, Logs, Categories, Scopes, Todos
  * @output Filter detail display with timeline and heatmap
  * @pos View (Detail Page)
@@ -15,6 +16,7 @@ import { filterCountableLogs, isCountableLog } from '../utils/statLogUtils';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { Clock, ChevronLeft } from 'lucide-react';
 import { IconRenderer } from '../components/IconRenderer';
+import { RecordStatistics } from '../components/RecordStatistics';
 
 interface FilterDetailViewProps {
     filter: Filter;
@@ -25,6 +27,7 @@ interface FilterDetailViewProps {
     todoCategories: TodoCategory[];
     onClose: () => void;
     onEditLog?: (log: Log) => void;
+    onUpdateFilter: (filter: Filter) => void;
 }
 
 export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
@@ -35,7 +38,8 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
     todos,
     todoCategories,
     onClose,
-    onEditLog
+    onEditLog,
+    onUpdateFilter
 }) => {
     const [activeTab, setActiveTab] = useState('时间线');
     const [selectedActivities, setSelectedActivities] = useState<Set<string> | null>(null);
@@ -378,6 +382,13 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
 
     const renderContent = () => {
         switch (activeTab) {
+            case '统计':
+                return <RecordStatistics
+                    entity={filter}
+                    logs={countableLogs}
+                    title="筛选器统计"
+                    onChange={(settings) => onUpdateFilter({ ...filter, ...settings })}
+                />;
             case '时间线':
                 return (
                     <DetailTimelineCard
@@ -1062,7 +1073,7 @@ export const FilterDetailView: React.FC<FilterDetailViewProps> = ({
 
                     {/* Tab Navigation */}
                     <div className="flex gap-6 border-b border-stone-200 mb-8 overflow-x-auto no-scrollbar">
-                        {['时间线', '节奏', '趋势', '专注', '情绪'].map((tab) => (
+                        {['时间线', '统计', '节奏', '趋势', '专注', '情绪'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}

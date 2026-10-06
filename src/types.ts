@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-06: Adds record-duration statistic sources and persisted filter/scope cards.
  * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
  * @updated 2026-09-21: Adds stacked time-series charts for single-choice statistics.
  * @updated 2026-09-23: Adds weekly/monthly duration rhythm chart card types and range support.
@@ -128,6 +129,7 @@ export type ActivityStatisticCardSource =
   | { type: 'note' }
   | { type: 'tagDuration' }
   | { type: 'categoryDuration' }
+  | { type: 'recordDuration' }
   | { type: 'categoryActivity' };
 
 export interface ActivityStatisticCard {
@@ -223,6 +225,8 @@ export interface Scope {
   themeColor: string; // Hex color or Tailwind class name
   noteTemplates?: NoteTemplate[];
   keywords?: string[];
+  statisticCards?: ActivityStatisticCard[];
+  statisticPalette?: ActivityStatisticPaletteId;
 }
 
 export interface Goal {
@@ -1215,6 +1219,8 @@ export interface Filter {
   createdAt: number;
   order?: number;
   icon?: string;
+  statisticCards?: ActivityStatisticCard[];
+  statisticPalette?: ActivityStatisticPaletteId;
 }
 
 export interface ParsedFilterCondition {

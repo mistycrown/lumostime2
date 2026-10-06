@@ -1,3 +1,10 @@
+/**
+ * @file FiltersSettingsView.tsx
+ * @input Saved filters and record context.
+ * @output Filter edits, ordering, and detail navigation.
+ * @pos View (Settings)
+ * @updated 2026-10-06: Preserves statistic settings when editing expressions and saves detail-card updates.
+ */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, PlusCircle, Edit2, Trash2, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
@@ -116,6 +123,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
         }
 
         const newFilter: Filter = {
+            ...editingFilter,
             id: editingFilter ? editingFilter.id : Date.now().toString(),
             name: filterName.trim(),
             filterExpression: filterExpression.trim(),
@@ -150,6 +158,7 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                 todoCategories={todoCategories}
                 onClose={() => setSelectedFilterId(null)}
                 onEditLog={onEditLog}
+                onUpdateFilter={(nextFilter) => onUpdateFilters(orderedFilters.map((item) => item.id === nextFilter.id ? nextFilter : item))}
             />
         );
     }
