@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-06: Mounts node navigation and includes metadata in backup and reset flows.
  * @updated 2026-10-03: Runs Feishu synchronization in the main app and marks dataset resets as replacements.
  * @updated 2026-10-02: Routes settings transfers through the shared sync coordinator and blocks editing during cloud application.
  * @input localStorage (logs, todos, user preferences), Capacitor Plugins (AppUsage, FocusNotification), Services (webdav, ai, nfc)
@@ -59,6 +60,8 @@ import AssistantAgent from './plugins/AssistantAgentPlugin';
 
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { DataProvider, useData } from './contexts/DataContext';
+import { NodeProvider } from './contexts/NodeContext';
+import { NodeDetailOverlay } from './components/NodeDetailOverlay';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { ReviewProvider, useReview } from './contexts/ReviewContext';
 import { SessionProvider, useSession } from './contexts/SessionContext';
@@ -413,6 +416,7 @@ const AppContent: React.FC = () => {
     usesFallbackSeedData,
     collections,
     collectionEntries,
+    nodes, setNodes,
     setLogs,
     setTodos,
     setTodoCategories
@@ -446,7 +450,7 @@ const AppContent: React.FC = () => {
     const customColorGroup = customColorGroupService.getGroup();
     
     const data = {
-      logs, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
+      logs, nodes, todos, categories, todoCategories, collections, collectionEntries, scopes, goals, majorGoals,
       autoLinkRules, reviewTemplates, checkTemplates, dailyReviews, weeklyReviews,
       monthlyReviews, onThisDayEntries, customNarrativeTemplates, userPersonalInfo, customStickerSets, customStickers, filters,
       memoirFilterConfig,
@@ -1336,6 +1340,7 @@ const AppContent: React.FC = () => {
             onReset={() => {
               markFeishuLogReplacement(INITIAL_LOGS);
               setLogs(INITIAL_LOGS);
+              setNodes([]);
               setTodos(INITIAL_TODOS);
               setCategories(CATEGORIES);
               setScopes(SCOPES);
@@ -1366,6 +1371,7 @@ const AppContent: React.FC = () => {
               const clearedLogs: Log[] = [];
               markFeishuLogReplacement(clearedLogs);
               setLogs(clearedLogs);
+              setNodes([]);
               setTodos([]);
               setGoals([]);
               setMajorGoals([]);
@@ -1415,6 +1421,7 @@ const AppContent: React.FC = () => {
               todoCategories,
               collections,
               collectionEntries,
+              nodes,
               scopes,
               goals,
               majorGoals,
@@ -1580,6 +1587,7 @@ const AppContent: React.FC = () => {
         onDownload={syncManager.handleConflictDownload}
       />
 
+      <NodeDetailOverlay />
     </MainLayout>
   );
 };
@@ -1597,7 +1605,9 @@ const App: React.FC = () => {
                     <AIChatWindowProvider>
                       <PrivacyProvider>
                         <AppBootstrapGate>
-                          <AppContent />
+                          <NodeProvider>
+                            <AppContent />
+                          </NodeProvider>
                         </AppBootstrapGate>
                       </PrivacyProvider>
                     </AIChatWindowProvider>

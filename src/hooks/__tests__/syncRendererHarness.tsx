@@ -1,5 +1,6 @@
 /**
  * @file syncRendererHarness.tsx
+ * @updated 2026-10-06: Verifies node-only edits upload and restored aliases/descriptions survive.
  * @input Real React hook renders with isolated contexts and cloud adapter
  * @output Machine-readable integration results for the Electron test runner
  * @pos Test (Cloud Sync Renderer)
@@ -33,6 +34,7 @@ const until = async (predicate: () => boolean, label: string) => {
 };
 const main = () => cloud.files.get('lumostime_backup.json');
 const uploads = () => cloud.uploads.filter(name => name === 'lumostime_backup.json').length;
+const nodeFixture = { id: 'node-1', name: '小林', aliases: ['林林'], description: '节点简介', createdAt: 1, updatedAt: 2 };
 const edit = (text: string) => update('data', { logs: [{ id: 'log-1', startTime: 1, endTime: 2, note: text }] });
 const waitIdle = () => until(() => !state.settings.isSyncing, 'idle');
 
@@ -57,6 +59,11 @@ async function run() {
   await until(() => main().appearanceData.storage.theme === 'new-theme' && !state.settings.isSyncing, 'appearance');
   check(main().logs[0].note === 'first', 'long-lived appearance listener uploaded old logs');
   passed.push('long-lived callbacks read latest React data');
+
+  update('data', { nodes: [nodeFixture] });
+  await until(() => main().nodes?.[0]?.description === '节点简介' && !state.settings.isSyncing, 'node-only edit upload');
+  check(main().nodes[0].aliases[0] === '林林', 'Node aliases missing from backup');
+  passed.push('node-only metadata edits enter the cloud backup');
 
   for (const event of ['navigationBackgroundChange', 'navigationBackgroundModeChange', 'navigationTransparencyChange']) {
     localStorage.setItem('test-theme', event);
@@ -100,7 +107,8 @@ async function run() {
   const restoredStickers = [{ id: 'flower', setId: restoredStickerSets[0].id, imageFilename: 'flower.webp', sortOrder: 0, status: 'active', createdAt: 1, updatedAt: 1 }];
   cloud.files.set('lumostime_backup.json', {
     ...main(), logs: [{ id: 'cloud', startTime: 1, endTime: 2, note: 'remote-newer' }], syncRevision: 'remote-newer',
-    customStickerSets: restoredStickerSets, customStickers: restoredStickers
+    customStickerSets: restoredStickerSets, customStickers: restoredStickers,
+    nodes: [{ ...nodeFixture, description: '云端简介' }]
   });
   await manager.handleConflictDownload();
   await until(() => manager.syncConflictModalState.isOpen, 'rechecked conflict');
@@ -110,6 +118,8 @@ async function run() {
   await until(() => state.data.logs[0].note === 'remote-newer' && !state.settings.isSyncing, 'restore committed');
   check(JSON.stringify(state.settings.customStickerSets) === JSON.stringify(restoredStickerSets), 'appearance restore overwrote synchronized sticker sets');
   check(JSON.stringify(state.settings.customStickers) === JSON.stringify(restoredStickers), 'appearance restore overwrote synchronized sticker images');
+  check(state.data.nodes[0]?.description === '云端简介' && state.data.nodes[0]?.aliases[0] === '林林', 'Node metadata did not restore');
+  passed.push('cloud restore preserves node aliases and descriptions');
   passed.push('appearance restoration preserves synchronized sticker metadata');
   const before = uploads();
   await delay(250);

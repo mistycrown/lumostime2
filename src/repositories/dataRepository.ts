@@ -1,5 +1,6 @@
 ﻿/**
  * @file dataRepository.ts
+ * @updated 2026-10-06: Hydrates and persists lightweight wiki-link node metadata.
  * @updated 2026-10-03: Commits logs with the Feishu outbox, distinguishes first-install snapshots, and notifies after dependent datasets persist.
  * @input Legacy localStorage keys, IndexedDB-backed storage repository, application defaults
  * @output Unified domain repository for heavy core data and one-time localStorage migration
@@ -42,6 +43,7 @@ import {
   DailyReview,
   Goal,
   Log,
+  NoteNode,
   MajorGoal,
   MonthlyReview,
   OnThisDayEntry,
@@ -67,6 +69,7 @@ const getTimingNow = (): number => (
 
 export const REPOSITORY_KEYS = {
   LOGS: 'logs',
+  NODES: 'nodes',
   TODOS: 'todos',
   TODO_CATEGORIES: 'todoCategories',
   DATA_COLLECTIONS: 'dataCollections',
@@ -119,6 +122,7 @@ const MIGRATION_DEFINITIONS: MigrationDefinition[] = [
 
 export interface DataContextSnapshot {
   logs: Log[];
+  nodes: NoteNode[];
   hasStoredLogs: boolean;
   todos: TodoItem[];
   todoCategories: TodoCategory[];
@@ -302,13 +306,15 @@ export class DataRepository {
       storedTodos,
       storedTodoCategories,
       storedCollections,
-      storedCollectionEntries
+      storedCollectionEntries,
+      storedNodes
     ] = await Promise.all([
       this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS),
       this.repository.getData<TodoItem[]>(REPOSITORY_KEYS.TODOS),
       this.repository.getData<TodoCategory[]>(REPOSITORY_KEYS.TODO_CATEGORIES),
       this.repository.getData<DataCollection[]>(REPOSITORY_KEYS.DATA_COLLECTIONS),
-      this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES)
+      this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES),
+      this.repository.getData<NoteNode[]>(REPOSITORY_KEYS.NODES)
     ]);
     const logs = storedLogs ?? INITIAL_LOGS;
     const todos = storedTodos ?? this.buildDefaultTodos(logs);
@@ -322,6 +328,7 @@ export class DataRepository {
 
     return {
       logs,
+      nodes: storedNodes ?? [],
       hasStoredLogs: storedLogs !== null,
       todos,
       todoCategories,
@@ -477,12 +484,14 @@ export class DataRepository {
     return snapshot.logs;
   }
 
-  async saveLogs(logs: Log[]): Promise<void> {
+  async saveLogs(logs: Log[], nodes?: NoteNode[]): Promise<void> {
     await this.initialize();
     if (this.repository.setBatch) {
-      await new FeishuAutoSyncStore({ getMeta: this.repository.getMeta.bind(this.repository), setBatch: this.repository.setBatch.bind(this.repository) }).saveLogs(logs);
+      await new FeishuAutoSyncStore({ getMeta: this.repository.getMeta.bind(this.repository), setBatch: this.repository.setBatch.bind(this.repository) }).saveLogs(logs, undefined,
+        nodes ? [{ namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes }] : []);
     } else {
       await this.repository.setData(REPOSITORY_KEYS.LOGS, logs);
+      if (nodes) await this.repository.setData(REPOSITORY_KEYS.NODES, nodes);
     }
     publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
@@ -491,6 +500,11 @@ export class DataRepository {
     await this.initialize();
     await this.repository.setData(REPOSITORY_KEYS.TODOS, todos);
     publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
+  }
+
+  async saveNodes(nodes: NoteNode[]): Promise<void> {
+    await this.initialize();
+    await this.repository.setData(REPOSITORY_KEYS.NODES, nodes);
   }
 
   async saveTodoCategories(todoCategories: TodoCategory[]): Promise<void> {

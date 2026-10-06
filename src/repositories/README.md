@@ -1,5 +1,7 @@
 # Data repositories
 
+Update 2026-10-06: `dataRepository.ts` hydrates optional `nodes` with an empty default for existing installations. `saveLogs(logs, nodes)` persists linked metadata atomically with logs and the Feishu outbox; metadata-only edits use `saveNodes`.
+
 - `storageRepository.ts` provides IndexedDB data/meta persistence and a localStorage fallback. `setBatch` uses one transaction across stores; fallback batches recover through a write-ahead journal.
 - `dataRepository.ts` migrates and saves product datasets. Log writes atomically include Feishu automatic-sync metadata; completed logs, todos, categories and scopes writes wake the foreground scheduler.
 - Repository tests cover migration, fallback recovery and atomic-write failure behavior.

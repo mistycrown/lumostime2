@@ -1,5 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-10-06: Renders node links, current-node highlights and saved-note suggestions.
  * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
  * @updated 2026-10-02: Centers only the day's first available sticker at full cell size and overlays the date in the bottom-right corner.
  * @updated 2026-10-02: Matches keyword calendar empty cells and date colors to the theme-aware heatmap treatment.
@@ -35,6 +36,8 @@ import { TimelineStyleRail } from './TimelineStyleRail';
 import { ActivityAttributeSummary } from './ActivityAttributeSummary';
 import { RoutineChecklistPreview } from './RoutineChecklistPreview';
 import { FeatureHint } from './FeatureHint';
+import { NodeText } from './NodeText';
+import { NodeSuggestions } from './NodeSuggestions';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
 import {
@@ -118,6 +121,7 @@ const getHeatmapTextStyle = (
 };
 
 interface DetailTimelineCardProps {
+    highlightNodeName?: string;
     // 数据
     filteredLogs: Log[];              // 已过滤的日志（category/activity/scope特定）
     displayDate: Date;                // 当前显示的月份
@@ -129,7 +133,7 @@ interface DetailTimelineCardProps {
         id?: string;
         icon?: string;
         name: string;
-        type: 'category' | 'activity' | 'scope' | 'other';
+        type: 'category' | 'activity' | 'scope' | 'node' | 'other';
     };
 
     // 回调
@@ -184,7 +188,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     tagStickerEnabled = false,
     enableFocusScore = false,
     enableMoodScore = false,
-    progressTracking
+    progressTracking,
+    highlightNodeName
 }) => {
     const { collections, collectionEntries } = useData();
     const { isPrivacyMode } = usePrivacy();
@@ -1326,15 +1331,17 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                         isRoutineChecklistMarkdown(log.note) ? (
                                                             <RoutineChecklistPreview
                                                                 markdown={log.note}
+                                                                highlightNodeName={highlightNodeName}
                                                                 className={`mb-2 text-stone-500 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}
                                                             />
                                                         ) : (
                                                             <p className={`text-sm text-stone-500 font-light leading-relaxed mb-2 whitespace-pre-wrap ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
-                                                                {log.note}
+                                                                <NodeText text={log.note} highlightName={highlightNodeName} />
                                                             </p>
                                                         )
                                                     )}
 
+                                                    <NodeSuggestions log={log} />
                                                     <ActivityAttributeSummary
                                                         activity={activity}
                                                         values={log.attributeValues}
@@ -1353,7 +1360,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                             ))}
                                                             <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                                 <span className="font-bold text-stone-400">
-                                                                    {entityInfo.type === 'category' ? '#' : entityInfo.type === 'activity' ? '#' : '%'}
+                                                                    {entityInfo.type === 'node' ? '[[]]' : entityInfo.type === 'category' || entityInfo.type === 'activity' ? '#' : '%'}
                                                                 </span>
                                                                 <IconRenderer icon={entityInfo.icon || ''} uiIcon={category?.uiIcon} className="text-xs" />
                                                                 <span>{entityInfo.name}</span>

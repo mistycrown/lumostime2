@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-06: Adds lightweight NoteNode metadata for text-derived wiki links.
  * @updated 2026-10-06: Adds record-duration statistic sources and persisted filter/scope cards.
  * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
  * @updated 2026-09-21: Adds stacked time-series charts for single-choice statistics.
@@ -323,6 +324,16 @@ export interface Comment {
   id: string;
   content: string;
   createdAt: number;
+}
+
+/** Lightweight wiki-link metadata. Relationships are derived from Log.note. */
+export interface NoteNode {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Log {

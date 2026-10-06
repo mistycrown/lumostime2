@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-06: DataContext discovers nodes from saved notes and serializes log/node persistence without rewriting existing hydrated logs. NodeContext derives backlinks/co-occurrence and manages metadata and detail history. Renames persist notes, metadata and the Feishu outbox in one transaction.
+
 Contexts hydrate product state from repositories before enabling persistence. `DataContext.tsx` owns logs and todos; `CategoryScopeContext.tsx` owns categories and associated definitions.
 
 2026-10-03: Persisted log hydration is not written back as a user edit. Missing logs are initialized once on a fresh install. Subsequent changes use the repository's atomic log/outbox persistence path, avoiding automatic-calendar deletion intentions from a stale window's bootstrap snapshot.

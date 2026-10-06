@@ -1,5 +1,6 @@
 /**
  * @file dataValidation.ts
+ * @updated 2026-10-06: Validates optional node metadata while accepting older backups.
  * @description Data validation helpers for backup, import, and cloud sync payloads.
  * @updated 2026-07-06: Added validation support for self-belief library arrays so AI-created identity descriptions can sync with the main backup payload.
  * @updated 2026-06-13: Added validation support for data collections and collection entries in user backup payloads while preserving old backups that omit those fields.
@@ -22,6 +23,7 @@ import {
   MOCK_TODO_CATEGORIES,
   SCOPES
 } from '../constants';
+import { isValidNodeName } from './nodeUtils';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -54,6 +56,7 @@ export function validateLocalData(data: any): ValidationResult {
     'todoCategories',
     'collections',
     'collectionEntries',
+    'nodes',
     'scopes',
     'goals',
     'majorGoals',
@@ -75,6 +78,23 @@ export function validateLocalData(data: any): ValidationResult {
   for (const field of arrayFields) {
     if (data[field] !== undefined && data[field] !== null && !Array.isArray(data[field])) {
       errors.push(`Field ${field} must be an array`);
+    }
+  }
+
+  if (Array.isArray(data.nodes)) {
+    const names = new Set<string>();
+    const ids = new Set<string>();
+    for (const node of data.nodes) {
+      if (!node || typeof node.id !== 'string' || !node.id || typeof node.name !== 'string'
+        || !isValidNodeName(node.name) || node.name !== node.name.trim()
+        || !Array.isArray(node.aliases) || node.aliases.some((alias: unknown) => typeof alias !== 'string')
+        || typeof node.description !== 'string' || !Number.isFinite(node.createdAt) || !Number.isFinite(node.updatedAt)) {
+        errors.push('Invalid node metadata');
+        continue;
+      }
+      if (names.has(node.name) || ids.has(node.id)) errors.push('Duplicate node name or id');
+      names.add(node.name);
+      ids.add(node.id);
     }
   }
 

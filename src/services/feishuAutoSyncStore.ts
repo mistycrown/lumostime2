@@ -1,5 +1,6 @@
 /**
  * @file feishuAutoSyncStore.ts
+ * @updated 2026-10-06: Allows related metadata to persist atomically with log and outbox changes.
  * @input Structured storage, persisted logs and account queue mutations.
  * @output Atomic log/outbox writes, durable settings and post-commit notifications.
  * @pos Local Feishu synchronization metadata; excluded from backups and cloud datasets.
@@ -44,8 +45,8 @@ export class FeishuAutoSyncStore {
     });
   }
 
-  async saveLogs(logs: Log[], replacement = isFeishuLogReplacement(logs)): Promise<void> {
-    await this.update((state) => collectFeishuLogChanges(state, logs, replacement), [{ namespace: 'data', key: 'logs', value: logs }]);
+  async saveLogs(logs: Log[], replacement = isFeishuLogReplacement(logs), relatedWrites: StorageWrite[] = []): Promise<void> {
+    await this.update((state) => collectFeishuLogChanges(state, logs, replacement), [...relatedWrites, { namespace: 'data', key: 'logs', value: logs }]);
     if (replacement) { replacements.delete(logs); replacementPending = false; }
   }
 }

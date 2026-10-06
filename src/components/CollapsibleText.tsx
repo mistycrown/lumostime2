@@ -1,9 +1,12 @@
 /**
  * @file CollapsibleText.tsx
+ * @updated 2026-10-06: Renders wiki-link nodes and avoids truncating a link mid-token.
  * @description 可折叠文本组件，当文本超过指定字数时显示折叠按钮
  */
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { NodeText } from './NodeText';
+import { parseNodeLinks } from '../utils/nodeUtils';
 
 interface CollapsibleTextProps {
     text: string;
@@ -23,19 +26,20 @@ export const CollapsibleText: React.FC<CollapsibleTextProps> = ({
         return (
             <div className={className}>
                 <div className="whitespace-pre-wrap">
-                    {text}
+                    <NodeText text={text} />
                 </div>
             </div>
         );
     }
 
     // 需要折叠的情况
-    const displayText = isExpanded ? text : text.slice(0, threshold);
+    const crossingLink = parseNodeLinks(text).find((link) => link.start < threshold && link.end > threshold);
+    const displayText = isExpanded ? text : text.slice(0, crossingLink?.end || threshold);
 
     return (
         <div className={className}>
             <div className="whitespace-pre-wrap">
-                {displayText}
+                <NodeText text={displayText} />
                 {!isExpanded && '...'}
             </div>
             <button

@@ -1,5 +1,6 @@
 /**
  * @file TimelineView.tsx
+ * @updated 2026-10-06: Adds post-save node suggestions beside rendered notes.
  * @input Logs, Categories, Todos, Scopes, Reviews (Daily/Weekly/Monthly)
  * @output Log CRUD, Date Navigation, Gesture/Calendar Animated Day Navigation, Search Trigger, Filter Trigger, Review Navigation
  * @pos View (Main Tab)
@@ -43,6 +44,7 @@ import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
 import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
+import { NodeSuggestions } from '../components/NodeSuggestions';
 import { ParsedTimeEntry } from '../services/aiService';
 import { ToastType } from '../components/Toast';
 import { imageService } from '../services/imageService';
@@ -1691,6 +1693,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                                             />
                                         )}
 
+                                        <NodeSuggestions log={item.logData} />
                                         <ActivityAttributeSummary
                                             activity={item.logData.activity}
                                             values={item.logData.attributeValues}

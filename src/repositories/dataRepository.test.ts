@@ -1,3 +1,9 @@
+/**
+ * @file dataRepository.test.ts
+ * @input In-memory core repository snapshots
+ * @output Persistence and hydration regressions
+ * @updated 2026-10-06: Verifies node metadata round-trips and atomic log/node writes.
+ */
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_ACHIEVEMENT_COLLECTION_COST,
@@ -45,6 +51,35 @@ const createLegacyStorageAdapter = (initialValues: Map<string, unknown>) => {
 };
 
 describe('DataRepository', () => {
+  it('round-trips node aliases and descriptions, with an empty default for old snapshots', async () => {
+    const storage = new InMemoryStorageRepository();
+    const legacy = createLegacyStorageAdapter(new Map());
+    const repository = new DataRepository(storage, legacy.adapter);
+    expect((await repository.loadDataContextSnapshot()).nodes).toEqual([]);
+    const nodes = [{ id: 'n', name: '小林', aliases: ['林林'], description: '一起讨论项目', createdAt: 1, updatedAt: 2 }];
+    await repository.saveNodes(nodes);
+    expect((await repository.loadDataContextSnapshot()).nodes).toEqual(nodes);
+  });
+
+  it('persists renamed log text and metadata in the same outbox transaction', async () => {
+    const storage = new InMemoryStorageRepository();
+    storage.meta.set('core-data-migration-v2', true);
+    const setBatch = vi.fn(async (writes: { namespace: string; key: string; value: unknown }[]) => {
+      for (const write of writes) (write.namespace === 'data' ? storage.data : storage.meta).set(write.key, write.value);
+    });
+    const repository = new DataRepository(Object.assign(storage, { setBatch }), createLegacyStorageAdapter(new Map()).adapter);
+    const logs = [{ id: 'l', note: '[[林老师]]', categoryId: 'c', activityId: 'a', startTime: 1, endTime: 2, duration: 1 }];
+    const nodes = [{ id: 'n', name: '林老师', aliases: ['小林'], description: '', createdAt: 1, updatedAt: 2 }];
+    await repository.saveLogs(logs, nodes);
+    expect(setBatch).toHaveBeenCalledTimes(1);
+    const writes = setBatch.mock.calls[0][0];
+    expect(writes).toEqual(expect.arrayContaining([
+      { namespace: 'data', key: REPOSITORY_KEYS.LOGS, value: logs },
+      { namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes }
+    ]));
+    expect(writes.some((write) => write.namespace === 'meta')).toBe(true);
+  });
+
   const preset02 = getDefaultAchievementCollectionPreset('default-bottle-02');
   const preset03 = getDefaultAchievementCollectionPreset('default-bottle-03');
   const preset08 = getDefaultAchievementCollectionPreset('default-bottle-08');

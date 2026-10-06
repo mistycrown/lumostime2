@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-06: `NodeText.tsx` renders wiki links in ordinary and checklist notes. `NodeSuggestions.tsx` offers saved-log association; `NodeNoteSuggestions.tsx` matches names/aliases below backfill drafts and converts text only on click. `NodeDetailOverlay.tsx` uses the tag-detail title bar and unwinds node history before the underlying view. Run `node scripts/test-nodes-renderer.mjs` after building for mobile/desktop checks.
+
 Update 2026-10-06: AI quick-add backfills forward custom attribute values into the shared executor. `AIBackfillChatAppliedActionRenderer.tsx` reuses `ActivityAttributeSummary` to display live saved attributes and original snapshots after undo; clearing live attributes does not restore stale snapshot values. The isolated `aiLogAttributesRendererHarness.tsx` checks desktop/mobile rendering, editing, clearing, undo, and old actions.
 
 Update 2026-10-06: `RecordStatistics.tsx` reuses statistic cards for filter/scope details with only record duration and notes. `ActivityAttributeStatistics.tsx` shares chart-specific range validation, supports all-time summary/rhythm cards, preserves explicitly empty card lists, and allocates weekday/hour heatmaps across elapsed hours.
