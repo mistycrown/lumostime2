@@ -8,9 +8,14 @@ import android.net.Uri;
 import android.os.Build;
 import android.widget.RemoteViews;
 
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
 /**
  * Rendering and actions for the dedicated quick-todo widget.
  * Updated 2026-08-12: Animates the manual refresh control while the widget redraws.
+ * Updated 2026-10-06: Rebinds the list to each saved payload revision so home-screen additions render without opening the app.
  */
 public final class WidgetQuickTodoProviderSupport {
     public static final String ACTION_COMPLETE = "com.mistycrown.lumostime.action.COMPLETE_QUICK_TODO";
@@ -53,8 +58,15 @@ public final class WidgetQuickTodoProviderSupport {
         if (normalizedTitle.isEmpty()) return;
 
         WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
-        if (payload == null) return;
-        long now = System.currentTimeMillis();
+        if (payload == null) {
+            payload = new WidgetTodoPinPayload(
+                    new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date()),
+                    java.util.Collections.<WidgetTodoPinItem>emptyList(), 0L,
+                    java.util.Collections.<WidgetTodoPinSourceTodo>emptyList(),
+                    java.util.Collections.<WidgetTodoPinSourceCategory>emptyList()
+            );
+        }
+        long now = Math.max(System.currentTimeMillis(), payload.getSyncedAt() + 1L);
         String todoId = "widget-quick-" + now;
         java.util.List<WidgetTodoPinSourceTodo> sourceTodos = new java.util.ArrayList<>(payload.getSourceTodos());
         sourceTodos.add(new WidgetTodoPinSourceTodo(
@@ -88,11 +100,14 @@ public final class WidgetQuickTodoProviderSupport {
             int layoutId
     ) {
         if (ids == null || ids.length == 0) return;
+        WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
+        long dataVersion = payload == null ? 0L : payload.getSyncedAt();
         for (int appWidgetId : ids) {
             RemoteViews views = new RemoteViews(context.getPackageName(), layoutId);
             Intent serviceIntent = new Intent(context, WidgetQuickTodoRemoteViewsService.class);
             serviceIntent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId);
-            serviceIntent.setData(Uri.parse(serviceIntent.toUri(Intent.URI_INTENT_SCHEME)));
+            // Intent extras do not distinguish cached factories; the URI must change with the data.
+            serviceIntent.setData(Uri.parse("lumostime-widget://quick-todo/" + appWidgetId + "/" + dataVersion));
             views.setRemoteAdapter(R.id.widget_quick_todo_list, serviceIntent);
             views.setEmptyView(R.id.widget_quick_todo_list, R.id.widget_quick_todo_empty);
             views.setImageViewResource(
@@ -105,8 +120,8 @@ public final class WidgetQuickTodoProviderSupport {
                     addIntent(context, appWidgetId, providerClass)
             );
             views.setPendingIntentTemplate(R.id.widget_quick_todo_list, completionTemplate(context, appWidgetId, providerClass));
-            manager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_quick_todo_list);
             manager.updateAppWidget(appWidgetId, views);
+            manager.notifyAppWidgetViewDataChanged(new int[] { appWidgetId }, R.id.widget_quick_todo_list);
         }
     }
 
