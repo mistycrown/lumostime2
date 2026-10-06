@@ -3,6 +3,7 @@
  * @input Quick-add command text, active chat session state, and local action adapters
  * @output Quick-add todo, note, and backfill handlers with shared request lifecycle management
  * @pos Component Support (AI Integration)
+ * @updated 2026-10-06: Forwards quick-add attribute values to the shared log executor.
  * @description Keeps quick-add request orchestration and backfill argument resolution out of the main chat modal.
  * @updated 2026-09-22: Extracted quick-add command handlers from AIBackfillChatModal.
  * @updated 2026-09-23: Passes local date context to quick-add todo parsing.
@@ -188,6 +189,7 @@ export const useAIBackfillChatQuickAddHandlers = ({
           description: rawArgs.description.trim(),
           categoryId: hasResolvedActivity ? resolvedCategory!.id : 'uncategorized',
           activityId: hasResolvedActivity ? resolvedActivity!.id : 'quick_punch',
+          ...(rawArgs.attributeValues?.length ? { attributeValues: rawArgs.attributeValues } : {}),
           ...(rawArgs.scopeIds?.length ? { scopeIds: rawArgs.scopeIds } : {})
         }
       };

@@ -3,11 +3,14 @@
  * @input AI configuration, user quick-add descriptions, and runtime dictionaries
  * @output Structured one-turn quick-add tool calls for todos, backfills, and notes
  * @pos Service (AI Quick Add)
+ * @updated 2026-10-06: Extracts optional ID-based attributes for quick-add backfills.
  * @description Keeps all quick-add prompts, contracts, and normalization isolated from the general AI service.
  * @updated 2026-09-23: Supplies local date context and normalizes relative dates for quick-add todos.
  */
 
 import type { AssistantTurnDictionaryContext } from '../types/assistant';
+import type { ActivityAttributeValue } from '../types';
+import { normalizeAILogAttributeValues } from '../utils/aiLogAttributeUtils';
 import { aiService, type AIRequestOptions, type AITodoToolCall, type AIDebugExchange } from './aiService';
 
 export interface AIBackfillCreateLogArgs {
@@ -20,6 +23,7 @@ export interface AIBackfillCreateLogArgs {
   scopeIds?: string[];
   linkedTodoId?: string;
   progressIncrement?: number;
+  attributeValues?: ActivityAttributeValue[];
 }
 
 export interface AIBackfillToolCall {
@@ -47,6 +51,7 @@ export interface AIQuickAddBackfillCreateLogArgs {
   scopeIds?: string[];
   categoryName?: string;
   activityName?: string;
+  attributeValues?: ActivityAttributeValue[];
 }
 
 export interface AIQuickAddBackfillToolCall {
@@ -226,10 +231,13 @@ export const quickAddService = {
     const systemPrompt = [
       'You are the structured tool caller for quick-add backfills.',
       'Create exactly one already-happened timeline log from the user description. Do not chat, explain, summarize, or call another tool.',
-      'Return JSON: {"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"original backfill content","categoryId":"activity category id","activityId":"activity id","scopeIds":["scope id"]}}]}.',
+      'Return JSON: {"toolCalls":[{"toolName":"create_log","args":{"date":"YYYY-MM-DD","startTime":"HH:mm","endTime":"HH:mm","description":"original backfill content","categoryId":"activity category id","activityId":"activity id","scopeIds":["scope id"],"attributeValues":[]}}]}.',
       `Current local time: ${currentDateTime || 'not provided'}`,
       `Target-day timeline summary: ${todayTimelineSummary || 'none'}`,
       'Preserve all key information from the user description. Select ids only from the supplied dictionary; leave ids empty when no reliable match exists.',
+      'attributeValues is optional. Fill only existing, active attributes belonging to the selected activity, using facts explicitly provided by the user. Never invent attributes, options, measurements, or subjective ratings; omit unknown values.',
+      'Use {"attributeId":"id","value":"text"} for text, {"attributeId":"id","value":5} for numbers in the configured unit, {"attributeId":"id","optionId":"option id"} for single choice, and {"attributeId":"id","optionIds":["option id"]} for multi choice. Match clear synonyms to supplied options only. Include conditional attributes only when the parent single-choice value satisfies displayCondition; include that parent value too. Preserve the facts in description as well.',
+      'For cross-midnight events, numeric measurements describe the whole event. The app keeps those measurements on the first segment only to avoid double-counting.',
       JSON.stringify(dictionaryContext)
     ].join('\n');
 
@@ -260,7 +268,8 @@ export const quickAddService = {
               ...(normalizeText(args.activityId) ? { activityId: normalizeText(args.activityId) } : {}),
               ...(Array.isArray(args.scopeIds) ? { scopeIds: args.scopeIds.map((scopeId) => String(scopeId).trim()).filter(Boolean) } : {}),
               ...(normalizeText(args.categoryName) ? { categoryName: normalizeText(args.categoryName) } : {}),
-              ...(normalizeText(args.activityName) ? { activityName: normalizeText(args.activityName) } : {})
+              ...(normalizeText(args.activityName) ? { activityName: normalizeText(args.activityName) } : {}),
+              ...(Array.isArray(args.attributeValues) ? { attributeValues: normalizeAILogAttributeValues(args.attributeValues) } : {})
             }
           }
         };

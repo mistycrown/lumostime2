@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-06: AI quick-add backfills forward custom attribute values into the shared executor. `AIBackfillChatAppliedActionRenderer.tsx` reuses `ActivityAttributeSummary` to display live saved attributes and original snapshots after undo; clearing live attributes does not restore stale snapshot values. The isolated `aiLogAttributesRendererHarness.tsx` checks desktop/mobile rendering, editing, clearing, undo, and old actions.
+
 Update 2026-10-06: `RecordStatistics.tsx` reuses statistic cards for filter/scope details with only record duration and notes. `ActivityAttributeStatistics.tsx` shares chart-specific range validation, supports all-time summary/rhythm cards, preserves explicitly empty card lists, and allocates weekday/hour heatmaps across elapsed hours.
 
 Update 2026-10-05: `FeedbackReportModal.tsx` keeps feedback and user IDs visible until closed, supports individual/combined copying, and handles keyboard focus plus Android hardware back.

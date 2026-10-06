@@ -1,5 +1,9 @@
 # 图片优化脚本使用说明
 
+## test-ai-log-attributes-renderer.mjs
+
+`node scripts/test-ai-log-attributes-renderer.mjs` 在隔离、隐藏的 Electron 中验证 AI 补记四种属性的结果卡显示、实时编辑、清空、撤销和旧消息兼容性。先运行 `npm run build`；明确加载已验证的微软雅黑字体，桌面及手机宽度截图保存在临时目录，不访问用户数据。
+
 ## test-detail-statistics-renderer.mjs
 
 `node scripts/test-detail-statistics-renderer.mjs` 在隔离、隐藏的 Electron 中验证筛选器和领域统计的来源限制、历史数据、卡片/配色保存、编辑表达式、清空和恢复卡片，以及跨午夜时长热力图。先运行 `npm run build`；使用已验证的微软雅黑字体，桌面及窄屏截图保存到临时目录。

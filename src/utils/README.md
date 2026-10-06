@@ -1,5 +1,7 @@
 # Utils Architecture
 
+> Update 2026-10-06: `aiLogAttributeUtils.ts` normalizes unknown AI attribute payloads and validates ownership, types, active options, and one-level display conditions. `aiBackfillUtils.ts` clones attribute arrays, includes their content in deduplication, and stores whole-event numeric measurements only on the first segment of a cross-midnight split to conserve numeric totals.
+
 > Update 2026-10-06: `hourlyDurationUtils.ts` splits effective record duration across actual local hours with period clipping and pause scaling, shared by weekday/hour heatmaps and rhythm charts. `activityStatisticCardUtils.ts` adds record-duration sources and chart-specific all-time capability rules.
 
 > Update 2026-10-05: `imageAssetStorage.ts` removes runtime image URLs from file-backed settings and appearance snapshots while preserving legacy assets that have no file reference.

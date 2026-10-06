@@ -3,6 +3,7 @@
  * @input None
  * @output Shared type definitions for the background AI agent, memory, reminders, and system triggers
  * @pos Type Definitions (Assistant Agent)
+ * @updated 2026-10-06: Exposes active activity attribute schemas and create_log attribute values.
  * @description Defines the structured contracts used by the Android-first assistant agent layer so background triggers, memory updates, reminder queues, and AI system-turn decisions can stay typed and stable across services and plugins.
  *
  * @updated 2026-09-25: Added optional persisted session/message targets to surfaced assistant turn results for unread-message navigation.
@@ -34,7 +35,7 @@
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
 
-import type { TodoKind, TodoRecurrenceRule } from '../types';
+import type { ActivityAttributeDefinition, ActivityAttributeValue, TodoKind, TodoRecurrenceRule } from '../types';
 
 export type AssistantTriggerSource = 'user' | 'agent' | 'system';
 
@@ -373,6 +374,9 @@ export interface AssistantTurnStateContext {
 export interface AssistantActivityDictionaryItem {
   id: string;
   name: string;
+  attributes?: Array<Pick<ActivityAttributeDefinition, 'id' | 'name' | 'type' | 'unit' | 'displayCondition'> & {
+    options?: Array<{ id: string; label: string }>;
+  }>;
 }
 
 export interface AssistantActivityCategoryDictionaryItem {
@@ -493,6 +497,7 @@ export interface AssistantCreateLogToolCall {
     scopeIds?: string[];
     linkedTodoId?: string;
     progressIncrement?: number;
+    attributeValues?: ActivityAttributeValue[];
   };
 }
 

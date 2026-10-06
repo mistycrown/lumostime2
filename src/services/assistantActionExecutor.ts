@@ -3,6 +3,7 @@
  * @input Current logs/todos plus runtime dictionaries, principle-library storage, and assistant tool-call payloads
  * @output Applied assistant action summaries together with the next local logs/todos state
  * @pos Service (Assistant Action Executor)
+ * @updated 2026-10-06: Validates AI log attributes against the resolved activity and preserves result snapshots.
  * @description Executes AI-planned log/todo/subtask/edit/principle/self-belief tool calls against local app data using shared helpers so the UI can reuse one execution layer instead of keeping tool application logic inside a modal component.
  *
  * @updated 2026-09-20: Allows the quick-add-backfill flow to persist the reserved virtual quick-punch category when local matching fails.
@@ -17,6 +18,7 @@
 
 import type {
   AutoLinkRule,
+  ActivityAttributeValue,
   Category,
   Log,
   Scope,
@@ -46,6 +48,7 @@ import {
 } from '../utils/todoQuickCategoryUtils';
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { buildTimelinePlannedLog } from '../utils/todoRecurringPlanUtils';
+import { validateAILogAttributeValues } from '../utils/aiLogAttributeUtils';
 
 export type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
@@ -63,6 +66,7 @@ export interface AppliedCreateLogSnapshot {
   linkedTodoId?: string;
   linkedTodoTitle?: string;
   progressIncrement?: number;
+  attributeValues?: ActivityAttributeValue[];
 }
 
 export interface AppliedCreateLogAction {
@@ -1212,6 +1216,7 @@ export const assistantActionExecutor = {
         }
       }
 
+      const attributeValues = validateAILogAttributeValues(args.attributeValues, activity);
       const newLog: Log = {
         id: crypto.randomUUID(),
         categoryId: resolvedCategoryId,
@@ -1221,6 +1226,7 @@ export const assistantActionExecutor = {
         endTime,
         duration: Math.max(0, (endTime - startTime) / 1000),
         note: args.description,
+        ...(attributeValues.length > 0 ? { attributeValues } : {}),
         ...(scopeIds.length > 0 ? { scopeIds } : {}),
         ...(linkedTodo ? { linkedTodoId: linkedTodo.id } : {}),
         ...(progressIncrement ? { progressIncrement } : {})
@@ -1244,6 +1250,7 @@ export const assistantActionExecutor = {
           activityName: resolvedActivityName,
           scopeIds,
           scopeNames: getScopeNames(context, scopeIds),
+          ...(attributeValues.length > 0 ? { attributeValues } : {}),
           ...(linkedTodo ? { linkedTodoId: linkedTodo.id, linkedTodoTitle: linkedTodo.title } : {}),
           ...(progressIncrement ? { progressIncrement } : {})
         }

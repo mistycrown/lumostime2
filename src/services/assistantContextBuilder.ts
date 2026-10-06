@@ -3,6 +3,7 @@
  * @input App runtime dictionaries, logs, todos, conversation turns, and current session state
  * @output Shared assistant state-context and dictionary-context snapshots for unified turns
  * @pos Service (Assistant Context Builder)
+ * @updated 2026-10-06: Includes active attribute types, units, options, and conditions in both dictionary formats.
  * @description Builds the minimal structured context payloads used by the unified assistant-turn architecture so foreground and background flows can share the same state summaries and full candidate dictionaries without duplicating formatting logic in UI components.
  *
  * @updated 2026-05-13: Added an absolute time reference table, renamed machine-facing state fields away from ambiguous today/yesterday labels, and timestamped serialized conversation turns so relative-date reasoning can anchor to explicit dates.
@@ -37,6 +38,7 @@ import type {
 } from '../types/assistant';
 import { getTodoKind } from '../utils/todoKindUtils';
 import { ensureQuickTodoCategory } from '../utils/todoQuickCategoryUtils';
+import { getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 
 interface BuildStateContextParams {
   currentDateTime: string;
@@ -377,7 +379,8 @@ export const assistantContextBuilder = {
       category.activities.map((activity) => ([
         category.id,
         activity.id,
-        activity.name
+        activity.name,
+        activity.attributes
       ]))
     ));
 
@@ -426,7 +429,7 @@ export const assistantContextBuilder = {
     return [
       '以下是候选词典无损表。字段与应用词典一一对应；活动通过 categoryId 关联分类；子任务通过 parentTodoId 关联主任务；日志候选中的 id 可直接用于 edit_log；数组字段保持 JSON 数组；空值记为 - 。',
       buildExactTableSection('ActivityCategories', ['id', 'name'], activityCategoryRows),
-      buildExactTableSection('Activities', ['categoryId', 'id', 'name'], activityRows),
+      buildExactTableSection('Activities', ['categoryId', 'id', 'name', 'attributes'], activityRows),
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
       buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
@@ -440,7 +443,21 @@ export const assistantContextBuilder = {
       name: category.name,
       activities: category.activities.map((activity) => ({
         id: activity.id,
-        name: activity.name
+        name: activity.name,
+        ...(activity.attributes?.length ? {
+          attributes: getSortedActivityAttributes(activity).filter((attribute) => !attribute.isArchived).map((attribute) => ({
+            id: attribute.id,
+            name: attribute.name,
+            type: attribute.type,
+            ...(attribute.unit ? { unit: attribute.unit } : {}),
+            ...(attribute.displayCondition ? { displayCondition: {
+              attributeId: attribute.displayCondition.attributeId,
+              optionIds: [...attribute.displayCondition.optionIds]
+            } } : {}),
+            ...(attribute.options ? { options: attribute.options.filter((option) => !option.isArchived)
+              .map((option) => ({ id: option.id, label: option.label })) } : {})
+          }))
+        } : {})
       }))
     }));
 
