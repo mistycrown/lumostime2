@@ -3,6 +3,7 @@
  * @input Synthetic AI backfill tool-call payloads
  * @output Regression coverage for AI backfill date normalization and midnight splitting
  * @pos Test (AI backfill utility)
+ * @updated 2026-10-06: Checks attribute cloning, deduplication, and numeric total conservation.
  * @description Verifies that AI backfill tool calls default to today, split cross-midnight records, and dedupe identical payloads.
  * @updated 2026-04-22: Added coverage for date fallback, cross-day splitting, and duplicate create_log removal.
  */
@@ -11,6 +12,34 @@ import { describe, expect, it } from 'vitest';
 import { normalizeAIBackfillToolCalls, parseTimeOnDateKey } from './aiBackfillUtils';
 
 describe('normalizeAIBackfillToolCalls', () => {
+  it('stores whole-event numeric measurements only once when splitting at midnight', () => {
+    const normalized = normalizeAIBackfillToolCalls([{ toolName: 'create_log', args: {
+      date: '2026-04-22', startTime: '23:00', endTime: '01:00',
+      description: '跑步五公里', categoryId: 'cat-1', activityId: 'act-1',
+      attributeValues: [{ attributeId: 'distance', value: 5 }, { attributeId: 'place', optionId: 'park' }]
+    } }], '2026-04-22');
+    expect(normalized[0].args.attributeValues).toEqual([{ attributeId: 'distance', value: 5 }, { attributeId: 'place', optionId: 'park' }]);
+    expect(normalized[1].args.attributeValues).toEqual([{ attributeId: 'place', optionId: 'park' }]);
+  });
+  it('preserves independent attribute arrays across midnight and dedupes by attribute content', () => {
+    const args = {
+      date: '2026-04-22', startTime: '23:00', endTime: '01:00',
+      description: '运动', categoryId: 'cat-1', activityId: 'act-1',
+      attributeValues: [{ attributeId: 'equipment', optionIds: ['phone', 'watch'] }]
+    };
+    const normalized = normalizeAIBackfillToolCalls([
+      { toolName: 'create_log', args },
+      { toolName: 'create_log', args: { ...args, attributeValues: [{ attributeId: 'equipment', optionIds: ['watch', 'phone'] }] } },
+      { toolName: 'create_log', args: { ...args, attributeValues: [{ attributeId: 'equipment', optionIds: ['phone'] }] } }
+    ], '2026-04-22');
+    expect(normalized).toHaveLength(4);
+    expect(normalized[0].args.attributeValues).toEqual(args.attributeValues);
+    expect(normalized[1].args.attributeValues).toEqual(args.attributeValues);
+    expect(normalized[0].args.attributeValues).not.toBe(normalized[1].args.attributeValues);
+    const first = normalized[0].args.attributeValues![0];
+    const second = normalized[1].args.attributeValues![0];
+    expect('optionIds' in first && 'optionIds' in second && first.optionIds !== second.optionIds).toBe(true);
+  });
   it('fills missing dates with the provided fallback date', () => {
     const normalized = normalizeAIBackfillToolCalls([
       {

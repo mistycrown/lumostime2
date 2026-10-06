@@ -2,6 +2,7 @@
  * @file aiService.ts
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
+ * @updated 2026-10-06: Preserves shape-normalized custom attributes in create_log tool calls.
  * @pos Service (AI Integration Layer)
  * @updated 2026-08-10: Restored native HTTP error bodies and exposed the request transport in AI debug exchanges so Android failures retain their real status and response text.
  * @updated 2026-09-21: Quick-add todo and backfill requests now receive the full user dictionary and return dictionary ids for todo categories, linked activities, and scopes instead of forcing the reserved quick bucket.
@@ -34,6 +35,7 @@ import type {
     AssistantTurnMode
 } from '../types/assistant';
 import { buildAssistantReasoningSummary } from '../utils/assistantReasoning';
+import { normalizeAILogAttributeValues } from '../utils/aiLogAttributeUtils';
 export interface AIConfig {
     provider: 'openai' | 'gemini';
     apiKey: string;
@@ -1356,7 +1358,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
         return [];
     }
 
-    return value.flatMap((item) => {
+    return value.flatMap((item): AssistantToolCall[] => {
         if (!item || typeof item !== 'object') {
             return [];
         }
@@ -1375,6 +1377,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     description: typeof args.description === 'string' ? args.description.trim() : '',
                     categoryId: typeof args.categoryId === 'string' ? args.categoryId.trim() : '',
                     activityId: typeof args.activityId === 'string' ? args.activityId.trim() : '',
+                    ...(Array.isArray(args.attributeValues) ? { attributeValues: normalizeAILogAttributeValues(args.attributeValues) } : {}),
                     ...(Array.isArray(args.scopeIds) ? { scopeIds: args.scopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
                     ...(typeof args.linkedTodoId === 'string' && args.linkedTodoId.trim() ? { linkedTodoId: args.linkedTodoId.trim() } : {}),
                     ...(typeof args.progressIncrement === 'number' && Number.isFinite(args.progressIncrement)

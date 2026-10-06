@@ -161,6 +161,10 @@
 - 只有在活动匹配清晰、区间落在同一天内，并且现有当天上下文还没有显示这一段时，才创建这条推断 log。
 - 如果配对不清晰，或推断出的时间范围会和已有记录重叠，就保持 `toolCalls` 为空，并问一个短追问，而不是直接创建 log。
 - 跨天的记录，需要分成两段 log。
+- `attributeValues` 可选：依据用户明确给出的事实，填写所选 activity 的已有属性。属性 ID、选项 ID 必须来自活动词典；不得新建属性或选项，不得猜测未提及的测量值或主观评分。无法确定的属性留空。
+- 文本使用 `{ "attributeId": "id", "value": "text" }`，数字使用 `{ "attributeId": "id", "value": 5 }`（按配置单位），单选使用 `{ "attributeId": "id", "optionId": "option id" }`，多选使用 `{ "attributeId": "id", "optionIds": ["option id"] }`。可以将明确的同义表达匹配到已有选项。
+- 条件属性仅在父单选属性满足 `displayCondition` 时填写，并同时提供父属性的选项值。属性提取后仍需在 `description` 保留用户提供的事实。
+- 拆分跨天补记时，整段活动的数值总量只写入第一段，避免重复累加。只有用户明确提供各段数值时才分别填写。
 
 ### 2. create_planned_log
 
@@ -233,7 +237,13 @@
         "activityId": "activity id",
         "scopeIds": ["scope id"],
         "linkedTodoId": "todo id",
-        "progressIncrement": 1
+        "progressIncrement": 1,
+        "attributeValues": [
+          { "attributeId": "text attribute id", "value": "text" },
+          { "attributeId": "number attribute id", "value": 5 },
+          { "attributeId": "single attribute id", "optionId": "option id" },
+          { "attributeId": "multi attribute id", "optionIds": ["option id"] }
+        ]
       }
     },
     {

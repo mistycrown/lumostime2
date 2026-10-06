@@ -3,6 +3,7 @@
  * @input Applied assistant actions, live log/todo lookups, theme tokens, and action callbacks
  * @output Reusable renderer for in-chat applied-action result cards
  * @pos Component Support (AI Integration)
+ * @updated 2026-10-06: Displays custom attributes from live logs or original action snapshots after undo.
  * @description Extracts the bulky applied-action JSX branches out of AIBackfillChatModal while keeping the same live-data lookups, undo affordances, and visual treatment.
  * @updated 2026-07-31: Added rendering for AI-created timeline Plan blocks as todo-linked planned actions.
  * @updated 2026-07-06: Added rendering for AI-created principles and self-beliefs with undo affordances.
@@ -11,6 +12,7 @@
  */
 import React from 'react';
 import { ListTodo, Pencil, Undo2 } from 'lucide-react';
+import { ActivityAttributeSummary } from '../ActivityAttributeSummary';
 import type { Category, Log, TodoCategory, TodoItem } from '../../types';
 import type {
   AppliedChatAction,
@@ -215,6 +217,14 @@ const RenderLogAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
       {action.errorMessage && (
         <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>
       )}
+
+      <div style={{ color: theme.textMuted }}>
+        <ActivityAttributeSummary
+          activity={liveActivity}
+          values={liveLog ? liveLog.attributeValues : action.snapshot.attributeValues}
+          className="!text-inherit"
+        />
+      </div>
 
       <div className="mt-2.5 flex justify-end gap-2">
         <button

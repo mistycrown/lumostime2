@@ -1,3 +1,10 @@
+/**
+ * @file aiService.test.ts
+ * @input Mock AI transport responses and assistant request contracts
+ * @output Coverage for general and quick-add AI request normalization
+ * @pos Service test
+ * @updated 2026-10-06: Covers custom attribute preservation through both create_log parsers.
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { aiService, normalizeNativeFetchError } from './aiService';
 import { quickAddService } from './quickAddService';
@@ -58,6 +65,33 @@ describe('aiService unified turn normalization', () => {
       configurable: true
     });
     vi.restoreAllMocks();
+  });
+
+  it.each(['chat', 'quick'] as const)('preserves valid attribute shapes through the %s backfill parser', async (mode) => {
+    const attributeValues = [
+      { attributeId: 'distance', value: 5 },
+      { attributeId: 'place', optionId: 'park' },
+      { attributeId: 'equipment', optionIds: ['watch', 'phone'] },
+      { attributeId: 'route', value: '湖边' }
+    ];
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({
+        choices: [{ message: { content: JSON.stringify({
+          outcome: 'reply', assistantReply: '已添加', memoryAction: 'no_update',
+          toolCalls: [{ toolName: 'create_log', args: {
+            date: '2026-10-06', startTime: '07:00', endTime: '08:00',
+            description: '公园跑步五公里', categoryId: 'sport', activityId: 'running',
+            attributeValues: [...attributeValues, null, { attributeId: 'bad', value: true }]
+          } }]
+        }) } }]
+      })), configurable: true
+    });
+    const toolCall = mode === 'chat'
+      ? (await aiService.requestAssistantUnifiedTurnWithDebug({
+        mode: 'foreground', systemPrompt: 'system', userPrompt: 'user'
+      })).output.toolCalls?.[0]
+      : (await quickAddService.requestQuickAddBackfillWithDebug('公园跑步五公里')).toolCall;
+    expect(toolCall).toMatchObject({ toolName: 'create_log', args: { attributeValues } });
   });
 
   it('preserves native HTTP error text through the Fetch-compatible adapter', async () => {

@@ -1,3 +1,10 @@
+/**
+ * @file assistantContextBuilder.test.ts
+ * @input Runtime dictionaries, logs, and assistant date context
+ * @output Coverage for assistant state summaries and dictionary serialization
+ * @pos Service test
+ * @updated 2026-10-06: Verifies active attribute schemas survive JSON and compact dictionary serialization.
+ */
 import { describe, expect, it } from 'vitest';
 import type { Category, DailyReview, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { assistantContextBuilder } from './assistantContextBuilder';
@@ -96,6 +103,33 @@ const createLog = (
 };
 
 describe('assistantContextBuilder', () => {
+  it('provides active attribute schemas losslessly to JSON and compact dictionaries', () => {
+    const attributeCategories: Category[] = [{
+      ...categories[0], activities: [{
+        ...categories[0].activities[0], attributes: [
+          { id: 'distance', name: '距离', type: 'number', unit: 'km', order: 0, createdAt: 1, updatedAt: 1 },
+          { id: 'place', name: '地点', type: 'single', order: 1, createdAt: 1, updatedAt: 1,
+            options: [{ id: 'park', label: '公园' }, { id: 'old-place', label: '旧地点', isArchived: true }] },
+          { id: 'route', name: '路线', type: 'text', order: 2, createdAt: 1, updatedAt: 1,
+            displayCondition: { attributeId: 'place', optionIds: ['park'] } },
+          { id: 'old-field', name: '旧属性', type: 'text', order: 3, createdAt: 1, updatedAt: 1, isArchived: true }
+        ]
+      }]
+    }];
+    const dictionary = assistantContextBuilder.buildDictionaryContext({ categories: attributeCategories });
+    expect(dictionary.activityCategories![0].activities[0].attributes).toEqual([
+      { id: 'distance', name: '距离', type: 'number', unit: 'km' },
+      { id: 'place', name: '地点', type: 'single', options: [{ id: 'park', label: '公园' }] },
+      { id: 'route', name: '路线', type: 'text', displayCondition: { attributeId: 'place', optionIds: ['park'] } }
+    ]);
+    const digest = assistantContextBuilder.buildDictionaryDigest(dictionary);
+    expect(digest).toContain('attributes');
+    expect(digest).toContain('"unit":"km"');
+    expect(digest).toContain('"displayCondition":{"attributeId":"place","optionIds":["park"]}');
+    expect(digest).toContain('公园');
+    expect(digest).not.toContain('old-field');
+    expect(digest).not.toContain('old-place');
+  });
   it('buildStateContext keeps one local-offset current-time anchor and builds an absolute reference table', () => {
     const stateContext = assistantContextBuilder.buildStateContext({
       currentDateTime: '2026-04-27T18:00:00+08:00',

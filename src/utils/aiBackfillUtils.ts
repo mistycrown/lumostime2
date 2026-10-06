@@ -3,6 +3,7 @@
  * @input AI backfill tool-call payloads, fallback dates, and date/time strings
  * @output Normalized backfill tool calls plus reusable date/time parsing helpers
  * @pos Utility (AI backfill)
+ * @updated 2026-10-06: Clones and deduplicates attribute values; whole-event numeric measurements stay on the first cross-day segment.
  * @description Keeps AI backfill date handling consistent so the service and chat UI can share the same default-date, cross-day split, and dedupe rules.
  * @updated 2026-04-22: Added per-tool-call date normalization, midnight split handling, and reusable timestamp/date formatting helpers for AI backfill.
  * @updated 2026-09-23: Narrows unknown date inputs before trimming them.
@@ -11,6 +12,7 @@
  */
 
 import type { AIBackfillToolCall } from '../services/quickAddService';
+import { normalizeAILogAttributeValues } from './aiLogAttributeUtils';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^(\d{2}):(\d{2})$/;
@@ -76,7 +78,8 @@ const cloneToolCallWithArgs = (
   ...toolCall,
   args: {
     ...args,
-    ...(Array.isArray(args.scopeIds) ? { scopeIds: [...args.scopeIds] } : {})
+    ...(Array.isArray(args.scopeIds) ? { scopeIds: [...args.scopeIds] } : {}),
+    ...(Array.isArray(args.attributeValues) ? { attributeValues: normalizeAILogAttributeValues(args.attributeValues) } : {})
   }
 });
 
@@ -115,7 +118,13 @@ export const normalizeAIBackfillToolCalls = (
       cloneToolCallWithArgs(toolCall, {
         ...normalizedArgs,
         date: nextDate,
-        startTime: '00:00'
+        startTime: '00:00',
+        // A measurement describes the whole event unless the user supplied per-segment values.
+        // Keep it on the first segment so splitting never doubles numeric totals.
+        ...(Array.isArray(normalizedArgs.attributeValues) ? {
+          attributeValues: normalizeAILogAttributeValues(normalizedArgs.attributeValues)
+            .filter((value) => !('value' in value && typeof value.value === 'number'))
+        } : {})
       })
     ];
   });
@@ -130,6 +139,9 @@ export const normalizeAIBackfillToolCalls = (
       categoryId: call.args.categoryId,
       activityId: call.args.activityId,
       scopeIds: [...(call.args.scopeIds || [])].sort(),
+      attributeValues: normalizeAILogAttributeValues(call.args.attributeValues)
+        .map((value) => 'optionIds' in value ? { ...value, optionIds: [...value.optionIds].sort() } : value)
+        .sort((left, right) => left.attributeId.localeCompare(right.attributeId)),
       linkedTodoId: call.args.linkedTodoId || '',
       progressIncrement: typeof call.args.progressIncrement === 'number'
         ? call.args.progressIncrement
@@ -145,6 +157,9 @@ export const normalizeAIBackfillToolCalls = (
       categoryId: candidate.args.categoryId,
       activityId: candidate.args.activityId,
       scopeIds: [...(candidate.args.scopeIds || [])].sort(),
+      attributeValues: normalizeAILogAttributeValues(candidate.args.attributeValues)
+        .map((value) => 'optionIds' in value ? { ...value, optionIds: [...value.optionIds].sort() } : value)
+        .sort((left, right) => left.attributeId.localeCompare(right.attributeId)),
       linkedTodoId: candidate.args.linkedTodoId || '',
       progressIncrement: typeof candidate.args.progressIncrement === 'number'
         ? candidate.args.progressIncrement

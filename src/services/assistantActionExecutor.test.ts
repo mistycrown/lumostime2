@@ -1,3 +1,10 @@
+/**
+ * @file assistantActionExecutor.test.ts
+ * @input Synthetic local data and assistant tool calls
+ * @output Coverage for assistant writeback and rollback
+ * @pos Service test
+ * @updated 2026-10-06: Checks attribute validation, cross-day persistence, quick-punch fallback, and rollback.
+ */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   assistantActionExecutor,
@@ -50,6 +57,53 @@ const buildBaseContext = (): AssistantActionExecutionContext => ({
   ],
   autoApplyAutoLinkRules: false,
   autoLinkRules: []
+});
+
+describe('assistantActionExecutor AI log attributes', () => {
+  beforeEach(installLocalStorageMock);
+  it('writes validated attributes and result snapshots to both cross-day segments', () => {
+    const context = buildBaseContext();
+    context.categories[0].activities[0].attributes = [
+      { id: 'distance', name: '距离', type: 'number', order: 0, createdAt: 1, updatedAt: 1 },
+      { id: 'place', name: '地点', type: 'single', order: 1, createdAt: 1, updatedAt: 1,
+        options: [{ id: 'park', label: '公园' }] }
+    ];
+    const result = assistantActionExecutor.applyLogToolCalls(context, [{
+      toolName: 'create_log', args: {
+        date: '2026-05-15', startTime: '23:00', endTime: '01:00',
+        categoryId: 'study', activityId: 'writing', description: '公园走了五公里',
+        attributeValues: [
+          { attributeId: 'distance', value: 5 }, { attributeId: 'place', optionId: 'park' },
+          { attributeId: 'unknown', value: 'ignored' }
+        ]
+      }
+    }]);
+    const expected = [{ attributeId: 'distance', value: 5 }, { attributeId: 'place', optionId: 'park' }];
+    expect(result.nextLogs).toHaveLength(2);
+    expect(result.actions).toHaveLength(2);
+    const firstDayLog = result.nextLogs.find((log) => new Date(log.startTime).getDate() === 15)!;
+    const secondDayLog = result.nextLogs.find((log) => new Date(log.startTime).getDate() === 16)!;
+    expect(firstDayLog.attributeValues).toEqual(expected);
+    expect(secondDayLog.attributeValues).toEqual([{ attributeId: 'place', optionId: 'park' }]);
+    expect(result.actions[0]).toMatchObject({ snapshot: { attributeValues: expected } });
+    expect(result.actions[1]).toMatchObject({ snapshot: { attributeValues: [{ attributeId: 'place', optionId: 'park' }] } });
+    result.actions.forEach((action) => expect(action.status).toBe('applied'));
+    expect(result.nextLogs[0].attributeValues).not.toBe(result.nextLogs[1].attributeValues);
+    const rolledBack = rollbackAppliedChatActions(result.actions, result.nextLogs, result.nextTodos);
+    expect(rolledBack.logs).toEqual([]);
+  });
+
+  it('omits attributes for the quick-punch fallback without configured definitions', () => {
+    const result = assistantActionExecutor.applyLogToolCalls(buildBaseContext(), [{
+      toolName: 'create_log', args: {
+        date: '2026-05-15', startTime: '09:00', endTime: '10:00', description: '散步',
+        categoryId: 'uncategorized', activityId: 'quick_punch',
+        attributeValues: [{ attributeId: 'distance', value: 5 }]
+      }
+    }]);
+    expect(result.actions[0].status).toBe('applied');
+    expect(result.nextLogs[0].attributeValues).toBeUndefined();
+  });
 });
 
 describe('assistantActionExecutor applyTodoToolCalls', () => {
