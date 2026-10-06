@@ -1,15 +1,19 @@
 /**
  * @file themePackageNavigationStorage.test.ts
  * @input Schema-v2 theme ZIPs, legacy native image URLs, and a nearly full localStorage
- * @output Integration coverage for applying navigation assets before startup hydration finishes
+ * @output Integration coverage for applying navigation and calendar assets near the storage quota
  * @pos Test (Theme Package Application)
  * @updated 2026-10-05: Covers quota recovery and subsequent card-background selection.
+ * @updated 2026-10-06: Covers the full import/application path and calendar image recovery near the storage quota.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import JSZip from 'jszip';
 import { parseThemePackage } from './themePackageService';
 
-const images = vi.hoisted(() => ({ getImageUrl: vi.fn() }));
+const images = vi.hoisted(() => ({
+  getImageUrl: vi.fn(), saveImage: vi.fn(), deleteImage: vi.fn(),
+  removeFromReferencedList: vi.fn(), deleteImageLocalOnly: vi.fn(async () => undefined)
+}));
 vi.mock('./imageService', () => ({ imageService: images }));
 vi.mock('./backgroundService', () => ({ backgroundService: {} }));
 vi.mock('./colorSchemeService', () => ({ colorSchemeService: {} }));
@@ -18,6 +22,8 @@ vi.mock('./appearanceBackupService', () => ({ APPEARANCE_RESTORED_EVENT: 'appear
 beforeEach(() => {
   vi.resetModules();
   images.getImageUrl.mockReset();
+  images.saveImage.mockReset().mockResolvedValueOnce('nav.png').mockResolvedValueOnce('card.png');
+  images.deleteImage.mockReset().mockResolvedValue(undefined);
   vi.stubGlobal('window', { dispatchEvent: vi.fn(), addEventListener: vi.fn() });
   vi.stubGlobal('CustomEvent', class { constructor(public type: string, public detail?: unknown) {} });
 });
@@ -25,10 +31,11 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe.each([
-  { key: 'navigation_icon_custom_list_v1', selection: { mode: 'modern', iconsId: 'icons' }, resources: { navigationIcons: [{ id: 'icons', files: { record: 'assets/nav.png' } }] } },
-  { key: 'navigation_new_background_custom_list', selection: { mode: 'modern', backgroundId: 'background' }, resources: { navigationBackgrounds: [{ id: 'background', file: 'assets/nav.png' }] } },
-  { key: 'navigation_decoration_custom_list', selection: { mode: 'legacy', decorationResourceId: 'decoration' }, resources: { navigationDecorations: [{ id: 'decoration', file: 'assets/nav.png' }] } }
-])('packaged $key', ({ key, selection, resources }) => {
+  { key: 'navigation_icon_custom_list_v1', apply: { navigation: { mode: 'modern', iconsId: 'icons' } }, resources: { navigationIcons: [{ id: 'icons', files: { record: 'assets/nav.png' } }] } },
+  { key: 'navigation_new_background_custom_list', apply: { navigation: { mode: 'modern', backgroundId: 'background' } }, resources: { navigationBackgrounds: [{ id: 'background', file: 'assets/nav.png' }] } },
+  { key: 'navigation_decoration_custom_list', apply: { navigation: { mode: 'legacy', decorationResourceId: 'decoration' } }, resources: { navigationDecorations: [{ id: 'decoration', file: 'assets/nav.png' }] } },
+  { key: 'mood_calendar_fill_background_custom_list', apply: { memoirCalendar: { backgroundId: 'calendar' } }, resources: { memoirCalendarBackgrounds: [{ id: 'calendar', image: 'assets/nav.png', settings: { opacity: 0.8 } }] } }
+])('packaged $key', ({ key, apply, resources }) => {
   it('waits for legacy compaction before appending assets and applies the card background', async () => {
     const legacy = JSON.stringify([
       { id: 'legacy', name: 'Legacy', type: 'custom', imageFilename: 'legacy.png', url: `data:image/png;base64,${'A'.repeat(6000)}`, thumbnail: '' }
@@ -45,28 +52,28 @@ describe.each([
       removeItem: (name: string) => values.delete(name)
     });
     let resolveLegacy: (url: string) => void = () => undefined;
+    const legacyImage = new Promise<string>((resolve) => { resolveLegacy = resolve; });
     images.getImageUrl.mockImplementation((filename: string) => filename === 'legacy.png'
-      ? new Promise<string>((resolve) => { resolveLegacy = resolve; })
+      ? legacyImage
       : Promise.resolve(`data:image/png;base64,${'B'.repeat(6000)}`));
 
     const { applyImportedThemePackage } = await import('./themePackageApplicationService');
+    const { themePackageImportService } = await import('./themePackageImportService');
     const zip = new JSZip();
     zip.file('theme.json', JSON.stringify({
       format: 'lumostime-theme-package', schemaVersion: 2,
       package: { id: 'quota-theme', name: 'Quota Theme', version: '1.0.0' },
       resources: { ...resources, cardBackgroundGroups: [{ id: 'cards', files: ['assets/card.png'] }] },
-      apply: { navigation: selection, cardBackground: { groupId: 'cards', opacity: 1 } }
+      apply: { ...apply, cardBackground: { groupId: 'cards', opacity: 1 } }
     }));
     const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
     zip.file('assets/nav.png', png, { base64: true });
     zip.file('assets/card.png', png, { base64: true });
-    const parsed = await parseThemePackage(new Blob([await zip.generateAsync({ type: 'uint8array' })]));
+    const archive = new Blob([await zip.generateAsync({ type: 'uint8array' })]);
+    const parsed = await parseThemePackage(archive);
     expect(parsed.assets.get('assets/nav.png')?.type).toBe('image/png');
-    const applying = applyImportedThemePackage({
-      id: 'quota-theme', name: 'Quota Theme', version: '1.0.0', importedAt: 1, updatedAt: 1,
-      imageAssets: { 'assets/nav.png': 'nav.png', 'assets/card.png': 'card.png' },
-      manifest: parsed.manifest
-    });
+    const applying = themePackageImportService.importPackage(archive)
+      .then(({ record }) => applyImportedThemePackage(record));
     // Attach immediately so a regression reports the quota error without an unhandled rejection.
     const result = applying.then((value) => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error }));
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -80,5 +87,12 @@ describe.each([
     expect(storedAssets[0]).toMatchObject({ id: 'legacy', imageFilename: 'legacy.png', url: '' });
     expect(storedAssets[1]).toMatchObject({ imageFilename: 'nav.png', url: '' });
     expect(values.get(key)).not.toContain('data:');
+    if (key === 'mood_calendar_fill_background_custom_list') {
+      const { moodCalendarBackgroundService } = await import('./moodCalendarBackgroundService');
+      expect(moodCalendarBackgroundService.getCurrentBackground()).toBe('theme:quota-theme:memoir-calendar');
+      expect(moodCalendarBackgroundService.getBackgroundById('theme:quota-theme:memoir-calendar')).toMatchObject({
+        url: `data:image/png;base64,${'B'.repeat(6000)}`, opacity: 0.8
+      });
+    }
   });
 });

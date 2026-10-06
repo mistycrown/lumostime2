@@ -19,6 +19,7 @@
  * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  * @updated 2026-09-30: Applies packaged custom navigation icon size scales.
  * @updated 2026-10-05: Waits for legacy navigation image compaction before writing package settings.
+ * @updated 2026-10-05: Also compacts calendar image storage through the shared package preparation step.
  */
 
 import { TIMEPAL_KEYS, THEME_KEYS, storage } from '../constants/storageKeys';
@@ -53,6 +54,7 @@ import {
   CARD_BACKGROUND_OPACITY_EVENT
 } from './cardBackgroundService';
 import { floatingButtonBackgroundService } from './floatingButtonBackgroundService';
+import { prepareThemePackageImageStorage } from './themePackageImageStorage';
 
 const CUSTOM_BACKGROUND_KEY = 'lumos_custom_backgrounds';
 const CUSTOM_NAVIGATION_BACKGROUND_KEY = 'navigation_new_background_custom_list';
@@ -663,13 +665,7 @@ export const applyImportedThemePackage = async (
   const warnings: string[] = [];
   const appliedSections: string[] = [];
 
-  // Startup hydration may still be reading native files. Release legacy Base64
-  // copies before any package writes can exhaust the shared localStorage quota.
-  await Promise.all([
-    navigationIconService.hydrateCustomIcons(),
-    navigationBackgroundService.hydrateCustomBackgrounds(),
-    navigationDecorationService.hydrateImageBackedCustomDecorations()
-  ]);
+  await prepareThemePackageImageStorage();
 
   const sectionTasks: Array<[string, () => Promise<void>]> = [
     ['background', () => applyBackground(record, warnings)],

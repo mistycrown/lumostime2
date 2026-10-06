@@ -14,12 +14,14 @@
  * @updated 2026-09-28: Retains package images that remain referenced by independent user settings during deletion or replacement.
  * @updated 2026-09-30: Passes packaged font Blobs with their archive filenames to avoid Android synthetic File metadata failures.
  * @updated 2026-09-28: Supports retaining package resources after deleting a theme and resolving same-package reimports.
+ * @updated 2026-10-05: Compacts legacy navigation and calendar image lists before saving imported package resources.
  */
 
 import { THEME_KEYS, TIMEPAL_KEYS, storage } from '../constants/storageKeys';
 import { DEFAULT_ACHIEVEMENT_BOTTLE_ICON_PACK } from './achievementBottleIconPackService';
 import { fontService } from './fontService';
 import { imageService } from './imageService';
+import { prepareThemePackageImageStorage } from './themePackageImageStorage';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { getStoredCustomStickerState } from './customStickerAssetService';
 import {
@@ -630,6 +632,7 @@ export const themePackageImportService = {
   async importPackage(source: Blob | File, options: ThemePackageImportOptions = {}): Promise<ThemePackageImportResult> {
     const parsedPackage = await parseThemePackage(source);
     const { manifest, assets } = parsedPackage;
+    await prepareThemePackageImageStorage();
     const existingPackages = readImportedThemePackages();
     const sourcePackageId = manifest.package.id;
     const retainedResources = readRetainedThemePackageResources()

@@ -5,6 +5,7 @@
  * @pos Test (UI Customization)
  * @updated 2026-09-29: Covers temporary URL persistence, hydration deduplication, concurrent list updates, and same-ID replacements.
  * @updated 2026-10-05: Covers hydration when storage compaction exceeds the remaining quota.
+ * @updated 2026-10-06: Keeps legacy image bytes until their file references can be resolved.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -102,6 +103,27 @@ describe('mood calendar background persistence', () => {
 
     expect(moodCalendarBackgroundService.getBackgroundById(background.id)?.url).toBe('data:image/png;base64,AAAA');
     expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).not.toContain('data:image/png;base64,AAAA');
+  });
+
+  it('preserves a URL-only legacy image during compaction', async () => {
+    const legacy = { id: 'url-only', name: 'Legacy', type: 'custom', url: 'data:image/png;base64,only-copy' };
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([legacy]));
+    await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+    expect(JSON.parse(localStorage.getItem('mood_calendar_fill_background_custom_list') || '[]')).toEqual([legacy]);
+    expect(imageServiceMocks.getImageUrl).not.toHaveBeenCalled();
+  });
+
+  it('retries a legacy file and retains its fallback until the file loads successfully', async () => {
+    const legacy = { id: 'legacy-missing', name: 'Legacy', type: 'custom', imageFilename: 'missing.png', url: 'data:image/png;base64,fallback' };
+    localStorage.setItem('mood_calendar_fill_background_custom_list', JSON.stringify([legacy]));
+    imageServiceMocks.getImageUrl.mockResolvedValueOnce('').mockResolvedValueOnce('blob:recovered');
+    await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+    expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).toContain(legacy.url);
+    expect(moodCalendarBackgroundService.getBackgroundById(legacy.id)?.url).toBe(legacy.url);
+    await moodCalendarBackgroundService.hydrateCustomBackgrounds();
+    expect(moodCalendarBackgroundService.getBackgroundById(legacy.id)?.url).toBe('blob:recovered');
+    expect(localStorage.getItem('mood_calendar_fill_background_custom_list')).not.toContain('data:');
+    expect(imageServiceMocks.getImageUrl).toHaveBeenCalledTimes(2);
   });
 
   it('still displays hydrated images when metadata compaction fails', async () => {

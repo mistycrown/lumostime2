@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-06: `themePackageImageStorage.ts` prepares navigation and Memoir calendar image storage before both ZIP import and application. Calendar lists participate in legacy Base64 compaction before imported image manifests and package records are persisted; unresolved legacy calendar images retain their original bytes until their files load successfully.
+
 Update 2026-10-05: `themePackageApplicationService.ts` waits for navigation image hydration and legacy Base64 compaction before writing any package settings, preventing nearly full storage from interrupting application before card backgrounds are selected.
 
 Update 2026-10-05: `diagnosticIdentityService.ts` reuses sponsorship numbers as `lumos001` IDs or persists random numeric IDs. `errorReporting.ts` attaches searchable `user_id` / `user_type` tags to events, retains only the pseudonymous user ID, and waits for manual report transport flushing.
