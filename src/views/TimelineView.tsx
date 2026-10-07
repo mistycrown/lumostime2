@@ -30,6 +30,7 @@
  * @updated 2026-08-09: Added the configurable shortcut to the daily-check overview page.
  * @updated 2026-08-10: Records Timeline as the return target when opening daily-check overview.
  * @updated 2026-08-26: Added the configurable review-overview shortcut with Timeline return behavior.
+ * @updated 2026-10-07: Adds the configurable node-directory shortcut with Timeline return behavior.
  * @updated 2026-09-15: Changed the Principle Library shortcut icon to Scale so it is distinct from Review Overview.
  * @updated 2026-08-09: Passes actionable real-record idle gaps into the split timeline canvas while excluding plan blocks from gap detection.
  * @updated 2026-08-24: Added an always-leftmost More menu for timeline shortcuts that are not pinned to the header.
@@ -42,7 +43,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose, Network } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { NodeSuggestions } from '../components/NodeSuggestions';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -568,6 +569,16 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
             onClick: () => {
                 setIsSettingsOpen(true);
                 setSettingsSubmenu('principle');
+                setSettingsSubmenuBackCloses(true);
+            }
+        },
+        nodes: {
+            label: '节点',
+            title: '节点',
+            icon: <Network size={20} />,
+            onClick: () => {
+                setIsSettingsOpen(true);
+                setSettingsSubmenu('nodes');
                 setSettingsSubmenuBackCloses(true);
             }
         },

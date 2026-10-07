@@ -1,6 +1,7 @@
 /**
  * @file AddLogModal.tsx
  * @updated 2026-10-07: Adds a selection/caret-preserving node bracket shortcut beside the Note heading.
+ * @updated 2026-10-07: Adds contextual guidance for node links, the node directory, and common node workflows.
  * @updated 2026-10-06: Shows opt-in node name/alias suggestions directly below the note draft.
  * @updated 2026-10-01: Sends the current record's full attachment list to the shared preview so swiping, download, and deletion stay on the active image.
  * @updated 2026-09-17: Uses an adaptive equal-sided time grid so the start/end inputs and center separator stay horizontally and vertically aligned across modal widths.
@@ -47,6 +48,7 @@ import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { NodeNoteSuggestions } from './NodeNoteSuggestions';
+import { FeatureHint } from './FeatureHint';
 import { insertNodeBrackets } from '../utils/nodeUtils';
 import {
   getTodoProgressDisplayCompletedUnits,
@@ -1185,6 +1187,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Note</span>
                 <button type="button" aria-label="插入节点双括号" title="插入节点双括号" onMouseDown={(event) => event.preventDefault()} onClick={handleInsertNodeBrackets}
                   className="rounded-md px-1.5 py-1 font-mono text-xs text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">[[]]</button>
+                <FeatureHint
+                  hintId="note-node-links"
+                  title="节点怎么用"
+                  message={'节点用于把备注中的人、地点、项目或主题串成可回看的脉络。\n\n入口：打开设置 → 内容 → 节点，或在脉络页顶部快捷按钮中添加“节点”。节点目录支持搜索名称/别名、按最近使用或记录数量查看，也可以进入分类与排序管理。\n\n创建与关联：在备注中输入 [[节点名称]]，保存记录后会自动创建或关联节点；选中一段文字后点击“[[]]”按钮，会自动包裹为节点链接。也支持全角括号：［［节点名称］］。\n\n节点详情：点击备注里的节点链接，或从节点目录点击节点，可查看全部历史记录、反向链接和相关节点；详情页中的节点名称可以继续点击，返回会按进入顺序逐级回退。\n\n使用场景：用节点追踪一个人的所有互动、一个项目的相关记录、一个地点的经历，或一个主题在不同时间的变化。节点别名适合处理简称、旧名称和不同写法。'}
+                  className="text-stone-400/80 hover:text-stone-700"
+                />
               </div>
               <button
                 onClick={() => setIsNoteExpanded(!isNoteExpanded)}
