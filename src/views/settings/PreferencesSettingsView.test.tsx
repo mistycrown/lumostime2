@@ -1,6 +1,6 @@
 /**
  * @file PreferencesSettingsView.test.tsx
- * @updated 2026-10-07: Verifies manual-only daily backup controls and selected time.
+ * @updated 2026-10-07: Verifies manual-only daily backup controls and four-digit selected time.
  * @description Verifies the selected timer auto-jump label shown in preferences.
  * @updated 2026-05-10: Added coverage for the new three-option post-start jump selector.
  * @updated 2026-08-06: Added coverage for the shared association-selector layout preference.
@@ -34,7 +34,7 @@ describe('PreferencesSettingsView daily backup', () => {
     const html = renderToStaticMarkup(<PreferencesSettingsView onBack={() => {}} onToast={() => {}} manualSyncMode />);
     expect(html).toContain('定时备份');
     expect(html).toContain('每日备份时间');
-    expect(html).toContain('value="21:30"');
+    expect(html).toContain('value="2130"');
     expect(html).toContain('aria-checked="true"');
   });
 

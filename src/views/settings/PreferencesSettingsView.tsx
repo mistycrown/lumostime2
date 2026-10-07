@@ -1,6 +1,6 @@
 /**
  * @file PreferencesSettingsView.tsx
- * @updated 2026-10-07: Adds daily backup switch and time picker under manual sync preferences.
+ * @updated 2026-10-07: Uses four-digit daily backup input with validation under manual sync preferences.
  * @description 偏好设置页面
  * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
@@ -11,7 +11,7 @@
  * @updated 2026-08-06: Added a shared association-selector layout preference for the category, scope, tag, and todo pickers.
  * @updated 2026-09-15: Added the global font-scale control under general preferences.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus, X } from 'lucide-react';
 import { ToastType } from '../../components/Toast';
 import { useSettings, NavigationModuleKey, NavigationModuleVisibility } from '../../contexts/SettingsContext';
@@ -143,6 +143,10 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
         dailyBackupTime,
         setDailyBackupTime
     } = useSettings();
+    const [dailyBackupTimeInput, setDailyBackupTimeInput] = useState(() => dailyBackupTime.replace(':', ''));
+    useEffect(() => {
+        setDailyBackupTimeInput(dailyBackupTime.replace(':', ''));
+    }, [dailyBackupTime]);
     const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
     const [isAutoStartTimerJumpModeDropdownOpen, setIsAutoStartTimerJumpModeDropdownOpen] = useState(false);
@@ -339,10 +343,20 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                         <label htmlFor="daily-backup-time" className="font-bold text-stone-700">每日备份时间</label>
                                         <input
                                             id="daily-backup-time"
-                                            type="time"
-                                            value={dailyBackupTime}
-                                            onChange={event => { if (event.target.value) setDailyBackupTime(event.target.value); }}
-                                            className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:bg-stone-200 transition-colors font-mono"
+                                            type="text"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            value={dailyBackupTimeInput}
+                                            onChange={event => {
+                                                const value = event.target.value.replace(/[^0-9]/g, '').slice(0, 4);
+                                                setDailyBackupTimeInput(value);
+                                                if (/^([01]\d|2[0-3])[0-5]\d$/.test(value)) {
+                                                    setDailyBackupTime(`${value.slice(0, 2)}:${value.slice(2)}`);
+                                                }
+                                            }}
+                                            onFocus={event => event.target.select()}
+                                            onBlur={() => setDailyBackupTimeInput(dailyBackupTime.replace(':', ''))}
+                                            className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:ring-0 focus:bg-stone-200 transition-colors w-20 text-center tracking-widest font-mono"
                                         />
                                     </div>
                                 )}

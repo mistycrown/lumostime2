@@ -1,6 +1,6 @@
 /**
  * @file test-sync-renderer.mjs
- * @updated 2026-10-07: Smoke-tests daily backup controls, persistence and manual-only visibility.
+ * @updated 2026-10-07: Smoke-tests four-digit daily backup input, validation and persistence.
  * @input Real sync hook and isolated test adapters; optional --smoke-url for a local production preview
  * @output Renderer integration results and optional production-page screenshot in a temporary directory
  * @pos Test Runner
@@ -98,9 +98,17 @@ app.whenReady().then(async () => {
     if (!await execute("document.querySelector('button[role=switch]')?.getAttribute('aria-checked') === 'false'")) throw new Error('Daily backup should default to disabled');
     await execute("document.querySelector('button[role=switch]').click()");
     await sleep(200);
-    await execute("(() => { const input = document.getElementById('daily-backup-time'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '21:30'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); })()");
+    if (!await execute("(() => { const input = document.getElementById('daily-backup-time'); return input.type === 'text' && input.inputMode === 'numeric' && input.maxLength === 4; })()")) throw new Error('Backup time should use four-digit text input');
+    // Hidden Electron windows do not receive native focus, so dispatch React's focus events explicitly.
+    await execute("(async () => { const input = document.getElementById('daily-backup-time'); input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })); for (const value of ['', '2', '21', '213', '2130']) { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); await new Promise(resolve => setTimeout(resolve, 20)); } })()");
     await sleep(200);
     if (!await execute("localStorage.getItem('lumostime_daily_backup_enabled') === 'true' && localStorage.getItem('lumostime_daily_backup_time') === '21:30'")) throw new Error('Daily preferences were not saved');
+    await execute("(() => { const input = document.getElementById('daily-backup-time'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '2599'); input.dispatchEvent(new Event('input', { bubbles: true })); })()");
+    await sleep(100);
+    if (!await execute("localStorage.getItem('lumostime_daily_backup_time') === '21:30'")) throw new Error('Invalid digits changed the backup schedule');
+    await execute("document.getElementById('daily-backup-time').dispatchEvent(new FocusEvent('focusout', { bubbles: true }))");
+    await sleep(100);
+    if (!await execute("document.getElementById('daily-backup-time').value === '2130'")) throw new Error('Invalid input did not revert on blur');
     await execute("document.getElementById('daily-backup-time').scrollIntoView({ block: 'center' })");
     // Wake the compositor of the hidden test window before saving its updated frame.
     await window.webContents.capturePage();
@@ -111,7 +119,7 @@ app.whenReady().then(async () => {
     await window.loadURL(smokeUrl);
     await sleep(3000);
     await openPreferences();
-    if (!await execute("document.getElementById('daily-backup-time')?.value === '21:30'")) throw new Error('Daily backup time did not survive reload');
+    if (!await execute("document.getElementById('daily-backup-time')?.value === '2130'")) throw new Error('Daily backup time did not survive reload');
     await execute("Array.from(document.querySelectorAll('h4')).find(node => node.textContent === '手动同步模式').parentElement.parentElement.querySelector('button').click()");
     await sleep(200);
     if (await execute("!!document.querySelector('button[role=switch]')")) throw new Error('Daily backup controls remain visible in automatic mode');
