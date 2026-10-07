@@ -13,6 +13,7 @@ import { Check, ChevronRight, Loader2, Pencil, Plus, Sparkles, X } from 'lucide-
 import type { DailyReview, Log, NoteNode } from '../types';
 import { useNodes } from '../contexts/NodeContext';
 import { useData } from '../contexts/DataContext';
+import { useOptionalReview } from '../contexts/ReviewContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useToast } from '../contexts/ToastContext';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -108,8 +109,10 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
 };
 
 export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) => void; onOpenDailyReview?: (date: string) => void }> = ({ node, onEditLog, onOpenDailyReview }) => {
-  const { nodes, index, openNode, rename, associate } = useNodes();
+  const { nodes, index, openNode, rename, associate, associateReviewAnswer } = useNodes();
   const { logs, todos } = useData();
+  const reviewContext = useOptionalReview();
+  const dailyReviews = reviewContext?.dailyReviews || [];
   const { categories } = useCategoryScope();
   const { addToast } = useToast();
   const { isPrivacyMode } = usePrivacy();
@@ -121,10 +124,16 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
   const linkedLogs = entry?.logs || [];
   const linkedAnswers = entry?.reviewAnswers || [];
   const relatedNodes = useMemo(() => nodes.filter((item) => entry?.related.has(item.id)).sort((a, b) => (entry!.related.get(b.id)! - entry!.related.get(a.id)!) || a.name.localeCompare(b.name, 'zh-CN')), [nodes, entry]);
-  const candidates = useMemo(() => logs.flatMap((log) => {
-    const candidate = getNodeCandidates(log.note || '', [node])[0];
-    return candidate ? [{ log, matches: candidate.matches }] : [];
-  }).sort((a, b) => b.log.startTime - a.log.startTime), [logs, node]);
+  const candidates = useMemo(() => [
+    ...logs.flatMap((log) => {
+      const candidate = getNodeCandidates(log.note || '', [node])[0];
+      return candidate ? [{ kind: 'log' as const, log, matches: candidate.matches }] : [];
+    }),
+    ...dailyReviews.flatMap((review) => review.answers.flatMap((answer) => {
+      const candidate = getNodeCandidates(answer.answer || '', [node])[0];
+      return candidate ? [{ kind: 'review' as const, reviewId: review.id, date: review.date, answer, matches: candidate.matches }] : [];
+    }))
+  ].sort((a, b) => (b.kind === 'log' ? b.log.startTime : new Date(`${b.date}T12:00:00`).getTime()) - (a.kind === 'log' ? a.log.startTime : new Date(`${a.date}T12:00:00`).getTime())), [dailyReviews, logs, node]);
   const saveName = () => {
     try { rename(node.id, name); setRenaming(false); }
     catch (error) { addToast('error', error instanceof Error ? error.message : '重命名失败'); }
@@ -165,10 +174,14 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
           </section>
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">潜在关联<span className="font-mono text-xs font-normal text-stone-400">{candidates.length}</span></h2>
-            <div className="divide-y divide-stone-200 border-y border-stone-200">{candidates.map(({ log, matches }) => <article key={log.id} className="py-5">
-              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(log.startTime).toLocaleDateString('zh-CN')}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onEditLog(log)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associate(log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
-              <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={log.note || ''} /></p>
-              <p className="mt-2 text-xs text-stone-400">匹配：{matches.join('、')}</p>
+            <div className="divide-y divide-stone-200 border-y border-stone-200">{candidates.map((candidate) => candidate.kind === 'log' ? <article key={candidate.log.id} className="py-5">
+              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(candidate.log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(candidate.log.startTime).toLocaleDateString('zh-CN')}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onEditLog(candidate.log)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associate(candidate.log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
+              <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.log.note || ''} /></p>
+              <p className="mt-2 text-xs text-stone-400">匹配：{candidate.matches.join('、')}</p>
+            </article> : <article key={`${candidate.reviewId}-${candidate.answer.questionId}`} className="py-5">
+              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label={`打开日报：${candidate.date}`} onClick={() => onOpenDailyReview?.(candidate.date)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{candidate.date}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onOpenDailyReview?.(candidate.date)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associateReviewAnswer(candidate.reviewId, candidate.answer.questionId, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
+              <p className="mb-1 text-xs text-stone-400">{candidate.answer.question}</p><p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.answer.answer} /></p>
+              <p className="mt-2 text-xs text-stone-400">匹配：{candidate.matches.join('、')}</p>
             </article>)}</div>
             {!candidates.length && <p className="py-6 text-sm text-stone-400">暂无潜在关联</p>}
           </section>
