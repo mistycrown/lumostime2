@@ -1,5 +1,6 @@
 /**
  * @file test-nodes-renderer.mjs
+ * @updated 2026-10-07: Drives native mouse/touch input for capsule drag and category ordering.
  * @input Real node React renderer harness and production CSS from npm run build
  * @output Offline interaction results and verified-font mobile/desktop screenshots
  * @pos Test Runner
@@ -38,7 +39,19 @@ setTimeout(() => { console.error('Node renderer exceeded 60 seconds'); app.exit(
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ show: false, width: 390, height: 844, webPreferences: { contextIsolation: true, backgroundThrottling: false, offscreen: true } });
   await win.loadFile(path.join(__dirname, 'index.html'));
+  win.webContents.debugger.attach('1.3');
   for (let i = 0; i < 550; i++) {
+    const pointer = await win.webContents.executeJavaScript('window.__nodeRendererPointer');
+    if (pointer) {
+      if (pointer.pointerType === 'touch') {
+        const type = { down: 'touchStart', move: 'touchMove', up: 'touchEnd', cancel: 'touchCancel' }[pointer.phase];
+        await win.webContents.debugger.sendCommand('Input.dispatchTouchEvent', { type, touchPoints: ['up', 'cancel'].includes(pointer.phase) ? [] : [{ x: pointer.x, y: pointer.y, id: 1 }] });
+      } else {
+        if (pointer.phase === 'down') win.webContents.sendInputEvent({ type: 'mouseMove', x: pointer.x, y: pointer.y });
+        win.webContents.sendInputEvent({ type: { down: 'mouseDown', move: 'mouseMove', up: 'mouseUp' }[pointer.phase], x: pointer.x, y: pointer.y, button: 'left', clickCount: 1 });
+      }
+      await win.webContents.executeJavaScript('window.__nodeRendererPointer = null');
+    }
     const capture = await win.webContents.executeJavaScript('window.__nodeRendererCapture');
     if (capture) {
       if (capture.endsWith('-desktop')) win.setSize(1100, 900);

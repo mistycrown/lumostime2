@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-07: NodeContext exposes `moveNode` and `reorderCategory`. Node/category array order is the persisted manual order, carried by existing atomic writes, exports and sync without separate sorting metadata.
+
 Update 2026-10-07: DataContext persists node categories atomically with node/log snapshots. NodeContext exposes category creation and assignment, including assigning a newly created detail-page category within the same event. Nodes without valid assignments are displayed as 未分类.
 
 Update 2026-10-06: DataContext discovers nodes from saved notes and serializes log/node persistence without rewriting existing hydrated logs. NodeContext derives backlinks/co-occurrence and manages metadata and detail history. Renames persist notes, metadata and the Feishu outbox in one transaction.
