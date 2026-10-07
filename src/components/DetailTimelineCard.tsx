@@ -1,6 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
- * @updated 2026-10-07: Supports review-answer entries in each date group before Log records.
+ * @updated 2026-10-07: Renders linked daily-review answers as independent cards above the Log history and keeps Log rows keyboard-accessible without nested buttons.
  * @updated 2026-10-06: Renders node links, current-node highlights and saved-note suggestions.
  * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
  * @updated 2026-10-02: Centers only the day's first available sticker at full cell size and overlays the date in the bottom-right corner.
@@ -56,6 +56,16 @@ type ScoreBarColor = {
 
 const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+const handleKeyboardActivation = (
+    event: React.KeyboardEvent<HTMLElement>,
+    action: () => void
+) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+};
 
 const formatDayTotalDuration = (totalSeconds: number): string => {
     const totalMinutes = Math.floor(totalSeconds / 60);
@@ -359,10 +369,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
         const date = new Date(`${entry.date}T12:00:00`);
         return date.getMonth() === displayMonth && date.getFullYear() === displayYear;
     }), [displayMonth, displayYear, reviewEntries, viewMode]);
-    const reviewDateKeys = useMemo(() => reviewsToDisplay.flatMap((entry) => {
-        const date = new Date(`${entry.date}T00:00:00`);
-        return Number.isNaN(date.getTime()) ? [] : [new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()];
-    }), [reviewsToDisplay]);
 
     const styledLogIndexMap = useMemo(() => {
         return [...logsToDisplay]
@@ -398,8 +404,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 热图/分组数据
     const groupedData = useMemo(
-        () => buildDetailTimelineGroupedData(logsToDisplay, countableLogsToDisplay, viewMode, reviewDateKeys),
-        [countableLogsToDisplay, logsToDisplay, reviewDateKeys, viewMode]
+        () => buildDetailTimelineGroupedData(logsToDisplay, countableLogsToDisplay, viewMode),
+        [countableLogsToDisplay, logsToDisplay, viewMode]
     );
     
     // 滚动监听：显示日期悬浮条并更新活跃日期
@@ -1190,6 +1196,46 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
               </div>
             )}
 
+            {reviewsToDisplay.length > 0 && (
+                <section aria-label="关联日报" className="mb-8 space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Clock size={14} className="text-stone-400" />
+                        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400">关联日报</h2>
+                        <span className="font-mono text-[10px] text-stone-300">{reviewsToDisplay.length}</span>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        {reviewsToDisplay.map((entry) => {
+                            const entryDate = new Date(`${entry.date}T12:00:00`);
+                            const dateLabel = Number.isNaN(entryDate.getTime())
+                                ? entry.date
+                                : entryDate.toLocaleDateString('zh-CN');
+                            const openReview = entry.onOpen || (() => undefined);
+
+                            return (
+                                <article
+                                    key={entry.id}
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label={`打开日报：${dateLabel}`}
+                                    onClick={openReview}
+                                    onKeyDown={(event) => handleKeyboardActivation(event, openReview)}
+                                    className="group rounded-xl border border-stone-200/80 bg-white/70 p-4 text-left shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
+                                >
+                                    <div className="mb-2 flex items-center justify-between gap-3">
+                                        <span className="font-mono text-xs text-stone-400">{dateLabel}</span>
+                                        <span className="text-[10px] uppercase tracking-wider text-stone-400">每日回顾</span>
+                                    </div>
+                                    <h3 className="mb-1 text-sm font-semibold leading-6 text-stone-900">{entry.question}</h3>
+                                    <p className="whitespace-pre-wrap break-words text-sm font-light leading-7 text-stone-600">
+                                        <NodeText text={entry.answer} highlightName={highlightNodeName} />
+                                    </p>
+                                </article>
+                            );
+                        })}
+                    </div>
+                </section>
+            )}
+
             {/* History List */}
             <div className="space-y-8">
                 <div className="flex items-center justify-between mb-2">
@@ -1234,11 +1280,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     Array.from(groupedData.durationMap.keys()).sort((a: number, b: number) => b - a).map((timestamp: number) => {
                         const daySeconds = groupedData.durationMap.get(timestamp) || 0;
                         const dayLogsFiltered = groupedData.logsMap.get(timestamp) || [];
-                        const dayReviews = reviewsToDisplay.filter((entry) => {
-                            const date = new Date(`${entry.date}T00:00:00`);
-                            return !Number.isNaN(date.getTime()) && new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() === timestamp;
-                        });
-
                         const date = new Date(timestamp);
                         const month = date.getMonth() + 1;
                         const day = date.getDate();
@@ -1272,19 +1313,6 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     {timelineStyleTheme === 'default' && (
                                         <div className="absolute left-0 top-0 bottom-0 w-[1px] border-l border-stone-300 pointer-events-none" />
                                     )}
-
-                                    {dayReviews.map((entry) => (
-                                        <article key={entry.id} className="relative pl-8 animate-in slide-in-from-bottom-2 duration-500">
-                                            <div className="absolute -left-[60px] top-0 w-[45px] text-right">
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">日报</span>
-                                            </div>
-                                            <TimelineStyleRail theme={timelineStyleTheme} config={activeConfig} index={0} showLine={true} extendLinePastContainer={dayReviews.length > 1 || dayLogsFiltered.length > 0} />
-                                            <button type="button" onClick={entry.onOpen} className="block w-full rounded-xl px-2 pb-2 text-left transition-colors hover:bg-stone-50/80">
-                                                <div className="mb-1 flex items-center gap-2"><span className="text-base font-bold text-stone-900">{entry.question}</span><span className="text-[10px] text-stone-400">每日回顾</span></div>
-                                                <p className="whitespace-pre-wrap text-sm font-light leading-relaxed text-stone-500"><NodeText text={entry.answer} highlightName={highlightNodeName} /></p>
-                                            </button>
-                                        </article>
-                                    ))}
 
                                     {dayLogsFiltered.sort((a, b) => b.startTime - a.startTime).map((log, index, sortedLogs) => {
                                         // 查找对应的category和activity
@@ -1323,8 +1351,12 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                 />
 
                                                 <div
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    aria-label={`打开记录：${activity?.name || category?.name || 'Unknown Activity'}`}
                                                     className="cursor-pointer rounded-xl hover:bg-stone-50/80 transition-colors px-2 pb-2 -ml-2"
                                                     onClick={() => onEditLog?.(log)}
+                                                    onKeyDown={(event) => handleKeyboardActivation(event, () => onEditLog?.(log))}
                                                 >
                                                     <div className="flex items-center gap-2 mb-1">
                                                         <span className="text-lg font-bold text-stone-900 leading-tight">

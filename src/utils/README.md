@@ -1,6 +1,6 @@
 # Utils Architecture
 
-Update 2026-10-07: Detail timeline grouping accepts review-only date keys so daily answers can share the same date sections as Log records.
+Update 2026-10-07: Detail timeline grouping remains scoped to Log records; linked daily-review answers are rendered as an independent section by `DetailTimelineCard`.
 
 Update 2026-10-07: Node indexing includes deduplicated daily-review answers; answer links support canonical rename/merge transforms. Node description formatting keeps existing prose and emits structured basic-info and dated interaction sections.
 

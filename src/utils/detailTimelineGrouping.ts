@@ -3,6 +3,7 @@
  * @input Detail timeline logs, countable logs, and the active timeline view mode
  * @output Date-keyed duration and log maps for detail timeline rendering
  * @description Builds consistent date groups for month and all-record detail timelines.
+ * @updated 2026-10-07: Keeps grouping scoped to Log records so linked daily reviews can render as an independent timeline section.
  * @updated 2026-08-09: Added month grouping that excludes cross-month and planned-only dates.
  */
 import { Log } from '../types';
@@ -22,8 +23,7 @@ const getStartOfDayTimestamp = (log: Log): number => {
 export const buildDetailTimelineGroupedData = (
     logsToDisplay: Log[],
     countableLogsToDisplay: Log[],
-    viewMode: DetailTimelineViewMode,
-    additionalDateKeys: number[] = []
+    viewMode: DetailTimelineViewMode
 ): DetailTimelineGroupedData => {
     const durationMap = new Map<number, number>();
     const logsMap = new Map<number, Log[]>();
@@ -68,11 +68,6 @@ export const buildDetailTimelineGroupedData = (
             logsMap.get(startOfDay)!.push(log);
         });
     }
-
-    additionalDateKeys.forEach((dateKey) => {
-        if (!durationMap.has(dateKey)) durationMap.set(dateKey, 0);
-        if (!logsMap.has(dateKey)) logsMap.set(dateKey, []);
-    });
 
     return { durationMap, logsMap };
 };

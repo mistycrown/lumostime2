@@ -3,6 +3,7 @@
  * @input Timeline logs and selected detail timeline view mode
  * @output Regression coverage for detail timeline date grouping
  * @description Verifies month views do not create cross-month or planned-only date headings while preserving same-day timeline records.
+ * @updated 2026-10-07: Confirms review-only dates stay outside Log date grouping.
  * @updated 2026-08-09: Added month grouping coverage for cross-month and planned-only records.
  */
 import { describe, expect, test } from 'vitest';
@@ -71,10 +72,10 @@ describe('buildDetailTimelineGroupedData', () => {
         expect(result.logsMap.get(dayTimestamp(plannedOnlyDate))?.map((log) => log.id)).toEqual(['planned-only']);
     });
 
-    test('adds review-only dates before their daily log entries', () => {
+    test('does not create a Log date group for a review-only date', () => {
         const reviewDate = new Date(2026, 7, 4, 12, 0);
-        const result = buildDetailTimelineGroupedData([], [], 'all', [dayTimestamp(reviewDate)]);
-        expect(Array.from(result.durationMap.keys())).toEqual([dayTimestamp(reviewDate)]);
-        expect(result.logsMap.get(dayTimestamp(reviewDate))).toEqual([]);
+        const result = buildDetailTimelineGroupedData([], [], 'all');
+        expect(Array.from(result.durationMap.keys())).toEqual([]);
+        expect(result.logsMap.has(dayTimestamp(reviewDate))).toBe(false);
     });
 });

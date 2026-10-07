@@ -197,6 +197,9 @@ async function run() {
   await input('测试备注草稿', '今天和林林去了杭州。');
   assertFits(); await capture('node-editor-suggestions-mobile');
   navigation.setIsAddModalOpen(false); await delay();
+  logCard!.focus(); logCard!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await delay();
+  check(navigation.isAddModalOpen && navigation.editingLog?.id, 'Record did not open from keyboard');
+  navigation.setIsAddModalOpen(false); await delay();
   await labelledClick('重命名节点'); await input('节点名称', '杭州'); await labelledClick('保存名称');
   check(nodes.nodes.find((node) => node.id === 'person')?.name === '小林', 'Conflicting rename mutated data');
   await input('节点名称', '林老师'); await labelledClick('保存名称');
