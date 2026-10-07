@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-07: Covers full-width links and quick insertion selections, caret positions and bracket completion.
  * @updated 2026-10-07: Covers capsule moves, ordering boundaries and metadata preservation.
  * @updated 2026-10-07: Covers alias-first syntax, alias preservation and classification fallback.
  * @input Wiki-link notes, node metadata and logs
@@ -8,12 +9,50 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Log, NoteNode } from '../types';
-import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, linkNodeInText, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode } from './nodeUtils';
+import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
 
 describe('node text relationships', () => {
+  it('recognizes full-width and mixed brackets with the same canonical names and exact text offsets', () => {
+    const text = '与 ［［浩特］］ 和 [[浩特]]、［［小浩丨浩特］］ 见面';
+    expect(getNodeNames(text)).toEqual(['浩特']);
+    expect(parseNodeLinks(text).map((link) => text.slice(link.start, link.end))).toEqual(['［［浩特］］', '[[浩特]]', '［［小浩丨浩特］］']);
+    expect(parseNodeLinks(text).at(-1)).toMatchObject({ name: '浩特', label: '小浩' });
+    expect(getNodeNames('[［浩特]］ ［[杭州］]')).toEqual(['浩特', '杭州']);
+    expect(getNodeNames('［［［浩特］］］ ［［］］ ［［a|b］］ ［［a\nb］］')).toEqual([]);
+    const discovered = discoverNodes([], [log('full', text)]);
+    expect(discovered.map((item) => item.name)).toEqual(['浩特']);
+    expect(buildNodeIndex(discovered, [log('full', text)]).get(discovered[0].id)?.logs).toHaveLength(1);
+  });
+
+  it('protects full-width links from suggestions/conversion and preserves their delimiters when renaming', () => {
+    const source = node('浩特', ['小浩']);
+    expect(getNodeCandidates('［［浩特］］ 小浩', [source])).toEqual([]);
+    expect(getNodeCandidates('［［小浩项目］］', [source])).toEqual([]);
+    expect(linkNodeInText('小浩 ［［小浩项目］］ ［［小浩丨浩特］］', source)).toBe('[[小浩丨浩特]] ［［小浩项目］］ ［［小浩丨浩特］］');
+    expect(renameNode([source], [log('full', '［［小浩丨浩特］］ [[浩特]]')], source.id, '浩老师').logs[0].note).toBe('［［小浩丨浩老师］］ [[浩老师]]');
+    expect(() => renameNode([source], [], source.id, '［浩特］')).toThrow('有效');
+  });
+
+  it('wraps the exact selection and keeps the remainder and caret after the closing brackets', () => {
+    expect(insertNodeBrackets('今天和浩特见面', 3, 5)).toEqual({ text: '今天和[[浩特]]见面', caret: 9 });
+    expect(insertNodeBrackets('🙂浩特', 2, 4)).toEqual({ text: '🙂[[浩特]]', caret: 8 });
+    expect(insertNodeBrackets('浩特', 0, 2)).toEqual({ text: '[[浩特]]', caret: 6 });
+  });
+
+  it('opens or completes a node at the caret without closing an already complete earlier node', () => {
+    expect(insertNodeBrackets('')).toEqual({ text: '[[', caret: 2 });
+    expect(insertNodeBrackets('与浩特见面', 1)).toEqual({ text: '与[[浩特见面', caret: 3 });
+    expect(insertNodeBrackets('与[[浩特')).toEqual({ text: '与[[浩特]]', caret: 7 });
+    expect(insertNodeBrackets('与［［浩特')).toEqual({ text: '与［［浩特］］', caret: 7 });
+    expect(insertNodeBrackets('与[浩特')).toEqual({ text: '与[[浩特]]', caret: 7 });
+    expect(insertNodeBrackets('与［浩特')).toEqual({ text: '与［［浩特］］', caret: 7 });
+    expect(insertNodeBrackets('[[浩特]]，')).toEqual({ text: '[[浩特]]，[[', caret: 9 });
+    expect(insertNodeBrackets('[[浩特]]', 4)).toEqual({ text: '[[浩特]]', caret: 6 });
+  });
+
   it('parses trimmed distinct names and leaves malformed or unsupported links ordinary', () => {
     expect(getNodeNames('和 [[ 小林 ]] 去 [[杭州]]，[[小林]] [[]] [[  ]] [[a|b]] [[[x]]] [[x\ny]] [[未结束')).toEqual(['小林', '杭州']);
     const [link] = parseNodeLinks('前 [[小林]] 后');

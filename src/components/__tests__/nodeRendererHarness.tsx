@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-07: Verifies full-width alias links render, navigate and retain delimiters on rename.
  * @updated 2026-10-07: Exercises searchable pickers and capsule mouse/touch drag ordering across reloads.
  * @updated 2026-10-07: Verifies classifications and alias-label navigation/conversion across reloads.
  * @input Actual DataProvider, NodeProvider and node UI in an isolated Electron renderer
@@ -95,7 +96,7 @@ const render = () => root.render(<ToastProvider><DataProvider><PrivacyProvider><
 const fixture = (id: string, note: string, day: number): Log => ({ id, note, startTime: new Date(2026, 9, day, 12).getTime(), endTime: new Date(2026, 9, day, 13).getTime(), duration: 3600, categoryId: 'c', activityId: 'a' });
 
 async function run() {
-  await dataRepository.saveLogs([fixture('first', '和 [[小林]] 在 [[杭州]] 讨论了 [[LumosTime]]。[[小林]] 记录节点功能的设计。', 6), fixture('second', '和 [[林林丨小林]] 在 [[杭州]] 散步。', 5), fixture('candidate', '今天林林推荐了一本书。', 4)]);
+  await dataRepository.saveLogs([fixture('first', '和 [[小林]] 在 [[杭州]] 讨论了 [[LumosTime]]。[[小林]] 记录节点功能的设计。', 6), fixture('second', '和 ［［林林丨小林］］ 在 ［［杭州］］ 散步。', 5), fixture('candidate', '今天林林推荐了一本书。', 4)]);
   await dataRepository.saveNodes([{ id: 'person', name: '小林', aliases: ['林林'], description: '', createdAt: 1, updatedAt: 1 }]);
   render();
   await until(() => data?.isReady && nodes.nodes.length === 3, 'hydration and discovery');
@@ -198,7 +199,7 @@ async function run() {
   check(nodes.nodes.find((node) => node.id === 'person')?.aliases.includes('小林'), 'Old name not preserved as alias');
   check(data.logs.every((log) => !log.note?.includes('[[小林]]')), 'Rename left old links');
   check(nodes.nodes.filter((node) => node.name === '小林').length === 0, 'Rename resurrected old node');
-  check(data.logs.find((log) => log.id === 'second')?.note?.includes('[[林林丨林老师]]'), 'Rename changed alias display label');
+  check(data.logs.find((log) => log.id === 'second')?.note?.includes('［［林林丨林老师］］'), 'Rename changed full-width delimiters or alias label');
   manager.handleSaveLog(fixture('new', '和 [[林老师]] 去了 [[北京]]。', 3)); await delay();
   check(nodes.nodes.some((node) => node.name === '北京'), 'Saved log did not auto-create node');
   passed.push('original editor navigation, live draft suggestions, conflict protection and saved-log creation');
