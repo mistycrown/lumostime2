@@ -1,6 +1,12 @@
 # Components Directory
 
+Update 2026-10-07: `NodeTextEditor` is shared by review answers and note editors for bracket insertion, caret restoration and live node suggestions. Review text answers render wiki links as clickable nodes.
+
+Update 2026-10-07: `NodeMergePanel` lets users search/select another node and explicitly choose either primary, preview the unique record count, cancel or confirm. It supports Escape/hardware back and keyboard primary selection. Node details commit pending edits and invalidate stale AI output before merging.
+
 Update 2026-10-07: AddLogModal places a node bracket shortcut beside Note. It wraps selected text or inserts/completes brackets at the caret, preserves selection on mouse interaction, and restores input focus/caret after React updates.
+
+Update 2026-10-07: AddLogModal places a FeatureHint beside the node bracket shortcut. It explains node entry points, link syntax, node details, aliases, categories and common tracking scenarios.
 
 Update 2026-10-07: `NodeCategorySelect` replaces native node classification selects with a compact searchable popover, selected checkmarks, keyboard navigation, Escape/outside close and focus return. Directory, details and capsule management share it.
 

@@ -1,5 +1,9 @@
 # Utils Architecture
 
+Update 2026-10-07: Node indexing includes deduplicated daily-review answers; answer links support canonical rename/merge transforms. Node description formatting keeps existing prose and emits structured basic-info and dated interaction sections.
+
+Update 2026-10-07: `mergeNodes` preserves the chosen primary's ID/category/order, unions aliases including the source name, and appends distinct biographies. It redirects source references throughout logs while preserving original display labels and bracket width. Renaming thereafter retargets every historical/alias reference; unchanged logs retain identity.
+
 Update 2026-10-07: Node parsing accepts full-width `［［名称］］` and mixed-width delimiters while retaining canonical indexing and original offsets. Suggestions protect either delimiter form; renames preserve delimiters. `insertNodeBrackets` wraps a selection or completes an unmatched opener at the caret, including manually typed single brackets.
 
 Update 2026-10-07: `moveNodeToCategory` reclassifies nodes with exact before/after insertion while retaining aliases, biographies and identities. `reorderNodeItems` preserves object identity and ignores invalid/self targets; both use persisted array order.

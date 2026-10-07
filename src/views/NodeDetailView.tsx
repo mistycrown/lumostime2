@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
  * @updated 2026-10-07: Reuses the print-style searchable category picker.
  * @updated 2026-10-07: Adds category selection/creation and validates syntax-safe aliases.
  * @input Node metadata, backlinks, co-occurrence and ordinary-text candidates
@@ -9,7 +10,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronRight, Loader2, Pencil, Plus, Sparkles, X } from 'lucide-react';
-import type { Log, NoteNode } from '../types';
+import type { DailyReview, Log, NoteNode } from '../types';
 import { useNodes } from '../contexts/NodeContext';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
@@ -20,10 +21,11 @@ import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { NodeText } from '../components/NodeText';
 import { NodeCategoryCreator } from '../components/NodeCategoryCreator';
 import { NodeCategorySelect } from '../components/NodeCategorySelect';
+import { NodeMergePanel } from '../components/NodeMergePanel';
 import { getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
-import { generateNodeDescription } from '../services/nodeDescriptionService';
+import { formatNodeDescription, generateNodeDescriptionResult } from '../services/nodeDescriptionService';
 
-const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[] }> = ({ node, logs }) => {
+const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?: Array<{ date: string; question: string; answer: string }> }> = ({ node, logs, reviewAnswers = [] }) => {
   const { updateNode, nodeCategories, assignCategory } = useNodes();
   const { addToast } = useToast();
   const draft = useBufferedRecord(node, (value) => updateNode(value.id, { aliases: value.aliases, description: value.description }));
@@ -55,13 +57,13 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[] }> = ({ node, lo
     const before = revision.current;
     setGenerating(true);
     try {
-      const description = await generateNodeDescription(draft.value, logs);
+      const result = await generateNodeDescriptionResult(draft.value, logs, reviewAnswers);
       if (!mounted.current) return;
       if (before !== revision.current) {
         addToast('info', '简介已修改，请重新生成');
         return;
       }
-      latestDraft.current.update({ ...latestDraft.current.value, description });
+      latestDraft.current.update({ ...latestDraft.current.value, description: formatNodeDescription(latestDraft.current.value.description, result) });
     } catch (error) {
       if (mounted.current) addToast('error', error instanceof Error ? error.message : '生成失败，请重试');
     } finally {
@@ -97,14 +99,15 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[] }> = ({ node, lo
     <section>
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold text-stone-900">简介</h2>
-        <button type="button" onClick={generate} disabled={generating || !logs.length} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900 disabled:opacity-40">{generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {generating ? '生成中' : 'AI 生成'}</button>
+        <button type="button" onClick={generate} disabled={generating || (!logs.length && !reviewAnswers.length)} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900 disabled:opacity-40">{generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {generating ? '生成中' : 'AI 生成'}</button>
       </div>
       <textarea aria-label="节点简介" placeholder="写下关于这个节点的简介…" value={draft.value.description} rows={7} onChange={(event) => { revision.current += 1; draft.update({ ...draft.value, description: event.target.value }); }} onBlur={draft.commit} className="w-full resize-y rounded-none border border-stone-200 bg-transparent px-4 py-3 text-sm leading-7 text-stone-700 outline-none focus:border-stone-400 placeholder:text-stone-300" />
     </section>
+    <NodeMergePanel node={node} onBeforeMerge={() => { revision.current += 1; draft.commit(); }} />
   </div>;
 };
 
-export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) => void }> = ({ node, onEditLog }) => {
+export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) => void; onOpenDailyReview?: (date: string) => void }> = ({ node, onEditLog, onOpenDailyReview }) => {
   const { nodes, index, openNode, rename, associate } = useNodes();
   const { logs, todos } = useData();
   const { categories } = useCategoryScope();
@@ -116,6 +119,7 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
   const [name, setName] = useState(node.name);
   const entry = index.get(node.id);
   const linkedLogs = entry?.logs || [];
+  const linkedAnswers = entry?.reviewAnswers || [];
   const relatedNodes = useMemo(() => nodes.filter((item) => entry?.related.has(item.id)).sort((a, b) => (entry!.related.get(b.id)! - entry!.related.get(a.id)!) || a.name.localeCompare(b.name, 'zh-CN')), [nodes, entry]);
   const candidates = useMemo(() => logs.flatMap((log) => {
     const candidate = getNodeCandidates(log.note || '', [node])[0];
@@ -143,9 +147,17 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
         {([['details', '细节'], ['timeline', '时间线'], ['related', '关联']] as const).map(([value, label]) => <button type="button" key={value} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)} className={`whitespace-nowrap pb-3 font-serif text-sm tracking-wide ${tab === value ? 'border-b-2 border-stone-900 font-bold text-stone-900' : 'text-stone-400 hover:text-stone-600'}`}>{label}</button>)}
       </nav>
       <div className={isPrivacyMode ? 'blur-sm select-none' : ''}>
-        {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} />}
+        {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} reviewAnswers={linkedAnswers.map(({ date, answer }) => ({ date, question: answer.question, answer: answer.answer }))} />}
         {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} />}
         {tab === 'related' && <div className="space-y-10">
+          <section>
+            <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">日报回答<span className="font-mono text-xs font-normal text-stone-400">{linkedAnswers.length}</span></h2>
+            <div className="divide-y divide-stone-200 border-y border-stone-200">{linkedAnswers.map(({ reviewId, date, answer }) => <article key={`${reviewId}-${answer.questionId}`} className="py-5">
+              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label={`打开日报：${date}`} onClick={() => onOpenDailyReview?.(date)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{date}</button><span className="text-xs text-stone-400">{answer.question}</span></div>
+              <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={answer.answer} /></p>
+            </article>)}</div>
+            {!linkedAnswers.length && <p className="py-6 text-sm text-stone-400">暂无日报回答</p>}
+          </section>
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">相关节点<span className="font-mono text-xs font-normal text-stone-400">{relatedNodes.length}</span></h2>
             <div className="divide-y divide-stone-200 border-y border-stone-200">{relatedNodes.map((other) => <button type="button" key={other.id} aria-label={`查看相关节点：${other.name}`} onClick={() => openNode(other.name)} className="flex w-full items-center gap-3 py-4 text-left text-sm text-stone-700"><span className="min-w-0 flex-1 break-words">{other.name}</span><span className="font-mono text-xs text-stone-400">{entry!.related.get(other.id)} 条</span><ChevronRight size={14} className="text-stone-300" /></button>)}</div>
@@ -154,7 +166,7 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">潜在关联<span className="font-mono text-xs font-normal text-stone-400">{candidates.length}</span></h2>
             <div className="divide-y divide-stone-200 border-y border-stone-200">{candidates.map(({ log, matches }) => <article key={log.id} className="py-5">
-              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(log.startTime).toLocaleDateString('zh-CN')}</button><button type="button" onClick={() => associate(log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div>
+              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(log.startTime).toLocaleDateString('zh-CN')}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onEditLog(log)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associate(log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
               <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={log.note || ''} /></p>
               <p className="mt-2 text-xs text-stone-400">匹配：{matches.join('、')}</p>
             </article>)}</div>

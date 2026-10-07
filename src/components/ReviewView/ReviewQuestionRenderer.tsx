@@ -9,6 +9,8 @@ import React from 'react';
 import { ReviewQuestion, ReviewAnswer } from '../../types';
 import { COLOR_OPTIONS } from '../../constants';
 import * as LucideIcons from 'lucide-react';
+import { NodeText } from '../NodeText';
+import { NodeTextEditor } from '../NodeTextEditor';
 
 interface ReviewQuestionRendererProps {
     question: ReviewQuestion;
@@ -36,8 +38,6 @@ const EditModeQuestion: React.FC<{
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
 }> = ({ question: q, answer, onUpdateAnswer }) => {
     const [isTextAnswerExpanded, setIsTextAnswerExpanded] = React.useState(false);
-    const textareaId = React.useId();
-
     if (q.type === 'text') {
         return (
             <div key={q.id} className="space-y-3">
@@ -57,11 +57,11 @@ const EditModeQuestion: React.FC<{
                             : <LucideIcons.Minimize2 size={16} className="rotate-180" />}
                     </button>
                 </div>
-                <textarea
-                    id={textareaId}
+                <NodeTextEditor
+                    ariaLabel={q.question}
                     value={answer?.answer || ''}
-                    onChange={(e) => onUpdateAnswer(q.id, q.question, e.target.value)}
-                    className={`w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-[height,border-color] duration-150 ease-out placeholder:text-stone-300 focus:border-stone-400 ${
+                    onChange={(value) => onUpdateAnswer(q.id, q.question, value)}
+                    className={`w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 pr-10 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-[height,border-color] duration-150 ease-out placeholder:text-stone-300 focus:border-stone-400 ${
                         isTextAnswerExpanded ? 'h-[320px]' : 'h-[112px]'
                     }`}
                     placeholder="输入你的回答..."
@@ -153,7 +153,7 @@ const ReadingModeQuestion: React.FC<{
                     <div className={`text-sm leading-relaxed whitespace-pre-wrap ${
                         !hasAnswer ? 'text-stone-400 italic' : 'text-stone-600'
                     }`}>
-                        {hasAnswer ? answer.answer : '未填写'}
+                        {hasAnswer ? <NodeText text={answer.answer} /> : '未填写'}
                     </div>
                 )}
 

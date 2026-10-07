@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-07: Covers primary-node merge, complete backlink retargeting and rename across all records.
  * @updated 2026-10-07: Covers full-width links and quick insertion selections, caret positions and bracket completion.
  * @updated 2026-10-07: Covers capsule moves, ordering boundaries and metadata preservation.
  * @updated 2026-10-07: Covers alias-first syntax, alias preservation and classification fallback.
@@ -8,13 +9,56 @@
  * @updated 2026-10-06: Covers parsing, duplicates, alias conversion, co-occurrence and rename conflicts.
  */
 import { describe, expect, it } from 'vitest';
-import type { Log, NoteNode } from '../types';
-import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode } from './nodeUtils';
+import type { Log, NoteNode, ReviewAnswer } from '../types';
+import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeInAnswers } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
 
 describe('node text relationships', () => {
+  it('merges into the chosen primary without dropping aliases, biographies, category, order or record metadata', () => {
+    const primary = { ...node('浩特', ['浩老师', '小浩']), categoryId: 'people' };
+    const source = { ...node('小浩', ['小浩同学', '浩老师', '浩特']), description: '另一份简介', categoryId: 'friends' };
+    const unrelated = node('杭州');
+    const logs = [log('both', '[[浩特]] [[小浩]] ［［同学丨小浩］］ [[杭州]]'), log('source', '[［小浩]］ 小浩'), log('none', '小浩和浩特见面')];
+    const result = mergeNodes([source, unrelated, primary], logs, source.id, primary.id, 10);
+    expect(result.nodes.map((item) => item.id)).toEqual(['杭州', '浩特']);
+    expect(result.nodes[1]).toMatchObject({ id: '浩特', categoryId: 'people', aliases: ['浩老师', '小浩', '小浩同学'], createdAt: 1, updatedAt: 10 });
+    expect(result.nodes[1].description).toBe('已有简介\n\n另一份简介');
+    expect(result.nodes[0]).toBe(unrelated);
+    expect(result.logs[0].note).toBe('[[浩特]] [[小浩丨浩特]] ［［同学丨浩特］］ [[杭州]]');
+    expect(result.logs[1].note).toBe('[［小浩丨浩特]］ 小浩');
+    expect(result.logs[1]).toMatchObject({ ...logs[1], note: result.logs[1].note });
+    expect(result.logs[2]).toBe(logs[2]);
+    expect(buildNodeIndex(result.nodes, result.logs).get(primary.id)?.logs).toHaveLength(2);
+    expect(discoverNodes(result.nodes, result.logs)).toBe(result.nodes);
+    expect(source.aliases).toEqual(['小浩同学', '浩老师', '浩特']);
+    expect(logs[0].note).toContain('[[小浩]]');
+  });
+
+  it('accepts either primary and rejects invalid merge choices without changing data', () => {
+    const nodes = [node('甲'), { ...node('乙'), description: '' }];
+    const result = mergeNodes(nodes, [log('a', '[[甲]]')], '甲', '乙');
+    expect(result.nodes[0]).toMatchObject({ id: '乙', name: '乙', aliases: ['甲'], description: '已有简介' });
+    expect(() => mergeNodes(nodes, [], '甲', '甲')).toThrow('不同');
+    expect(() => mergeNodes(nodes, [], 'missing', '乙')).toThrow('不存在');
+    expect(() => mergeNodes(nodes, [], '甲', 'missing')).toThrow('不存在');
+    expect(nodes).toHaveLength(2);
+  });
+
+  it('renames every historical/reference form after a merge while preserving alias labels and unrelated mentions', () => {
+    const source = node('小浩');
+    const primary = node('浩特');
+    const logs = [log('old', '[[小浩]] ［［同学丨小浩］］', -100), log('primary', '[[浩特]] ［［浩特］］'), log('unrelated', '[[浩特项目]] 普通正文中的浩特')];
+    const merged = mergeNodes([source, primary], logs, source.id, primary.id);
+    const result = renameNode(merged.nodes, merged.logs, primary.id, '浩老师');
+    expect(result.logs[0].note).toBe('[[小浩丨浩老师]] ［［同学丨浩老师］］');
+    expect(result.logs[1].note).toBe('[[浩老师]] ［［浩老师］］');
+    expect(result.logs[2]).toBe(logs[2]);
+    expect(result.nodes[0].aliases).toEqual(['小浩', '浩特']);
+    expect(buildNodeIndex(result.nodes, result.logs).get(primary.id)?.logs).toHaveLength(2);
+  });
+
   it('recognizes full-width and mixed brackets with the same canonical names and exact text offsets', () => {
     const text = '与 ［［浩特］］ 和 [[浩特]]、［［小浩丨浩特］］ 见面';
     expect(getNodeNames(text)).toEqual(['浩特']);
@@ -74,6 +118,24 @@ describe('node text relationships', () => {
     expect(index.get('小林')?.logs.map((item) => item.id)).toEqual(['b', 'a']);
     expect(index.get('小林')?.related.get('杭州')).toBe(2);
     expect(index.get('小林')?.latestAt).toBe(5);
+  });
+
+  it('indexes daily review answers and keeps co-occurrence counts distinct', () => {
+    const answers: ReviewAnswer[] = [{ questionId: 'q', question: '今天和谁见面？', answer: '和[[小林]]一起见了[[杭州]]' }];
+    const index = buildNodeIndex([node('小林'), node('杭州')], [], [{ id: 'r', date: '2026-10-07', createdAt: 1, updatedAt: 2, answers }]);
+    expect(index.get('小林')?.reviewAnswers).toHaveLength(1);
+    expect(index.get('小林')?.related.get('杭州')).toBe(1);
+  });
+
+  it('renames node links in daily review answers without changing unrelated answers', () => {
+    const answers: ReviewAnswer[] = [
+      { questionId: 'q1', question: 'Q', answer: '[[小林]] 和 [[小林丨小林]]' },
+      { questionId: 'q2', question: 'Q', answer: '杭州'
+      }
+    ];
+    const result = renameNodeInAnswers(answers, '小林', '林老师');
+    expect(result[0].answer).toBe('[[林老师]] 和 [[小林丨林老师]]');
+    expect(result[1]).toBe(answers[1]);
   });
 
   it('suggests names and aliases outside explicit links only', () => {
