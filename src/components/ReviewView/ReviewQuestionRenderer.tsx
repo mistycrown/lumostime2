@@ -38,6 +38,7 @@ const EditModeQuestion: React.FC<{
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
 }> = ({ question: q, answer, onUpdateAnswer }) => {
     const [isTextAnswerExpanded, setIsTextAnswerExpanded] = React.useState(false);
+    const textareaId = React.useId();
     if (q.type === 'text') {
         return (
             <div key={q.id} className="space-y-3">
@@ -58,6 +59,7 @@ const EditModeQuestion: React.FC<{
                     </button>
                 </div>
                 <NodeTextEditor
+                    id={textareaId}
                     ariaLabel={q.question}
                     value={answer?.answer || ''}
                     onChange={(value) => onUpdateAnswer(q.id, q.question, value)}
