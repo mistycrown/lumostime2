@@ -1,5 +1,6 @@
 /**
  * @file useSyncManager.ts
+ * @updated 2026-10-07: Runs daily manual-mode uploads only in foreground and recovers missed backups.
  * @updated 2026-10-07: Backs up, restores and tracks node categories with node assignments.
  * @updated 2026-10-06: Includes node metadata in backup payloads, restores and change tracking.
  * @updated 2026-10-03: Marks restored log snapshots so automatic calendar sync cannot infer mass deletions.
@@ -50,6 +51,7 @@ import {
     runSyncCycle, getRemoteVersion, readPendingUpload, writePendingUpload, clearPendingUpload
 } from '../utils/syncProtocol';
 import { createSyncScheduler, SyncAttempt } from '../utils/syncScheduler';
+import { createDailyBackupScheduler, DAILY_BACKUP_STATE_PREFIX } from '../utils/dailyBackupScheduler';
 import { getJsonByteSize, getSyncPayloadTimestamp } from '../utils/syncPayloadMetadata';
 import {
     clearPendingLocalDataEdit, getLocalDataTimestamp, getLocalEditRevision,
@@ -69,7 +71,7 @@ import {
 } from '../services/preferencesBackupService';
 
 export const useSyncManager = () => {
-    type SyncMode = 'startup' | 'resume' | 'manual' | 'auto';
+    type SyncMode = 'startup' | 'resume' | 'manual' | 'auto' | 'scheduled';
     type SyncExecutionDirection = 'upload' | 'restore';
     interface SyncDirectionDecision {
         direction: 'conflict';
@@ -109,7 +111,7 @@ export const useSyncManager = () => {
         updateLastSyncTime,
         isRestoring,
         isSyncing, setIsSyncing,
-        manualSyncMode
+        manualSyncMode, dailyBackupEnabled, dailyBackupTime
     } = useSettings();
     const { categories, setCategories, scopes, setScopes, goals, setGoals, majorGoals, setMajorGoals } = useCategoryScope();
     const {
@@ -162,6 +164,9 @@ export const useSyncManager = () => {
     const trackingContentRef = useRef(false);
     const initializedRef = useRef(false);
     const schedulerRef = useRef<ReturnType<typeof createSyncScheduler> | null>(null);
+    const dailyBackupRef = useRef<ReturnType<typeof createDailyBackupScheduler> | null>(null);
+    const nativeActiveRef = useRef(!Capacitor.isNativePlatform());
+    const isBackupForeground = () => document.visibilityState === 'visible' && nativeActiveRef.current;
     const conflictRef = useRef(false);
     const [isApplyingCloud, setIsApplyingCloud] = useState(false);
     const restoreCommitRef = useRef<(() => void) | null>(null);
@@ -421,8 +426,8 @@ export const useSyncManager = () => {
     const destinationIdentity = getCloudDestinationIdentity;
 
     // Long-lived native and DOM callbacks always dereference the current render.
-    const latestRef = useRef({ getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, isSyncing });
-    latestRef.current = { getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, isSyncing };
+    const latestRef = useRef({ getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, dailyBackupEnabled, isSyncing });
+    latestRef.current = { getLocal: getFullLocalData, applyDataUpdate, manualSyncMode, dailyBackupEnabled, isSyncing };
     const performRef = useRef<(mode: SyncMode) => Promise<SyncAttempt>>(async () => 'blocked');
 
     const closeSyncConflictModal = () => {
@@ -444,7 +449,10 @@ export const useSyncManager = () => {
             if (mode === 'manual') addToast('info', '正在同步，请稍后再试');
             return 'retry';
         }
-        if (mode !== 'manual' && (latestRef.current.manualSyncMode || conflictRef.current)) return 'blocked';
+        const scheduled = mode === 'scheduled';
+        const canRunScheduled = () => latestRef.current.manualSyncMode && latestRef.current.dailyBackupEnabled && isBackupForeground();
+        if (scheduled && (!canRunScheduled() || conflictRef.current)) return 'blocked';
+        if (mode !== 'manual' && !scheduled && (latestRef.current.manualSyncMode || conflictRef.current)) return 'blocked';
         const { service: activeService, error: serviceError } = requestedService
             ? { service: requestedService, error: null }
             : getActiveCloudService();
@@ -466,7 +474,8 @@ export const useSyncManager = () => {
             if ((!requestedService && getActiveCloudService().service !== activeService) || destinationIdentity(activeService) !== identity) {
                 throw new Error('云端连接已改变，已停止本次同步');
             }
-            if (mode !== 'manual' && latestRef.current.manualSyncMode) throw new Error('已切换到手动同步');
+            if (scheduled && !canRunScheduled()) throw new Error('定时备份已暂停');
+            if (mode !== 'manual' && !scheduled && latestRef.current.manualSyncMode) throw new Error('已切换到手动同步');
         };
         syncLock.current = true;
         setIsSyncing(true);
@@ -544,7 +553,7 @@ export const useSyncManager = () => {
                 return 'blocked';
             }
             conflictRef.current = false;
-            if (mode === 'manual') {
+            if (mode === 'manual' || scheduled) {
                 addToast(imageWarnings ? 'warning' : result.direction === 'equal' ? 'info' : 'success',
                     result.direction === 'equal' ? '云端与本地数据一致，无需同步' : message);
             } else if (result.direction === 'restore' || imageWarnings) {
@@ -563,7 +572,7 @@ export const useSyncManager = () => {
             setIsSyncing(false);
         }
     };
-    performRef.current = (mode) => performSync(mode);
+    performRef.current = (mode) => performSync(mode, mode === 'scheduled' ? 'upload' : undefined);
 
     const handleQuickSync = async (event?: React.MouseEvent | { stopPropagation?: () => void } | null) => {
         event?.stopPropagation?.();
@@ -644,6 +653,7 @@ export const useSyncManager = () => {
                 initializedRef.current = true;
             }
             if (!manualSyncMode && destination) scheduler.request('startup', true);
+            dailyBackupRef.current?.check();
         }).catch(error => {
             console.error('[Sync] Failed to initialize chat storage', error);
             if (!cancelled && !manualSyncMode) scheduler.request('startup');
@@ -654,6 +664,24 @@ export const useSyncManager = () => {
             if (schedulerRef.current === scheduler) schedulerRef.current = null;
         };
     }, [manualSyncMode, destination]);
+
+    useEffect(() => {
+        if (!manualSyncMode || !dailyBackupEnabled || !destination) return;
+        const scheduler = createDailyBackupScheduler({
+            time: dailyBackupTime,
+            storageKey: DAILY_BACKUP_STATE_PREFIX + encodeURIComponent(destination),
+            storage: localStorage,
+            isForeground: isBackupForeground,
+            run: () => performRef.current('scheduled'),
+            retryMs: SYNC_CONFIG.PENDING_SYNC_RETRY_DELAY_MS,
+            maxRetryMs: SYNC_CONFIG.MAX_RETRY_DELAY_MS
+        });
+        dailyBackupRef.current = scheduler;
+        return () => {
+            scheduler.dispose();
+            if (dailyBackupRef.current === scheduler) dailyBackupRef.current = null;
+        };
+    }, [manualSyncMode, dailyBackupEnabled, dailyBackupTime, destination]);
 
     useEffect(() => {
         const changed = () => trackRef.current();
@@ -680,8 +708,10 @@ export const useSyncManager = () => {
         const resume = (urgent = false) => {
             trackRef.current();
             if (!latestRef.current.manualSyncMode) schedulerRef.current?.request('resume', urgent);
+            dailyBackupRef.current?.check();
         };
         const visibility = () => {
+            dailyBackupRef.current?.check();
             if (document.visibilityState === 'visible' && !Capacitor.isNativePlatform()) resume();
             else if (document.visibilityState === 'hidden' && !latestRef.current.manualSyncMode && hasPendingLocalDataEdit()) {
                 schedulerRef.current?.request('auto', true);
@@ -695,8 +725,21 @@ export const useSyncManager = () => {
             if (document.visibilityState === 'visible') trackRef.current();
         }, SYNC_CONFIG.LOCAL_AUDIT_INTERVAL_MS);
         let cancelled = false;
+        let receivedNativeState = false;
         let appListener: { remove: () => Promise<void> } | undefined;
+        if (Capacitor.isNativePlatform()) {
+            void App.getState().then(state => {
+                if (cancelled || receivedNativeState) return;
+                nativeActiveRef.current = state.isActive;
+                dailyBackupRef.current?.check();
+            }).catch(error => console.warn('[Sync] Native foreground state unavailable', error));
+        }
         void App.addListener('appStateChange', state => {
+            if (Capacitor.isNativePlatform()) {
+                receivedNativeState = true;
+                nativeActiveRef.current = state.isActive;
+                dailyBackupRef.current?.check();
+            }
             if (state.isActive && Capacitor.isNativePlatform()) resume();
             else if (!state.isActive && !latestRef.current.manualSyncMode && hasPendingLocalDataEdit()) {
                 schedulerRef.current?.request('auto', true);

@@ -1,5 +1,6 @@
 /**
  * @file SettingsContext.tsx
+ * @updated 2026-10-07: Persists device-local daily backup preferences for manual sync mode.
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
  * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
  * @updated 2026-04-25: Added configurable timeline quick-action preferences for the timeline header.
@@ -63,6 +64,7 @@ import {
     type CalendarNumberStyle
 } from '../services/calendarNumberStyleService';
 import { normalizeFiltersOrder } from '../utils/filterUtils';
+import { DAILY_BACKUP_ENABLED_KEY, DAILY_BACKUP_TIME_KEY, DAILY_BACKUP_STATE_PREFIX, normalizeDailyBackupTime } from '../utils/dailyBackupScheduler';
 import {
     getLocalDataTimestamp,
     isLocalDataTimestampUpdateLocked,
@@ -297,6 +299,10 @@ interface SettingsContextType {
     // 手动同步模式
     manualSyncMode: boolean;
     setManualSyncMode: React.Dispatch<React.SetStateAction<boolean>>;
+    dailyBackupEnabled: boolean;
+    setDailyBackupEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+    dailyBackupTime: string;
+    setDailyBackupTime: React.Dispatch<React.SetStateAction<string>>;
 
     // 场景卡片计时模式
     sceneCardTimerMode: SceneCardTimerMode;
@@ -472,6 +478,9 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         const stored = localStorage.getItem('lumostime_manual_sync_mode');
         return stored ? stored === 'true' : true; // 默认为 true（手动同步）
     });
+
+    const [dailyBackupEnabled, setDailyBackupEnabled] = useState(() => localStorage.getItem(DAILY_BACKUP_ENABLED_KEY) === 'true');
+    const [dailyBackupTime, setDailyBackupTime] = useState(() => normalizeDailyBackupTime(localStorage.getItem(DAILY_BACKUP_TIME_KEY)));
 
     // 场景卡片计时模式
     const [sceneCardTimerMode, setSceneCardTimerMode] = useState<SceneCardTimerMode>(() => {
@@ -1076,6 +1085,18 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     }, [manualSyncMode]);
 
     useEffect(() => {
+        localStorage.setItem(DAILY_BACKUP_ENABLED_KEY, String(dailyBackupEnabled));
+        if (!dailyBackupEnabled) {
+            Object.keys(localStorage).filter(key => key.startsWith(DAILY_BACKUP_STATE_PREFIX))
+                .forEach(key => localStorage.removeItem(key));
+        }
+    }, [dailyBackupEnabled]);
+
+    useEffect(() => {
+        localStorage.setItem(DAILY_BACKUP_TIME_KEY, normalizeDailyBackupTime(dailyBackupTime));
+    }, [dailyBackupTime]);
+
+    useEffect(() => {
         localStorage.setItem('lumostime_scene_card_timer_mode', sceneCardTimerMode);
     }, [sceneCardTimerMode]);
 
@@ -1194,6 +1215,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setIsSyncing,
             manualSyncMode,
             setManualSyncMode,
+            dailyBackupEnabled,
+            setDailyBackupEnabled,
+            dailyBackupTime,
+            setDailyBackupTime,
             sceneCardTimerMode,
             setSceneCardTimerMode
         }}>

@@ -1,5 +1,6 @@
 /**
  * @file syncRendererHarness.tsx
+ * @updated 2026-10-07: Exercises daily backup background deferral, latest data and restart recovery.
  * @updated 2026-10-07: Verifies node-category-only uploads and classification restore.
  * @updated 2026-10-06: Verifies node-only edits upload and restored aliases/descriptions survive.
  * @input Real React hook renders with isolated contexts and cloud adapter
@@ -11,8 +12,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { useSyncManager } from '../useSyncManager';
-import { backupRead, cloud, lifecycle, state, update } from './syncHarnessMocks';
+import { backupRead, Capacitor, cloud, lifecycle, state, update, webdavService } from './syncHarnessMocks';
 import { hasPendingLocalDataEdit } from '../../utils/localDataTimestamp';
+import { DAILY_BACKUP_STATE_PREFIX } from '../../utils/dailyBackupScheduler';
+import { getCloudDestinationIdentity } from '../../utils/syncUtils';
 
 declare global {
   interface Window { __syncTestResult?: { passed: string[]; error?: string }; }
@@ -23,7 +26,7 @@ const Probe = () => {
   manager = useSyncManager();
   return <div>{manager.isApplyingCloud ? 'applying' : 'ready'}</div>;
 };
-const root = createRoot(document.getElementById('root')!);
+let root = createRoot(document.getElementById('root')!);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const check = (condition: unknown, message: string) => { if (!condition) throw new Error(message); };
 const until = async (predicate: () => boolean, label: string) => {
@@ -142,6 +145,57 @@ async function run() {
   await manager.handleManualUpload();
   check(main().logs[0].note === 'manual edit', 'manual upload missed latest state');
   passed.push('manual and automatic transfers use the same coordinator');
+
+  const dailyKey = DAILY_BACKUP_STATE_PREFIX + encodeURIComponent(getCloudDestinationIdentity(webdavService as any));
+  const seedMissedBackup = () => localStorage.setItem(dailyKey, JSON.stringify({
+    time: '22:00', nextDueAt: Date.now() - 86_400_000, pendingSince: null
+  }));
+  const dailyState = () => JSON.parse(localStorage.getItem(dailyKey)!);
+  let visibility = 'hidden';
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+  seedMissedBackup();
+  const beforeDaily = uploads();
+  update('settings', { dailyBackupEnabled: true });
+  await delay(50);
+  edit('latest scheduled backup');
+  await delay(50);
+  check(uploads() === beforeDaily, 'background daily backup unexpectedly uploaded');
+  check(dailyState().pendingSince !== null, 'missed daily backup was not persisted');
+
+  Capacitor.native = true;
+  lifecycle.callback({ isActive: false });
+  visibility = 'visible';
+  document.dispatchEvent(new Event('visibilitychange'));
+  await delay(50);
+  check(uploads() === beforeDaily, 'visible native WebView backed up while the app was inactive');
+  lifecycle.callback({ isActive: true });
+  lifecycle.callback({ isActive: true });
+  window.dispatchEvent(new Event('online'));
+  await until(() => main().logs[0].note === 'latest scheduled backup' && !state.settings.isSyncing && dailyState().pendingSince === null, 'daily foreground catch-up');
+  check(uploads() === beforeDaily + 1, 'duplicate lifecycle events caused multiple daily backups');
+  check(dailyState().nextDueAt > Date.now(), 'successful backup did not schedule tomorrow');
+  check(cloud.uploads.some(name => name.startsWith('backups/cloud_backup_')), 'scheduled overwrite skipped cloud safety backup');
+  passed.push('manual daily backup persists missed work, respects native foreground and uploads latest data once');
+
+  update('settings', { dailyBackupEnabled: false });
+  await delay(20);
+  seedMissedBackup();
+  cloud.failReads = true;
+  edit('daily offline edit');
+  update('settings', { dailyBackupEnabled: true });
+  await until(() => dailyState().pendingSince !== null && cloud.reads > 0 && !state.settings.isSyncing, 'failed daily backup remains pending');
+  const beforeRestart = uploads();
+  await delay(50);
+  check(uploads() === beforeRestart, 'failed backup overwrote cloud data');
+  root.unmount();
+  cloud.failReads = false;
+  root = createRoot(document.getElementById('root')!);
+  root.render(<Probe />);
+  await until(() => main().logs[0].note === 'daily offline edit' && !state.settings.isSyncing && dailyState().pendingSince === null, 'restart daily catch-up');
+  passed.push('daily upload failure survives remount and retries before the next scheduled time');
+  update('settings', { dailyBackupEnabled: false });
+  await delay(20);
+  Capacitor.native = false;
 
   cloud.failReads = true;
   update('settings', { manualSyncMode: false });

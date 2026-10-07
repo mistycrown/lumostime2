@@ -1,5 +1,6 @@
 /**
  * @file PreferencesSettingsView.test.tsx
+ * @updated 2026-10-07: Verifies manual-only daily backup controls and selected time.
  * @description Verifies the selected timer auto-jump label shown in preferences.
  * @updated 2026-05-10: Added coverage for the new three-option post-start jump selector.
  * @updated 2026-08-06: Added coverage for the shared association-selector layout preference.
@@ -18,11 +19,31 @@ vi.mock('../../contexts/SettingsContext', () => ({
     timelineLayout: 'timeline',
     setTimelineLayout: vi.fn(),
     associationSelectorColumns: 3,
-    setAssociationSelectorColumns: vi.fn()
+    setAssociationSelectorColumns: vi.fn(),
+    dailyBackupEnabled: true,
+    setDailyBackupEnabled: vi.fn(),
+    dailyBackupTime: '21:30',
+    setDailyBackupTime: vi.fn()
   })
 }));
 
 import { PreferencesSettingsView } from './PreferencesSettingsView';
+
+describe('PreferencesSettingsView daily backup', () => {
+  test('shows the backup switch and selected time in manual mode', () => {
+    const html = renderToStaticMarkup(<PreferencesSettingsView onBack={() => {}} onToast={() => {}} manualSyncMode />);
+    expect(html).toContain('定时备份');
+    expect(html).toContain('每日备份时间');
+    expect(html).toContain('value="21:30"');
+    expect(html).toContain('aria-checked="true"');
+  });
+
+  test('hides daily backup controls in automatic mode', () => {
+    const html = renderToStaticMarkup(<PreferencesSettingsView onBack={() => {}} onToast={() => {}} manualSyncMode={false} />);
+    expect(html).not.toContain('定时备份');
+    expect(html).not.toContain('daily-backup-time');
+  });
+});
 
 describe('PreferencesSettingsView timer auto-jump selector', () => {
   test.each([
