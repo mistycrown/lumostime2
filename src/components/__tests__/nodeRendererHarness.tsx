@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-07: Exercises review-card period filtering, review-kind navigation and cross-kind backlink transforms.
  * @updated 2026-10-07: Exercises merge choices, dirty-editor retention, rapid rename, navigation and persisted complete backlink updates.
  * @updated 2026-10-07: Verifies full-width alias links render, navigate and retain delimiters on rename.
  * @updated 2026-10-07: Exercises searchable pickers and capsule mouse/touch drag ordering across reloads.

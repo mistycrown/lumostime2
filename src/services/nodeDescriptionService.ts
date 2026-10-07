@@ -1,5 +1,6 @@
 /**
  * @file nodeDescriptionService.ts
+ * @updated 2026-10-07: Includes daily, weekly and monthly review answers as typed evidence for node descriptions.
  * @updated 2026-10-07: Supports AI-selected node types and custom biography sections while preserving legacy fields.
  * @input Node metadata and all related logs with timestamps
  * @output Concise editable node description through the existing AI configuration
@@ -8,6 +9,14 @@
  */
 import type { Log, NoteNode } from '../types';
 import { aiService } from './aiService';
+
+export type NodeDescriptionReviewKind = 'daily' | 'weekly' | 'monthly';
+export interface NodeDescriptionReviewAnswer {
+  date: string;
+  kind: NodeDescriptionReviewKind;
+  question: string;
+  answer: string;
+}
 
 export interface NodeDescriptionAiResult {
   nodeType: string;
@@ -19,7 +28,7 @@ export interface NodeDescriptionAiResult {
 
 const emptyResult = (): NodeDescriptionAiResult => ({ nodeType: '', sections: [], basicInfo: { identity: '', relationship: '' }, bioAdditions: [], recentInteractions: [] });
 
-export const buildNodeDescriptionPrompt = (node: NoteNode, logs: Log[], reviewAnswers: Array<{ date: string; question: string; answer: string }> = []): string => JSON.stringify({
+export const buildNodeDescriptionPrompt = (node: NoteNode, logs: Log[], reviewAnswers: NodeDescriptionReviewAnswer[] = []): string => JSON.stringify({
   名称: node.name,
   别名: node.aliases,
   已有简介: node.description,
@@ -28,10 +37,10 @@ export const buildNodeDescriptionPrompt = (node: NoteNode, logs: Log[], reviewAn
     标题: log.title || '',
     备注: log.note || ''
   })),
-  日报回答: reviewAnswers.map((answer) => ({ 日期: answer.date, 问题: answer.question, 回答: answer.answer }))
+  关联回顾回答: reviewAnswers.map((answer) => ({ 类型: answer.kind, 日期或周期: answer.date, 问题: answer.question, 回答: answer.answer }))
 });
 
-const requestNodeDescription = async (node: NoteNode, logs: Log[], reviewAnswers: Array<{ date: string; question: string; answer: string }> = []): Promise<string> => {
+const requestNodeDescription = async (node: NoteNode, logs: Log[], reviewAnswers: NodeDescriptionReviewAnswer[] = []): Promise<string> => {
   const config = aiService.getConfig();
   if (!config.apiKey?.trim()) throw new Error('请先在 AI 设置中配置服务');
   if (!logs.length && !reviewAnswers.length) throw new Error('暂无关联记录');
@@ -120,7 +129,7 @@ export const formatNodeDescription = (existing: string, result: NodeDescriptionA
   ].filter((line, index, lines) => !(line === '' && lines[index - 1] === '')).join('\n').trim();
 };
 
-export const generateNodeDescriptionResult = async (node: NoteNode, logs: Log[], reviewAnswers: Array<{ date: string; question: string; answer: string }> = []): Promise<NodeDescriptionAiResult> => parseNodeDescriptionResult(await requestNodeDescription(node, logs, reviewAnswers));
+export const generateNodeDescriptionResult = async (node: NoteNode, logs: Log[], reviewAnswers: NodeDescriptionReviewAnswer[] = []): Promise<NodeDescriptionAiResult> => parseNodeDescriptionResult(await requestNodeDescription(node, logs, reviewAnswers));
 
 export const generateNodeDescription = async (node: NoteNode, logs: Log[]): Promise<string> => {
   const raw = await requestNodeDescription(node, logs);

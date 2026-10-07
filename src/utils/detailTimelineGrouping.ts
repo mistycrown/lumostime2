@@ -10,6 +10,14 @@ import { Log } from '../types';
 
 export type DetailTimelineViewMode = 'month' | 'all';
 
+export const doesReviewPeriodOverlapMonth = (startDate: string, endDate: string, year: number, month: number): boolean => {
+    const monthStart = new Date(year, month, 1).getTime();
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
+    const start = new Date(`${startDate}T12:00:00`).getTime();
+    const end = new Date(`${endDate}T12:00:00`).getTime();
+    return Number.isFinite(start) && Number.isFinite(end) && start <= monthEnd && end >= monthStart;
+};
+
 export interface DetailTimelineGroupedData {
     durationMap: Map<number, number>;
     logsMap: Map<number, Log[]>;

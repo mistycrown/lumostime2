@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-07: Covers daily, weekly and monthly review indexing plus cross-kind rename/merge transforms.
  * @updated 2026-10-07: Covers primary-node merge, complete backlink retargeting and rename across all records.
  * @updated 2026-10-07: Covers full-width links and quick insertion selections, caret positions and bracket completion.
  * @updated 2026-10-07: Covers capsule moves, ordering boundaries and metadata preservation.
@@ -9,8 +10,8 @@
  * @updated 2026-10-06: Covers parsing, duplicates, alias conversion, co-occurrence and rename conflicts.
  */
 import { describe, expect, it } from 'vitest';
-import type { Log, NoteNode, ReviewAnswer } from '../types';
-import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeInAnswers } from './nodeUtils';
+import type { Log, MonthlyReview, NoteNode, ReviewAnswer, WeeklyReview } from '../types';
+import { buildNodeIndex, buildNodeReviewAnswers, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeInAnswers } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
@@ -125,6 +126,33 @@ describe('node text relationships', () => {
     const index = buildNodeIndex([node('小林'), node('杭州')], [], [{ id: 'r', date: '2026-10-07', createdAt: 1, updatedAt: 2, answers }]);
     expect(index.get('小林')?.reviewAnswers).toHaveLength(1);
     expect(index.get('小林')?.related.get('杭州')).toBe(1);
+  });
+
+  it('indexes all review kinds and discovers names from weekly/monthly answers', () => {
+    const answers: ReviewAnswer[] = [{ questionId: 'q', question: '关联对象', answer: '和[[小林]]讨论[[杭州]]' }];
+    const weekly: WeeklyReview = { id: 'w', weekStartDate: '2026-09-28', weekEndDate: '2026-10-04', createdAt: 1, updatedAt: 2, answers };
+    const monthly: MonthlyReview = { id: 'm', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', createdAt: 1, updatedAt: 2, answers };
+    const reviewAnswers = buildNodeReviewAnswers([], [weekly], [monthly]);
+    expect(reviewAnswers.map((entry) => [entry.kind, entry.startDate, entry.endDate])).toEqual([
+      ['weekly', '2026-09-28', '2026-10-04'],
+      ['monthly', '2026-10-01', '2026-10-31']
+    ]);
+    const discovered = discoverNodes([], [], 42, [], [weekly], [monthly]);
+    expect(discovered.map((item) => item.name)).toEqual(['小林', '杭州']);
+    const xiaolin = discovered.find((item) => item.name === '小林')!;
+    expect(buildNodeIndex(discovered, [], [], [weekly], [monthly]).get(xiaolin.id)?.reviewAnswers.map((entry) => entry.kind)).toEqual(['monthly', 'weekly']);
+  });
+
+  it('renames and merges links in weekly and monthly answers', () => {
+    const answers: ReviewAnswer[] = [{ questionId: 'q', question: 'Q', answer: '[[小林]] 和 [[杭州]]' }];
+    const weekly: WeeklyReview = { id: 'w', weekStartDate: '2026-10-05', weekEndDate: '2026-10-11', createdAt: 1, updatedAt: 2, answers };
+    const monthly: MonthlyReview = { id: 'm', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', createdAt: 1, updatedAt: 2, answers };
+    const renamed = renameNode([node('小林'), node('杭州')], [], '小林', '林老师', 10, answers);
+    expect(renamed.answers[0].answer).toBe('[[林老师]] 和 [[杭州]]');
+    const merged = mergeNodes([node('小林'), node('杭州')], [], '小林', '杭州', 10, answers);
+    expect(merged.answers[0].answer).toBe('[[小林丨杭州]] 和 [[杭州]]');
+    expect(renameNodeInAnswers(weekly.answers, '小林', '林老师')[0].answer).toContain('林老师');
+    expect(renameNodeInAnswers(monthly.answers, '小林', '林老师')[0].answer).toContain('林老师');
   });
 
   it('renames node links in daily review answers without changing unrelated answers', () => {

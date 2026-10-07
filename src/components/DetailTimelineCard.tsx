@@ -43,16 +43,28 @@ import { filterCountableLogs } from '../utils/statLogUtils';
 import { isRoutineChecklistMarkdown } from '../utils/routineChecklist';
 import {
     buildDetailTimelineGroupedData,
+    doesReviewPeriodOverlapMonth,
     DetailTimelineViewMode,
 } from '../utils/detailTimelineGrouping';
 import { getDefaultKeywordColor, getDetailTimelineKeywords, getDetailTimelineKeywordRecords, getLogMatchedDetailTimelineKeywords } from '../utils/detailTimelineKeywordUtils';
 import { getKeywordStickerMap, getTagStickerSets } from '../utils/tagStickerUtils';
+import type { NodeReviewKind } from '../utils/nodeUtils';
 type ScoreBarColor = {
     bg: string;
     bgStyle?: React.CSSProperties;
     text: string;
     useInlineStyle: boolean;
 };
+
+export interface DetailReviewEntry {
+    id: string;
+    kind: NodeReviewKind;
+    startDate: string;
+    endDate: string;
+    question: string;
+    answer: string;
+    onOpen?: () => void;
+}
 
 const CALENDAR_WEEK_DAYS_MONDAY_FIRST = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_SUNDAY_FIRST = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -65,6 +77,14 @@ const handleKeyboardActivation = (
     event.preventDefault();
     event.stopPropagation();
     action();
+};
+
+const REVIEW_KIND_LABEL: Record<NodeReviewKind, string> = { daily: '日报', weekly: '周报', monthly: '月报' };
+
+const formatReviewPeriod = (entry: Pick<DetailReviewEntry, 'kind' | 'startDate' | 'endDate'>): string => {
+    if (entry.kind === 'daily') return entry.startDate;
+    if (entry.kind === 'monthly') return entry.startDate.slice(0, 7);
+    return `${entry.startDate} ~ ${entry.endDate}`;
 };
 
 const formatDayTotalDuration = (totalSeconds: number): string => {
@@ -149,13 +169,7 @@ interface DetailTimelineCardProps {
 
     // 回调
     onEditLog?: (log: Log) => void;
-    reviewEntries?: Array<{
-        id: string;
-        date: string;
-        question: string;
-        answer: string;
-        onOpen?: () => void;
-    }>;
+    reviewEntries?: DetailReviewEntry[];
 
     // 可选的类别信息（用于显示activity名称）
     categories?: Category[];
@@ -366,8 +380,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const countableLogsToDisplay = viewMode === 'month' ? countableMonthLogs : countableLogs;
     const reviewsToDisplay = useMemo(() => reviewEntries.filter((entry) => {
         if (viewMode === 'all') return true;
-        const date = new Date(`${entry.date}T12:00:00`);
-        return date.getMonth() === displayMonth && date.getFullYear() === displayYear;
+        return doesReviewPeriodOverlapMonth(entry.startDate, entry.endDate, displayYear, displayMonth);
     }), [displayMonth, displayYear, reviewEntries, viewMode]);
 
     const styledLogIndexMap = useMemo(() => {
@@ -1197,17 +1210,17 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
             )}
 
             {reviewsToDisplay.length > 0 && (
-                <section aria-label="关联日报" className="mb-8 space-y-3">
+                <section aria-label="关联回顾" className="mb-8 space-y-3">
                     <div className="flex items-center gap-2">
                         <Clock size={14} className="text-stone-400" />
-                        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400">关联日报</h2>
+                        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400">关联回顾</h2>
                         <span className="font-mono text-[10px] text-stone-300">{reviewsToDisplay.length}</span>
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                         {reviewsToDisplay.map((entry) => {
-                            const entryDate = new Date(`${entry.date}T12:00:00`);
+                            const entryDate = new Date(`${entry.startDate}T12:00:00`);
                             const dateLabel = Number.isNaN(entryDate.getTime())
-                                ? entry.date
+                                ? entry.startDate
                                 : entryDate.toLocaleDateString('zh-CN');
                             const openReview = entry.onOpen || (() => undefined);
 
@@ -1216,14 +1229,14 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     key={entry.id}
                                     tabIndex={0}
                                     role="button"
-                                    aria-label={`打开日报：${dateLabel}`}
+                                    aria-label={`打开${REVIEW_KIND_LABEL[entry.kind]}：${formatReviewPeriod(entry)}`}
                                     onClick={openReview}
                                     onKeyDown={(event) => handleKeyboardActivation(event, openReview)}
                                     className="group rounded-xl border border-stone-200/80 bg-white/70 p-4 text-left shadow-sm transition-colors hover:border-stone-300 hover:bg-stone-50/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-400"
                                 >
                                     <div className="mb-2 flex items-center justify-between gap-3">
-                                        <span className="font-mono text-xs text-stone-400">{dateLabel}</span>
-                                        <span className="text-[10px] uppercase tracking-wider text-stone-400">每日回顾</span>
+                                        <span className="font-mono text-xs text-stone-400">{entry.kind === 'daily' ? dateLabel : formatReviewPeriod(entry)}</span>
+                                        <span className="text-[10px] uppercase tracking-wider text-stone-400">{REVIEW_KIND_LABEL[entry.kind]}</span>
                                     </div>
                                     <h3 className="mb-1 text-sm font-semibold leading-6 text-stone-900">{entry.question}</h3>
                                     <p className="whitespace-pre-wrap break-words text-sm font-light leading-7 text-stone-600">

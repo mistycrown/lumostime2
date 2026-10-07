@@ -2,7 +2,7 @@
 
 Update 2026-10-07: `exportSerialization.ts` keeps custom activity attribute values readable in exports while preserving their original ID-based JSON representation.
 
-Update 2026-10-07: Detail timeline grouping remains scoped to Log records; linked daily-review answers are rendered as an independent section by `DetailTimelineCard`.
+Update 2026-10-07: Node indexing and mutations cover daily, weekly and monthly review answers; detail timeline grouping remains scoped to Log records while typed review entries are filtered independently by overlapping month periods.
 
 Update 2026-10-07: Node indexing includes deduplicated daily-review answers; answer links support canonical rename/merge transforms. Node description formatting keeps existing prose and emits structured basic-info and dated interaction sections.
 
