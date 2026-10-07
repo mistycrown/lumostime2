@@ -1,5 +1,6 @@
 /**
  * @file DataContext.tsx
+ * @updated 2026-10-07: Hydrates and atomically persists node category metadata.
  * @updated 2026-10-06: Discovers wiki-link nodes after log changes and persists metadata with core data.
  * @updated 2026-10-03: Initializes missing logs once but does not rewrite persisted hydration snapshots, preventing stale-window calendar deletions.
  * @description Manages core application data state (logs, todos, todoCategories, and data collections) with async repository hydration and persistence.
@@ -14,7 +15,7 @@ import {
   publishDesktopTodoSyncEvent,
   subscribeDesktopTodoSyncEvent
 } from '../services/desktopWidgetService';
-import { DataCollection, DataCollectionEntry, Log, NoteNode, TodoCategory, TodoItem } from '../types';
+import { DataCollection, DataCollectionEntry, Log, NoteNode, NodeCategory, TodoCategory, TodoItem } from '../types';
 import { discoverNodes } from '../utils/nodeUtils';
 import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
 import { normalizeTodoRecurringPlanConfig } from '../utils/todoRecurringPlanUtils';
@@ -35,6 +36,8 @@ interface DataContextType {
   setLogs: React.Dispatch<React.SetStateAction<Log[]>>;
   nodes: NoteNode[];
   setNodes: React.Dispatch<React.SetStateAction<NoteNode[]>>;
+  nodeCategories: NodeCategory[];
+  setNodeCategories: React.Dispatch<React.SetStateAction<NodeCategory[]>>;
 
   todos: TodoItem[];
   setTodos: React.Dispatch<React.SetStateAction<TodoItem[]>>;
@@ -68,6 +71,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [usesFallbackSeedData, setUsesFallbackSeedData] = useState(true);
   const [logs, setLogs] = useState<Log[]>(INITIAL_LOGS);
   const [storedNodes, setNodes] = useState<NoteNode[]>([]);
+  const [nodeCategories, setNodeCategories] = useState<NodeCategory[]>([]);
   const nodes = useMemo(() => isReady ? discoverNodes(storedNodes, logs) : storedNodes, [isReady, storedNodes, logs]);
   const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
   const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
@@ -80,6 +84,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const latestTodosRef = useRef<TodoItem[]>(INITIAL_TODOS);
   const persistedLogsRef = useRef<Log[] | null>(null);
   const persistedNodesRef = useRef<NoteNode[] | null>(null);
+  const persistedNodeCategoriesRef = useRef<NodeCategory[] | null>(null);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
@@ -122,8 +127,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
         persistedLogsRef.current = snapshot.hasStoredLogs ? snapshot.logs : null;
         persistedNodesRef.current = snapshot.nodes ?? [];
+        persistedNodeCategoriesRef.current = snapshot.nodeCategories ?? [];
         setLogs(snapshot.logs);
         setNodes(snapshot.nodes ?? []);
+        setNodeCategories(snapshot.nodeCategories ?? []);
         setTodos(normalizedTodos);
         setTodoCategories(snapshot.todoCategories);
         setCollections(snapshot.collections);
@@ -167,17 +174,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    if (logs === persistedLogsRef.current && nodes === persistedNodesRef.current) return;
+    if (logs === persistedLogsRef.current && nodes === persistedNodesRef.current && nodeCategories === persistedNodeCategoriesRef.current) return;
     const logsChanged = logs !== persistedLogsRef.current;
     persistedLogsRef.current = logs;
     persistedNodesRef.current = nodes;
+    persistedNodeCategoriesRef.current = nodeCategories;
     // Serialize snapshots so a metadata-only write cannot overtake a log rename transaction.
     persistenceQueueRef.current = persistenceQueueRef.current
-      .then(() => logsChanged ? dataRepository.saveLogs(logs, nodes) : dataRepository.saveNodes(nodes))
+      .then(() => logsChanged ? dataRepository.saveLogs(logs, nodes, nodeCategories) : dataRepository.saveNodes(nodes, nodeCategories))
       .catch((error) => {
         reportCriticalDataError(error, '保存记录或节点失败，请重试。', { dataArea: 'logs-nodes' });
       });
-  }, [canPersist, isReady, logs, nodes]);
+  }, [canPersist, isReady, logs, nodes, nodeCategories]);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
@@ -275,7 +283,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     console.log(
       `[DataContext] Data changed, updated local timestamp: ${previous} -> ${now} (${new Date(now).toLocaleTimeString()})`
     );
-  }, [canPersist, isReady, logs, nodes, todos, todoCategories, collections, collectionEntries]);
+  }, [canPersist, isReady, logs, nodes, nodeCategories, todos, todoCategories, collections, collectionEntries]);
 
   return (
     <DataContext.Provider
@@ -286,6 +294,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLogs,
         nodes,
         setNodes,
+        nodeCategories,
+        setNodeCategories,
         todos,
         setTodos,
         todoCategories,

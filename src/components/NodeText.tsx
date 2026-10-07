@@ -1,5 +1,6 @@
 /**
  * @file NodeText.tsx
+ * @updated 2026-10-07: Displays alias labels while navigating/highlighting the canonical node.
  * @input Plain note text containing wiki links and optional highlighted node name
  * @output Inline accessible node links that do not trigger parent log clicks
  * @pos Component (Nodes)
@@ -21,7 +22,7 @@ export const NodeText: React.FC<{ text: string; highlightName?: string }> = ({ t
       aria-label={`查看节点：${link.name}`}
       className={`inline break-words text-left underline decoration-stone-300 underline-offset-4 hover:decoration-stone-600 focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 ${highlightName === link.name ? 'font-semibold text-stone-900' : 'text-stone-700'}`}
       onClick={(event) => { event.stopPropagation(); context.openNode(link.name); }}
-    >{link.name}</button> : <span key={link.start}>{text.slice(link.start, link.end)}</span>);
+    >{link.label || link.name}</button> : <span key={link.start}>{link.label || link.name}</span>);
     offset = link.end;
   }
   parts.push(text.slice(offset));

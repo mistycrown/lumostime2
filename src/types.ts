@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-07: Adds optional node classification and persisted node categories.
  * @updated 2026-10-06: Adds lightweight NoteNode metadata for text-derived wiki links.
  * @updated 2026-10-06: Adds record-duration statistic sources and persisted filter/scope cards.
  * @updated 2026-09-21: Adds category statistic duration and second-level activity sources.
@@ -332,6 +333,14 @@ export interface NoteNode {
   name: string;
   aliases: string[];
   description: string;
+  categoryId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface NodeCategory {
+  id: string;
+  name: string;
   createdAt: number;
   updatedAt: number;
 }

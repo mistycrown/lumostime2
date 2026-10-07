@@ -1,12 +1,13 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-07: Covers alias-first syntax, alias preservation and classification fallback.
  * @input Wiki-link notes, node metadata and logs
  * @output Regression checks for text-derived node relationships
  * @updated 2026-10-06: Covers parsing, duplicates, alias conversion, co-occurrence and rename conflicts.
  */
 import { describe, expect, it } from 'vitest';
 import type { Log, NoteNode } from '../types';
-import { buildNodeIndex, discoverNodes, getNodeCandidates, getNodeNames, linkNodeInText, parseNodeLinks, renameNode } from './nodeUtils';
+import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, linkNodeInText, parseNodeLinks, renameNode } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
@@ -42,8 +43,8 @@ describe('node text relationships', () => {
   });
 
   it('converts longest aliases without nesting links, including regex punctuation', () => {
-    expect(linkNodeInText('北大同学、北大 [[北大项目]] [[北京大学]]', node('北京大学', ['北大', '北大同学']))).toBe('[[北京大学]]、[[北京大学]] [[北大项目]] [[北京大学]]');
-    expect(linkNodeInText('C++ 和 C++', node('编程', ['C++']))).toBe('[[编程]] 和 [[编程]]');
+    expect(linkNodeInText('北大同学、北大 [[北大项目]] [[北京大学]]', node('北京大学', ['北大', '北大同学']))).toBe('[[北大同学丨北京大学]]、[[北大丨北京大学]] [[北大项目]] [[北京大学]]');
+    expect(linkNodeInText('C++ 和 C++', node('编程', ['C++']))).toBe('[[C++丨编程]] 和 [[C++丨编程]]');
     expect(linkNodeInText('小林 [[朋友|小林]]', node('小林'))).toBe('[[小林]] [[朋友|小林]]');
   });
 
@@ -58,5 +59,41 @@ describe('node text relationships', () => {
     expect(() => renameNode(nodes, [], '小林', '杭州')).toThrow('已存在同名节点');
     expect(() => renameNode(nodes, [], '小林', '[[新名字]]')).toThrow('有效名称');
     expect(nodes[0].name).toBe('小林');
+  });
+
+  it('resolves alias-first links to the canonical node and rejects incomplete aliases', () => {
+    expect(parseNodeLinks('[[ 林林 丨 小林 ]]')[0]).toMatchObject({ name: '小林', label: '林林' });
+    expect(getNodeNames('[[林林丨小林]] [[小林]] [[小林同学丨小林]]')).toEqual(['小林']);
+    expect(getNodeNames('[[丨小林]] [[林林丨]] [[a丨b丨c]]')).toEqual([]);
+    expect(discoverNodes([], [log('a', '[[林林丨小林]]')]).map((item) => item.name)).toEqual(['小林']);
+    expect(buildNodeIndex([node('小林')], [log('a', '[[林林丨小林]] [[小林]]')]).get('小林')?.logs).toHaveLength(1);
+  });
+
+  it('renames alias targets without changing display labels or category assignments', () => {
+    const source = { ...node('小林', ['林林']), categoryId: 'people' };
+    const result = renameNode([source], [log('a', '[[林林丨小林]] [[小林]] [[小林丨另一人]]')], '小林', '林老师');
+    expect(result.logs[0].note).toBe('[[林林丨林老师]] [[林老师]] [[小林丨另一人]]');
+    expect(result.nodes[0].categoryId).toBe('people');
+  });
+
+  it('repairs old alias-token node names without losing existing metadata', () => {
+    const existing = [node('小林'), { ...node('林林丨小林'), description: '旧别名简介', categoryId: 'people' }];
+    const result = discoverNodes(existing, [log('a', '[[林林丨小林]]')]);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ id: '小林', name: '小林', aliases: ['林林'], categoryId: 'people' });
+    expect(result[0].description).toContain('已有简介');
+    expect(result[0].description).toContain('旧别名简介');
+    expect(discoverNodes(result, [])).toBe(result);
+  });
+
+  it('creates unique categories and treats missing/obsolete assignments as uncategorized', () => {
+    const category = createNodeCategory([], ' 人物 ', 2);
+    expect(category).toMatchObject({ name: '人物', createdAt: 2, updatedAt: 2 });
+    expect(() => createNodeCategory([category], '人物')).toThrow('同名');
+    expect(() => createNodeCategory([], '未分类')).toThrow('其他');
+    expect(() => createNodeCategory([], '   ')).toThrow('有效');
+    expect(getNodeCategoryId(node('小林'), [category])).toBe('');
+    expect(getNodeCategoryId({ ...node('小林'), categoryId: 'deleted' }, [category])).toBe('');
+    expect(getNodeCategoryId({ ...node('小林'), categoryId: category.id }, [category])).toBe(category.id);
   });
 });

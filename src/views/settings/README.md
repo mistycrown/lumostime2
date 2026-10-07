@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-07: The node settings entry uses a distinct Network icon. The compact node directory groups by category, supports category filtering/creation, and places unassigned nodes in 未分类. Empty categories remain selectable without adding empty groups to the all-category list.
+
 Update 2026-10-06: Settings → 内容 → 节点 opens `NodesSettingsView.tsx`, a compact two-line directory searchable by name/alias and sortable by recency, backlink count or name. Selection opens the global node-detail overlay.
 
 2026-10-06：`FiltersSettingsView.tsx` 保存筛选器统计卡片和配色；编辑名称、表达式时保留既有配置与图标。

@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-07: Node links support `[[alias丨canonical name]]`. Parsing/indexing use the canonical name; conversion and rename preserve the alias label. Old metadata that treated an alias token as a whole name is normalized without discarding biographies. Category helpers validate creation and route missing/stale assignments to 未分类; backup validation accepts optional categories and legacy alias-token metadata.
+
 Update 2026-10-06: `nodeUtils.ts` parses wiki links, discovers metadata, indexes backlinks/co-occurrence, matches ordinary-text names/aliases and updates explicit links on rename. `dataValidation.ts` accepts older backups without nodes and rejects invalid/duplicate metadata.
 
 > Update 2026-10-06: `aiLogAttributeUtils.ts` normalizes unknown AI attribute payloads and validates ownership, types, active options, and one-level display conditions. `aiBackfillUtils.ts` clones attribute arrays, includes their content in deduplication, and stores whole-event numeric measurements only on the first segment of a cross-midnight split to conserve numeric totals.

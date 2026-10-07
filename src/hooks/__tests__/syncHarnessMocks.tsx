@@ -1,5 +1,6 @@
 /**
  * @file syncHarnessMocks.tsx
+ * @updated 2026-10-07: Models node category datasets alongside node assignments.
  * @updated 2026-10-06: Includes node metadata in the observable core data adapter.
  * @input Renderer integration scenarios and in-memory cloud objects
  * @output Observable React contexts and isolated cloud/service adapters
@@ -23,7 +24,7 @@ const area = (name: string, initial: Record<string, any>) => {
   state[name] = { ...initial, ...setters };
   return () => useSyncExternalStore(subscribe, () => state[name]);
 };
-export const useData = area('data', { logs: [], nodes: [], todos: [], todoCategories: [{ id: 'todo-category', name: 'Test' }], collections: [], collectionEntries: [] });
+export const useData = area('data', { logs: [], nodes: [], nodeCategories: [], todos: [], todoCategories: [{ id: 'todo-category', name: 'Test' }], collections: [], collectionEntries: [] });
 export const useCategoryScope = area('category', { categories: [{ id: 'category', name: 'Test', activities: [] }], scopes: [], goals: [], majorGoals: [] });
 export const useReview = area('review', {
   reviewTemplates: [], checkTemplates: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [], onThisDayEntries: []

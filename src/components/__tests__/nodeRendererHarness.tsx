@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-07: Verifies classifications and alias-label navigation/conversion across reloads.
  * @input Actual DataProvider, NodeProvider and node UI in an isolated Electron renderer
  * @output Interaction, persistence and mobile-layout regressions with capture checkpoints
  * @pos Test (Nodes Renderer)
@@ -50,6 +51,13 @@ const input = async (label: string, value: string) => {
   element!.dispatchEvent(new Event('input', { bubbles: true }));
   await delay();
 };
+const select = async (label: string, value: string) => {
+  const element = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
+  check(element, `Missing select: ${label}`);
+  element!.value = value;
+  element!.dispatchEvent(new Event('change', { bubbles: true }));
+  await delay();
+};
 const capture = async (name: string) => { window.__nodeRendererCapture = name; await until(() => !window.__nodeRendererCapture, `capture ${name}`); };
 const assertFits = () => check(document.documentElement.scrollWidth <= window.innerWidth, 'Horizontal overflow');
 
@@ -72,7 +80,7 @@ const render = () => root.render(<ToastProvider><DataProvider><PrivacyProvider><
 const fixture = (id: string, note: string, day: number): Log => ({ id, note, startTime: new Date(2026, 9, day, 12).getTime(), endTime: new Date(2026, 9, day, 13).getTime(), duration: 3600, categoryId: 'c', activityId: 'a' });
 
 async function run() {
-  await dataRepository.saveLogs([fixture('first', '和 [[小林]] 在 [[杭州]] 讨论了 [[LumosTime]]。[[小林]] 记录节点功能的设计。', 6), fixture('second', '和 [[小林]] 在 [[杭州]] 散步。', 5), fixture('candidate', '今天林林推荐了一本书。', 4)]);
+  await dataRepository.saveLogs([fixture('first', '和 [[小林]] 在 [[杭州]] 讨论了 [[LumosTime]]。[[小林]] 记录节点功能的设计。', 6), fixture('second', '和 [[林林丨小林]] 在 [[杭州]] 散步。', 5), fixture('candidate', '今天林林推荐了一本书。', 4)]);
   await dataRepository.saveNodes([{ id: 'person', name: '小林', aliases: ['林林'], description: '', createdAt: 1, updatedAt: 1 }]);
   render();
   await until(() => data?.isReady && nodes.nodes.length === 3, 'hydration and discovery');
@@ -80,6 +88,13 @@ async function run() {
   passed.push('auto-discovery and distinct backlinks');
   check(document.querySelector('main h2')!.closest('button')!.getBoundingClientRect().height <= 64, 'Node directory row is too tall');
   assertFits(); await capture('nodes-directory-mobile');
+  check(document.querySelector('main h3')?.textContent?.includes('未分类'), 'Legacy nodes are not in uncategorized');
+  await click('新建分类'); await input('新分类名称', '人物'); await labelledClick('保存分类');
+  check(nodes.nodeCategories.some((category) => category.name === '人物'), 'Empty category not created');
+  const peopleCategory = nodes.nodeCategories.find((category) => category.name === '人物')!;
+  await select('筛选节点分类', peopleCategory.id);
+  check(document.querySelectorAll('main h2').length === 0, 'Category filter included uncategorized nodes');
+  await select('筛选节点分类', 'all');
   await input('搜索节点', '林林');
   check(document.querySelectorAll('main h2').length === 1, 'Alias search failed');
   await input('搜索节点', '');
@@ -89,8 +104,20 @@ async function run() {
   check(document.querySelector('[role="dialog"] > header h1')?.textContent === '节点详情', 'Missing matching detail title bar');
   await until(() => document.body.textContent?.includes('记录节点功能的设计'), 'all-history timeline');
   check(document.querySelector('[aria-label="查看节点：杭州"]'), 'Timeline wiki-link is not clickable');
+  check([...document.querySelectorAll('[aria-label="查看节点：小林"]')].some((element) => element.textContent === '林林'), 'Alias label was replaced by node name');
   assertFits(); await capture('node-timeline-mobile');
   await click('细节');
+  await select('节点分类', peopleCategory.id);
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Category assignment failed');
+  // Creating a category and assigning it must work within the same React event.
+  const createInDetail = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((element) => element.textContent?.trim() === '新建分类')!;
+  createInDetail.click(); await delay();
+  await input('新分类名称', '朋友'); await labelledClick('保存分类');
+  const friendCategory = nodes.nodeCategories.find((category) => category.name === '朋友')!;
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === friendCategory.id, 'New detail category not assigned immediately');
+  await select('节点分类', '');
+  check(!nodes.nodes.find((node) => node.id === 'person')?.categoryId, 'Clearing classification failed');
+  await select('节点分类', peopleCategory.id);
   await input('节点简介', '和小林共同记录的日常与项目讨论。');
   await input('新别名', '小林同学'); await labelledClick('添加别名');
   await labelledClick('编辑别名：小林同学'); await input('新别名', '林同学'); await labelledClick('保存别名');
@@ -105,11 +132,15 @@ async function run() {
   assertFits(); await capture('node-related-mobile');
   const associate = [...document.querySelectorAll<HTMLButtonElement>('article button')].find((element) => element.textContent === '关联');
   check(associate, 'Missing candidate association'); associate!.click(); await delay();
-  check(data.logs.find((log) => log.id === 'candidate')?.note === '今天[[小林]]推荐了一本书。', 'Alias conversion failed');
+  check(data.logs.find((log) => log.id === 'candidate')?.note === '今天[[林林丨小林]]推荐了一本书。', 'Alias conversion failed');
   check(nodes.index.get('person')?.logs.length === 3, 'Associated log did not join backlinks');
   check(!document.querySelector('article'), 'Candidate did not disappear');
   await labelledClick('查看相关节点：杭州');
   await until(() => document.querySelector('[data-node-name]')?.textContent === '杭州', 'related-node navigation');
+  const aliasLink = [...document.querySelectorAll<HTMLButtonElement>('[aria-label="查看节点：小林"]')].find((element) => element.textContent === '林林');
+  check(aliasLink, 'Related timeline lost alias display'); aliasLink!.click(); await delay();
+  check(document.querySelector('[data-node-name]')?.textContent === '小林', 'Alias did not navigate to canonical node');
+  check(runRegisteredHardwareBackHandler(), 'Alias detail did not unwind'); await delay();
   check(runRegisteredHardwareBackHandler(), 'Hardware back did not handle node history'); await delay();
   check(document.querySelector('[data-node-name]')?.textContent === '小林', 'Back did not restore prior node');
   await click('细节');
@@ -132,7 +163,7 @@ async function run() {
   check(document.querySelector('[aria-label="在备注中关联节点：小林"]'), 'Alias draft suggestion missing');
   check(document.querySelector('[aria-label="在备注中关联节点：杭州"]'), 'Name draft suggestion missing');
   await labelledClick('在备注中关联节点：小林');
-  check((document.querySelector('[aria-label="测试备注草稿"]') as HTMLTextAreaElement).value === '今天和[[小林]]去了杭州。', 'Draft suggestion did not convert alias');
+  check((document.querySelector('[aria-label="测试备注草稿"]') as HTMLTextAreaElement).value === '今天和[[林林丨小林]]去了杭州。', 'Draft suggestion did not preserve alias');
   check(!document.querySelector('[aria-label="在备注中关联节点：小林"]'), 'Already-linked draft node is still suggested');
   await labelledClick('在备注中关联节点：杭州');
   check(JSON.stringify(data.logs) === unchangedLogs, 'Unsaved draft suggestion persisted a log');
@@ -145,6 +176,7 @@ async function run() {
   check(nodes.nodes.find((node) => node.id === 'person')?.aliases.includes('小林'), 'Old name not preserved as alias');
   check(data.logs.every((log) => !log.note?.includes('[[小林]]')), 'Rename left old links');
   check(nodes.nodes.filter((node) => node.name === '小林').length === 0, 'Rename resurrected old node');
+  check(data.logs.find((log) => log.id === 'second')?.note?.includes('[[林林丨林老师]]'), 'Rename changed alias display label');
   manager.handleSaveLog(fixture('new', '和 [[林老师]] 去了 [[北京]]。', 3)); await delay();
   check(nodes.nodes.some((node) => node.name === '北京'), 'Saved log did not auto-create node');
   passed.push('original editor navigation, live draft suggestions, conflict protection and saved-log creation');
@@ -160,6 +192,9 @@ async function run() {
   await until(() => data !== previousData && data.isReady && nodes.nodes.some((node) => node.name === '林老师'), 'reload');
   check(nodes.index.get('person')?.logs.length === 4, 'Reload lost backlinks');
   check(nodes.nodes.find((node) => node.id === 'person')?.description === '生成期间手写的简介。', 'Reload lost biography');
+  check(nodes.nodeCategories.some((category) => category.id === peopleCategory.id), 'Reload lost categories');
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Reload lost classification');
+  await capture('nodes-classified-directory-mobile');
   passed.push('persisted rename, aliases, biography and remount hydration');
   nodes.openNode('林老师'); await until(() => button('细节'), 'restored detail'); await click('细节');
   await capture('node-details-desktop');

@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-07: Adds category creation/assignment and preserves alias display links during text conversion.
  * @input DataContext logs and NoteNode metadata
  * @output Node index, metadata editing, text conversion and detail navigation history
  * @pos Context (Nodes)
@@ -8,11 +9,14 @@
  */
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useData } from './DataContext';
-import type { NoteNode } from '../types';
-import { buildNodeIndex, linkNodeInText, renameNode, renameNodeInText } from '../utils/nodeUtils';
+import type { NoteNode, NodeCategory } from '../types';
+import { buildNodeIndex, createNodeCategory, linkNodeInText, renameNode, renameNodeInText } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
+  nodeCategories: NodeCategory[];
+  addCategory: (name: string, nodeId?: string) => NodeCategory;
+  assignCategory: (nodeId: string, categoryId: string) => void;
   index: ReturnType<typeof buildNodeIndex>;
   selectedNodeId: string | null;
   openNode: (name: string) => void;
@@ -32,7 +36,7 @@ export const useNodes = () => {
 };
 
 export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { nodes, setNodes, logs, setLogs } = useData();
+  const { nodes, setNodes, nodeCategories, setNodeCategories, logs, setLogs } = useData();
   const [history, setHistory] = useState<string[]>([]);
   const index = useMemo(() => buildNodeIndex(nodes, logs), [nodes, logs]);
   const openNode = useCallback((name: string) => {
@@ -41,6 +45,16 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [nodes]);
   const goBack = useCallback(() => setHistory((previous) => previous.slice(0, -1)), []);
   const closeNode = useCallback(() => setHistory([]), []);
+  const addCategory = (name: string, nodeId?: string) => {
+    const category = createNodeCategory(nodeCategories, name);
+    setNodeCategories((previous) => [...previous, category]);
+    if (nodeId) setNodes((previous) => previous.map((node) => node.id === nodeId ? { ...node, categoryId: category.id, updatedAt: Date.now() } : node));
+    return category;
+  };
+  const assignCategory = (nodeId: string, categoryId: string) => {
+    if (categoryId && !nodeCategories.some((category) => category.id === categoryId)) throw new Error('分类不存在');
+    setNodes((previous) => previous.map((node) => node.id === nodeId ? { ...node, categoryId: categoryId || undefined, updatedAt: Date.now() } : node));
+  };
   const updateNode = (id: string, patch: Pick<NoteNode, 'aliases' | 'description'>) => {
     setNodes((previous) => previous.map((node) => node.id === id ? {
       ...node, ...patch, aliases: [...new Set(patch.aliases.map((alias) => alias.trim()).filter((alias) => alias && alias !== node.name))], updatedAt: Date.now()
@@ -61,5 +75,5 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!node) return;
     setLogs((previous) => previous.map((log) => log.id === logId ? { ...log, note: linkNodeInText(log.note || '', node) } : log));
   };
-  return <NodeContext.Provider value={{ nodes, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, associate }}>{children}</NodeContext.Provider>;
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, associate }}>{children}</NodeContext.Provider>;
 };
