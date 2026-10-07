@@ -6,6 +6,7 @@
  * @description Centralizes todo duplicate shaping so copy flows can be tested without booting React hook context dependencies.
  * @updated 2026-07-30: Normalizes recurring auto-Plan settings with the rest of todo planning fields.
  * @updated 2026-06-06: Added duplicate helpers that clear copied cover images by default while preserving existing date/tag/scope cleanup rules.
+ * @updated 2026-10-07: Clears copied todo notes by default so duplicates start without the source remark.
  */
 
 import { TodoDuplicateOptions, TodoItem } from '../types';
@@ -54,6 +55,7 @@ export const buildDuplicatedTodo = (
     completedAt: undefined,
     completedUnits: 0,
     coverImage: undefined,
+    note: undefined,
     parentTodoId: todo.parentTodoId,
     childOrder: todo.parentTodoId ? options?.childOrder : undefined,
     scheduledDate: clearDates ? undefined : todo.scheduledDate,

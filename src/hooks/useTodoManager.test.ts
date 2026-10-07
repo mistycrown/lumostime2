@@ -5,6 +5,7 @@
  * @pos Test
  * @description Verifies copied todos reset transient fields like cover images while preserving the existing duplicate cleanup toggles.
  * @updated 2026-06-06: Added regression coverage so duplicated todos no longer inherit the original cover image.
+ * @updated 2026-10-07: Added regression coverage so duplicated todos no longer inherit the source note.
  */
 
 import { describe, expect, test } from 'vitest';
@@ -21,10 +22,11 @@ describe('buildDuplicatedTodo', () => {
       completedAt: '2026-06-05T12:00:00.000Z',
       completedUnits: 3,
       coverImage: 'cover-image.webp',
+      note: 'Original note',
       pin: true,
       scheduledDate: '2026-06-08',
       deadlineDate: '2026-06-09',
-      maybeDates: ['2026-06-10'],
+      maybeDates: ['2099-06-10'],
       linkedActivityId: 'activity-1',
       linkedCategoryId: 'category-1',
       defaultScopeIds: ['scope-1']
@@ -43,10 +45,11 @@ describe('buildDuplicatedTodo', () => {
       completedAt: undefined,
       completedUnits: 0,
       coverImage: undefined,
+      note: undefined,
       pin: false,
       scheduledDate: '2026-06-08',
       deadlineDate: '2026-06-09',
-      maybeDates: ['2026-06-10'],
+      maybeDates: ['2099-06-10'],
       linkedActivityId: 'activity-1',
       linkedCategoryId: 'category-1',
       defaultScopeIds: ['scope-1']
