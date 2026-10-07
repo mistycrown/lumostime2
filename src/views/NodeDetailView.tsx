@@ -1,6 +1,6 @@
 /**
  * @file NodeDetailView.tsx
- * @updated 2026-10-07: Renders linked daily answers in node timelines, defaults biography to Markdown reading mode, and supports custom AI sections.
+ * @updated 2026-10-07: Keeps linked daily answers only in the timeline's independent review-card section, while the related tab focuses on node relationships and candidates.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
  * @updated 2026-10-07: Reuses the print-style searchable category picker.
  * @updated 2026-10-07: Adds category selection/creation and validates syntax-safe aliases.
@@ -174,14 +174,6 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
         {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} reviewAnswers={linkedAnswers.map(({ date, answer }) => ({ date, question: answer.question, answer: answer.answer }))} />}
         {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} reviewEntries={linkedAnswers.map(({ reviewId, date, answer }) => ({ id: `${reviewId}-${answer.questionId}`, date, question: answer.question, answer: answer.answer, onOpen: () => onOpenDailyReview?.(date) }))} />}
         {tab === 'related' && <div className="space-y-10">
-          <section>
-            <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">日报回答<span className="font-mono text-xs font-normal text-stone-400">{linkedAnswers.length}</span></h2>
-            <div className="divide-y divide-stone-200 border-y border-stone-200">{linkedAnswers.map(({ reviewId, date, answer }) => <article key={`${reviewId}-${answer.questionId}`} className="py-5">
-              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label={`打开日报：${date}`} onClick={() => onOpenDailyReview?.(date)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{date}</button><span className="text-xs text-stone-400">{answer.question}</span></div>
-              <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={answer.answer} /></p>
-            </article>)}</div>
-            {!linkedAnswers.length && <p className="py-6 text-sm text-stone-400">暂无日报回答</p>}
-          </section>
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">相关节点<span className="font-mono text-xs font-normal text-stone-400">{relatedNodes.length}</span></h2>
             <div className="divide-y divide-stone-200 border-y border-stone-200">{relatedNodes.map((other) => <button type="button" key={other.id} aria-label={`查看相关节点：${other.name}`} onClick={() => openNode(other.name)} className="flex w-full items-center gap-3 py-4 text-left text-sm text-stone-700"><span className="min-w-0 flex-1 break-words">{other.name}</span><span className="font-mono text-xs text-stone-400">{entry!.related.get(other.id)} 条</span><ChevronRight size={14} className="text-stone-300" /></button>)}</div>
