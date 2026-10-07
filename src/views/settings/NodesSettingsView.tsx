@@ -1,5 +1,6 @@
 /**
  * @file NodesSettingsView.tsx
+ * @updated 2026-10-07: Matches the search-page header spacing, title size and shared top safe area.
  * @updated 2026-10-07: Uses a searchable category picker and adds capsule management with manual ordering.
  * @updated 2026-10-07: Groups compact node rows by user-created categories and an uncategorized fallback.
  * @input Persisted nodes and text-derived node index
@@ -41,12 +42,12 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
     .map((category) => ({ ...category, nodes: visibleNodes.filter((node) => getNodeCategoryId(node, nodeCategories) === category.id) }))
     .filter((group) => group.nodes.length > 0 || (categoryId !== 'all' && !query.trim()));
   if (managing) return <NodeManageView onBack={() => { setManaging(false); setSort('manual'); }} />;
-  return <div className="fixed inset-0 z-50 flex flex-col bg-[#faf9f6] pt-[env(safe-area-inset-top)]">
-    <header className="flex shrink-0 items-center gap-3 border-b border-stone-200 px-6 py-4">
-      <button type="button" aria-label="返回设置" onClick={onBack} className="-ml-2 p-2 text-stone-500 hover:text-stone-900"><ChevronLeft size={22} /></button>
-      <h1 className="text-xl font-bold tracking-wide text-stone-900">节点</h1>
+  return <div className="fixed inset-0 z-50 flex flex-col bg-[#faf9f6] pt-[var(--app-safe-area-top,0px)]">
+    <header className="flex shrink-0 items-center gap-3 border-b border-stone-100 bg-[#faf9f6]/80 px-4 pb-3 pt-4 backdrop-blur-md">
+      <button type="button" aria-label="返回设置" onClick={onBack} className="p-1 text-stone-400 hover:text-stone-600"><ChevronLeft size={24} /></button>
+      <h1 className="text-lg font-bold text-stone-800">节点</h1>
       <span className="ml-auto font-mono text-xs text-stone-400">{nodes.length}</span>
-      <button type="button" aria-label="管理节点分类与排序" onClick={() => setManaging(true)} className="-mr-2 p-2 text-stone-500 hover:text-stone-900"><SlidersHorizontal size={18} /></button>
+      <button type="button" aria-label="管理节点分类与排序" onClick={() => setManaging(true)} className="p-1 text-stone-500 hover:text-stone-900"><SlidersHorizontal size={18} /></button>
     </header>
     <main className="min-h-0 flex-1 overflow-y-auto px-7 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-7">
       <div className="mx-auto max-w-3xl">
