@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-07: Indexes daily, weekly and monthly review answers with typed periods and applies node mutations across all review kinds.
  * @updated 2026-10-07: Merges nodes into a chosen primary, preserving labels/metadata and retargeting every linked log.
  * @updated 2026-10-07: Recognizes full-width brackets and supplies caret-aware quick bracket insertion.
  * @updated 2026-10-07: Adds metadata-preserving moves and persisted array ordering for node management.
@@ -10,11 +11,18 @@
  * @description Derives every node relationship from note text without storing relation tables.
  * @updated 2026-10-06: Added node parsing, alias candidates, indexing and rename helpers.
  */
-import type { DailyReview, Log, NoteNode, NodeCategory, ReviewAnswer } from '../types';
+import type { DailyReview, Log, MonthlyReview, NoteNode, NodeCategory, ReviewAnswer, WeeklyReview } from '../types';
 
 export interface NodeLink { name: string; label?: string; start: number; end: number }
 export interface NodeCandidate { node: NoteNode; matches: string[] }
-export interface NodeReviewAnswer { reviewId: string; date: string; answer: ReviewAnswer }
+export type NodeReviewKind = 'daily' | 'weekly' | 'monthly';
+export interface NodeReviewAnswer {
+  reviewId: string;
+  kind: NodeReviewKind;
+  startDate: string;
+  endDate: string;
+  answer: ReviewAnswer;
+}
 export interface NodeIndexEntry { logs: Log[]; reviewAnswers: NodeReviewAnswer[]; latestAt: number; related: Map<string, number> }
 
 export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]［］\r\n|丨]/.test(name);
@@ -76,7 +84,42 @@ const normalizeLegacyAliasNodes = (nodes: NoteNode[]): NoteNode[] => {
   return result;
 };
 
-export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now(), dailyReviews: DailyReview[] = []): NoteNode[] => {
+export const buildNodeReviewAnswers = (
+  dailyReviews: DailyReview[] = [],
+  weeklyReviews: WeeklyReview[] = [],
+  monthlyReviews: MonthlyReview[] = []
+): NodeReviewAnswer[] => [
+  ...dailyReviews.flatMap((review) => (review.answers || []).map((answer) => ({
+    reviewId: review.id,
+    kind: 'daily' as const,
+    startDate: review.date,
+    endDate: review.date,
+    answer
+  }))),
+  ...weeklyReviews.flatMap((review) => (review.answers || []).map((answer) => ({
+    reviewId: review.id,
+    kind: 'weekly' as const,
+    startDate: review.weekStartDate,
+    endDate: review.weekEndDate,
+    answer
+  }))),
+  ...monthlyReviews.flatMap((review) => (review.answers || []).map((answer) => ({
+    reviewId: review.id,
+    kind: 'monthly' as const,
+    startDate: review.monthStartDate,
+    endDate: review.monthEndDate,
+    answer
+  })))
+];
+
+export const discoverNodes = (
+  nodes: NoteNode[],
+  logs: Log[],
+  now = Date.now(),
+  dailyReviews: DailyReview[] = [],
+  weeklyReviews: WeeklyReview[] = [],
+  monthlyReviews: MonthlyReview[] = []
+): NoteNode[] => {
   const normalized = normalizeLegacyAliasNodes(nodes);
   const names = new Set(normalized.map((node) => node.name));
   const added: NoteNode[] = [];
@@ -87,19 +130,23 @@ export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now(), 
       added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
     }
   }
-  for (const review of dailyReviews) {
-    for (const answer of review.answers || []) {
-      for (const name of getNodeNames(answer.answer)) {
-        if (names.has(name)) continue;
-        names.add(name);
-        added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
-      }
+  for (const reviewAnswer of buildNodeReviewAnswers(dailyReviews, weeklyReviews, monthlyReviews)) {
+    for (const name of getNodeNames(reviewAnswer.answer.answer)) {
+      if (names.has(name)) continue;
+      names.add(name);
+      added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
     }
   }
   return added.length ? [...normalized, ...added] : normalized;
 };
 
-export const buildNodeIndex = (nodes: NoteNode[], logs: Log[], dailyReviews: DailyReview[] = []): Map<string, NodeIndexEntry> => {
+export const buildNodeIndex = (
+  nodes: NoteNode[],
+  logs: Log[],
+  dailyReviews: DailyReview[] = [],
+  weeklyReviews: WeeklyReview[] = [],
+  monthlyReviews: MonthlyReview[] = []
+): Map<string, NodeIndexEntry> => {
   const byName = new Map(nodes.map((node) => [node.name, node.id]));
   const index = new Map<string, NodeIndexEntry>(nodes.map((node) => [node.id, { logs: [], reviewAnswers: [], latestAt: 0, related: new Map() }]));
   const addRecord = (ids: string[], timestamp: number) => {
@@ -116,17 +163,15 @@ export const buildNodeIndex = (nodes: NoteNode[], logs: Log[], dailyReviews: Dai
     ids.forEach((id) => index.get(id)!.logs.push(log));
     addRecord(ids, log.startTime);
   }
-  for (const review of dailyReviews) {
-    const timestamp = new Date(`${review.date}T12:00:00`).getTime();
-    for (const answer of review.answers || []) {
-      const ids = [...new Set(getNodeNames(answer.answer).map((name) => byName.get(name)).filter((id): id is string => Boolean(id)))];
-      ids.forEach((id) => index.get(id)!.reviewAnswers.push({ reviewId: review.id, date: review.date, answer }));
-      addRecord(ids, Number.isFinite(timestamp) ? timestamp : review.updatedAt);
-    }
+  for (const reviewAnswer of buildNodeReviewAnswers(dailyReviews, weeklyReviews, monthlyReviews)) {
+    const timestamp = new Date(`${reviewAnswer.endDate}T12:00:00`).getTime();
+    const ids = [...new Set(getNodeNames(reviewAnswer.answer.answer).map((name) => byName.get(name)).filter((id): id is string => Boolean(id)))];
+    ids.forEach((id) => index.get(id)!.reviewAnswers.push(reviewAnswer));
+    addRecord(ids, Number.isFinite(timestamp) ? timestamp : 0);
   }
   for (const entry of index.values()) {
     entry.logs.sort((a, b) => b.startTime - a.startTime);
-    entry.reviewAnswers.sort((a, b) => b.date.localeCompare(a.date));
+    entry.reviewAnswers.sort((a, b) => b.endDate.localeCompare(a.endDate));
   }
   return index;
 };
@@ -173,9 +218,9 @@ export const renameNodeInText = (text: string, oldName: string, newName: string,
   return result + text.slice(offset);
 };
 
-export const renameNodeInAnswers = (answers: ReviewAnswer[], oldName: string, newName: string): ReviewAnswer[] => answers.map((answer) => {
+export const renameNodeInAnswers = (answers: ReviewAnswer[], oldName: string, newName: string, preserveOldLabel = false): ReviewAnswer[] => answers.map((answer) => {
   const text = answer.answer || '';
-  const next = renameNodeInText(text, oldName, newName);
+  const next = renameNodeInText(text, oldName, newName, preserveOldLabel);
   return next === text ? answer : { ...answer, answer: next };
 });
 
@@ -246,6 +291,6 @@ export const mergeNodes = (nodes: NoteNode[], logs: Log[], sourceId: string, pri
       const note = renameNodeInText(log.note || '', source.name, primary.name, true);
       return note === (log.note || '') ? log : { ...log, note };
     }),
-    answers: renameNodeInAnswers(answers, source.name, primary.name)
+    answers: renameNodeInAnswers(answers, source.name, primary.name, true)
   };
 };

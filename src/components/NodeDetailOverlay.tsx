@@ -1,6 +1,6 @@
 /**
  * @file NodeDetailOverlay.tsx
- * @updated 2026-10-07: Closes the node overlay before opening a linked daily review.
+ * @updated 2026-10-07: Opens linked daily, weekly and monthly reviews on their guide tabs after closing the node overlay.
  * @input Node navigation history and existing log editor navigation
  * @output Global node details with hardware-back and Escape navigation
  * @pos Component (Overlay)
@@ -18,7 +18,21 @@ const NodeDetailView = React.lazy(() => import('../views/NodeDetailView').then((
 
 export const NodeDetailOverlay: React.FC = () => {
   const { selectedNodeId, nodes, goBack, closeNode } = useNodes();
-  const { isAddModalOpen, isTodoModalOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyReviewInitialTab } = useNavigation();
+  const {
+    isAddModalOpen,
+    isTodoModalOpen,
+    setIsDailyReviewOpen,
+    setCurrentReviewDate,
+    setCurrentDailyReviewInitialTab,
+    setIsWeeklyReviewOpen,
+    setCurrentWeeklyReviewStart,
+    setCurrentWeeklyReviewEnd,
+    setCurrentWeeklyReviewInitialTab,
+    setIsMonthlyReviewOpen,
+    setCurrentMonthlyReviewStart,
+    setCurrentMonthlyReviewEnd,
+    setCurrentMonthlyReviewInitialTab
+  } = useNavigation();
   const { isAIChatOpen } = useAIChatWindow();
   const { openEditModal } = useLogManager();
   const node = nodes.find((item) => item.id === selectedNodeId);
@@ -48,6 +62,24 @@ export const NodeDetailOverlay: React.FC = () => {
           setCurrentReviewDate(reviewDate);
           setCurrentDailyReviewInitialTab('guide');
           setIsDailyReviewOpen(true);
+        }} onOpenWeeklyReview={(startDate, endDate) => {
+          const start = new Date(`${startDate}T12:00:00`);
+          const end = new Date(`${endDate}T12:00:00`);
+          if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+          closeNode();
+          setCurrentWeeklyReviewStart(start);
+          setCurrentWeeklyReviewEnd(end);
+          setCurrentWeeklyReviewInitialTab('guide');
+          setIsWeeklyReviewOpen(true);
+        }} onOpenMonthlyReview={(startDate, endDate) => {
+          const start = new Date(`${startDate}T12:00:00`);
+          const end = new Date(`${endDate}T12:00:00`);
+          if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return;
+          closeNode();
+          setCurrentMonthlyReviewStart(start);
+          setCurrentMonthlyReviewEnd(end);
+          setCurrentMonthlyReviewInitialTab('guide');
+          setIsMonthlyReviewOpen(true);
         }} />
       </React.Suspense>
     </div>

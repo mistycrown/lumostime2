@@ -49,9 +49,15 @@ describe('node description generation', () => {
     expect(formatNodeDescription('', result)).toBe('## 项目状态\n- 阶段：方案设计');
     expect(formatNodeDescription('## 项目状态\n- 阶段：立项', result)).toContain('## 项目状态（补充）\n- 阶段：方案设计');
   });
-  it('allows daily review answers as the only evidence source', async () => {
+  it('allows typed review answers as the only evidence source', async () => {
     mocks.generateNarrative.mockResolvedValue(JSON.stringify({ basicInfo: { identity: '', relationship: '' }, bioAdditions: [], recentInteractions: [] }));
-    await expect(generateNodeDescriptionResult(node, [], [{ date: '2026-10-07', question: '见了谁', answer: '和[[小林]]吃饭' }])).resolves.toMatchObject({ basicInfo: { identity: '', relationship: '' } });
+    const reviewAnswers = [
+      { kind: 'weekly' as const, date: '2026-09-28 ~ 2026-10-04', question: '见了谁', answer: '和[[小林]]吃饭' },
+      { kind: 'monthly' as const, date: '2026-10', question: '重要进展', answer: '与[[小林]]完成项目复盘' }
+    ];
+    await expect(generateNodeDescriptionResult(node, [], reviewAnswers)).resolves.toMatchObject({ basicInfo: { identity: '', relationship: '' } });
+    const prompt = JSON.parse(mocks.generateNarrative.mock.calls[0][0]);
+    expect(prompt.关联回顾回答.map((item: { 类型: string }) => item.类型)).toEqual(['weekly', 'monthly']);
   });
   it('rejects missing configuration and records without making a request', async () => {
     mocks.getConfig.mockReturnValue({ apiKey: '' });

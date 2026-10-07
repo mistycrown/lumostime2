@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from 'vitest';
 import { Log } from '../types';
-import { buildDetailTimelineGroupedData } from '../utils/detailTimelineGrouping';
+import { buildDetailTimelineGroupedData, doesReviewPeriodOverlapMonth } from '../utils/detailTimelineGrouping';
 
 const makeLog = (id: string, date: Date, options: Partial<Log> = {}): Log => ({
     id,
@@ -77,5 +77,12 @@ describe('buildDetailTimelineGroupedData', () => {
         const result = buildDetailTimelineGroupedData([], [], 'all');
         expect(Array.from(result.durationMap.keys())).toEqual([]);
         expect(result.logsMap.has(dayTimestamp(reviewDate))).toBe(false);
+    });
+
+    test('filters review periods by month overlap', () => {
+        expect(doesReviewPeriodOverlapMonth('2026-09-28', '2026-10-04', 2026, 9)).toBe(true);
+        expect(doesReviewPeriodOverlapMonth('2026-09-28', '2026-10-04', 2026, 8)).toBe(true);
+        expect(doesReviewPeriodOverlapMonth('2026-09-28', '2026-10-04', 2026, 10)).toBe(false);
+        expect(doesReviewPeriodOverlapMonth('2026-11-01', '2026-11-30', 2026, 9)).toBe(false);
     });
 });

@@ -1,6 +1,6 @@
 /**
  * @file NodeDetailView.tsx
- * @updated 2026-10-07: Keeps linked daily answers only in the timeline's independent review-card section, while the related tab focuses on node relationships and candidates.
+ * @updated 2026-10-07: Renders daily, weekly and monthly linked answers as filtered independent review cards and routes each card to its matching guide view.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
  * @updated 2026-10-07: Reuses the print-style searchable category picker.
  * @updated 2026-10-07: Adds category selection/creation and validates syntax-safe aliases.
@@ -24,13 +24,14 @@ import { NodeText } from '../components/NodeText';
 import { NodeCategoryCreator } from '../components/NodeCategoryCreator';
 import { NodeCategorySelect } from '../components/NodeCategorySelect';
 import { NodeMergePanel } from '../components/NodeMergePanel';
-import { getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
+import { buildNodeReviewAnswers, getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
+import type { NodeReviewAnswer, NodeReviewKind } from '../utils/nodeUtils';
 import { formatNodeDescription, generateNodeDescriptionResult } from '../services/nodeDescriptionService';
 import ReactMarkdown from 'react-markdown';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 
-const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?: Array<{ date: string; question: string; answer: string }> }> = ({ node, logs, reviewAnswers = [] }) => {
+const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?: Array<{ date: string; kind: NodeReviewKind; question: string; answer: string }> }> = ({ node, logs, reviewAnswers = [] }) => {
   const { updateNode, nodeCategories, assignCategory } = useNodes();
   const { addToast } = useToast();
   const draft = useBufferedRecord(node, (value) => updateNode(value.id, { aliases: value.aliases, description: value.description }));
@@ -123,11 +124,27 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
   </div>;
 };
 
-export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) => void; onOpenDailyReview?: (date: string) => void }> = ({ node, onEditLog, onOpenDailyReview }) => {
+const REVIEW_KIND_LABEL: Record<NodeReviewKind, string> = { daily: '日报', weekly: '周报', monthly: '月报' };
+
+const reviewPeriodLabel = (review: Pick<NodeReviewAnswer, 'kind' | 'startDate' | 'endDate'>): string => {
+  if (review.kind === 'daily') return review.startDate;
+  if (review.kind === 'monthly') return review.startDate.slice(0, 7);
+  return `${review.startDate} ~ ${review.endDate}`;
+};
+
+export const NodeDetailView: React.FC<{
+  node: NoteNode;
+  onEditLog: (log: Log) => void;
+  onOpenDailyReview?: (date: string) => void;
+  onOpenWeeklyReview?: (startDate: string, endDate: string) => void;
+  onOpenMonthlyReview?: (startDate: string, endDate: string) => void;
+}> = ({ node, onEditLog, onOpenDailyReview, onOpenWeeklyReview, onOpenMonthlyReview }) => {
   const { nodes, index, openNode, rename, associate, associateReviewAnswer } = useNodes();
   const { logs, todos } = useData();
   const reviewContext = useOptionalReview();
   const dailyReviews = reviewContext?.dailyReviews || [];
+  const weeklyReviews = reviewContext?.weeklyReviews || [];
+  const monthlyReviews = reviewContext?.monthlyReviews || [];
   const { categories } = useCategoryScope();
   const { addToast } = useToast();
   const { isPrivacyMode } = usePrivacy();
@@ -138,17 +155,18 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
   const entry = index.get(node.id);
   const linkedLogs = entry?.logs || [];
   const linkedAnswers = entry?.reviewAnswers || [];
+  const allReviewAnswers = useMemo(() => buildNodeReviewAnswers(dailyReviews, weeklyReviews, monthlyReviews), [dailyReviews, monthlyReviews, weeklyReviews]);
   const relatedNodes = useMemo(() => nodes.filter((item) => entry?.related.has(item.id)).sort((a, b) => (entry!.related.get(b.id)! - entry!.related.get(a.id)!) || a.name.localeCompare(b.name, 'zh-CN')), [nodes, entry]);
   const candidates = useMemo(() => [
     ...logs.flatMap((log) => {
       const candidate = getNodeCandidates(log.note || '', [node])[0];
       return candidate ? [{ kind: 'log' as const, log, matches: candidate.matches }] : [];
     }),
-    ...dailyReviews.flatMap((review) => review.answers.flatMap((answer) => {
-      const candidate = getNodeCandidates(answer.answer || '', [node])[0];
-      return candidate ? [{ kind: 'review' as const, reviewId: review.id, date: review.date, answer, matches: candidate.matches }] : [];
-    }))
-  ].sort((a, b) => (b.kind === 'log' ? b.log.startTime : new Date(`${b.date}T12:00:00`).getTime()) - (a.kind === 'log' ? a.log.startTime : new Date(`${a.date}T12:00:00`).getTime())), [dailyReviews, logs, node]);
+    ...allReviewAnswers.flatMap((reviewAnswer) => {
+      const candidate = getNodeCandidates(reviewAnswer.answer.answer || '', [node])[0];
+      return candidate ? [{ kind: 'review' as const, review: reviewAnswer, matches: candidate.matches }] : [];
+    })
+  ].sort((a, b) => (b.kind === 'log' ? b.log.startTime : new Date(`${b.review.endDate}T12:00:00`).getTime()) - (a.kind === 'log' ? a.log.startTime : new Date(`${a.review.endDate}T12:00:00`).getTime())), [allReviewAnswers, logs, node]);
   const saveName = () => {
     try { rename(node.id, name); setRenaming(false); }
     catch (error) { addToast('error', error instanceof Error ? error.message : '重命名失败'); }
@@ -171,8 +189,12 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
         {([['details', '细节'], ['timeline', '时间线'], ['related', '关联']] as const).map(([value, label]) => <button type="button" key={value} aria-current={tab === value ? 'page' : undefined} onClick={() => setTab(value)} className={`whitespace-nowrap pb-3 font-serif text-sm tracking-wide ${tab === value ? 'border-b-2 border-stone-900 font-bold text-stone-900' : 'text-stone-400 hover:text-stone-600'}`}>{label}</button>)}
       </nav>
       <div className={isPrivacyMode ? 'blur-sm select-none' : ''}>
-        {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} reviewAnswers={linkedAnswers.map(({ date, answer }) => ({ date, question: answer.question, answer: answer.answer }))} />}
-        {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} reviewEntries={linkedAnswers.map(({ reviewId, date, answer }) => ({ id: `${reviewId}-${answer.questionId}`, date, question: answer.question, answer: answer.answer, onOpen: () => onOpenDailyReview?.(date) }))} />}
+        {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} reviewAnswers={linkedAnswers.map((reviewAnswer) => ({ date: reviewPeriodLabel(reviewAnswer), kind: reviewAnswer.kind, question: reviewAnswer.answer.question, answer: reviewAnswer.answer.answer }))} />}
+        {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} reviewEntries={linkedAnswers.map((reviewAnswer) => ({ id: `${reviewAnswer.kind}-${reviewAnswer.reviewId}-${reviewAnswer.answer.questionId}`, kind: reviewAnswer.kind, startDate: reviewAnswer.startDate, endDate: reviewAnswer.endDate, question: reviewAnswer.answer.question, answer: reviewAnswer.answer.answer, onOpen: () => {
+          if (reviewAnswer.kind === 'daily') onOpenDailyReview?.(reviewAnswer.startDate);
+          else if (reviewAnswer.kind === 'weekly') onOpenWeeklyReview?.(reviewAnswer.startDate, reviewAnswer.endDate);
+          else onOpenMonthlyReview?.(reviewAnswer.startDate, reviewAnswer.endDate);
+        } }))} />}
         {tab === 'related' && <div className="space-y-10">
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">相关节点<span className="font-mono text-xs font-normal text-stone-400">{relatedNodes.length}</span></h2>
@@ -185,9 +207,17 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
               <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(candidate.log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(candidate.log.startTime).toLocaleDateString('zh-CN')}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onEditLog(candidate.log)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associate(candidate.log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
               <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.log.note || ''} /></p>
               <p className="mt-2 text-xs text-stone-400">匹配：{candidate.matches.join('、')}</p>
-            </article> : <article key={`${candidate.reviewId}-${candidate.answer.questionId}`} className="py-5">
-              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label={`打开日报：${candidate.date}`} onClick={() => onOpenDailyReview?.(candidate.date)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{candidate.date}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onOpenDailyReview?.(candidate.date)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associateReviewAnswer(candidate.reviewId, candidate.answer.questionId, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
-              <p className="mb-1 text-xs text-stone-400">{candidate.answer.question}</p><p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.answer.answer} /></p>
+            </article> : <article key={`${candidate.review.kind}-${candidate.review.reviewId}-${candidate.review.answer.questionId}`} className="py-5">
+              <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label={`打开${REVIEW_KIND_LABEL[candidate.review.kind]}：${reviewPeriodLabel(candidate.review)}`} onClick={() => {
+                if (candidate.review.kind === 'daily') onOpenDailyReview?.(candidate.review.startDate);
+                else if (candidate.review.kind === 'weekly') onOpenWeeklyReview?.(candidate.review.startDate, candidate.review.endDate);
+                else onOpenMonthlyReview?.(candidate.review.startDate, candidate.review.endDate);
+              }} className="font-mono text-xs text-stone-400 hover:text-stone-700">{REVIEW_KIND_LABEL[candidate.review.kind]} · {reviewPeriodLabel(candidate.review)}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => {
+                if (candidate.review.kind === 'daily') onOpenDailyReview?.(candidate.review.startDate);
+                else if (candidate.review.kind === 'weekly') onOpenWeeklyReview?.(candidate.review.startDate, candidate.review.endDate);
+                else onOpenMonthlyReview?.(candidate.review.startDate, candidate.review.endDate);
+              }} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associateReviewAnswer(candidate.review.kind, candidate.review.reviewId, candidate.review.answer.questionId, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
+              <p className="mb-1 text-xs text-stone-400">{candidate.review.answer.question}</p><p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.review.answer.answer} /></p>
               <p className="mt-2 text-xs text-stone-400">匹配：{candidate.matches.join('、')}</p>
             </article>)}</div>
             {!candidates.length && <p className="py-6 text-sm text-stone-400">暂无潜在关联</p>}
