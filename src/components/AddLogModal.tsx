@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-07: Adds a selection/caret-preserving node bracket shortcut beside the Note heading.
  * @updated 2026-10-06: Shows opt-in node name/alias suggestions directly below the note draft.
  * @updated 2026-10-01: Sends the current record's full attachment list to the shared preview so swiping, download, and deletion stay on the active image.
  * @updated 2026-09-17: Uses an adaptive equal-sided time grid so the start/end inputs and center separator stay horizontally and vertically aligned across modal widths.
@@ -22,7 +23,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2, Scissors } from 'lucide-react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -46,6 +47,7 @@ import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { NodeNoteSuggestions } from './NodeNoteSuggestions';
+import { insertNodeBrackets } from '../utils/nodeUtils';
 import {
   getTodoProgressDisplayCompletedUnits,
   getTodoProgressSnapshot,
@@ -198,10 +200,20 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // Refs
   const sliderRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const noteBracketCaretRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const endHourInputRef = useRef<HTMLInputElement>(null);
   const startMinuteInputRef = useRef<HTMLInputElement>(null);
   const endMinuteInputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    const caret = noteBracketCaretRef.current;
+    const element = noteRef.current;
+    if (caret === null || !element) return;
+    noteBracketCaretRef.current = null;
+    element.focus({ preventScroll: true });
+    element.setSelectionRange(caret, caret);
+  }, [formState.note]);
   
   // 跟踪已自动应用的规则，避免重复应用
   const autoAppliedRulesRef = useRef<Set<string>>(new Set());
@@ -359,6 +371,19 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
       noteElement.setSelectionRange(noteLength, noteLength);
       noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 0);
+  };
+
+  const handleInsertNodeBrackets = () => {
+    const element = noteRef.current;
+    if (!element) return;
+    const result = insertNodeBrackets(formState.note, element.selectionStart, element.selectionEnd);
+    if (result.text === formState.note) {
+      element.focus({ preventScroll: true });
+      element.setSelectionRange(result.caret, result.caret);
+      return;
+    }
+    noteBracketCaretRef.current = result.caret;
+    updateField('note', result.text);
   };
 
   const handleSetStartToNow = () => {
@@ -1156,7 +1181,11 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           {/* Note Input */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Note</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Note</span>
+                <button type="button" aria-label="插入节点双括号" title="插入节点双括号" onMouseDown={(event) => event.preventDefault()} onClick={handleInsertNodeBrackets}
+                  className="rounded-md px-1.5 py-1 font-mono text-xs text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700">[[]]</button>
+              </div>
               <button
                 onClick={() => setIsNoteExpanded(!isNoteExpanded)}
                 className="text-stone-400 hover:text-stone-600 transition-all duration-200 p-1 rounded-md hover:bg-stone-100"

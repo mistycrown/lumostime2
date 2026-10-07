@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-07: AddLogModal places a node bracket shortcut beside Note. It wraps selected text or inserts/completes brackets at the caret, preserves selection on mouse interaction, and restores input focus/caret after React updates.
+
 Update 2026-10-07: `NodeCategorySelect` replaces native node classification selects with a compact searchable popover, selected checkmarks, keyboard navigation, Escape/outside close and focus return. Directory, details and capsule management share it.
 
 Update 2026-10-07: `NodeText` displays the left-hand alias in `[[alias丨node name]]` and resolves navigation by the canonical name. `NodeCategoryCreator` provides inline category creation in both node directory and details. Draft/saved-note suggestions preserve the matched alias in link text.

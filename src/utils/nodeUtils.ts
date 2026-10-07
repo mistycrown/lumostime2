@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-07: Recognizes full-width brackets and supplies caret-aware quick bracket insertion.
  * @updated 2026-10-07: Adds metadata-preserving moves and persisted array ordering for node management.
  * @updated 2026-10-07: Parses alias-first links, preserves alias text on linking/rename, and validates node categories.
  * @input Log note text and lightweight NoteNode metadata
@@ -14,11 +15,11 @@ export interface NodeLink { name: string; label?: string; start: number; end: nu
 export interface NodeCandidate { node: NoteNode; matches: string[] }
 export interface NodeIndexEntry { logs: Log[]; latestAt: number; related: Map<string, number> }
 
-export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]\r\n|丨]/.test(name);
+export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]［］\r\n|丨]/.test(name);
 
 export const parseNodeLinks = (text = ''): NodeLink[] => {
   const links: NodeLink[] = [];
-  const pattern = /(?<!\[)\[\[([^\[\]\r\n|]+)\]\](?!\])/g;
+  const pattern = /(?<![\[［])[\[［]{2}([^\[\]［］\r\n|]+)[\]］]{2}(?![\]］])/g;
   for (const match of text.matchAll(pattern)) {
     const parts = match[1].split('丨').map((part) => part.trim());
     if (parts.length > 2 || parts.some((part) => !part)) continue;
@@ -29,6 +30,25 @@ export const parseNodeLinks = (text = ''): NodeLink[] => {
 };
 
 export const getNodeNames = (text = ''): string[] => [...new Set(parseNodeLinks(text).map((link) => link.name))];
+
+export const insertNodeBrackets = (text: string, selectionStart = text.length, selectionEnd = selectionStart): { text: string; caret: number } => {
+  const start = Math.max(0, Math.min(selectionStart, text.length));
+  const end = Math.max(start, Math.min(selectionEnd, text.length));
+  if (end > start) return { text: `${text.slice(0, start)}[[${text.slice(start, end)}]]${text.slice(end)}`, caret: end + 4 };
+  let opening: RegExpMatchArray | undefined;
+  for (const token of text.slice(0, start).matchAll(/[\[［]{1,2}|[\]］]{1,2}/g)) {
+    if (/^[\[［]/.test(token[0])) opening = token;
+    else opening = undefined;
+  }
+  if (!opening) return { text: `${text.slice(0, start)}[[${text.slice(start)}`, caret: start + 2 };
+  const right = opening[0][0] === '［' ? '］］' : ']]';
+  const suffix = text.slice(start);
+  const hasClosing = /^[\]］]{2}/.test(suffix);
+  // A manually typed single opening bracket is completed into usable node syntax.
+  const missingLeft = opening[0].length === 1 ? opening[0] : '';
+  const prefix = missingLeft ? text.slice(0, opening.index! + 1) + missingLeft + text.slice(opening.index! + 1, start) : text.slice(0, start);
+  return { text: prefix + (hasClosing ? '' : right) + suffix, caret: start + missingLeft.length + 2 };
+};
 
 // Earlier versions treated the whole alias token as a name. Preserve its metadata when upgrading.
 const normalizeLegacyAliasNodes = (nodes: NoteNode[]): NoteNode[] => {
@@ -90,7 +110,7 @@ export const buildNodeIndex = (nodes: NoteNode[], logs: Log[]): Map<string, Node
 const mapOrdinaryText = (text: string, map: (part: string) => string): string => {
   let offset = 0;
   let result = '';
-  for (const match of text.matchAll(/\[\[[\s\S]*?\]\]/g)) {
+  for (const match of text.matchAll(/[\[［]{2}[\s\S]*?[\]］]{2}/g)) {
     const start = match.index!;
     const end = start + match[0].length;
     result += map(text.slice(offset, start)) + text.slice(start, end);
@@ -101,7 +121,7 @@ const mapOrdinaryText = (text: string, map: (part: string) => string): string =>
 
 export const getNodeCandidates = (text: string, nodes: NoteNode[]): NodeCandidate[] => {
   const linked = new Set(getNodeNames(text));
-  const ordinary = text.split(/\[\[[\s\S]*?\]\]/).join('\u0000');
+  const ordinary = text.split(/[\[［]{2}[\s\S]*?[\]］]{2}/).join('\u0000');
   return nodes.flatMap((node) => {
     if (linked.has(node.name)) return [];
     const matches = [...new Set([node.name, ...node.aliases])].filter((name) => isValidNodeName(name) && ordinary.includes(name));
@@ -121,7 +141,7 @@ export const renameNodeInText = (text: string, oldName: string, newName: string)
   let result = '';
   let offset = 0;
   for (const link of parseNodeLinks(text)) {
-    result += text.slice(offset, link.start) + (link.name === oldName ? `[[${link.label ? `${link.label}丨` : ''}${newName}]]` : text.slice(link.start, link.end));
+    result += text.slice(offset, link.start) + (link.name === oldName ? `${text.slice(link.start, link.start + 2)}${link.label ? `${link.label}丨` : ''}${newName}${text.slice(link.end - 2, link.end)}` : text.slice(link.start, link.end));
     offset = link.end;
   }
   return result + text.slice(offset);

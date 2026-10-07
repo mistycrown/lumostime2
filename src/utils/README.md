@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-07: Node parsing accepts full-width `［［名称］］` and mixed-width delimiters while retaining canonical indexing and original offsets. Suggestions protect either delimiter form; renames preserve delimiters. `insertNodeBrackets` wraps a selection or completes an unmatched opener at the caret, including manually typed single brackets.
+
 Update 2026-10-07: `moveNodeToCategory` reclassifies nodes with exact before/after insertion while retaining aliases, biographies and identities. `reorderNodeItems` preserves object identity and ignores invalid/self targets; both use persisted array order.
 
 Update 2026-10-07: Node links support `[[alias丨canonical name]]`. Parsing/indexing use the canonical name; conversion and rename preserve the alias label. Old metadata that treated an alias token as a whole name is normalized without discarding biographies. Category helpers validate creation and route missing/stale assignments to 未分类; backup validation accepts optional categories and legacy alias-token metadata.
