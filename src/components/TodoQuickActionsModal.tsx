@@ -16,6 +16,7 @@
  * @updated 2026-06-14: Added visualViewport-based mobile keyboard avoidance and scrollable sheet bounds so inline title editing stays visible above the soft keyboard.
  * @updated 2026-06-13: Added inline todo title editing inside the sheet header with auto-save on blur, styled with a print-inspired bottom border and no focus ring to prevent visual shifts.
  * @updated 2026-08-24: Added inline note editing from the shared quick-actions sheet, with Enter/blur save and cancel support.
+ * @updated 2026-10-07: Shows the todo note below the quick-actions title with single-line truncation.
  * @updated 2026-05-14: Reworked the `Maybe` quick-action row into one shared outer pill that contains the main `Maybe` picker plus inline `今 / 明 / +7` shortcuts, and renamed the arrange/due `下周` shortcuts to `+7`.
  * @updated 2026-05-14: Expanded the `Maybe` summary text under the title to show every future candidate date in order instead of collapsing multiple dates into a `+n` count.
  * @updated 2026-05-14: Moved the recurring skip icon into each skip action button so the shortcut row matches the shared quick-action button structure.
@@ -506,6 +507,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           >
             {todo.title}
           </div>
+          {todo.note?.trim() && (
+            <div className="mt-1 min-w-0 truncate text-sm text-stone-500" title={todo.note}>
+              {todo.note}
+            </div>
+          )}
           {visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
               {visibleQuickActionDateRows.map((item) => (

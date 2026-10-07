@@ -6,6 +6,7 @@
  * @updated 2026-10-04: Covers main-task association next to duplicate and hierarchy-based visibility.
  * @description Ensures the shared quick-actions modal only exposes category move for standalone todos, still offers quick-todo project upgrades through the shared category-picker flow, and summarizes Maybe dates as compact title metadata.
  * @updated 2026-08-27: Added coverage that long quick-actions titles use a two-line visual clamp without changing title-edit behavior.
+ * @updated 2026-10-07: Added coverage for displaying and truncating the todo note below the quick-actions title.
  * @updated 2026-06-14: Added coverage for the quick-actions duplicate entry so the modal can reuse the row swipe duplicate flow.
  * @updated 2026-05-14: Added coverage for the split `Maybe` shortcut row and `+7` date labels in the quick actions sheet, alongside Maybe summary rendering under the title.
  * @updated 2026-05-14: Added coverage for single and multi-date Maybe summaries under the quick-actions title, including full multi-date expansion instead of count folding.
@@ -91,6 +92,23 @@ describe('TodoQuickActionsModal category move', () => {
     );
 
     expect(html).toContain('line-clamp-2');
+  });
+
+  test('renders the todo note below the title with single-line truncation', () => {
+    const html = renderToStaticMarkup(
+      <TodoQuickActionsModal
+        {...baseProps}
+        todo={{
+          id: 'todo-note',
+          categoryId: 'cat-a',
+          title: 'Task title',
+          note: 'A deliberately long note that should stay on one line in the quick actions header',
+          isCompleted: false
+        } as any}
+      />
+    );
+
+    expect(html).toMatch(/Task title[\s\S]*truncate[\s\S]*A deliberately long note/);
   });
 
   test('renders the move-category action for standalone todos', () => {
