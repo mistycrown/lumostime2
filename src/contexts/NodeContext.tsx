@@ -31,6 +31,7 @@ interface NodeContextValue {
   rename: (id: string, name: string) => void;
   merge: (sourceId: string, primaryId: string) => void;
   associate: (logId: string, nodeId: string) => void;
+  associateReviewAnswer: (reviewId: string, questionId: string, nodeId: string) => void;
 }
 
 const NodeContext = createContext<NodeContextValue | null>(null);
@@ -112,5 +113,14 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!node) return;
     setLogs((previous) => previous.map((log) => log.id === logId ? { ...log, note: linkNodeInText(log.note || '', node) } : log));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate }}>{children}</NodeContext.Provider>;
+  const associateReviewAnswer = (reviewId: string, questionId: string, nodeId: string) => {
+    const node = nodes.find((item) => item.id === nodeId);
+    if (!node || !reviewContext) return;
+    setDailyReviews((previous) => previous.map((review) => review.id !== reviewId ? review : {
+      ...review,
+      answers: review.answers.map((answer) => answer.questionId !== questionId ? answer : { ...answer, answer: linkNodeInText(answer.answer || '', node) }),
+      updatedAt: Date.now()
+    }));
+  };
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
 };
