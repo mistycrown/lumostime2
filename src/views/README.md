@@ -1,5 +1,9 @@
 # Views Layer
 
+Update 2026-10-07: Node details show linked daily-review answers, navigate back to the guide tab, and expose an explicit open-details action for potential Log associations.
+
+Update 2026-10-07: Node details' 细节 tab provides a searchable merge panel with explicit primary selection. Pending biography edits are committed before a merge, and stale in-flight AI generation is invalidated.
+
 Update 2026-10-07: NodeDetailView shares the searchable print-style classification picker with node settings and capsule management.
 
 Update 2026-10-07: Node details support selecting or creating a category in 细节. Time-line aliases render their own label while navigating to the canonical node. Existing wiki-link syntax remains supported.

@@ -70,6 +70,8 @@ interface ReviewContextType {
 
 const ReviewContext = createContext<ReviewContextType | undefined>(undefined);
 
+export const useOptionalReview = () => useContext(ReviewContext);
+
 export const useReview = () => {
   const context = useContext(ReviewContext);
   if (!context) {

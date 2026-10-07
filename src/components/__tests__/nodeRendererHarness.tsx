@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-07: Exercises merge choices, dirty-editor retention, rapid rename, navigation and persisted complete backlink updates.
  * @updated 2026-10-07: Verifies full-width alias links render, navigate and retain delimiters on rename.
  * @updated 2026-10-07: Exercises searchable pickers and capsule mouse/touch drag ordering across reloads.
  * @updated 2026-10-07: Verifies classifications and alias-label navigation/conversion across reloads.
@@ -23,6 +24,7 @@ import { dataRepository } from '../../repositories/dataRepository';
 import { aiRequests, useNavigation } from './nodeRendererMocks';
 import { runRegisteredHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
 import type { Log } from '../../types';
+import { getNodeNames } from '../../utils/nodeUtils';
 
 declare global {
   interface Window {
@@ -263,6 +265,59 @@ async function run() {
   await capture('node-details-desktop');
   nodes.closeNode(); await delay(); await labelledClick('管理节点分类与排序');
   assertFits(); await capture('node-management-desktop');
+  await labelledClick('返回节点列表');
+  data.setNodes((previous) => [...previous, { id: 'merge-source', name: '浩特', aliases: ['小浩'], description: '待合并简介', categoryId: friendCategory.id, createdAt: 1, updatedAt: 1 }]);
+  data.setLogs((previous) => [...previous, fixture('merge-source-log', '和 [[浩特]] 见面。', 1), fixture('merge-overlap', '[[林老师]] 和 ［［小浩丨浩特］］ 讨论。', 2)]); await delay();
+  nodes.openNode('林老师'); await until(() => button('细节'), 'merge detail'); await click('细节');
+  await input('节点简介', '合并前手写简介');
+  await click('AI 生成'); await until(() => aiRequests.length === 3, 'generation pending during merge');
+  await click('合并节点'); await input('搜索待合并节点', '小浩'); await labelledClick('选择待合并节点：浩特');
+  check(document.querySelectorAll('[aria-label^="选择待合并节点："]').length === 1, 'Merge picker alias search failed');
+  await labelledClick('主节点：浩特'); check(document.querySelector('[aria-label="主节点：浩特"]')?.getAttribute('aria-checked') === 'true', 'Cannot choose another primary');
+  const mergeNotesBefore = JSON.stringify(data.logs);
+  await labelledClick('取消合并节点');
+  check(nodes.nodes.some((node) => node.id === 'merge-source') && JSON.stringify(data.logs) === mergeNotesBefore, 'Cancel merge changed records');
+  await click('合并节点'); await input('搜索待合并节点', '小浩'); await labelledClick('选择待合并节点：浩特');
+  await labelledClick('主节点：林老师');
+  document.querySelector('[aria-label="合并节点"]')!.scrollIntoView({ block: 'center' });
+  assertFits(); await capture('node-merge-desktop');
+  await labelledClick('确认合并节点');
+  await until(() => !nodes.nodes.some((node) => node.id === 'merge-source'), 'source removed after merge');
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Merge replaced primary classification');
+  check(nodes.nodes.find((node) => node.id === 'person')?.aliases.includes('浩特'), 'Source name missing from merged aliases');
+  check(nodes.nodes.find((node) => node.id === 'person')?.description === '合并前手写简介\n\n待合并简介', 'Merge lost dirty/other biography');
+  check(nodes.index.get('person')?.logs.length === 6, 'Merge union double-counted or omitted records');
+  check(data.logs.find((log) => log.id === 'merge-source-log')?.note?.includes('[[浩特丨林老师]]'), 'Merge did not retain old-name display alias');
+  check(data.logs.find((log) => log.id === 'merge-overlap')?.note?.includes('［［小浩丨林老师］］'), 'Merge lost full-width alias reference');
+  aiRequests[2].resolve('过期的合并前生成内容'); await delay();
+  check(nodes.nodes.find((node) => node.id === 'person')?.description === '合并前手写简介\n\n待合并简介', 'In-flight AI overwrote merged biography');
+  // Log updates and successive renames in a single batch must use the latest combined snapshot.
+  data.setLogs((previous) => [...previous, fixture('queued-rename', '[[林老师]] 新增记录', 2)]);
+  nodes.rename('person', '主节点一'); nodes.rename('person', '主节点二'); await delay();
+  check(nodes.nodes.find((node) => node.id === 'person')?.name === '主节点二', 'Rapid rename lost latest name');
+  check(data.logs.find((log) => log.id === 'queued-rename')?.note === '[[主节点二]] 新增记录', 'Queued record missed rename');
+  check(data.logs.filter((log) => ['first', 'second', 'candidate', 'new', 'merge-source-log', 'merge-overlap', 'queued-rename'].includes(log.id)).every((log) => getNodeNames(log.note).includes('主节点二')), 'Rename omitted a linked historical/alias record');
+  check(!nodes.nodes.some((node) => ['林老师', '主节点一', '浩特'].includes(node.name)), 'An intermediate node was rediscovered');
+  data.setNodes((previous) => [...previous, { id: 'new-primary', name: '新主节点', aliases: [], description: '主节点简介', categoryId: friendCategory.id, createdAt: 1, updatedAt: 1 }]); await delay();
+  await click('合并节点'); await input('搜索待合并节点', '新主'); await labelledClick('选择待合并节点：新主节点'); await labelledClick('主节点：新主节点'); await labelledClick('确认合并节点');
+  await until(() => document.querySelector('[data-node-name]')?.textContent === '新主节点', 'redirect to selected other primary');
+  check(!nodes.nodes.some((node) => node.id === 'person'), 'Second merge did not remove former primary');
+  check(nodes.index.get('new-primary')?.logs.length === 7, 'Second merge lost backlinks');
+  check(nodes.nodes.find((node) => node.id === 'new-primary')?.categoryId === friendCategory.id, 'Chosen other primary identity not retained');
+  check(runRegisteredHardwareBackHandler(), 'Merged detail cannot go back'); await delay();
+  check(nodes.selectedNodeId === null, 'Merge left duplicate/removed history entries');
+  await delay(350);
+  const mergedSnapshot = await dataRepository.loadDataContextSnapshot();
+  check(mergedSnapshot.nodes.some((node) => node.id === 'new-primary' && node.aliases.includes('主节点二') && node.aliases.includes('浩特')), 'Merged aliases did not persist');
+  check(!mergedSnapshot.nodes.some((node) => ['person', 'merge-source'].includes(node.id)), 'Removed source persisted');
+  const beforeMergedData = data;
+  restored.unmount(); await delay();
+  const mergedRoot = createRoot(document.getElementById('root')!);
+  mergedRoot.render(<ToastProvider><DataProvider><PrivacyProvider><NodeProvider><Probe /></NodeProvider></PrivacyProvider></DataProvider></ToastProvider>);
+  await until(() => data !== beforeMergedData && data.isReady && nodes.nodes.some((node) => node.id === 'new-primary'), 'merged remount');
+  check(nodes.index.get('new-primary')?.logs.length === 7, 'Reload lost merged/renamed history');
+  check(!nodes.nodes.some((node) => ['person', 'merge-source'].includes(node.id)), 'Reload resurrected merged nodes');
+  passed.push('both merge-primary choices, cancellation, dirty biographies/AI race, queued log plus rapid rename, all-record retargeting and persisted merged history');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });

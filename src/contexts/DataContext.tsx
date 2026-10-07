@@ -1,5 +1,6 @@
 /**
  * @file DataContext.tsx
+ * @updated 2026-10-07: Applies node rename/merge and related log edits as one React state transition.
  * @updated 2026-10-07: Hydrates and atomically persists node category metadata.
  * @updated 2026-10-06: Discovers wiki-link nodes after log changes and persists metadata with core data.
  * @updated 2026-10-03: Initializes missing logs once but does not rewrite persisted hydration snapshots, preventing stale-window calendar deletions.
@@ -8,7 +9,7 @@
  * @updated 2026-05-23: Broadcasts desktop todo sync events after persisted todo writes and rehydrates todos from external desktop-window edits so Electron widgets and the main app stay aligned.
  * @updated 2026-08-11: Reports core local-data hydration failures and stops the bootstrap gate with a shareable error ID.
  */
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { INITIAL_LOGS, INITIAL_TODOS, MOCK_TODO_CATEGORIES } from '../constants';
 import { dataRepository } from '../repositories/dataRepository';
 import {
@@ -36,6 +37,7 @@ interface DataContextType {
   setLogs: React.Dispatch<React.SetStateAction<Log[]>>;
   nodes: NoteNode[];
   setNodes: React.Dispatch<React.SetStateAction<NoteNode[]>>;
+  updateNodeRecords: (transform: (nodes: NoteNode[], logs: Log[]) => { nodes: NoteNode[]; logs: Log[] }) => void;
   nodeCategories: NodeCategory[];
   setNodeCategories: React.Dispatch<React.SetStateAction<NodeCategory[]>>;
 
@@ -69,10 +71,24 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isReady, setIsReady] = useState(false);
   const [canPersist, setCanPersist] = useState(false);
   const [usesFallbackSeedData, setUsesFallbackSeedData] = useState(true);
-  const [logs, setLogs] = useState<Log[]>(INITIAL_LOGS);
-  const [storedNodes, setNodes] = useState<NoteNode[]>([]);
+  const [{ logs, nodes: storedNodes }, setNodeRecords] = useState<{ logs: Log[]; nodes: NoteNode[] }>({ logs: INITIAL_LOGS, nodes: [] });
+  const setLogs = useCallback((action: React.SetStateAction<Log[]>) => setNodeRecords((previous) => {
+    const next = typeof action === 'function' ? action(previous.logs) : action;
+    return next === previous.logs ? previous : { ...previous, logs: next };
+  }), []);
+  const setNodes = useCallback((action: React.SetStateAction<NoteNode[]>) => setNodeRecords((previous) => {
+    const next = typeof action === 'function' ? action(previous.nodes) : action;
+    return next === previous.nodes ? previous : { ...previous, nodes: next };
+  }), []);
   const [nodeCategories, setNodeCategories] = useState<NodeCategory[]>([]);
   const nodes = useMemo(() => isReady ? discoverNodes(storedNodes, logs) : storedNodes, [isReady, storedNodes, logs]);
+  const updateNodeRecords = useCallback((transform: (nodes: NoteNode[], logs: Log[]) => { nodes: NoteNode[]; logs: Log[] }) => {
+    setNodeRecords((previous) => {
+      const currentNodes = previous.nodes === storedNodes && previous.logs === logs ? nodes : previous.nodes;
+      const next = transform(currentNodes, previous.logs);
+      return next.nodes === previous.nodes && next.logs === previous.logs ? previous : next;
+    });
+  }, [nodes, storedNodes, logs]);
   const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
   const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
   const [collections, setCollections] = useState<DataCollection[]>([]);
@@ -166,8 +182,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   useEffect(() => {
-    if (nodes !== storedNodes) setNodes(nodes);
-  }, [nodes, storedNodes]);
+    if (nodes !== storedNodes) setNodeRecords((previous) => previous.nodes === storedNodes && previous.logs === logs ? { ...previous, nodes } : previous);
+  }, [nodes, storedNodes, logs]);
 
   useEffect(() => {
     if (!isReady || !canPersist) {
@@ -294,6 +310,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLogs,
         nodes,
         setNodes,
+        updateNodeRecords,
         nodeCategories,
         setNodeCategories,
         todos,

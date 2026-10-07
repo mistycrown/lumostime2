@@ -17,7 +17,7 @@ const NodeDetailView = React.lazy(() => import('../views/NodeDetailView').then((
 
 export const NodeDetailOverlay: React.FC = () => {
   const { selectedNodeId, nodes, goBack, closeNode } = useNodes();
-  const { isAddModalOpen, isTodoModalOpen } = useNavigation();
+  const { isAddModalOpen, isTodoModalOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyReviewInitialTab } = useNavigation();
   const { isAIChatOpen } = useAIChatWindow();
   const { openEditModal } = useLogManager();
   const node = nodes.find((item) => item.id === selectedNodeId);
@@ -40,7 +40,13 @@ export const NodeDetailOverlay: React.FC = () => {
     </header>
     <div className="min-h-0 flex-1">
       <React.Suspense fallback={<div className="p-7 text-sm text-stone-400">正在加载节点…</div>}>
-        <NodeDetailView key={node.id} node={node} onEditLog={openEditModal} />
+        <NodeDetailView key={node.id} node={node} onEditLog={openEditModal} onOpenDailyReview={(date) => {
+          const reviewDate = new Date(`${date}T12:00:00`);
+          if (Number.isNaN(reviewDate.getTime())) return;
+          setCurrentReviewDate(reviewDate);
+          setCurrentDailyReviewInitialTab('guide');
+          setIsDailyReviewOpen(true);
+        }} />
       </React.Suspense>
     </div>
   </div>;

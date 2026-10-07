@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-07: Atomically renames/merges nodes with every referenced record and redirects merged navigation history.
  * @updated 2026-10-07: Exposes persisted node moves and category ordering for capsule management.
  * @updated 2026-10-07: Adds category creation/assignment and preserves alias display links during text conversion.
  * @input DataContext logs and NoteNode metadata
@@ -8,10 +9,11 @@
  * @description Shares node navigation across timeline, settings and detail pages.
  * @updated 2026-10-06: Added text-derived backlinks and lightweight node actions.
  */
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useData } from './DataContext';
+import { useOptionalReview } from './ReviewContext';
 import type { NoteNode, NodeCategory } from '../types';
-import { buildNodeIndex, createNodeCategory, linkNodeInText, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeInText } from '../utils/nodeUtils';
+import { buildNodeIndex, createNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeInAnswers } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
@@ -27,6 +29,7 @@ interface NodeContextValue {
   closeNode: () => void;
   updateNode: (id: string, patch: Pick<NoteNode, 'aliases' | 'description'>) => void;
   rename: (id: string, name: string) => void;
+  merge: (sourceId: string, primaryId: string) => void;
   associate: (logId: string, nodeId: string) => void;
 }
 
@@ -39,9 +42,14 @@ export const useNodes = () => {
 };
 
 export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { nodes, setNodes, nodeCategories, setNodeCategories, logs, setLogs } = useData();
+  const { nodes: storedNodes, setNodes, updateNodeRecords, nodeCategories, setNodeCategories, logs, setLogs } = useData();
+  const reviewContext = useOptionalReview();
+  const dailyReviews = reviewContext?.dailyReviews || [];
+  const setDailyReviews = reviewContext?.setDailyReviews || (() => undefined);
   const [history, setHistory] = useState<string[]>([]);
-  const index = useMemo(() => buildNodeIndex(nodes, logs), [nodes, logs]);
+  const nodes = useMemo(() => discoverNodes(storedNodes, logs, Date.now(), dailyReviews), [storedNodes, logs, dailyReviews]);
+  useEffect(() => { if (nodes !== storedNodes) setNodes(nodes); }, [nodes, setNodes, storedNodes]);
+  const index = useMemo(() => buildNodeIndex(nodes, logs, dailyReviews), [nodes, logs, dailyReviews]);
   const openNode = useCallback((name: string) => {
     const node = nodes.find((item) => item.name === name);
     if (node) setHistory((previous) => previous.at(-1) === node.id ? previous : [...previous, node.id]);
@@ -71,18 +79,38 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   const rename = (id: string, name: string) => {
     renameNode(nodes, [], id, name);
-    const source = nodes.find((node) => node.id === id)!;
     const nextName = name.trim();
-    setNodes((previous) => renameNode(previous, [], id, nextName).nodes);
-    setLogs((previous) => previous.map((log) => {
-      const note = renameNodeInText(log.note || '', source.name, nextName);
-      return note === (log.note || '') ? log : { ...log, note };
+    const source = nodes.find((node) => node.id === id);
+    if (!source) return;
+    updateNodeRecords((previousNodes, previousLogs) => {
+      if (!previousNodes.some((node) => node.id === id) || previousNodes.some((node) => node.id !== id && node.name === nextName)) return { nodes: previousNodes, logs: previousLogs };
+      return renameNode(previousNodes, previousLogs, id, nextName);
+    });
+    setDailyReviews((previous) => previous.map((review) => {
+      const answers = renameNodeInAnswers(review.answers || [], source.name, nextName);
+      return answers === review.answers || answers.every((answer, index) => answer === review.answers?.[index]) ? review : { ...review, answers, updatedAt: Date.now() };
     }));
+  };
+  const merge = (sourceId: string, primaryId: string) => {
+    mergeNodes(nodes, [], sourceId, primaryId);
+    updateNodeRecords((previousNodes, previousLogs) => {
+      if (!previousNodes.some((node) => node.id === sourceId) || !previousNodes.some((node) => node.id === primaryId)) return { nodes: previousNodes, logs: previousLogs };
+      return mergeNodes(previousNodes, previousLogs, sourceId, primaryId);
+    });
+    const source = nodes.find((node) => node.id === sourceId);
+    const primary = nodes.find((node) => node.id === primaryId);
+    if (source && primary) {
+      setDailyReviews((previous) => previous.map((review) => {
+        const answers = renameNodeInAnswers(review.answers || [], source.name, primary.name);
+        return answers === review.answers || answers.every((answer, index) => answer === review.answers?.[index]) ? review : { ...review, answers, updatedAt: Date.now() };
+      }));
+    }
+    setHistory((previous) => previous.map((id) => id === sourceId ? primaryId : id).filter((id, index, items) => index === 0 || items[index - 1] !== id));
   };
   const associate = (logId: string, nodeId: string) => {
     const node = nodes.find((item) => item.id === nodeId);
     if (!node) return;
     setLogs((previous) => previous.map((log) => log.id === logId ? { ...log, note: linkNodeInText(log.note || '', node) } : log));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, associate }}>{children}</NodeContext.Provider>;
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate }}>{children}</NodeContext.Provider>;
 };

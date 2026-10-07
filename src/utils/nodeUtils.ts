@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-07: Merges nodes into a chosen primary, preserving labels/metadata and retargeting every linked log.
  * @updated 2026-10-07: Recognizes full-width brackets and supplies caret-aware quick bracket insertion.
  * @updated 2026-10-07: Adds metadata-preserving moves and persisted array ordering for node management.
  * @updated 2026-10-07: Parses alias-first links, preserves alias text on linking/rename, and validates node categories.
@@ -9,11 +10,12 @@
  * @description Derives every node relationship from note text without storing relation tables.
  * @updated 2026-10-06: Added node parsing, alias candidates, indexing and rename helpers.
  */
-import type { Log, NoteNode, NodeCategory } from '../types';
+import type { DailyReview, Log, NoteNode, NodeCategory, ReviewAnswer } from '../types';
 
 export interface NodeLink { name: string; label?: string; start: number; end: number }
 export interface NodeCandidate { node: NoteNode; matches: string[] }
-export interface NodeIndexEntry { logs: Log[]; latestAt: number; related: Map<string, number> }
+export interface NodeReviewAnswer { reviewId: string; date: string; answer: ReviewAnswer }
+export interface NodeIndexEntry { logs: Log[]; reviewAnswers: NodeReviewAnswer[]; latestAt: number; related: Map<string, number> }
 
 export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]［］\r\n|丨]/.test(name);
 
@@ -74,7 +76,7 @@ const normalizeLegacyAliasNodes = (nodes: NoteNode[]): NoteNode[] => {
   return result;
 };
 
-export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now()): NoteNode[] => {
+export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now(), dailyReviews: DailyReview[] = []): NoteNode[] => {
   const normalized = normalizeLegacyAliasNodes(nodes);
   const names = new Set(normalized.map((node) => node.name));
   const added: NoteNode[] = [];
@@ -85,24 +87,47 @@ export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now()):
       added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
     }
   }
+  for (const review of dailyReviews) {
+    for (const answer of review.answers || []) {
+      for (const name of getNodeNames(answer.answer)) {
+        if (names.has(name)) continue;
+        names.add(name);
+        added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
+      }
+    }
+  }
   return added.length ? [...normalized, ...added] : normalized;
 };
 
-export const buildNodeIndex = (nodes: NoteNode[], logs: Log[]): Map<string, NodeIndexEntry> => {
+export const buildNodeIndex = (nodes: NoteNode[], logs: Log[], dailyReviews: DailyReview[] = []): Map<string, NodeIndexEntry> => {
   const byName = new Map(nodes.map((node) => [node.name, node.id]));
-  const index = new Map<string, NodeIndexEntry>(nodes.map((node) => [node.id, { logs: [], latestAt: 0, related: new Map() }]));
-  for (const log of logs) {
-    const ids = getNodeNames(log.note).map((name) => byName.get(name)).filter((id): id is string => Boolean(id));
+  const index = new Map<string, NodeIndexEntry>(nodes.map((node) => [node.id, { logs: [], reviewAnswers: [], latestAt: 0, related: new Map() }]));
+  const addRecord = (ids: string[], timestamp: number) => {
     for (const id of ids) {
       const entry = index.get(id)!;
-      entry.logs.push(log);
-      entry.latestAt = Math.max(entry.latestAt, log.startTime);
+      entry.latestAt = Math.max(entry.latestAt, timestamp);
       for (const otherId of ids) {
         if (otherId !== id) entry.related.set(otherId, (entry.related.get(otherId) || 0) + 1);
       }
     }
+  };
+  for (const log of logs) {
+    const ids = [...new Set(getNodeNames(log.note).map((name) => byName.get(name)).filter((id): id is string => Boolean(id)))];
+    ids.forEach((id) => index.get(id)!.logs.push(log));
+    addRecord(ids, log.startTime);
   }
-  for (const entry of index.values()) entry.logs.sort((a, b) => b.startTime - a.startTime);
+  for (const review of dailyReviews) {
+    const timestamp = new Date(`${review.date}T12:00:00`).getTime();
+    for (const answer of review.answers || []) {
+      const ids = [...new Set(getNodeNames(answer.answer).map((name) => byName.get(name)).filter((id): id is string => Boolean(id)))];
+      ids.forEach((id) => index.get(id)!.reviewAnswers.push({ reviewId: review.id, date: review.date, answer }));
+      addRecord(ids, Number.isFinite(timestamp) ? timestamp : review.updatedAt);
+    }
+  }
+  for (const entry of index.values()) {
+    entry.logs.sort((a, b) => b.startTime - a.startTime);
+    entry.reviewAnswers.sort((a, b) => b.date.localeCompare(a.date));
+  }
   return index;
 };
 
@@ -137,15 +162,22 @@ export const linkNodeInText = (text: string, node: NoteNode): string => {
   return mapOrdinaryText(text, (part) => part.replace(pattern, (matched) => matched === node.name ? `[[${node.name}]]` : `[[${matched}丨${node.name}]]`));
 };
 
-export const renameNodeInText = (text: string, oldName: string, newName: string): string => {
+export const renameNodeInText = (text: string, oldName: string, newName: string, preserveOldLabel = false): string => {
   let result = '';
   let offset = 0;
   for (const link of parseNodeLinks(text)) {
-    result += text.slice(offset, link.start) + (link.name === oldName ? `${text.slice(link.start, link.start + 2)}${link.label ? `${link.label}丨` : ''}${newName}${text.slice(link.end - 2, link.end)}` : text.slice(link.start, link.end));
+    const label = link.label || (preserveOldLabel ? oldName : undefined);
+    result += text.slice(offset, link.start) + (link.name === oldName ? `${text.slice(link.start, link.start + 2)}${label ? `${label}丨` : ''}${newName}${text.slice(link.end - 2, link.end)}` : text.slice(link.start, link.end));
     offset = link.end;
   }
   return result + text.slice(offset);
 };
+
+export const renameNodeInAnswers = (answers: ReviewAnswer[], oldName: string, newName: string): ReviewAnswer[] => answers.map((answer) => {
+  const text = answer.answer || '';
+  const next = renameNodeInText(text, oldName, newName);
+  return next === text ? answer : { ...answer, answer: next };
+});
 
 export const createNodeCategory = (categories: NodeCategory[], name: string, now = Date.now()): NodeCategory => {
   const normalized = name.trim();
@@ -177,13 +209,13 @@ export const moveNodeToCategory = (nodes: NoteNode[], categories: NodeCategory[]
   return ordered.map((entry) => entry.id === id ? { ...entry, categoryId: categoryId || undefined, updatedAt: now } : entry);
 };
 
-export const renameNode = (nodes: NoteNode[], logs: Log[], id: string, name: string, now = Date.now()) => {
+export const renameNode = (nodes: NoteNode[], logs: Log[], id: string, name: string, now = Date.now(), answers: ReviewAnswer[] = []) => {
   const source = nodes.find((node) => node.id === id);
   const nextName = name.trim();
   if (!source) throw new Error('节点不存在');
   if (!isValidNodeName(nextName)) throw new Error('请输入有效名称，名称不能包含方括号、竖线或换行');
   if (nodes.some((node) => node.id !== id && node.name === nextName)) throw new Error('已存在同名节点');
-  if (source.name === nextName) return { nodes, logs };
+  if (source.name === nextName) return { nodes, logs, answers };
   return {
     nodes: nodes.map((node) => node.id === id ? {
       ...node, name: nextName,
@@ -192,6 +224,28 @@ export const renameNode = (nodes: NoteNode[], logs: Log[], id: string, name: str
     logs: logs.map((log) => {
       const note = renameNodeInText(log.note || '', source.name, nextName);
       return note !== (log.note || '') ? { ...log, note } : log;
-    })
+    }),
+    answers: renameNodeInAnswers(answers, source.name, nextName)
+  };
+};
+
+export const mergeNodes = (nodes: NoteNode[], logs: Log[], sourceId: string, primaryId: string, now = Date.now(), answers: ReviewAnswer[] = []) => {
+  if (sourceId === primaryId) throw new Error('请选择两个不同的节点');
+  const source = nodes.find((node) => node.id === sourceId);
+  const primary = nodes.find((node) => node.id === primaryId);
+  if (!source || !primary) throw new Error('节点不存在');
+  const descriptions = [...new Set([primary.description.trim(), source.description.trim()].filter(Boolean))];
+  return {
+    nodes: nodes.filter((node) => node.id !== sourceId).map((node) => node.id === primaryId ? {
+      ...node,
+      aliases: [...new Set([...primary.aliases, source.name, ...source.aliases].map((alias) => alias.trim()))].filter((alias) => isValidNodeName(alias) && alias !== primary.name),
+      description: descriptions.join('\n\n'),
+      updatedAt: now
+    } : node),
+    logs: logs.map((log) => {
+      const note = renameNodeInText(log.note || '', source.name, primary.name, true);
+      return note === (log.note || '') ? log : { ...log, note };
+    }),
+    answers: renameNodeInAnswers(answers, source.name, primary.name)
   };
 };

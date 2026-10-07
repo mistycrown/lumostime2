@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Log, NoteNode } from '../types';
 const mocks = vi.hoisted(() => ({ getConfig: vi.fn(), generateNarrative: vi.fn() }));
 vi.mock('./aiService', () => ({ aiService: mocks }));
-import { buildNodeDescriptionPrompt, generateNodeDescription } from './nodeDescriptionService';
+import { buildNodeDescriptionPrompt, formatNodeDescription, generateNodeDescription, generateNodeDescriptionResult, parseNodeDescriptionResult } from './nodeDescriptionService';
 
 const node: NoteNode = { id: 'n', name: '小林', aliases: ['林林'], description: '原有简介', createdAt: 1, updatedAt: 1 };
 const logs = [1, 2].map((id) => ({ id: String(id), note: `[[小林]] 记录 ${id}`, title: `标题${id}`, startTime: id * 1000 } as Log));
@@ -25,6 +25,21 @@ describe('node description generation', () => {
     mocks.generateNarrative.mockResolvedValue('  一起讨论科研和项目。  ');
     expect(await generateNodeDescription(node, logs)).toBe('一起讨论科研和项目。');
     expect(mocks.generateNarrative.mock.calls[0][1]).toContain('禁止猜测性格、动机、亲密程度或用户情感');
+  });
+  it('parses structured fields and formats a stable biography while preserving existing text', () => {
+    const result = parseNodeDescriptionResult(JSON.stringify({
+      basicInfo: { identity: '', relationship: '同事' },
+      bioAdditions: ['共同准备项目汇报。'],
+      recentInteractions: [{ date: '2026-10-07', summary: '一起讨论项目。' }, { date: '2026-10-07', summary: '讨论项目并吃饭。' }]
+    }));
+    const formatted = formatNodeDescription('用户原写的背景。', result);
+    expect(formatted).toContain('## 基本信息\n- 身份：\n- 关系：同事');
+    expect(formatted).toContain('用户原写的背景。\n共同准备项目汇报。');
+    expect(formatted).toContain('- 10月7日：一起讨论项目。；讨论项目并吃饭。');
+  });
+  it('allows daily review answers as the only evidence source', async () => {
+    mocks.generateNarrative.mockResolvedValue(JSON.stringify({ basicInfo: { identity: '', relationship: '' }, bioAdditions: [], recentInteractions: [] }));
+    await expect(generateNodeDescriptionResult(node, [], [{ date: '2026-10-07', question: '见了谁', answer: '和[[小林]]吃饭' }])).resolves.toMatchObject({ basicInfo: { identity: '', relationship: '' } });
   });
   it('rejects missing configuration and records without making a request', async () => {
     mocks.getConfig.mockReturnValue({ apiKey: '' });
