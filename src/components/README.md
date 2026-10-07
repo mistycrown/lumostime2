@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-07: `DetailTimelineCard` accepts linked daily-review answer entries and renders them before Logs in each date block; `NodeTextEditor` remains shared by review and Log text input.
+
 Update 2026-10-07: `NodeTextEditor` is shared by review answers and note editors for bracket insertion, caret restoration and live node suggestions. Review text answers render wiki links as clickable nodes.
 
 Update 2026-10-07: `NodeMergePanel` lets users search/select another node and explicitly choose either primary, preview the unique record count, cancel or confirm. It supports Escape/hardware back and keyboard primary selection. Node details commit pending edits and invalidate stale AI output before merging.

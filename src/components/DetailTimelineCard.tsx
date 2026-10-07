@@ -1,5 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-10-07: Supports review-answer entries in each date group before Log records.
  * @updated 2026-10-06: Renders node links, current-node highlights and saved-note suggestions.
  * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
  * @updated 2026-10-02: Centers only the day's first available sticker at full cell size and overlays the date in the bottom-right corner.
@@ -138,6 +139,13 @@ interface DetailTimelineCardProps {
 
     // 回调
     onEditLog?: (log: Log) => void;
+    reviewEntries?: Array<{
+        id: string;
+        date: string;
+        question: string;
+        answer: string;
+        onOpen?: () => void;
+    }>;
 
     // 可选的类别信息（用于显示activity名称）
     categories?: Category[];
@@ -178,6 +186,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     customScale,
     entityInfo,
     onEditLog,
+    reviewEntries = [],
     categories,
     renderLogMetadata,
     defaultViewMode = 'month',
@@ -345,6 +354,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     // 显示日志：根据模式选择
     const logsToDisplay = viewMode === 'month' ? monthLogs : filteredLogs;
     const countableLogsToDisplay = viewMode === 'month' ? countableMonthLogs : countableLogs;
+    const reviewsToDisplay = useMemo(() => reviewEntries.filter((entry) => {
+        if (viewMode === 'all') return true;
+        const date = new Date(`${entry.date}T12:00:00`);
+        return date.getMonth() === displayMonth && date.getFullYear() === displayYear;
+    }), [displayMonth, displayYear, reviewEntries, viewMode]);
+    const reviewDateKeys = useMemo(() => reviewsToDisplay.flatMap((entry) => {
+        const date = new Date(`${entry.date}T00:00:00`);
+        return Number.isNaN(date.getTime()) ? [] : [new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()];
+    }), [reviewsToDisplay]);
 
     const styledLogIndexMap = useMemo(() => {
         return [...logsToDisplay]
@@ -380,8 +398,8 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     // 热图/分组数据
     const groupedData = useMemo(
-        () => buildDetailTimelineGroupedData(logsToDisplay, countableLogsToDisplay, viewMode),
-        [countableLogsToDisplay, logsToDisplay, viewMode]
+        () => buildDetailTimelineGroupedData(logsToDisplay, countableLogsToDisplay, viewMode, reviewDateKeys),
+        [countableLogsToDisplay, logsToDisplay, reviewDateKeys, viewMode]
     );
     
     // 滚动监听：显示日期悬浮条并更新活跃日期
@@ -1216,6 +1234,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                     Array.from(groupedData.durationMap.keys()).sort((a: number, b: number) => b - a).map((timestamp: number) => {
                         const daySeconds = groupedData.durationMap.get(timestamp) || 0;
                         const dayLogsFiltered = groupedData.logsMap.get(timestamp) || [];
+                        const dayReviews = reviewsToDisplay.filter((entry) => {
+                            const date = new Date(`${entry.date}T00:00:00`);
+                            return !Number.isNaN(date.getTime()) && new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() === timestamp;
+                        });
 
                         const date = new Date(timestamp);
                         const month = date.getMonth() + 1;
@@ -1250,6 +1272,19 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                     {timelineStyleTheme === 'default' && (
                                         <div className="absolute left-0 top-0 bottom-0 w-[1px] border-l border-stone-300 pointer-events-none" />
                                     )}
+
+                                    {dayReviews.map((entry) => (
+                                        <article key={entry.id} className="relative pl-8 animate-in slide-in-from-bottom-2 duration-500">
+                                            <div className="absolute -left-[60px] top-0 w-[45px] text-right">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">日报</span>
+                                            </div>
+                                            <TimelineStyleRail theme={timelineStyleTheme} config={activeConfig} index={0} showLine={true} extendLinePastContainer={dayReviews.length > 1 || dayLogsFiltered.length > 0} />
+                                            <button type="button" onClick={entry.onOpen} className="block w-full rounded-xl px-2 pb-2 text-left transition-colors hover:bg-stone-50/80">
+                                                <div className="mb-1 flex items-center gap-2"><span className="text-base font-bold text-stone-900">{entry.question}</span><span className="text-[10px] text-stone-400">每日回顾</span></div>
+                                                <p className="whitespace-pre-wrap text-sm font-light leading-relaxed text-stone-500"><NodeText text={entry.answer} highlightName={highlightNodeName} /></p>
+                                            </button>
+                                        </article>
+                                    ))}
 
                                     {dayLogsFiltered.sort((a, b) => b.startTime - a.startTime).map((log, index, sortedLogs) => {
                                         // 查找对应的category和activity

@@ -22,7 +22,8 @@ const getStartOfDayTimestamp = (log: Log): number => {
 export const buildDetailTimelineGroupedData = (
     logsToDisplay: Log[],
     countableLogsToDisplay: Log[],
-    viewMode: DetailTimelineViewMode
+    viewMode: DetailTimelineViewMode,
+    additionalDateKeys: number[] = []
 ): DetailTimelineGroupedData => {
     const durationMap = new Map<number, number>();
     const logsMap = new Map<number, Log[]>();
@@ -67,6 +68,11 @@ export const buildDetailTimelineGroupedData = (
             logsMap.get(startOfDay)!.push(log);
         });
     }
+
+    additionalDateKeys.forEach((dateKey) => {
+        if (!durationMap.has(dateKey)) durationMap.set(dateKey, 0);
+        if (!logsMap.has(dateKey)) logsMap.set(dateKey, []);
+    });
 
     return { durationMap, logsMap };
 };

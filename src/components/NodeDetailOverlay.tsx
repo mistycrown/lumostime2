@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailOverlay.tsx
+ * @updated 2026-10-07: Closes the node overlay before opening a linked daily review.
  * @input Node navigation history and existing log editor navigation
  * @output Global node details with hardware-back and Escape navigation
  * @pos Component (Overlay)
@@ -43,6 +44,7 @@ export const NodeDetailOverlay: React.FC = () => {
         <NodeDetailView key={node.id} node={node} onEditLog={openEditModal} onOpenDailyReview={(date) => {
           const reviewDate = new Date(`${date}T12:00:00`);
           if (Number.isNaN(reviewDate.getTime())) return;
+          closeNode();
           setCurrentReviewDate(reviewDate);
           setCurrentDailyReviewInitialTab('guide');
           setIsDailyReviewOpen(true);

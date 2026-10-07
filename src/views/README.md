@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-07: Node details render linked daily answers in the timeline, close the node overlay before opening a daily review, and show biography Markdown in reading mode until explicitly edited.
+
 Update 2026-10-07: Node details show linked daily-review answers, navigate back to the guide tab, and expose an explicit open-details action for potential Log associations.
 
 Update 2026-10-07: Node details' 细节 tab provides a searchable merge panel with explicit primary selection. Pending biography edits are committed before a merge, and stale in-flight AI generation is invalidated.

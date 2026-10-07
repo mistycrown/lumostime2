@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-07: Renders linked daily answers in node timelines, defaults biography to Markdown reading mode, and supports custom AI sections.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
  * @updated 2026-10-07: Reuses the print-style searchable category picker.
  * @updated 2026-10-07: Adds category selection/creation and validates syntax-safe aliases.
@@ -9,7 +10,7 @@
  * @updated 2026-10-06: Added node details, buffered biography editing, AI generation and rename.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronRight, Loader2, Pencil, Plus, Sparkles, X } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Pencil, Plus, Save, Sparkles, X } from 'lucide-react';
 import type { DailyReview, Log, NoteNode } from '../types';
 import { useNodes } from '../contexts/NodeContext';
 import { useData } from '../contexts/DataContext';
@@ -25,6 +26,9 @@ import { NodeCategorySelect } from '../components/NodeCategorySelect';
 import { NodeMergePanel } from '../components/NodeMergePanel';
 import { getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
 import { formatNodeDescription, generateNodeDescriptionResult } from '../services/nodeDescriptionService';
+import ReactMarkdown from 'react-markdown';
+import remarkBreaks from 'remark-breaks';
+import remarkGfm from 'remark-gfm';
 
 const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?: Array<{ date: string; question: string; answer: string }> }> = ({ node, logs, reviewAnswers = [] }) => {
   const { updateNode, nodeCategories, assignCategory } = useNodes();
@@ -34,6 +38,8 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
   const [editingAlias, setEditingAlias] = useState<string | null>(null);
   const aliasInput = useRef<HTMLInputElement>(null);
   const [generating, setGenerating] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const descriptionBeforeEdit = useRef(node.description);
   const revision = useRef(0);
   const mounted = useRef(true);
   const latestDraft = useRef(draft);
@@ -65,6 +71,8 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
         return;
       }
       latestDraft.current.update({ ...latestDraft.current.value, description: formatNodeDescription(latestDraft.current.value.description, result) });
+      latestDraft.current.commit();
+      setEditingDescription(false);
     } catch (error) {
       if (mounted.current) addToast('error', error instanceof Error ? error.message : '生成失败，请重试');
     } finally {
@@ -100,9 +108,16 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
     <section>
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold text-stone-900">简介</h2>
-        <button type="button" onClick={generate} disabled={generating || (!logs.length && !reviewAnswers.length)} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900 disabled:opacity-40">{generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {generating ? '生成中' : 'AI 生成'}</button>
+        <div className="flex items-center gap-3">
+          {!editingDescription && <button type="button" aria-label="编辑节点简介" onClick={() => { descriptionBeforeEdit.current = draft.value.description; setEditingDescription(true); }} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900"><Pencil size={13} />编辑</button>}
+          {editingDescription && <button type="button" aria-label="保存节点简介" onClick={() => { draft.commit(); setEditingDescription(false); }} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900"><Save size={13} />保存</button>}
+          {editingDescription && <button type="button" aria-label="取消编辑节点简介" onClick={() => { draft.update({ ...draft.value, description: descriptionBeforeEdit.current }); draft.commit(); setEditingDescription(false); }} className="py-1 text-xs text-stone-400 hover:text-stone-700">取消</button>}
+          <button type="button" onClick={generate} disabled={generating || (!logs.length && !reviewAnswers.length)} className="flex items-center gap-1.5 py-1 text-xs text-stone-500 hover:text-stone-900 disabled:opacity-40">{generating ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} {generating ? '生成中' : 'AI 生成'}</button>
+        </div>
       </div>
-      <textarea aria-label="节点简介" placeholder="写下关于这个节点的简介…" value={draft.value.description} rows={7} onChange={(event) => { revision.current += 1; draft.update({ ...draft.value, description: event.target.value }); }} onBlur={draft.commit} className="w-full resize-y rounded-none border border-stone-200 bg-transparent px-4 py-3 text-sm leading-7 text-stone-700 outline-none focus:border-stone-400 placeholder:text-stone-300" />
+      {editingDescription ? <textarea aria-label="节点简介" placeholder="写下关于这个节点的简介…" value={draft.value.description} rows={10} onChange={(event) => { revision.current += 1; draft.update({ ...draft.value, description: event.target.value }); }} className="w-full resize-y rounded-none border border-stone-200 bg-transparent px-4 py-3 text-sm leading-7 text-stone-700 outline-none focus:border-stone-400 placeholder:text-stone-300" /> : (
+        draft.value.description.trim() ? <div aria-label="节点简介预览" className="prose prose-stone max-w-none text-sm leading-7 prose-headings:font-semibold prose-headings:text-stone-900 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-blockquote:border-stone-300 prose-blockquote:text-stone-500"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{draft.value.description}</ReactMarkdown></div> : <button type="button" onClick={() => { descriptionBeforeEdit.current = ''; setEditingDescription(true); }} className="w-full border border-dashed border-stone-200 px-4 py-8 text-left text-sm text-stone-400 hover:border-stone-400">暂无简介，点击编辑</button>
+      )}
     </section>
     <NodeMergePanel node={node} onBeforeMerge={() => { revision.current += 1; draft.commit(); }} />
   </div>;
@@ -157,7 +172,7 @@ export const NodeDetailView: React.FC<{ node: NoteNode; onEditLog: (log: Log) =>
       </nav>
       <div className={isPrivacyMode ? 'blur-sm select-none' : ''}>
         {tab === 'details' && <NodeDetailsEditor node={node} logs={linkedLogs} reviewAnswers={linkedAnswers.map(({ date, answer }) => ({ date, question: answer.question, answer: answer.answer }))} />}
-        {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} />}
+        {tab === 'timeline' && <DetailTimelineCard filteredLogs={linkedLogs} displayDate={displayDate} onDateChange={setDisplayDate} entityInfo={{ id: node.id, name: node.name, type: 'node' }} defaultViewMode="all" categories={categories} todos={todos} onEditLog={onEditLog} highlightNodeName={node.name} reviewEntries={linkedAnswers.map(({ reviewId, date, answer }) => ({ id: `${reviewId}-${answer.questionId}`, date, question: answer.question, answer: answer.answer, onOpen: () => onOpenDailyReview?.(date) }))} />}
         {tab === 'related' && <div className="space-y-10">
           <section>
             <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">日报回答<span className="font-mono text-xs font-normal text-stone-400">{linkedAnswers.length}</span></h2>

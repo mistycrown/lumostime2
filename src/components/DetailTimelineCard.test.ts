@@ -70,4 +70,11 @@ describe('buildDetailTimelineGroupedData', () => {
         expect(result.durationMap.get(dayTimestamp(plannedOnlyDate))).toBe(0);
         expect(result.logsMap.get(dayTimestamp(plannedOnlyDate))?.map((log) => log.id)).toEqual(['planned-only']);
     });
+
+    test('adds review-only dates before their daily log entries', () => {
+        const reviewDate = new Date(2026, 7, 4, 12, 0);
+        const result = buildDetailTimelineGroupedData([], [], 'all', [dayTimestamp(reviewDate)]);
+        expect(Array.from(result.durationMap.keys())).toEqual([dayTimestamp(reviewDate)]);
+        expect(result.logsMap.get(dayTimestamp(reviewDate))).toEqual([]);
+    });
 });
