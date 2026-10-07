@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-07: `excelExportService.ts` now exports complete log metadata, dynamic activity-attribute columns, and related data sheets for todos, nodes, collections, and reviews. `obsidianExportService.ts` preserves current log/review metadata, uses filtered report ranges, exports review-only periods, and overwrites the target file to avoid duplicate sections.
+
 Update 2026-10-06: `nodeDescriptionService.ts` reuses the configured AI provider to summarize all backlinks and timestamps into editable text, with constraints against unsupported personal inference. `FeishuAutoSyncStore.saveLogs` accepts related writes for atomic node renames.
 
 Update 2026-10-06: AI `create_log` supports optional custom activity attributes in ordinary chat and quick-add backfills. `assistantContextBuilder.ts` exposes active attribute schemas in JSON and compact dictionaries; both parsers preserve ID-based values, and `assistantActionExecutor.ts` validates values against the resolved activity before saving logs and action snapshots. Missing attributes remain optional for existing calls.

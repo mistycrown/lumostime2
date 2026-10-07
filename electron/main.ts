@@ -1655,21 +1655,7 @@ ipcMain.handle('write-obsidian-file', async (_, { filePath, content }) => {
     const dir = path.dirname(filePath);
     await fs.mkdir(dir, { recursive: true });
 
-    let finalContent = content;
-
-    try {
-      const existingContent = await fs.readFile(filePath, 'utf-8');
-      finalContent = existingContent + '\n\n---\n\n' + content;
-      console.log(`[Electron] Appending Obsidian file content: ${filePath}`);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        console.log(`[Electron] Creating Obsidian file: ${filePath}`);
-      } else {
-        throw error;
-      }
-    }
-
-    await fs.writeFile(filePath, finalContent, 'utf-8');
+    await fs.writeFile(filePath, content, 'utf-8');
 
     console.log(`[Electron] Obsidian file write succeeded: ${filePath}`);
     return { success: true };

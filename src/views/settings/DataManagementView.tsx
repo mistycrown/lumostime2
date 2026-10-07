@@ -8,7 +8,7 @@ import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { ToastType } from '../../components/Toast';
-import { Log, Category, DailyReview, TodoItem, TodoCategory, Scope } from '../../types';
+import { Log, Category, DailyReview, MonthlyReview, NodeCategory, NoteNode, DataCollection, DataCollectionEntry, TodoItem, TodoCategory, Scope, WeeklyReview } from '../../types';
 import { getStoredCustomStickerState } from '../../services/customStickerAssetService';
 import excelExportService from '../../services/excelExportService';
 import { imageService } from '../../services/imageService';
@@ -30,10 +30,16 @@ interface DataManagementViewProps {
     onToast: (type: ToastType, message: string) => void;
     logs: Log[];
     dailyReviews: DailyReview[];
+    weeklyReviews: WeeklyReview[];
+    monthlyReviews: MonthlyReview[];
     categories: Category[];
     todos: TodoItem[];
     todoCategories: TodoCategory[];
     scopes: Scope[];
+    nodes: NoteNode[];
+    nodeCategories: NodeCategory[];
+    collections: DataCollection[];
+    collectionEntries: DataCollectionEntry[];
     onCleanupCloudBackups: () => Promise<void>;
     onCheckCloudImageConsistency: () => Promise<string>;
     onCleanupCloudImages: () => Promise<{ message: string; report: string }>;
@@ -48,10 +54,16 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     onToast,
     logs,
     dailyReviews,
+    weeklyReviews,
+    monthlyReviews,
     categories,
     todos,
     todoCategories,
     scopes,
+    nodes,
+    nodeCategories,
+    collections,
+    collectionEntries,
     onCleanupCloudBackups,
     onCheckCloudImageConsistency,
     onCleanupCloudImages
@@ -215,7 +227,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 todoCategories,
                 scopes,
                 excelStartDate,
-                excelEndDate
+                excelEndDate,
+                { nodes, nodeCategories, collections, collectionEntries, dailyReviews, weeklyReviews, monthlyReviews }
             );
 
             if (result.mode === 'native' && result.savedPath) {
