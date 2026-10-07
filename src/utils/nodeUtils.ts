@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-07: Adds metadata-preserving moves and persisted array ordering for node management.
  * @updated 2026-10-07: Parses alias-first links, preserves alias text on linking/rename, and validates node categories.
  * @input Log note text and lightweight NoteNode metadata
  * @output Wiki-link parsing, node discovery, backlinks, co-occurrence and text mutations
@@ -135,6 +136,26 @@ export const createNodeCategory = (categories: NodeCategory[], name: string, now
 };
 
 export const getNodeCategoryId = (node: NoteNode, categories: NodeCategory[]): string => categories.some((category) => category.id === node.categoryId) ? node.categoryId! : '';
+
+export const reorderNodeItems = <T extends { id: string }>(items: T[], id: string, targetId?: string, after = false): T[] => {
+  const item = items.find((entry) => entry.id === id);
+  if (!item || id === targetId || (targetId && !items.some((entry) => entry.id === targetId))) return items;
+  const result = items.filter((entry) => entry.id !== id);
+  const index = targetId ? result.findIndex((entry) => entry.id === targetId) + (after ? 1 : 0) : result.length;
+  result.splice(index, 0, item);
+  return result.every((entry, position) => entry === items[position]) ? items : result;
+};
+
+export const moveNodeToCategory = (nodes: NoteNode[], categories: NodeCategory[], id: string, categoryId: string, targetId?: string, after = false, now = Date.now()): NoteNode[] => {
+  const node = nodes.find((entry) => entry.id === id);
+  if (!node || (categoryId && !categories.some((category) => category.id === categoryId))) return nodes;
+  if (targetId && (targetId === id || !nodes.some((entry) => entry.id === targetId && getNodeCategoryId(entry, categories) === categoryId))) return nodes;
+  const siblings = nodes.filter((entry) => entry.id !== id && getNodeCategoryId(entry, categories) === categoryId);
+  const destination = targetId || siblings.at(-1)?.id;
+  const ordered = reorderNodeItems(nodes, id, destination, targetId ? after : true);
+  if ((node.categoryId || '') === categoryId) return ordered;
+  return ordered.map((entry) => entry.id === id ? { ...entry, categoryId: categoryId || undefined, updatedAt: now } : entry);
+};
 
 export const renameNode = (nodes: NoteNode[], logs: Log[], id: string, name: string, now = Date.now()) => {
   const source = nodes.find((node) => node.id === id);

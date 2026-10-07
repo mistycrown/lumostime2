@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-07: Exposes persisted node moves and category ordering for capsule management.
  * @updated 2026-10-07: Adds category creation/assignment and preserves alias display links during text conversion.
  * @input DataContext logs and NoteNode metadata
  * @output Node index, metadata editing, text conversion and detail navigation history
@@ -10,13 +11,15 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { useData } from './DataContext';
 import type { NoteNode, NodeCategory } from '../types';
-import { buildNodeIndex, createNodeCategory, linkNodeInText, renameNode, renameNodeInText } from '../utils/nodeUtils';
+import { buildNodeIndex, createNodeCategory, linkNodeInText, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeInText } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
   nodeCategories: NodeCategory[];
   addCategory: (name: string, nodeId?: string) => NodeCategory;
   assignCategory: (nodeId: string, categoryId: string) => void;
+  moveNode: (nodeId: string, categoryId: string, targetId?: string, after?: boolean) => void;
+  reorderCategory: (categoryId: string, targetId: string, after?: boolean) => void;
   index: ReturnType<typeof buildNodeIndex>;
   selectedNodeId: string | null;
   openNode: (name: string) => void;
@@ -60,6 +63,12 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ...node, ...patch, aliases: [...new Set(patch.aliases.map((alias) => alias.trim()).filter((alias) => alias && alias !== node.name))], updatedAt: Date.now()
     } : node));
   };
+  const moveNode = (id: string, categoryId: string, targetId?: string, after = false) => {
+    setNodes((previous) => moveNodeToCategory(previous, nodeCategories, id, categoryId, targetId, after));
+  };
+  const reorderCategory = (id: string, targetId: string, after = false) => {
+    setNodeCategories((previous) => reorderNodeItems(previous, id, targetId, after));
+  };
   const rename = (id: string, name: string) => {
     renameNode(nodes, [], id, name);
     const source = nodes.find((node) => node.id === id)!;
@@ -75,5 +84,5 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!node) return;
     setLogs((previous) => previous.map((log) => log.id === logId ? { ...log, note: linkNodeInText(log.note || '', node) } : log));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, associate }}>{children}</NodeContext.Provider>;
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, associate }}>{children}</NodeContext.Provider>;
 };

@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-07: Exercises searchable pickers and capsule mouse/touch drag ordering across reloads.
  * @updated 2026-10-07: Verifies classifications and alias-label navigation/conversion across reloads.
  * @input Actual DataProvider, NodeProvider and node UI in an isolated Electron renderer
  * @output Interaction, persistence and mobile-layout regressions with capture checkpoints
@@ -26,6 +27,7 @@ declare global {
   interface Window {
     __nodeRendererResult?: { passed: string[]; error?: string };
     __nodeRendererCapture?: string | null;
+    __nodeRendererPointer?: { phase: 'down' | 'move' | 'up' | 'cancel'; x: number; y: number; pointerType: string } | null;
   }
 }
 let data: ReturnType<typeof useData>;
@@ -52,11 +54,24 @@ const input = async (label: string, value: string) => {
   await delay();
 };
 const select = async (label: string, value: string) => {
-  const element = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
-  check(element, `Missing select: ${label}`);
-  element!.value = value;
-  element!.dispatchEvent(new Event('change', { bubbles: true }));
-  await delay();
+  await labelledClick(label);
+  const element = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((option) => option.dataset.categoryValue === value);
+  check(element, `Missing category: ${value}`); element!.click(); await delay();
+};
+const drag = async (source: HTMLElement, destination: HTMLElement, pointerType = 'mouse', after = false, cancel = false) => {
+  const pointer = async (phase: 'down' | 'move' | 'up' | 'cancel', x: number, y: number) => {
+    window.__nodeRendererPointer = { phase, x: Math.round(x), y: Math.round(y), pointerType };
+    await until(() => !window.__nodeRendererPointer, `native ${pointerType} ${phase}`); await delay();
+  };
+  source.scrollIntoView({ block: 'center' }); await delay();
+  const from = source.getBoundingClientRect();
+  await pointer('down', from.left + from.width / 2, from.top + from.height / 2);
+  destination.scrollIntoView({ block: 'center' }); await delay();
+  const to = destination.getBoundingClientRect();
+  const x = to.left + to.width * (after ? 0.8 : 0.2);
+  const y = to.top + to.height * (after ? 0.8 : 0.2);
+  await pointer('move', x, y);
+  await pointer(cancel ? 'cancel' : 'up', x, y);
 };
 const capture = async (name: string) => { window.__nodeRendererCapture = name; await until(() => !window.__nodeRendererCapture, `capture ${name}`); };
 const assertFits = () => check(document.documentElement.scrollWidth <= window.innerWidth, 'Horizontal overflow');
@@ -95,6 +110,13 @@ async function run() {
   await select('筛选节点分类', peopleCategory.id);
   check(document.querySelectorAll('main h2').length === 0, 'Category filter included uncategorized nodes');
   await select('筛选节点分类', 'all');
+  await labelledClick('筛选节点分类'); await input('搜索节点分类', '人物');
+  check(document.querySelectorAll('[role="option"]').length === 1, 'Category picker search failed');
+  document.querySelector('[aria-label="搜索节点分类"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })); await delay();
+  check(document.activeElement?.getAttribute('role') === 'option', 'Category picker keyboard navigation failed');
+  await capture('node-category-picker-mobile');
+  document.querySelector('[aria-label="搜索节点分类"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await delay();
+  check(!document.querySelector('[role="listbox"]'), 'Category picker did not close on Escape');
   await input('搜索节点', '林林');
   check(document.querySelectorAll('main h2').length === 1, 'Alias search failed');
   await input('搜索节点', '');
@@ -180,6 +202,43 @@ async function run() {
   manager.handleSaveLog(fixture('new', '和 [[林老师]] 去了 [[北京]]。', 3)); await delay();
   check(nodes.nodes.some((node) => node.name === '北京'), 'Saved log did not auto-create node');
   passed.push('original editor navigation, live draft suggestions, conflict protection and saved-log creation');
+  nodes.closeNode(); await delay();
+  data.setNodes((previous) => [...previous, ...Array.from({ length: 18 }, (_, index) => ({ id: `sample-${index}`, name: `节点 ${index + 1}`, aliases: [], description: '', createdAt: 1, updatedAt: 1 }))]); await delay();
+  const hangzhou = nodes.nodes.find((node) => node.name === '杭州')!;
+  const beijing = nodes.nodes.find((node) => node.name === '北京')!;
+  nodes.assignCategory(hangzhou.id, friendCategory.id); nodes.assignCategory(beijing.id, friendCategory.id); await delay();
+  await labelledClick('管理节点分类与排序');
+  await until(() => document.querySelector('[data-testid="node-management"]'), 'capsule manager');
+  const capsule = (id: string) => document.querySelector<HTMLElement>(`[data-node-capsule="${id}"]`)!;
+  const group = (id: string) => document.querySelector<HTMLElement>(`[data-node-group="${id}"]`)!;
+  const notesBeforeManagement = JSON.stringify(data.logs);
+  await drag(capsule('person'), capsule(beijing.id), 'touch');
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === friendCategory.id, 'Touch drag did not change category');
+  await drag(capsule('person'), group(peopleCategory.id), 'mouse');
+  check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Empty category drop failed');
+  await drag(capsule(beijing.id), capsule(hangzhou.id));
+  check(nodes.nodes.filter((node) => node.categoryId === friendCategory.id)[0].id === beijing.id, 'Capsule order unchanged');
+  const beforeCancel = JSON.stringify(nodes.nodes);
+  await drag(capsule('person'), capsule(beijing.id), 'touch', false, true);
+  check(JSON.stringify(nodes.nodes) === beforeCancel, 'Cancelled drag changed metadata');
+  await drag(document.querySelector<HTMLElement>('[aria-label="拖动分类：朋友"]')!, group(peopleCategory.id), 'touch');
+  check(nodes.nodeCategories[0].id === friendCategory.id, 'Category drag did not reorder');
+  await labelledClick('管理节点：林老师'); await select('移动选中节点到分类', '');
+  check(!nodes.nodes.find((node) => node.id === 'person')?.categoryId, 'Accessible category move failed');
+  await select('移动选中节点到分类', peopleCategory.id);
+  await labelledClick('管理节点：节点 1'); await labelledClick('节点向后移动');
+  check(nodes.nodes.findIndex((node) => node.id === 'sample-0') > nodes.nodes.findIndex((node) => node.id === 'sample-1'), 'Accessible node reorder failed');
+  check(JSON.stringify(data.logs) === notesBeforeManagement, 'Management changed wiki-link notes');
+  const sample1 = capsule('sample-0').getBoundingClientRect();
+  const sample2 = capsule('sample-1').getBoundingClientRect();
+  check(sample1.top === sample2.top && sample1.width < window.innerWidth / 2, 'Capsules do not share a compact row');
+  await labelledClick('取消选择节点');
+  document.querySelector('[data-testid="node-management"] main')!.scrollTop = 0;
+  document.querySelectorAll<HTMLButtonElement>('[class*="pointer-events-auto"] button').forEach((element) => element.click()); await delay();
+  assertFits(); await capture('node-management-mobile');
+  await labelledClick('返回节点列表');
+  check(button('手动排序')?.getAttribute('aria-pressed') === 'true', 'Directory did not adopt manual order');
+  passed.push('searchable pickers, touch/mouse cross-category drag, empty drops, node/category order, cancellation and accessible controls');
   await until(() => !document.body.textContent?.includes('正在加载'), 'settled view');
   await delay(350);
   const persisted = await dataRepository.loadDataContextSnapshot();
@@ -194,10 +253,15 @@ async function run() {
   check(nodes.nodes.find((node) => node.id === 'person')?.description === '生成期间手写的简介。', 'Reload lost biography');
   check(nodes.nodeCategories.some((category) => category.id === peopleCategory.id), 'Reload lost categories');
   check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Reload lost classification');
+  check(nodes.nodeCategories[0].id === friendCategory.id, 'Reload lost category order');
+  check(nodes.nodes.filter((node) => node.categoryId === friendCategory.id)[0].id === beijing.id, 'Reload lost capsule order');
+  check(nodes.nodes.findIndex((node) => node.id === 'sample-0') > nodes.nodes.findIndex((node) => node.id === 'sample-1'), 'Reload lost accessible reorder');
   await capture('nodes-classified-directory-mobile');
   passed.push('persisted rename, aliases, biography and remount hydration');
   nodes.openNode('林老师'); await until(() => button('细节'), 'restored detail'); await click('细节');
   await capture('node-details-desktop');
+  nodes.closeNode(); await delay(); await labelledClick('管理节点分类与排序');
+  assertFits(); await capture('node-management-desktop');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });

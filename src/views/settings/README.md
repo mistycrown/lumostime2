@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-07: NodesSettingsView uses a searchable category popover, defaults to persisted manual order, and adds a top-right management entry. NodeManageView wraps draggable capsules in category sections, supports touch/mouse moves and category ordering, edge scrolling, cancellation and click/button alternatives. Unclassified stays last; search preserves hidden nodes during moves.
+
 Update 2026-10-07: The node settings entry uses a distinct Network icon. The compact node directory groups by category, supports category filtering/creation, and places unassigned nodes in 未分类. Empty categories remain selectable without adding empty groups to the all-category list.
 
 Update 2026-10-06: Settings → 内容 → 节点 opens `NodesSettingsView.tsx`, a compact two-line directory searchable by name/alias and sortable by recency, backlink count or name. Selection opens the global node-detail overlay.

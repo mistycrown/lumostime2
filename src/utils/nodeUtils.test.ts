@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-07: Covers capsule moves, ordering boundaries and metadata preservation.
  * @updated 2026-10-07: Covers alias-first syntax, alias preservation and classification fallback.
  * @input Wiki-link notes, node metadata and logs
  * @output Regression checks for text-derived node relationships
@@ -7,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Log, NoteNode } from '../types';
-import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, linkNodeInText, parseNodeLinks, renameNode } from './nodeUtils';
+import { buildNodeIndex, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, linkNodeInText, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
@@ -95,5 +96,32 @@ describe('node text relationships', () => {
     expect(getNodeCategoryId(node('小林'), [category])).toBe('');
     expect(getNodeCategoryId({ ...node('小林'), categoryId: 'deleted' }, [category])).toBe('');
     expect(getNodeCategoryId({ ...node('小林'), categoryId: category.id }, [category])).toBe(category.id);
+  });
+
+  it('moves capsules between categories at exact positions and preserves metadata', () => {
+    const categories = [createNodeCategory([], '人物'), createNodeCategory([], '地点')];
+    const source = [{ ...node('小林', ['林林']), categoryId: categories[0].id }, { ...node('杭州'), categoryId: categories[1].id }, node('项目'), { ...node('北京'), categoryId: categories[1].id }];
+    const moved = moveNodeToCategory(source, categories, '小林', categories[1].id, '北京', false, 10);
+    expect(moved.map((item) => item.id)).toEqual(['杭州', '项目', '小林', '北京']);
+    expect(moved[2]).toMatchObject({ categoryId: categories[1].id, aliases: ['林林'], description: '已有简介', createdAt: 1, updatedAt: 10 });
+    expect(source[0].categoryId).toBe(categories[0].id);
+    expect(moveNodeToCategory(moved, categories, '小林', '').find((item) => item.id === '小林')?.categoryId).toBeUndefined();
+    const empty = createNodeCategory(categories, '空分类');
+    expect(moveNodeToCategory(source, [...categories, empty], '小林', empty.id).at(-1)?.id).toBe('小林');
+  });
+
+  it('reorders within groups and ignores invalid/self targets', () => {
+    const category = createNodeCategory([], '人物');
+    const source = ['a', 'b', 'c'].map((name) => ({ ...node(name), categoryId: category.id }));
+    expect(moveNodeToCategory(source, [category], 'c', category.id, 'a').map((item) => item.id)).toEqual(['c', 'a', 'b']);
+    expect(moveNodeToCategory(source, [category], 'a', category.id).map((item) => item.id)).toEqual(['b', 'c', 'a']);
+    expect(moveNodeToCategory(source, [category], 'b', category.id, 'c', true).map((item) => item.id)).toEqual(['a', 'c', 'b']);
+    expect(moveNodeToCategory(source, [category], 'a', 'missing')).toBe(source);
+    expect(moveNodeToCategory(source, [category], 'a', category.id, 'a')).toBe(source);
+    expect(moveNodeToCategory(source, [category], 'a', '', 'b')).toBe(source);
+    expect(reorderNodeItems(source, 'b', 'a', true)).toBe(source);
+    expect(reorderNodeItems(source, 'a', 'missing')).toBe(source);
+    expect(reorderNodeItems(source, 'unknown', 'a')).toBe(source);
+    expect(reorderNodeItems(source, 'c', 'a').map((item) => item.id)).toEqual(['c', 'a', 'b']);
   });
 });

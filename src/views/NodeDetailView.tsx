@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-07: Reuses the print-style searchable category picker.
  * @updated 2026-10-07: Adds category selection/creation and validates syntax-safe aliases.
  * @input Node metadata, backlinks, co-occurrence and ordinary-text candidates
  * @output Tag-style node details, reusable timeline and candidate conversion
@@ -18,6 +19,7 @@ import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import { DetailTimelineCard } from '../components/DetailTimelineCard';
 import { NodeText } from '../components/NodeText';
 import { NodeCategoryCreator } from '../components/NodeCategoryCreator';
+import { NodeCategorySelect } from '../components/NodeCategorySelect';
 import { getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
 import { generateNodeDescription } from '../services/nodeDescriptionService';
 
@@ -70,10 +72,7 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[] }> = ({ node, lo
     <section>
       <h2 className="mb-3 text-sm font-semibold text-stone-900">分类</h2>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-stone-200 pb-2">
-        <select aria-label="节点分类" value={getNodeCategoryId(node, nodeCategories)} onChange={(event) => assignCategory(node.id, event.target.value)} className="min-w-0 max-w-full bg-transparent py-2 text-sm text-stone-700 outline-none">
-          <option value="">未分类</option>
-          {nodeCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-        </select>
+        <NodeCategorySelect label="节点分类" value={getNodeCategoryId(node, nodeCategories)} onChange={(categoryId) => assignCategory(node.id, categoryId)} />
         <NodeCategoryCreator nodeId={node.id} />
       </div>
     </section>

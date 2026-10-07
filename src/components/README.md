@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-07: `NodeCategorySelect` replaces native node classification selects with a compact searchable popover, selected checkmarks, keyboard navigation, Escape/outside close and focus return. Directory, details and capsule management share it.
+
 Update 2026-10-07: `NodeText` displays the left-hand alias in `[[alias丨node name]]` and resolves navigation by the canonical name. `NodeCategoryCreator` provides inline category creation in both node directory and details. Draft/saved-note suggestions preserve the matched alias in link text.
 
 Update 2026-10-06: `NodeText.tsx` renders wiki links in ordinary and checklist notes. `NodeSuggestions.tsx` offers saved-log association; `NodeNoteSuggestions.tsx` matches names/aliases below backfill drafts and converts text only on click. `NodeDetailOverlay.tsx` uses the tag-detail title bar and unwinds node history before the underlying view. Run `node scripts/test-nodes-renderer.mjs` after building for mobile/desktop checks.
