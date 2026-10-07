@@ -1,5 +1,6 @@
 /**
  * @file syncHarnessMocks.tsx
+ * @updated 2026-10-07: Models daily backup preferences and native foreground state.
  * @updated 2026-10-07: Models node category datasets alongside node assignments.
  * @updated 2026-10-06: Includes node metadata in the observable core data adapter.
  * @input Renderer integration scenarios and in-memory cloud objects
@@ -32,6 +33,7 @@ export const useReview = area('review', {
 export const useSettings = area('settings', {
   autoLinkRules: [], customNarrativeTemplates: [], userPersonalInfo: '', customStickerSets: [], customStickers: [],
   filters: [], memoirFilterConfig: {}, isRestoring: { current: false }, isSyncing: false, manualSyncMode: false,
+  dailyBackupEnabled: false, dailyBackupTime: '22:00',
   updateLastSyncTime: () => {}
 });
 export const useNavigation = area('navigation', { currentView: 'TIMELINE', isSettingsOpen: false });
@@ -111,12 +113,13 @@ export const reportException = () => 'test';
 export const withErrorReference = (message: string) => message;
 export const lifecycle = { callback: null as any, removed: false };
 export const App = {
+  async getState() { return { isActive: true }; },
   async addListener(_event: string, callback: any) {
     lifecycle.callback = callback;
     return { remove: async () => { lifecycle.removed = true; } };
   }
 };
-export const Capacitor = { isNativePlatform: () => false };
+export const Capacitor = { native: false, isNativePlatform: () => Capacitor.native };
 // Production timings are independently tested with fake timers in syncScheduler.test.ts.
 export const SYNC_CONFIG = {
   AUTO_SYNC_DEBOUNCE_MS: 30, AUTO_SYNC_MAX_WAIT_MS: 150, RESUME_SYNC_COOLDOWN_MS: 100,

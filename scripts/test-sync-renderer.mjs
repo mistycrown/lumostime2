@@ -1,5 +1,6 @@
 /**
  * @file test-sync-renderer.mjs
+ * @updated 2026-10-07: Smoke-tests daily backup controls, persistence and manual-only visibility.
  * @input Real sync hook and isolated test adapters; optional --smoke-url for a local production preview
  * @output Renderer integration results and optional production-page screenshot in a temporary directory
  * @pos Test Runner
@@ -86,6 +87,41 @@ app.whenReady().then(async () => {
     await fs.writeFile(screenshot, (await window.webContents.capturePage()).toPNG());
     console.log('SMOKE_SCREENSHOT=' + screenshot);
     console.log('SMOKE_TEXT=' + text.slice(0, 500));
+    const execute = code => window.webContents.executeJavaScript(code);
+    const openPreferences = async () => {
+      await execute("document.querySelector('button svg.lucide-settings').closest('button').click()");
+      await sleep(1000);
+      await execute("Array.from(document.querySelectorAll('span')).find(node => node.textContent === '偏好设置').click()");
+      await sleep(1000);
+    };
+    await openPreferences();
+    if (!await execute("document.querySelector('button[role=switch]')?.getAttribute('aria-checked') === 'false'")) throw new Error('Daily backup should default to disabled');
+    await execute("document.querySelector('button[role=switch]').click()");
+    await sleep(200);
+    await execute("(() => { const input = document.getElementById('daily-backup-time'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, '21:30'); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); })()");
+    await sleep(200);
+    if (!await execute("localStorage.getItem('lumostime_daily_backup_enabled') === 'true' && localStorage.getItem('lumostime_daily_backup_time') === '21:30'")) throw new Error('Daily preferences were not saved');
+    await execute("document.getElementById('daily-backup-time').scrollIntoView({ block: 'center' })");
+    // Wake the compositor of the hidden test window before saving its updated frame.
+    await window.webContents.capturePage();
+    await sleep(500);
+    const preferencesScreenshot = path.join(__dirname, 'daily-backup-preferences.png');
+    await fs.writeFile(preferencesScreenshot, (await window.webContents.capturePage()).toPNG());
+    console.log('PREFERENCES_SCREENSHOT=' + preferencesScreenshot);
+    await window.loadURL(smokeUrl);
+    await sleep(3000);
+    await openPreferences();
+    if (!await execute("document.getElementById('daily-backup-time')?.value === '21:30'")) throw new Error('Daily backup time did not survive reload');
+    await execute("Array.from(document.querySelectorAll('h4')).find(node => node.textContent === '手动同步模式').parentElement.parentElement.querySelector('button').click()");
+    await sleep(200);
+    if (await execute("!!document.querySelector('button[role=switch]')")) throw new Error('Daily backup controls remain visible in automatic mode');
+    await execute("Array.from(document.querySelectorAll('h4')).find(node => node.textContent === '手动同步模式').parentElement.parentElement.querySelector('button').click()");
+    await sleep(200);
+    await execute("document.querySelector('button[role=switch]').click()");
+    await sleep(200);
+    if (await execute("!!document.getElementById('daily-backup-time')")) throw new Error('Disabled backup time remains visible');
+    if (seenErrors.size) throw new Error('Preferences smoke errors: ' + JSON.stringify(Array.from(seenErrors)));
+    console.log('PREFERENCES_SMOKE=passed');
   }
   app.exit(0);
 }).catch(error => { console.error(error); app.exit(1); });

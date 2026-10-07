@@ -1,5 +1,6 @@
 /**
  * @file PreferencesSettingsView.tsx
+ * @updated 2026-10-07: Adds daily backup switch and time picker under manual sync preferences.
  * @description 偏好设置页面
  * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.
@@ -136,7 +137,11 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
         timelineLayout,
         setTimelineLayout,
         associationSelectorColumns,
-        setAssociationSelectorColumns
+        setAssociationSelectorColumns,
+        dailyBackupEnabled,
+        setDailyBackupEnabled,
+        dailyBackupTime,
+        setDailyBackupTime
     } = useSettings();
     const [isThemeModeDropdownOpen, setIsThemeModeDropdownOpen] = useState(false);
     const [isDefaultViewDropdownOpen, setIsDefaultViewDropdownOpen] = useState(false);
@@ -296,7 +301,7 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                         </div>
                         
                         {/* Manual Sync Mode Toggle */}
-                        <div className="flex items-center justify-between gap-3 p-4 hover:bg-stone-50 transition-colors rounded-b-2xl">
+                        <div className="flex items-center justify-between gap-3 p-4 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-stone-700">手动同步模式</h4>
                                 <p className="text-xs text-stone-400 mt-1">开启后点击同步按钮将弹出方向选择，关闭则自动检测</p>
@@ -314,6 +319,35 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                                 />
                             </button>
                         </div>
+                        {manualSyncMode && (
+                            <>
+                                <div className="flex items-center justify-between gap-3 p-4 border-t border-stone-100 hover:bg-stone-50 transition-colors">
+                                    <h4 className="font-bold text-stone-700">定时备份</h4>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-label="定时备份"
+                                        aria-checked={dailyBackupEnabled}
+                                        onClick={() => setDailyBackupEnabled(!dailyBackupEnabled)}
+                                        className={`flex-shrink-0 w-12 h-7 rounded-full transition-colors flex items-center px-1 ${dailyBackupEnabled ? 'bg-stone-800' : 'bg-stone-200'}`}
+                                    >
+                                        <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${dailyBackupEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
+                                {dailyBackupEnabled && (
+                                    <div className="flex items-center justify-between gap-3 p-4 border-t border-stone-100 hover:bg-stone-50 transition-colors">
+                                        <label htmlFor="daily-backup-time" className="font-bold text-stone-700">每日备份时间</label>
+                                        <input
+                                            id="daily-backup-time"
+                                            type="time"
+                                            value={dailyBackupTime}
+                                            onChange={event => { if (event.target.value) setDailyBackupTime(event.target.value); }}
+                                            className="bg-stone-100 border-none rounded-lg px-3 py-1.5 text-sm font-bold text-stone-700 focus:outline-none focus:bg-stone-200 transition-colors font-mono"
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 </div>
 
