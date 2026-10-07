@@ -12,6 +12,7 @@ import { NodeNoteSuggestions } from './NodeNoteSuggestions';
 interface NodeTextEditorProps {
   value: string;
   onChange: (value: string) => void;
+  id?: string;
   ariaLabel?: string;
   placeholder?: string;
   className?: string;
@@ -21,6 +22,7 @@ interface NodeTextEditorProps {
 export const NodeTextEditor: React.FC<NodeTextEditorProps> = ({
   value,
   onChange,
+  id,
   ariaLabel = '文本',
   placeholder = '输入内容...',
   className = '',
@@ -41,6 +43,7 @@ export const NodeTextEditor: React.FC<NodeTextEditorProps> = ({
     <div className="relative">
       <textarea
         ref={inputRef}
+        id={id}
         aria-label={ariaLabel}
         value={value}
         rows={rows}
