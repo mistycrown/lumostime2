@@ -1,5 +1,6 @@
 /**
  * @file dataValidation.test.ts
+ * @updated 2026-10-07: Covers optional category backups and invalid category identities.
  * @input Modern and legacy backup payloads
  * @output Regression coverage for optional backup blocks
  * @updated 2026-10-06: Validates node metadata and rejects malformed or duplicate node identities.
@@ -15,11 +16,20 @@ const createValidPayload = () => ({
 });
 
 describe('dataValidation achievementData support', () => {
+  it('accepts node categories and rejects malformed or duplicate classifications', () => {
+    const category = { id: 'people', name: '人物', createdAt: 1, updatedAt: 2 };
+    expect(validateLocalData({ ...createValidPayload(), nodeCategories: [category] }).isValid).toBe(true);
+    expect(validateLocalData({ ...createValidPayload(), nodeCategories: {} }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodeCategories: [{ ...category, name: '未分类' }] }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodeCategories: [category, { ...category, id: 'other' }] }).isValid).toBe(false);
+    expect(validateLocalData({ ...createValidPayload(), nodes: [{ id: 'n', name: '小林', aliases: [], description: '', createdAt: 1, updatedAt: 2, categoryId: 3 }] }).isValid).toBe(false);
+  });
   it('preserves valid nodes and accepts legacy backups that omit them', () => {
     const nodes = [{ id: 'n', name: '小林', aliases: ['林林'], description: '朋友', createdAt: 1, updatedAt: 2 }];
     const payload = { ...createValidPayload(), nodes };
     expect(validateAndFixData(payload).data.nodes).toEqual(nodes);
     expect(validateLocalData(payload).isValid).toBe(true);
+    expect(validateLocalData({ ...payload, nodes: [{ ...nodes[0], name: '林林丨小林' }] }).isValid).toBe(true);
     expect(validateLocalData(createValidPayload()).isValid).toBe(true);
   });
 

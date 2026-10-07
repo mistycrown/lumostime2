@@ -1,5 +1,6 @@
 ﻿/**
  * @file dataRepository.ts
+ * @updated 2026-10-07: Persists node categories alongside node metadata and log transactions.
  * @updated 2026-10-06: Hydrates and persists lightweight wiki-link node metadata.
  * @updated 2026-10-03: Commits logs with the Feishu outbox, distinguishes first-install snapshots, and notifies after dependent datasets persist.
  * @input Legacy localStorage keys, IndexedDB-backed storage repository, application defaults
@@ -44,6 +45,7 @@ import {
   Goal,
   Log,
   NoteNode,
+  NodeCategory,
   MajorGoal,
   MonthlyReview,
   OnThisDayEntry,
@@ -70,6 +72,7 @@ const getTimingNow = (): number => (
 export const REPOSITORY_KEYS = {
   LOGS: 'logs',
   NODES: 'nodes',
+  NODE_CATEGORIES: 'nodeCategories',
   TODOS: 'todos',
   TODO_CATEGORIES: 'todoCategories',
   DATA_COLLECTIONS: 'dataCollections',
@@ -123,6 +126,7 @@ const MIGRATION_DEFINITIONS: MigrationDefinition[] = [
 export interface DataContextSnapshot {
   logs: Log[];
   nodes: NoteNode[];
+  nodeCategories: NodeCategory[];
   hasStoredLogs: boolean;
   todos: TodoItem[];
   todoCategories: TodoCategory[];
@@ -307,14 +311,16 @@ export class DataRepository {
       storedTodoCategories,
       storedCollections,
       storedCollectionEntries,
-      storedNodes
+      storedNodes,
+      storedNodeCategories
     ] = await Promise.all([
       this.repository.getData<Log[]>(REPOSITORY_KEYS.LOGS),
       this.repository.getData<TodoItem[]>(REPOSITORY_KEYS.TODOS),
       this.repository.getData<TodoCategory[]>(REPOSITORY_KEYS.TODO_CATEGORIES),
       this.repository.getData<DataCollection[]>(REPOSITORY_KEYS.DATA_COLLECTIONS),
       this.repository.getData<DataCollectionEntry[]>(REPOSITORY_KEYS.DATA_COLLECTION_ENTRIES),
-      this.repository.getData<NoteNode[]>(REPOSITORY_KEYS.NODES)
+      this.repository.getData<NoteNode[]>(REPOSITORY_KEYS.NODES),
+      this.repository.getData<NodeCategory[]>(REPOSITORY_KEYS.NODE_CATEGORIES)
     ]);
     const logs = storedLogs ?? INITIAL_LOGS;
     const todos = storedTodos ?? this.buildDefaultTodos(logs);
@@ -329,6 +335,7 @@ export class DataRepository {
     return {
       logs,
       nodes: storedNodes ?? [],
+      nodeCategories: storedNodeCategories ?? [],
       hasStoredLogs: storedLogs !== null,
       todos,
       todoCategories,
@@ -484,14 +491,18 @@ export class DataRepository {
     return snapshot.logs;
   }
 
-  async saveLogs(logs: Log[], nodes?: NoteNode[]): Promise<void> {
+  async saveLogs(logs: Log[], nodes?: NoteNode[], nodeCategories?: NodeCategory[]): Promise<void> {
     await this.initialize();
     if (this.repository.setBatch) {
       await new FeishuAutoSyncStore({ getMeta: this.repository.getMeta.bind(this.repository), setBatch: this.repository.setBatch.bind(this.repository) }).saveLogs(logs, undefined,
-        nodes ? [{ namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes }] : []);
+        [
+          ...(nodes ? [{ namespace: 'data' as const, key: REPOSITORY_KEYS.NODES, value: nodes }] : []),
+          ...(nodeCategories ? [{ namespace: 'data' as const, key: REPOSITORY_KEYS.NODE_CATEGORIES, value: nodeCategories }] : [])
+        ]);
     } else {
       await this.repository.setData(REPOSITORY_KEYS.LOGS, logs);
       if (nodes) await this.repository.setData(REPOSITORY_KEYS.NODES, nodes);
+      if (nodeCategories) await this.repository.setData(REPOSITORY_KEYS.NODE_CATEGORIES, nodeCategories);
     }
     publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
@@ -502,9 +513,17 @@ export class DataRepository {
     publishFeishuEvent(FEISHU_DATA_SAVED_EVENT);
   }
 
-  async saveNodes(nodes: NoteNode[]): Promise<void> {
+  async saveNodes(nodes: NoteNode[], nodeCategories?: NodeCategory[]): Promise<void> {
     await this.initialize();
-    await this.repository.setData(REPOSITORY_KEYS.NODES, nodes);
+    if (nodeCategories && this.repository.setBatch) {
+      await this.repository.setBatch([
+        { namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes },
+        { namespace: 'data', key: REPOSITORY_KEYS.NODE_CATEGORIES, value: nodeCategories }
+      ]);
+    } else {
+      await this.repository.setData(REPOSITORY_KEYS.NODES, nodes);
+      if (nodeCategories) await this.repository.setData(REPOSITORY_KEYS.NODE_CATEGORIES, nodeCategories);
+    }
   }
 
   async saveTodoCategories(todoCategories: TodoCategory[]): Promise<void> {

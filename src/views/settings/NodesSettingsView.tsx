@@ -1,5 +1,6 @@
 /**
  * @file NodesSettingsView.tsx
+ * @updated 2026-10-07: Groups compact node rows by user-created categories and an uncategorized fallback.
  * @input Persisted nodes and text-derived node index
  * @output Searchable node directory with recent/count/name sorting and detail navigation
  * @pos View (Settings / Content)
@@ -9,15 +10,19 @@ import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { useNodes } from '../../contexts/NodeContext';
 import { usePrivacy } from '../../contexts/PrivacyContext';
+import { NodeCategoryCreator } from '../../components/NodeCategoryCreator';
+import { getNodeCategoryId } from '../../utils/nodeUtils';
 
 export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { nodes, index, openNode } = useNodes();
+  const { nodes, nodeCategories, index, openNode } = useNodes();
   const { isPrivacyMode } = usePrivacy();
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<'recent' | 'count' | 'name'>('recent');
+  const [categoryId, setCategoryId] = useState('all');
   const visibleNodes = useMemo(() => {
     const search = query.trim().toLocaleLowerCase();
-    return nodes.filter((node) => [node.name, ...node.aliases].some((name) => name.toLocaleLowerCase().includes(search)))
+    return nodes.filter((node) => (categoryId === 'all' || getNodeCategoryId(node, nodeCategories) === categoryId)
+      && [node.name, ...node.aliases].some((name) => name.toLocaleLowerCase().includes(search)))
       .sort((a, b) => {
         const aEntry = index.get(a.id);
         const bEntry = index.get(b.id);
@@ -25,7 +30,11 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
           : sort === 'count' ? (bEntry?.logs.length || 0) - (aEntry?.logs.length || 0) : 0;
         return difference || a.name.localeCompare(b.name, 'zh-CN');
       });
-  }, [nodes, index, query, sort]);
+  }, [nodes, nodeCategories, categoryId, index, query, sort]);
+  const groups = [...nodeCategories, { id: '', name: '未分类' }]
+    .filter((category) => categoryId === 'all' || category.id === categoryId)
+    .map((category) => ({ ...category, nodes: visibleNodes.filter((node) => getNodeCategoryId(node, nodeCategories) === category.id) }))
+    .filter((group) => group.nodes.length > 0 || (categoryId !== 'all' && !query.trim()));
   return <div className="fixed inset-0 z-50 flex flex-col bg-[#faf9f6] pt-[env(safe-area-inset-top)]">
     <header className="flex shrink-0 items-center gap-3 border-b border-stone-200 px-6 py-4">
       <button type="button" aria-label="返回设置" onClick={onBack} className="-ml-2 p-2 text-stone-500 hover:text-stone-900"><ChevronLeft size={22} /></button>
@@ -38,12 +47,21 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
           <Search size={16} className="shrink-0 text-stone-400" />
           <input aria-label="搜索节点" placeholder="搜索名称或别名" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-stone-800 outline-none placeholder:text-stone-400" />
         </div>
-        <div className="mb-3 mt-6 flex items-center gap-5 text-xs">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <select aria-label="筛选节点分类" value={categoryId} onChange={(event) => setCategoryId(event.target.value)} className="min-w-0 max-w-full bg-transparent py-2 text-xs text-stone-600 outline-none">
+            <option value="all">全部分类</option><option value="">未分类</option>
+            {nodeCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+          <NodeCategoryCreator />
+        </div>
+        <div className="mb-3 mt-3 flex items-center gap-5 text-xs">
           {([['recent', '最近使用'], ['count', '记录数量'], ['name', '名称']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={sort === value} onClick={() => setSort(value)} className={`py-2 ${sort === value ? 'font-semibold text-stone-900' : 'text-stone-400 hover:text-stone-600'}`}>{label}</button>)}
           <span className="ml-auto font-mono text-stone-400">{visibleNodes.length}</span>
         </div>
-        <div className="divide-y divide-stone-200 border-y border-stone-200">
-          {visibleNodes.map((node) => {
+        {(nodes.length > 0 || nodeCategories.length > 0) && groups.map((group) => <section key={group.id || 'uncategorized'} className="mb-7">
+          <h3 className="mb-2 flex items-center justify-between text-xs font-medium text-stone-500"><span>{group.name}</span><span className="font-mono text-[10px] text-stone-400">{group.nodes.length}</span></h3>
+          <div className="divide-y divide-stone-200 border-y border-stone-200">
+          {group.nodes.map((node) => {
             const entry = index.get(node.id);
             return <button type="button" key={node.id} onClick={() => openNode(node.name)} className="group flex w-full items-center gap-3 py-3 text-left">
               <span aria-hidden="true" className="font-serif text-sm text-stone-300">[[]]</span>
@@ -57,8 +75,10 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
               <ChevronRight size={16} className="shrink-0 text-stone-300 group-hover:text-stone-700" />
             </button>;
           })}
-        </div>
-        {!visibleNodes.length && <p className="py-16 text-center text-sm leading-7 text-stone-400">{query ? '没有找到节点' : <>暂无节点<br />在记录备注中写下 [[名称]]，保存后即可创建</>}</p>}
+          </div>
+          {!group.nodes.length && <p className="py-4 text-xs text-stone-400">{query ? '没有找到节点' : '暂无节点'}</p>}
+        </section>)}
+        {(groups.length === 0 || (!nodes.length && !nodeCategories.length)) && <p className="py-16 text-center text-sm leading-7 text-stone-400">{query ? '没有找到节点' : <>暂无节点<br />在记录备注中写下 [[名称]]，保存后即可创建</>}</p>}
       </div>
     </main>
   </div>;

@@ -1,5 +1,6 @@
 /**
  * @file dataRepository.test.ts
+ * @updated 2026-10-07: Tests legacy category defaults and classification round-trips.
  * @input In-memory core repository snapshots
  * @output Persistence and hydration regressions
  * @updated 2026-10-06: Verifies node metadata round-trips and atomic log/node writes.
@@ -56,9 +57,12 @@ describe('DataRepository', () => {
     const legacy = createLegacyStorageAdapter(new Map());
     const repository = new DataRepository(storage, legacy.adapter);
     expect((await repository.loadDataContextSnapshot()).nodes).toEqual([]);
-    const nodes = [{ id: 'n', name: '小林', aliases: ['林林'], description: '一起讨论项目', createdAt: 1, updatedAt: 2 }];
-    await repository.saveNodes(nodes);
+    expect((await repository.loadDataContextSnapshot()).nodeCategories).toEqual([]);
+    const categories = [{ id: 'people', name: '人物', createdAt: 1, updatedAt: 2 }];
+    const nodes = [{ id: 'n', name: '小林', aliases: ['林林'], description: '一起讨论项目', categoryId: 'people', createdAt: 1, updatedAt: 2 }];
+    await repository.saveNodes(nodes, categories);
     expect((await repository.loadDataContextSnapshot()).nodes).toEqual(nodes);
+    expect((await repository.loadDataContextSnapshot()).nodeCategories).toEqual(categories);
   });
 
   it('persists renamed log text and metadata in the same outbox transaction', async () => {
@@ -70,12 +74,14 @@ describe('DataRepository', () => {
     const repository = new DataRepository(Object.assign(storage, { setBatch }), createLegacyStorageAdapter(new Map()).adapter);
     const logs = [{ id: 'l', note: '[[林老师]]', categoryId: 'c', activityId: 'a', startTime: 1, endTime: 2, duration: 1 }];
     const nodes = [{ id: 'n', name: '林老师', aliases: ['小林'], description: '', createdAt: 1, updatedAt: 2 }];
-    await repository.saveLogs(logs, nodes);
+    const categories = [{ id: 'people', name: '人物', createdAt: 1, updatedAt: 2 }];
+    await repository.saveLogs(logs, nodes, categories);
     expect(setBatch).toHaveBeenCalledTimes(1);
     const writes = setBatch.mock.calls[0][0];
     expect(writes).toEqual(expect.arrayContaining([
       { namespace: 'data', key: REPOSITORY_KEYS.LOGS, value: logs },
-      { namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes }
+      { namespace: 'data', key: REPOSITORY_KEYS.NODES, value: nodes },
+      { namespace: 'data', key: REPOSITORY_KEYS.NODE_CATEGORIES, value: categories }
     ]));
     expect(writes.some((write) => write.namespace === 'meta')).toBe(true);
   });

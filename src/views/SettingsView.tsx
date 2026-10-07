@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-07: Uses a distinct network icon for the node entry.
  * @updated 2026-10-06: Adds the node directory entry to the Content group.
  * @updated 2026-10-05: Keeps delivered error-report IDs and user identifiers in a copyable receipt dialog.
  * @updated 2026-10-02: Added the manual Feishu calendar connection/test-event entry under Data and Sync.
@@ -75,6 +76,7 @@ import {
     Edit,
     Search,
     Star,
+    Network,
     Link,
     Smartphone,
     ImageIcon,
@@ -1301,7 +1303,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                             onClick={() => openSettingsSubmenu('filters')}
                         />
                         <MenuItem
-                            icon={<Star size={18} className="text-stone-500" />}
+                            icon={<Network size={18} className="text-stone-500" />}
                             label="节点"
                             onClick={() => openSettingsSubmenu('nodes')}
                         />

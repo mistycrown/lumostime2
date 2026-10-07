@@ -1,5 +1,6 @@
 /**
  * @file dataValidation.ts
+ * @updated 2026-10-07: Validates optional node category datasets and node category identifiers.
  * @updated 2026-10-06: Validates optional node metadata while accepting older backups.
  * @description Data validation helpers for backup, import, and cloud sync payloads.
  * @updated 2026-07-06: Added validation support for self-belief library arrays so AI-created identity descriptions can sync with the main backup payload.
@@ -23,7 +24,7 @@ import {
   MOCK_TODO_CATEGORIES,
   SCOPES
 } from '../constants';
-import { isValidNodeName } from './nodeUtils';
+import { isValidNodeName, parseNodeLinks } from './nodeUtils';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -57,6 +58,7 @@ export function validateLocalData(data: any): ValidationResult {
     'collections',
     'collectionEntries',
     'nodes',
+    'nodeCategories',
     'scopes',
     'goals',
     'majorGoals',
@@ -86,15 +88,33 @@ export function validateLocalData(data: any): ValidationResult {
     const ids = new Set<string>();
     for (const node of data.nodes) {
       if (!node || typeof node.id !== 'string' || !node.id || typeof node.name !== 'string'
-        || !isValidNodeName(node.name) || node.name !== node.name.trim()
+        || (!isValidNodeName(node.name) && !parseNodeLinks(`[[${node.name}]]`)[0]?.label) || node.name !== node.name.trim()
         || !Array.isArray(node.aliases) || node.aliases.some((alias: unknown) => typeof alias !== 'string')
-        || typeof node.description !== 'string' || !Number.isFinite(node.createdAt) || !Number.isFinite(node.updatedAt)) {
+        || typeof node.description !== 'string' || !Number.isFinite(node.createdAt) || !Number.isFinite(node.updatedAt)
+        || (node.categoryId !== undefined && typeof node.categoryId !== 'string')) {
         errors.push('Invalid node metadata');
         continue;
       }
       if (names.has(node.name) || ids.has(node.id)) errors.push('Duplicate node name or id');
       names.add(node.name);
       ids.add(node.id);
+    }
+  }
+
+  if (Array.isArray(data.nodeCategories)) {
+    const names = new Set<string>();
+    const ids = new Set<string>();
+    for (const category of data.nodeCategories) {
+      if (!category || typeof category.id !== 'string' || !category.id || typeof category.name !== 'string'
+        || !category.name.trim() || category.name !== category.name.trim() || /[\r\n]/.test(category.name)
+        || category.name === '未分类' || category.name === '全部'
+        || !Number.isFinite(category.createdAt) || !Number.isFinite(category.updatedAt)) {
+        errors.push('Invalid node category metadata');
+        continue;
+      }
+      if (names.has(category.name) || ids.has(category.id)) errors.push('Duplicate node category name or id');
+      names.add(category.name);
+      ids.add(category.id);
     }
   }
 

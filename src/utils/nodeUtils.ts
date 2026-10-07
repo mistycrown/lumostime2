@@ -1,33 +1,61 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-07: Parses alias-first links, preserves alias text on linking/rename, and validates node categories.
  * @input Log note text and lightweight NoteNode metadata
  * @output Wiki-link parsing, node discovery, backlinks, co-occurrence and text mutations
  * @pos Utils (Nodes)
  * @description Derives every node relationship from note text without storing relation tables.
  * @updated 2026-10-06: Added node parsing, alias candidates, indexing and rename helpers.
  */
-import type { Log, NoteNode } from '../types';
+import type { Log, NoteNode, NodeCategory } from '../types';
 
-export interface NodeLink { name: string; start: number; end: number }
+export interface NodeLink { name: string; label?: string; start: number; end: number }
 export interface NodeCandidate { node: NoteNode; matches: string[] }
 export interface NodeIndexEntry { logs: Log[]; latestAt: number; related: Map<string, number> }
 
-export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]\r\n|]/.test(name);
+export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]\r\n|丨]/.test(name);
 
 export const parseNodeLinks = (text = ''): NodeLink[] => {
   const links: NodeLink[] = [];
   const pattern = /(?<!\[)\[\[([^\[\]\r\n|]+)\]\](?!\])/g;
   for (const match of text.matchAll(pattern)) {
-    const name = match[1].trim();
-    if (name) links.push({ name, start: match.index!, end: match.index! + match[0].length });
+    const parts = match[1].split('丨').map((part) => part.trim());
+    if (parts.length > 2 || parts.some((part) => !part)) continue;
+    const name = parts.at(-1)!;
+    links.push({ name, ...(parts.length === 2 ? { label: parts[0] } : {}), start: match.index!, end: match.index! + match[0].length });
   }
   return links;
 };
 
 export const getNodeNames = (text = ''): string[] => [...new Set(parseNodeLinks(text).map((link) => link.name))];
 
+// Earlier versions treated the whole alias token as a name. Preserve its metadata when upgrading.
+const normalizeLegacyAliasNodes = (nodes: NoteNode[]): NoteNode[] => {
+  const legacy = nodes.filter((node) => parseNodeLinks(`[[${node.name}]]`)[0]?.label);
+  if (!legacy.length) return nodes;
+  const result = nodes.filter((node) => !legacy.includes(node));
+  for (const node of legacy) {
+    const link = parseNodeLinks(`[[${node.name}]]`)[0];
+    const index = result.findIndex((item) => item.name === link.name);
+    const target = index >= 0 ? result[index] : { ...node, name: link.name };
+    const descriptions = [...new Set([target.description, node.description].filter(Boolean))];
+    const merged = {
+      ...target,
+      aliases: [...new Set([...target.aliases, ...node.aliases, link.label!])].filter((alias) => alias !== link.name),
+      description: descriptions.join('\n\n'),
+      categoryId: target.categoryId || node.categoryId,
+      createdAt: Math.min(target.createdAt, node.createdAt),
+      updatedAt: Math.max(target.updatedAt, node.updatedAt)
+    };
+    if (index >= 0) result[index] = merged;
+    else result.push(merged);
+  }
+  return result;
+};
+
 export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now()): NoteNode[] => {
-  const names = new Set(nodes.map((node) => node.name));
+  const normalized = normalizeLegacyAliasNodes(nodes);
+  const names = new Set(normalized.map((node) => node.name));
   const added: NoteNode[] = [];
   for (const log of logs) {
     for (const name of getNodeNames(log.note)) {
@@ -36,7 +64,7 @@ export const discoverNodes = (nodes: NoteNode[], logs: Log[], now = Date.now()):
       added.push({ id: crypto.randomUUID(), name, aliases: [], description: '', createdAt: now, updatedAt: now });
     }
   }
-  return added.length ? [...nodes, ...added] : nodes;
+  return added.length ? [...normalized, ...added] : normalized;
 };
 
 export const buildNodeIndex = (nodes: NoteNode[], logs: Log[]): Map<string, NodeIndexEntry> => {
@@ -75,28 +103,38 @@ export const getNodeCandidates = (text: string, nodes: NoteNode[]): NodeCandidat
   const ordinary = text.split(/\[\[[\s\S]*?\]\]/).join('\u0000');
   return nodes.flatMap((node) => {
     if (linked.has(node.name)) return [];
-    const matches = [...new Set([node.name, ...node.aliases])].filter((name) => name && ordinary.includes(name));
+    const matches = [...new Set([node.name, ...node.aliases])].filter((name) => isValidNodeName(name) && ordinary.includes(name));
     return matches.length ? [{ node, matches }] : [];
   });
 };
 
 export const linkNodeInText = (text: string, node: NoteNode): string => {
-  const names = [...new Set([node.name, ...node.aliases])].filter(Boolean).sort((a, b) => b.length - a.length);
+  const names = [...new Set([node.name, ...node.aliases])].filter(isValidNodeName).sort((a, b) => b.length - a.length);
   const escaped = names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   if (!escaped.length) return text;
   const pattern = new RegExp(escaped.join('|'), 'g');
-  return mapOrdinaryText(text, (part) => part.replace(pattern, () => `[[${node.name}]]`));
+  return mapOrdinaryText(text, (part) => part.replace(pattern, (matched) => matched === node.name ? `[[${node.name}]]` : `[[${matched}丨${node.name}]]`));
 };
 
 export const renameNodeInText = (text: string, oldName: string, newName: string): string => {
   let result = '';
   let offset = 0;
   for (const link of parseNodeLinks(text)) {
-    result += text.slice(offset, link.start) + (link.name === oldName ? `[[${newName}]]` : text.slice(link.start, link.end));
+    result += text.slice(offset, link.start) + (link.name === oldName ? `[[${link.label ? `${link.label}丨` : ''}${newName}]]` : text.slice(link.start, link.end));
     offset = link.end;
   }
   return result + text.slice(offset);
 };
+
+export const createNodeCategory = (categories: NodeCategory[], name: string, now = Date.now()): NodeCategory => {
+  const normalized = name.trim();
+  if (!normalized || /[\r\n]/.test(normalized)) throw new Error('请输入有效分类名称');
+  if (normalized === '未分类' || normalized === '全部') throw new Error('请使用其他分类名称');
+  if (categories.some((category) => category.name === normalized)) throw new Error('已存在同名分类');
+  return { id: crypto.randomUUID(), name: normalized, createdAt: now, updatedAt: now };
+};
+
+export const getNodeCategoryId = (node: NoteNode, categories: NodeCategory[]): string => categories.some((category) => category.id === node.categoryId) ? node.categoryId! : '';
 
 export const renameNode = (nodes: NoteNode[], logs: Log[], id: string, name: string, now = Date.now()) => {
   const source = nodes.find((node) => node.id === id);

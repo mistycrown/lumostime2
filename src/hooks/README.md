@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-07: Node category datasets participate in sync change detection and backup restoration. Offline sync tests cover category-only uploads and restored classification references.
+
 Update 2026-10-06: `useSyncManager.ts` includes node metadata in JSON/cloud backups, restore and change tracking. Its offline renderer tests cover node-only biography edits and restored aliases/descriptions.
 
 > Update 2026-10-06: `useCustomPresets.ts` immediately marks successful saves/deletions for cloud sync, refreshes lists after appearance restores and storage changes, and reads the latest persisted list before mutations. Newly saved data is validated before writing. Run `node scripts/test-custom-presets-renderer.mjs` for real React save/reopen, restore, concurrent-callback, storage-failure, and first-sync regressions.

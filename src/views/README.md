@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-07: Node details support selecting or creating a category in 细节. Time-line aliases render their own label while navigating to the canonical node. Existing wiki-link syntax remains supported.
+
 Update 2026-10-06: `NodeDetailView.tsx` reuses tag-detail typography, tabs and the all-history timeline, with editable aliases/biography, AI generation, related nodes and potential backlinks. Timeline notes render node links and saved-log suggestions.
 
 > Update 2026-10-06: `FilterDetailView.tsx` and `ScopeDetailView.tsx` add a statistics tab beside the timeline, using complete matching/linked actual records and independent duration/note card settings. Filters persist immediately; scopes retain buffered exit/background saving.
