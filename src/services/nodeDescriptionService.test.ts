@@ -37,6 +37,18 @@ describe('node description generation', () => {
     expect(formatted).toContain('用户原写的背景。\n共同准备项目汇报。');
     expect(formatted).toContain('- 10月7日：一起讨论项目。；讨论项目并吃饭。');
   });
+  it('formats custom node sections without forcing the people template', () => {
+    const result = parseNodeDescriptionResult(JSON.stringify({
+      nodeType: '项目',
+      sections: [{ title: '项目状态', items: [{ label: '阶段', value: '方案设计' }] }],
+      basicInfo: { identity: '', relationship: '' },
+      bioAdditions: [],
+      recentInteractions: []
+    }));
+    expect(formatNodeDescription('', result)).toBe('## 项目状态\n- 阶段：方案设计');
+    expect(formatNodeDescription('', result)).toBe('## 项目状态\n- 阶段：方案设计');
+    expect(formatNodeDescription('## 项目状态\n- 阶段：立项', result)).toContain('## 项目状态（补充）\n- 阶段：方案设计');
+  });
   it('allows daily review answers as the only evidence source', async () => {
     mocks.generateNarrative.mockResolvedValue(JSON.stringify({ basicInfo: { identity: '', relationship: '' }, bioAdditions: [], recentInteractions: [] }));
     await expect(generateNodeDescriptionResult(node, [], [{ date: '2026-10-07', question: '见了谁', answer: '和[[小林]]吃饭' }])).resolves.toMatchObject({ basicInfo: { identity: '', relationship: '' } });

@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-07: Detail timeline grouping accepts review-only date keys so daily answers can share the same date sections as Log records.
+
 Update 2026-10-07: Node indexing includes deduplicated daily-review answers; answer links support canonical rename/merge transforms. Node description formatting keeps existing prose and emits structured basic-info and dated interaction sections.
 
 Update 2026-10-07: `mergeNodes` preserves the chosen primary's ID/category/order, unions aliases including the source name, and appends distinct biographies. It redirects source references throughout logs while preserving original display labels and bracket width. Renaming thereafter retargets every historical/alias reference; unchanged logs retain identity.

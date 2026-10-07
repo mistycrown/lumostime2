@@ -143,6 +143,7 @@ async function run() {
   await select('节点分类', '');
   check(!nodes.nodes.find((node) => node.id === 'person')?.categoryId, 'Clearing classification failed');
   await select('节点分类', peopleCategory.id);
+  await labelledClick('编辑节点简介');
   await input('节点简介', '和小林共同记录的日常与项目讨论。');
   await input('新别名', '小林同学'); await labelledClick('添加别名');
   await labelledClick('编辑别名：小林同学'); await input('新别名', '林同学'); await labelledClick('保存别名');
@@ -172,8 +173,9 @@ async function run() {
   await click('AI 生成'); await until(() => aiRequests.length === 1, 'AI request');
   check(JSON.parse(aiRequests[0].prompt).相关记录.length === 3, 'AI prompt omitted backlinks');
   aiRequests[0].resolve('相关记录涉及项目讨论、散步和书籍推荐。'); await delay();
-  check((document.querySelector('[aria-label="节点简介"]') as HTMLTextAreaElement).value.includes('书籍推荐'), 'Generated text not editable');
+  check(document.querySelector('[aria-label="节点简介预览"]')?.textContent?.includes('书籍推荐'), 'Generated text not rendered');
   await click('AI 生成'); await until(() => aiRequests.length === 2, 'second AI request');
+  await labelledClick('编辑节点简介');
   await input('节点简介', '生成期间手写的简介。');
   aiRequests[1].resolve('过期 AI 内容'); await delay();
   check((document.querySelector('[aria-label="节点简介"]') as HTMLTextAreaElement).value === '生成期间手写的简介。', 'AI overwrote newer edits');
@@ -269,6 +271,7 @@ async function run() {
   data.setNodes((previous) => [...previous, { id: 'merge-source', name: '浩特', aliases: ['小浩'], description: '待合并简介', categoryId: friendCategory.id, createdAt: 1, updatedAt: 1 }]);
   data.setLogs((previous) => [...previous, fixture('merge-source-log', '和 [[浩特]] 见面。', 1), fixture('merge-overlap', '[[林老师]] 和 ［［小浩丨浩特］］ 讨论。', 2)]); await delay();
   nodes.openNode('林老师'); await until(() => button('细节'), 'merge detail'); await click('细节');
+  await labelledClick('编辑节点简介');
   await input('节点简介', '合并前手写简介');
   await click('AI 生成'); await until(() => aiRequests.length === 3, 'generation pending during merge');
   await click('合并节点'); await input('搜索待合并节点', '小浩'); await labelledClick('选择待合并节点：浩特');
