@@ -10,9 +10,10 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { Log, Category, TodoItem, Scope, DailyReview } from '../types';
+import { Log, Category, TodoItem, Scope, DailyReview, NodeCategory, NoteNode, WeeklyReview, MonthlyReview } from '../types';
 import { imageService } from './imageService';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { serializeAttributeValues, serializeJsonCell } from '../utils/exportSerialization';
 
 /**
  * 导出选项
@@ -424,6 +425,15 @@ class ObsidianExportService {
                 text += `（${(todo.completedUnits || 0)}/${todo.totalAmount}）`;
             }
             if (scopesList.length > 0) text += ` %${scopesList.map(s => s.name).join(', ')}`;
+            const attributeValues = serializeAttributeValues(log.attributeValues, act);
+            if (attributeValues.length > 0) {
+                text += ` | ${attributeValues.map(value => `${value.attributeName}: ${value.value}`).join('; ')}`;
+            }
+            if (log.title) text += ` | 标题: ${log.title}`;
+            if (log.progressIncrement !== undefined) text += ` | 进度增量: ${log.progressIncrement}`;
+            if (log.isPlanned) text += ` | 计划记录${log.plannedOccurrenceDate ? `: ${log.plannedOccurrenceDate}` : ''}`;
+            if (log.reactions?.length) text += ` | ${log.reactions.join('')}`;
+            if (log.comments?.length) text += ` | 评论: ${log.comments.map(comment => comment.content).join(' / ')}`;
             text += '\n';
         });
 
@@ -442,7 +452,9 @@ class ObsidianExportService {
         dailyReview?: DailyReview,
         options: ObsidianExportOptions = this.defaultOptions,
         todoCategories?: any[],
-        imageFilenames?: string[]
+        imageFilenames?: string[],
+        nodes: NoteNode[] = [],
+        nodeCategories: NodeCategory[] = []
     ): string {
         const sections: string[] = [];
 
@@ -462,11 +474,46 @@ class ObsidianExportService {
             sections.push(this.generateNarrativeMarkdown(dailyReview?.narrative));
         }
 
+        if (dailyReview) {
+            sections.push(this.generateReviewMetadataMarkdown(dailyReview));
+        }
+
         if (imageFilenames && imageFilenames.length > 0) {
             sections.push(this.generateImagesSection(imageFilenames));
         }
 
+        if (nodes.length > 0 || nodeCategories.length > 0) {
+            sections.push(this.generateNodesSection(nodes, nodeCategories));
+        }
+
         return sections.join('\n\n');
+    }
+
+    generateNodesSection(nodes: NoteNode[], nodeCategories: NodeCategory[]): string {
+        if (nodes.length === 0 && nodeCategories.length === 0) return '';
+        const categoryNames = new Map(nodeCategories.map(category => [category.id, category.name]));
+        let text = '## 节点\n\n';
+        nodes.forEach(node => {
+            text += `- **${node.name}**${node.categoryId ? ` [${categoryNames.get(node.categoryId) || node.categoryId}]` : ''}`;
+            if (node.aliases.length > 0) text += `；别名: ${node.aliases.join(', ')}`;
+            if (node.description) text += `；${node.description}`;
+            text += '\n';
+        });
+        return text.trimEnd();
+    }
+
+    generateReviewMetadataMarkdown(review: DailyReview | WeeklyReview | MonthlyReview): string {
+        const sections: string[] = [];
+        if ('summary' in review && review.summary) sections.push(`**摘要**: ${review.summary}`);
+        if ('moodEmoji' in review && review.moodEmoji) sections.push(`**心情**: ${review.moodEmoji}`);
+        if ('checkItems' in review && review.checkItems?.length) {
+            sections.push(`**检查项**: ${review.checkItems.map(item => `${item.isCompleted ? '✓' : '○'} ${item.content}`).join('；')}`);
+        }
+        if ('aiNewspaper' in review && review.aiNewspaper) {
+            sections.push(`### AI Newspaper\n\n${serializeJsonCell(review.aiNewspaper)}`);
+        }
+        if (sections.length === 0) return '';
+        return `## 回顾元数据\n\n${sections.join('\n\n')}`;
     }
 
     /**
@@ -480,7 +527,9 @@ class ObsidianExportService {
         weekEndDate: Date,
         options: ObsidianExportOptions,
         weeklyReview?: any, // WeeklyReview 类型
-        todoCategories?: any[]
+        todoCategories?: any[],
+        nodes: NoteNode[] = [],
+        nodeCategories: NodeCategory[] = []
     ): string {
         // 计算周的开始日期(周日往前推6天,形成完整的7天周)
         const weekStart = new Date(weekEndDate);
@@ -514,6 +563,8 @@ class ObsidianExportService {
         if (options.includeNarrative && weeklyReview) {
             sections.push(this.generateNarrativeMarkdown(weeklyReview?.narrative));
         }
+        if (weeklyReview) sections.push(this.generateReviewMetadataMarkdown(weeklyReview));
+        if (nodes.length > 0 || nodeCategories.length > 0) sections.push(this.generateNodesSection(nodes, nodeCategories));
 
         return sections.join('\n\n');
     }
@@ -529,7 +580,9 @@ class ObsidianExportService {
         monthEndDate: Date,
         options: ObsidianExportOptions,
         monthlyReview?: any, // MonthlyReview 类型
-        todoCategories?: any[]
+        todoCategories?: any[],
+        nodes: NoteNode[] = [],
+        nodeCategories: NodeCategory[] = []
     ): string {
         // 计算月的开始日期
         const monthStart = new Date(monthEndDate.getFullYear(), monthEndDate.getMonth(), 1);
@@ -562,6 +615,8 @@ class ObsidianExportService {
         if (options.includeNarrative && monthlyReview) {
             sections.push(this.generateNarrativeMarkdown(monthlyReview?.narrative));
         }
+        if (monthlyReview) sections.push(this.generateReviewMetadataMarkdown(monthlyReview));
+        if (nodes.length > 0 || nodeCategories.length > 0) sections.push(this.generateNodesSection(nodes, nodeCategories));
 
         return sections.join('\n\n');
     }

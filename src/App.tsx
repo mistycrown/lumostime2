@@ -1416,6 +1416,10 @@ const AppContent: React.FC = () => {
             dailyReviews={dailyReviews}
             weeklyReviews={weeklyReviews}
             monthlyReviews={monthlyReviews}
+            nodes={nodes}
+            nodeCategories={nodeCategories}
+            collections={collections}
+            collectionEntries={collectionEntries}
             currentDate={new Date()}
             syncData={{
               logs,

@@ -14,7 +14,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import obsidianExportService, { ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
 
-import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview } from '../types';
+import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, NoteNode, NodeCategory } from '../types';
 import { ToastType } from '../components/Toast';
 
 interface ObsidianExportViewProps {
@@ -30,6 +30,8 @@ interface ObsidianExportViewProps {
     weeklyReviews?: WeeklyReview[];
     monthlyReviews?: MonthlyReview[];
     todoCategories?: any[]; // TodoCategory[]
+    nodes?: NoteNode[];
+    nodeCategories?: NodeCategory[];
 }
 
 export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
@@ -44,7 +46,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     dailyReviews,
     weeklyReviews = [],
     monthlyReviews = [],
-    todoCategories
+    todoCategories,
+    nodes = [],
+    nodeCategories = []
 }) => {
     // 配置状态
     const [rootPath, setRootPath] = useState('');
@@ -279,18 +283,20 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
 
                 // 获取当天的 dailyReview
                 const dateStr = formatDateKey(startDate);
-                const review = logs.length > 0 ? dailyReview : undefined; // 只有当天才传dailyReview
+                const review = dailyReviews?.find(r => r.date === formatDateKey(startDate)) || dailyReview;
 
                 const content = obsidianExportService.generateFullMarkdown(
-                    logs,
+                    singleDayLogs,
                     categories,
                     todos,
                     scopes,
                     startDate,
-                    startDate.toDateString() === currentDate.toDateString() ? dailyReview : undefined,
+                    review,
                     exportOptions,
                     todoCategories,
-                    dayImages
+                    dayImages,
+                    nodes,
+                    nodeCategories
                 );
 
                 await obsidianExportService.exportToFile(filePath, content);
@@ -311,11 +317,10 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     const dayImages = obsidianExportService.collectLogImages(dayLogs);
 
 
-                    if (dayLogs.length > 0) {
+                    const dayReview = dailyReviews?.find(r => r.date === formatDateKey(current));
+                    if (dayLogs.length > 0 || dayReview) {
                         // 查找当天的dailyReview
                         const dateStr = formatDateKey(current);
-                        const dayReview = dailyReviews?.find(r => r.date === dateStr);
-
                         // 只导出有记录的日期
                         const content = obsidianExportService.generateFullMarkdown(
                             dayLogs,
@@ -326,7 +331,9 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             dayReview,  // 传递当天的review
                             exportOptions,
                             todoCategories,
-                            dayImages
+                            dayImages,
+                            nodes,
+                            nodeCategories
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
@@ -357,22 +364,23 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             log.startTime >= weekStart.getTime() && log.startTime <= weekEndTime.getTime()
                         );
 
-                        // 只导出有数据的周报
-                        if (weekLogs.length > 0) {
+                        const dateStr = formatDateKey(weekEnd);
+                        const weeklyReview = weeklyReviews?.find(r => r.weekEndDate === dateStr);
+                        // 有日志或有回顾内容时都导出
+                        if (weekLogs.length > 0 || weeklyReview) {
                             const filePath = obsidianExportService.generateWeeklyFilePath(config, weekEnd);
-                            // 查找对应的 WeeklyReview
-                            const dateStr = formatDateKey(weekEnd);
-                            const weeklyReview = weeklyReviews?.find(r => r.weekEndDate === dateStr);
 
                             const content = obsidianExportService.generateWeeklyMarkdown(
-                                logs,
+                                weekLogs,
                                 categories,
                                 todos,
                                 scopes,
                                 weekEnd,
                                 exportOptions,
                                 weeklyReview,
-                                todoCategories
+                                todoCategories,
+                                nodes,
+                                nodeCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;
@@ -396,23 +404,23 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             log.startTime >= monthStart.getTime() && log.startTime <= monthEndTime.getTime()
                         );
 
-                        // 只导出有数据的月报
-                        if (monthLogs.length > 0) {
+                        const dateStr = formatDateKey(monthEnd);
+                        const monthlyReview = monthlyReviews?.find(r => r.monthEndDate === dateStr);
+                        // 有日志或有回顾内容时都导出
+                        if (monthLogs.length > 0 || monthlyReview) {
                             const filePath = obsidianExportService.generateMonthlyFilePath(config, monthEnd);
-                            // 查找对应的 MonthlyReview
-                            const dateStr = formatDateKey(monthEnd);
-                            // MonthlyReview 的 monthEndDate 也是 YYYY-MM-DD
-                            const monthlyReview = monthlyReviews?.find(r => r.monthEndDate === dateStr);
 
                             const content = obsidianExportService.generateMonthlyMarkdown(
-                                logs,
+                                monthLogs,
                                 categories,
                                 todos,
                                 scopes,
                                 monthEnd,
                                 exportOptions,
                                 monthlyReview,
-                                todoCategories
+                                todoCategories,
+                                nodes,
+                                nodeCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;
