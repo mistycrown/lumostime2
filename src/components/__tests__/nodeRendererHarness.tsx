@@ -156,6 +156,9 @@ async function run() {
   check(nodes.nodes.find((node) => node.id === 'person')?.description.includes('共同记录'), 'Description lost on tab change');
   check(document.querySelector('[aria-label="查看相关节点：杭州"]')?.textContent?.includes('2 条'), 'Co-occurrence count failed');
   assertFits(); await capture('node-related-mobile');
+  const relatedTab = [...document.querySelectorAll<HTMLButtonElement>('nav[aria-label="节点详情"] button')].find((element) => element.textContent?.trim() === '关联');
+  check(relatedTab, 'Missing related tab'); relatedTab!.click(); await delay();
+  check(![...document.querySelectorAll('h2')].some((heading) => heading.textContent?.includes('日报回答')), 'Related tab retained the old daily-answer section');
   const associate = [...document.querySelectorAll<HTMLButtonElement>('article button')].find((element) => element.textContent === '关联');
   check(associate, 'Missing candidate association'); associate!.click(); await delay();
   check(data.logs.find((log) => log.id === 'candidate')?.note === '今天[[林林丨小林]]推荐了一本书。', 'Alias conversion failed');

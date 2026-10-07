@@ -1,6 +1,6 @@
 # Views Layer
 
-Update 2026-10-07: Node details render linked daily answers in the timeline, close the node overlay before opening a daily review, and show biography Markdown in reading mode until explicitly edited.
+Update 2026-10-07: Node details render linked daily answers only as independent cards in the timeline tab, remove the old daily-answer block from the related tab, close the node overlay before opening a daily review, and show biography Markdown in reading mode until explicitly edited.
 
 Update 2026-10-07: Node details show linked daily-review answers, navigate back to the guide tab, and expose an explicit open-details action for potential Log associations.
 
