@@ -5,6 +5,7 @@
  * @pos Test (Cloud Sync)
  * @updated 2026-10-04: Covers modern navigation backgrounds across devices and legacy backups.
  * @updated 2026-10-05: Covers metadata-only backups and quota-safe restoration of legacy image URLs.
+ * @updated 2026-10-07: Verifies modern navigation background adjustments remain local-only.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -57,6 +58,13 @@ const navigationStorage = {
   navigation_transparent_enabled: 'true'
 };
 
+const syncedNavigationStorage = {
+  navigation_new_mode_enabled: navigationStorage.navigation_new_mode_enabled,
+  navigation_new_background: navigationStorage.navigation_new_background,
+  navigation_new_background_custom_list: navigationStorage.navigation_new_background_custom_list,
+  navigation_transparent_enabled: navigationStorage.navigation_transparent_enabled
+};
+
 describe('modern navigation appearance sync', () => {
   beforeEach(() => {
     const values = new Map<string, string>();
@@ -77,9 +85,14 @@ describe('modern navigation appearance sync', () => {
   it('backs up settings, restores selection, and loads the image URL on the destination', async () => {
     Object.entries(navigationStorage).forEach(([key, value]) => localStorage.setItem(key, value));
     const payload = appearanceBackupService.buildBackupPayload();
-    expect(payload.storage).toMatchObject(navigationStorage);
+    expect(payload.storage).toMatchObject(syncedNavigationStorage);
+    expect(payload.storage).not.toHaveProperty('navigation_new_background_settings');
 
     localStorage.clear();
+    const destinationSettings = JSON.stringify({
+      'modern-background': { offsetX: '100px', offsetY: '20px', scale: 0.8, verticalStretch: 0.9, opacity: 0.4 }
+    });
+    localStorage.setItem('navigation_new_background_settings', destinationSettings);
     vi.spyOn(imageService, 'getImageUrl').mockResolvedValue('blob:destination-device');
     appearanceBackupService.applyBackupPayload(payload);
 
@@ -89,8 +102,9 @@ describe('modern navigation appearance sync', () => {
     expect(navigationBackgroundService.isEnabled()).toBe(true);
     expect(navigationBackgroundService.getCurrentBackground()).toBe('modern-background');
     expect(navigationBackgroundService.isTransparentNavigationEnabled()).toBe(true);
+    expect(localStorage.getItem('navigation_new_background_settings')).toBe(destinationSettings);
     expect(navigationBackgroundService.getBackgroundById('modern-background')).toMatchObject({
-      offsetX: '8px', offsetY: '-4px', scale: 1.2, verticalStretch: 1.3, opacity: 0.7
+      offsetX: '100px', offsetY: '20px', scale: 0.8, verticalStretch: 0.9, opacity: 0.4
     });
     expect(window.dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({
       type: NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT, detail: { enabled: true }
@@ -172,7 +186,8 @@ describe('modern navigation appearance sync', () => {
     expect(download.success).toBe(true);
     expect(download.imageStats?.downloaded).toBe(2);
     expect(writeImage.mock.calls.map(([filename]) => filename).sort()).toEqual(filenames);
-    expect(download.data.appearanceData.storage).toMatchObject(navigationStorage);
+    expect(download.data.appearanceData.storage).toMatchObject(syncedNavigationStorage);
+    expect(download.data.appearanceData.storage).not.toHaveProperty('navigation_new_background_settings');
     expect(imageService.getReferencedImageManifest()).toEqual({ content: [], theme: filenames });
   });
 
@@ -181,7 +196,8 @@ describe('modern navigation appearance sync', () => {
     vi.spyOn(imageService, 'getImageUrl').mockResolvedValue('blob:source-device');
     appearanceBackupService.applyBackupPayload({ version: 1, storage: {} });
     await navigationBackgroundService.hydrateCustomBackgrounds();
-    expect(appearanceBackupService.buildBackupPayload().storage).toMatchObject(navigationStorage);
+    expect(appearanceBackupService.buildBackupPayload().storage).toMatchObject(syncedNavigationStorage);
+    expect(appearanceBackupService.buildBackupPayload().storage).not.toHaveProperty('navigation_new_background_settings');
   });
 
   it('clears modern navigation settings when the backup explicitly stores null', () => {
@@ -189,7 +205,8 @@ describe('modern navigation appearance sync', () => {
     appearanceBackupService.applyBackupPayload({
       version: 1, storage: Object.fromEntries(Object.keys(navigationStorage).map(key => [key, null]))
     });
-    Object.keys(navigationStorage).forEach(key => expect(localStorage.getItem(key)).toBeNull());
+    Object.keys(syncedNavigationStorage).forEach(key => expect(localStorage.getItem(key)).toBeNull());
+    expect(localStorage.getItem('navigation_new_background_settings')).toBe(navigationStorage.navigation_new_background_settings);
     expect(navigationBackgroundService.isEnabled()).toBe(false);
     expect(navigationBackgroundService.getCurrentBackground()).toBe('new-none');
   });

@@ -17,6 +17,7 @@
  * @updated 2026-10-01: Includes the TimePal card seconds-visibility preference.
  * @updated 2026-10-04: Backs up modern navigation settings and images, then hydrates and refreshes navigation on restore.
  * @updated 2026-10-05: Compacts file-backed image URLs in backups and restores, including saved theme snapshots.
+ * @updated 2026-10-07: Keeps modern navigation background adjustments local to each device instead of syncing them.
  */
 import { TIMEPAL_KEYS, THEME_KEYS } from '../constants/storageKeys';
 import { sanitizeAppearanceImageStorage } from '../utils/imageAssetStorage';
@@ -58,7 +59,6 @@ const APPEARANCE_STORAGE_KEYS = [
   'navigation_new_mode_enabled',
   'navigation_new_background',
   'navigation_new_background_custom_list',
-  'navigation_new_background_settings',
   'navigation_icon_selection_v1',
   'navigation_icon_custom_list_v1',
   'navigation_icon_schemes_v1',
