@@ -1,6 +1,7 @@
 /**
  * @file PreferencesSettingsView.tsx
  * @updated 2026-10-07: Uses four-digit daily backup input with validation under manual sync preferences.
+ * @updated 2026-10-07: Includes the node directory in Timeline quick-action customization.
  * @description 偏好设置页面
  * @updated 2026-07-21: Replaced the display-mode segmented control with a settings-style dropdown and improved dark-mode toggle contrast.
  * @updated 2026-05-10: Replaced the old timer auto-open toggle with a three-option dropdown that reuses the existing settings selector style.

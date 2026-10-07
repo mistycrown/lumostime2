@@ -6,6 +6,7 @@
  * @updated 2026-05-12: Added the Collection shortcut key so timeline quick actions can deep-link into the settings collection subpage.
  * @updated 2026-08-09: Added the daily-check overview shortcut key.
  * @updated 2026-08-26: Added the review-overview shortcut key without changing the default pinned actions.
+ * @updated 2026-10-07: Added the node directory shortcut for the Timeline header.
  * @updated 2026-04-25: Added shared quick-action metadata and normalization helpers for timeline header customization.
  * @updated 2026-04-25: Shortened timeline quick-action labels for the preferences UI.
  */
@@ -20,6 +21,7 @@ export type TimelineQuickActionKey =
   | 'review_overview'
   | 'collections'
   | 'principle'
+  | 'nodes'
   | 'sync';
 
 export interface TimelineQuickActionOption {
@@ -73,6 +75,11 @@ export const TIMELINE_QUICK_ACTION_OPTIONS: TimelineQuickActionOption[] = [
     key: 'principle',
     label: '原则库',
     description: '打开设置中的原则库。'
+  },
+  {
+    key: 'nodes',
+    label: '节点',
+    description: '打开设置中的节点目录。'
   },
   {
     key: 'sync',

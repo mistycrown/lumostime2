@@ -2,6 +2,7 @@
  * @file SettingsView.tsx
  * @updated 2026-10-07: Uses a distinct network icon for the node entry.
  * @updated 2026-10-06: Adds the node directory entry to the Content group.
+ * @updated 2026-10-07: Preserves Timeline shortcut origin when leaving the node directory.
  * @updated 2026-10-05: Keeps delivered error-report IDs and user identifiers in a copyable receipt dialog.
  * @updated 2026-10-02: Added the manual Feishu calendar connection/test-event entry under Data and Sync.
  * @updated 2026-10-02: Delegates all provider transfers to the shared versioned sync coordinator.
@@ -813,7 +814,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
     }
 
     if (activeSubmenu === 'nodes') {
-        return renderLazySettingsSubview(<NodesSettingsView onBack={handleBackToMain} />, '正在加载节点…');
+        return renderLazySettingsSubview(
+            <NodesSettingsView onBack={settingsSubmenuBackCloses ? handleBackFromShortcutSubview : handleBackToMain} />,
+            '正在加载节点…'
+        );
     }
 
     if (activeSubmenu === 'collections') {
