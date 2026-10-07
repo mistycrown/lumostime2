@@ -1,5 +1,6 @@
 /**
  * @file NodeManageView.tsx
+ * @updated 2026-10-07: Matches the search-page header and shared top safe-area spacing.
  * @input Node metadata, category order and shared pointer drag lifecycle
  * @output Wrapping capsules for drag classification and node/category ordering
  * @pos View (Settings / Nodes)
@@ -114,10 +115,10 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
   };
   const siblings = selected ? nodes.filter((node) => getNodeCategoryId(node, nodeCategories) === getNodeCategoryId(selected, nodeCategories)) : [];
   const selectedIndex = siblings.findIndex((node) => node.id === selectedId);
-  return <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf9f6] pt-[env(safe-area-inset-top)]" data-testid="node-management" onPointerCancel={clear} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); if (activeRef.current) clear(); else onBack(); } }}>
-    <header className="flex shrink-0 items-center gap-3 border-b border-stone-200 px-6 py-4">
-      <button type="button" aria-label="返回节点列表" onClick={onBack} className="-ml-2 p-2 text-stone-500 hover:text-stone-900"><ChevronLeft size={22} /></button>
-      <h1 className="text-xl font-bold tracking-wide text-stone-900">管理节点</h1><span className="ml-auto font-mono text-xs text-stone-400">{nodes.length}</span>
+  return <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf9f6] pt-[var(--app-safe-area-top,0px)]" data-testid="node-management" onPointerCancel={clear} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); if (activeRef.current) clear(); else onBack(); } }}>
+    <header className="flex shrink-0 items-center gap-3 border-b border-stone-100 bg-[#faf9f6]/80 px-4 pb-3 pt-4 backdrop-blur-md">
+      <button type="button" aria-label="返回节点列表" onClick={onBack} className="p-1 text-stone-400 hover:text-stone-600"><ChevronLeft size={24} /></button>
+      <h1 className="text-lg font-bold text-stone-800">管理节点</h1><span className="ml-auto font-mono text-xs text-stone-400">{nodes.length}</span>
     </header>
     <main ref={scroll} className="min-h-0 flex-1 overflow-y-auto px-7 pb-[calc(3rem+env(safe-area-inset-bottom))] pt-6">
       <div className="mx-auto max-w-3xl">
