@@ -1,13 +1,14 @@
 /**
  * @file obsidianExportService.test.ts
  * @updated 2026-10-08: Covers node-free daily/weekly/monthly exports and retained wiki links.
+ * @updated 2026-10-08: Checks task-list states, count progress and fresh automatic checks including previous-night logs.
  * @input Logs with custom attributes and review metadata.
  * @output Regression coverage for complete Obsidian Markdown sections.
  * @pos Service test
  */
 
 import { describe, expect, it } from 'vitest';
-import type { Category, DailyReview, Log, NodeCategory, NoteNode, Scope, TodoItem } from '../types';
+import type { Category, CheckItem, DailyReview, Log, NodeCategory, NoteNode, Scope, TodoItem } from '../types';
 import obsidianExportService from './obsidianExportService';
 
 const categories: Category[] = [{
@@ -58,6 +59,46 @@ const review: DailyReview = {
 };
 
 describe('obsidianExportService', () => {
+  it('exports completed and incomplete checks as task lists with normalized count progress', () => {
+    const checkItems: CheckItem[] = [
+      { id: 'done', content: '吃维生素', isCompleted: true },
+      { id: 'pending', content: '擦脸', isCompleted: false },
+      { id: 'count-done', content: '喝水', type: 'manual', manualMode: 'count', currentCount: 3, targetCount: 3, isCompleted: false },
+      { id: 'count-pending', content: '运动', type: 'manual', manualMode: 'count', currentCount: 1, targetCount: 2, isCompleted: true },
+      { id: 'legacy-count', content: '阅读', type: 'manual', manualMode: 'count', targetCount: 2, isCompleted: true }
+    ];
+    const before = JSON.stringify(checkItems);
+    const content = obsidianExportService.generateReviewMetadataMarkdown({ ...review, checkItems });
+    expect(content).toContain('**检查项**:\n\n- [x] 吃维生素\n- [ ] 擦脸');
+    expect(content).toContain('- [x] 喝水（3/3）');
+    expect(content).toContain('- [ ] 运动（1/2）');
+    expect(content).toContain('- [x] 阅读（2/2）');
+    expect(JSON.stringify(checkItems)).toBe(before);
+  });
+
+  it('refreshes automatic checks for the export date using full log history without changing daily statistics', () => {
+    const checkItems: CheckItem[] = [
+      { id: 'no-feed', content: 'no信息流', type: 'auto', isCompleted: false, autoConfig: { filterExpression: '信息流', comparisonType: 'duration', operator: '<=', targetValue: 0 } },
+      { id: 'reading', content: '干点正事', type: 'auto', isCompleted: false, autoConfig: { filterExpression: '#阅读', comparisonType: 'duration', operator: '>=', targetValue: 30 } },
+      { id: 'sleep', content: '早睡', type: 'auto', isCompleted: false, autoConfig: { filterExpression: '睡眠', comparisonType: 'nightEarliestStart', operator: '<=', targetValue: 23 * 60 } },
+      { id: 'missing', content: '出门运动', type: 'auto', isCompleted: true, autoConfig: { filterExpression: '运动', comparisonType: 'count', operator: '>=', targetValue: 1 } }
+    ];
+    const previousNight: Log = { ...log, id: 'night', note: '睡眠', startTime: new Date(2026, 9, 6, 22).getTime(), endTime: new Date(2026, 9, 7, 7).getTime(), duration: 9 * 3600 };
+    const otherDay: Log = { ...log, id: 'other', note: '信息流', startTime: new Date(2026, 9, 6, 9).getTime(), endTime: new Date(2026, 9, 6, 10).getTime() };
+    const planned: Log = { ...log, id: 'planned', note: '运动', isPlanned: true };
+    const dailyReview = { ...review, checkItems };
+    const before = JSON.stringify(dailyReview);
+    const content = obsidianExportService.generateFullMarkdown([log], categories, [], [], new Date(2026, 9, 7), dailyReview,
+      { includeTimeline: true, includeStats: true, includeQuestions: false, includeNarrative: false }, [], [], { logs: [previousNight, otherDay, planned, log] });
+    expect(content).toContain('- [x] no信息流');
+    expect(content).toContain('- [x] 干点正事');
+    expect(content).toContain('- [x] 早睡');
+    expect(content).toContain('- [ ] 出门运动');
+    expect(content).toContain('**总时长**: 1h 0m');
+    expect(content).not.toContain('9h 0m');
+    expect(JSON.stringify(dailyReview)).toBe(before);
+  });
+
   it.each(['daily', 'weekly', 'monthly'] as const)('excludes node metadata from %s exports even with legacy arguments', (kind) => {
     const nodes: NoteNode[] = [{
       id: 'node', name: '样例人物', aliases: ['样例别名'], categoryId: 'people',
@@ -98,7 +139,7 @@ describe('obsidianExportService', () => {
     expect(content).toContain('评论: 很好');
     expect(content).toContain('**摘要**: 完成了阅读');
     expect(content).toContain('**心情**: 🙂');
-    expect(content).toContain('✓ 运动');
+    expect(content).toContain('- [x] 运动');
   });
 
   it('limits statistics to the logs passed for the selected date', () => {

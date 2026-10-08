@@ -1,5 +1,6 @@
 /**
  * @file obsidianExportService.ts
+ * @updated 2026-10-08: Refreshes exported checks and writes Markdown tasks with normalized count progress.
  * @updated 2026-10-08: Excludes node metadata from daily, weekly and monthly Markdown exports.
  * @input Obsidian配置, 日志数据, 日期
  * @output Markdown文件路径和内容
@@ -15,6 +16,9 @@ import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyRevie
 import { imageService } from './imageService';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { serializeAttributeValues, serializeJsonCell } from '../utils/exportSerialization';
+import { normalizeCheckItem } from '../utils/checkItemNormalizer';
+import { updateAutoCheckItems } from '../utils/autoCheckUtils';
+import type { FilterContext } from '../utils/filterUtils';
 
 /**
  * 导出选项
@@ -453,7 +457,8 @@ class ObsidianExportService {
         dailyReview?: DailyReview,
         options: ObsidianExportOptions = this.defaultOptions,
         todoCategories?: any[],
-        imageFilenames?: string[]
+        imageFilenames?: string[],
+        checkEvaluation?: { logs: Log[] }
     ): string {
         const sections: string[] = [];
 
@@ -474,7 +479,11 @@ class ObsidianExportService {
         }
 
         if (dailyReview) {
-            sections.push(this.generateReviewMetadataMarkdown(dailyReview));
+            sections.push(this.generateReviewMetadataMarkdown(dailyReview, {
+                logs: checkEvaluation?.logs ?? logs,
+                context: { categories, todos, scopes, todoCategories: todoCategories || [] },
+                date
+            }));
         }
 
         if (imageFilenames && imageFilenames.length > 0) {
@@ -484,12 +493,25 @@ class ObsidianExportService {
         return sections.join('\n\n');
     }
 
-    generateReviewMetadataMarkdown(review: DailyReview | WeeklyReview | MonthlyReview): string {
+    generateReviewMetadataMarkdown(
+        review: DailyReview | WeeklyReview | MonthlyReview,
+        checkEvaluation?: { logs: Log[]; context: FilterContext; date: Date }
+    ): string {
         const sections: string[] = [];
         if ('summary' in review && review.summary) sections.push(`**摘要**: ${review.summary}`);
         if ('moodEmoji' in review && review.moodEmoji) sections.push(`**心情**: ${review.moodEmoji}`);
         if ('checkItems' in review && review.checkItems?.length) {
-            sections.push(`**检查项**: ${review.checkItems.map(item => `${item.isCompleted ? '✓' : '○'} ${item.content}`).join('；')}`);
+            const normalizedItems = review.checkItems.map(normalizeCheckItem);
+            const checkItems = checkEvaluation
+                ? updateAutoCheckItems(normalizedItems, checkEvaluation.logs, checkEvaluation.context, checkEvaluation.date)
+                : normalizedItems;
+            const tasks = checkItems.map(item => {
+                const progress = item.type === 'manual' && item.manualMode === 'count'
+                    ? `（${item.currentCount}/${item.targetCount}）`
+                    : '';
+                return `- [${item.isCompleted ? 'x' : ' '}] ${item.content}${progress}`;
+            });
+            sections.push(`**检查项**:\n\n${tasks.join('\n')}`);
         }
         if ('aiNewspaper' in review && review.aiNewspaper) {
             sections.push(`### AI Newspaper\n\n${serializeJsonCell(review.aiNewspaper)}`);

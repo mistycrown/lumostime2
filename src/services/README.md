@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-08: Obsidian daily exports refresh automatic checks for the report date, normalize manual count completion, and render Markdown task lists with count progress. Full history supports previous-night rules without adding other dates to daily statistics or changing saved review data.
+
 Update 2026-10-08: `obsidianExportService.ts` excludes the node directory, categories, aliases and biographies from daily, weekly and monthly Markdown exports while retaining wiki links in logs and review text.
 
 Update 2026-10-07: `excelExportService.ts` now exports complete log metadata, dynamic activity-attribute columns, and related data sheets for todos, nodes, collections, and reviews. `obsidianExportService.ts` preserves current log/review metadata, uses filtered report ranges, exports review-only periods, and overwrites the target file to avoid duplicate sections.

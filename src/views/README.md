@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-08: Single-day and range exports pass full log history to daily-check evaluation, including previous-night sleep rules, while report timelines, images and statistics retain their selected-day inputs.
+
 Update 2026-10-08: `SettingsView.tsx` and `ObsidianExportView.tsx` no longer pass node metadata into Obsidian exports, including single-day, date-range, weekly and monthly reports.
 
 Update 2026-10-07: Node details render linked daily, weekly and monthly answers as independent month-filtered cards in the timeline tab, route each card to its matching guide view, remove the old daily-answer block from the related tab, and show biography Markdown in reading mode until explicitly edited.

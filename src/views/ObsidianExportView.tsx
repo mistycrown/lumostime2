@@ -1,5 +1,6 @@
 /**
  * @file ObsidianExportView.tsx
+ * @updated 2026-10-08: Supplies full log history for automatic check evaluation during daily exports.
  * @updated 2026-10-08: Stops passing node metadata into single-day, range, weekly and monthly exports.
  * @input Obsidian配置, 日志数据
  * @output 导出操作, 配置更新
@@ -291,7 +292,8 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     review,
                     exportOptions,
                     todoCategories,
-                    dayImages
+                    dayImages,
+                    { logs }
                 );
 
                 await obsidianExportService.exportToFile(filePath, content);
@@ -326,7 +328,8 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             dayReview,  // 传递当天的review
                             exportOptions,
                             todoCategories,
-                            dayImages
+                            dayImages,
+                            { logs }
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
