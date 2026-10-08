@@ -1,5 +1,6 @@
 /**
  * @file ObsidianExportView.tsx
+ * @updated 2026-10-08: Stops passing node metadata into single-day, range, weekly and monthly exports.
  * @input Obsidian配置, 日志数据
  * @output 导出操作, 配置更新
  * @pos View (Obsidian导出设置)
@@ -14,7 +15,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, FolderOpen, FileText, Download, CheckCircle2, AlertCircle, Image as ImageIcon } from 'lucide-react';
 import obsidianExportService, { ObsidianExportConfig, ObsidianExportOptions } from '../services/obsidianExportService';
 
-import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, NoteNode, NodeCategory } from '../types';
+import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview } from '../types';
 import { ToastType } from '../components/Toast';
 
 interface ObsidianExportViewProps {
@@ -30,8 +31,6 @@ interface ObsidianExportViewProps {
     weeklyReviews?: WeeklyReview[];
     monthlyReviews?: MonthlyReview[];
     todoCategories?: any[]; // TodoCategory[]
-    nodes?: NoteNode[];
-    nodeCategories?: NodeCategory[];
 }
 
 export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
@@ -46,9 +45,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
     dailyReviews,
     weeklyReviews = [],
     monthlyReviews = [],
-    todoCategories,
-    nodes = [],
-    nodeCategories = []
+    todoCategories
 }) => {
     // 配置状态
     const [rootPath, setRootPath] = useState('');
@@ -294,9 +291,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                     review,
                     exportOptions,
                     todoCategories,
-                    dayImages,
-                    nodes,
-                    nodeCategories
+                    dayImages
                 );
 
                 await obsidianExportService.exportToFile(filePath, content);
@@ -331,9 +326,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                             dayReview,  // 传递当天的review
                             exportOptions,
                             todoCategories,
-                            dayImages,
-                            nodes,
-                            nodeCategories
+                            dayImages
                         );
 
                         await obsidianExportService.exportToFile(filePath, content);
@@ -378,9 +371,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                                 weekEnd,
                                 exportOptions,
                                 weeklyReview,
-                                todoCategories,
-                                nodes,
-                                nodeCategories
+                                todoCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;
@@ -418,9 +409,7 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                                 monthEnd,
                                 exportOptions,
                                 monthlyReview,
-                                todoCategories,
-                                nodes,
-                                nodeCategories
+                                todoCategories
                             );
                             await obsidianExportService.exportToFile(filePath, content);
                             exportedCount++;

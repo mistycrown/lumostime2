@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-08: Removes node metadata from the Obsidian export view inputs.
  * @updated 2026-10-07: Uses a distinct network icon for the node entry.
  * @updated 2026-10-06: Adds the node directory entry to the Content group.
  * @updated 2026-10-07: Preserves Timeline shortcut origin when leaving the node directory.
@@ -964,8 +965,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                 categories={categoriesData || categories || []}
                 todos={todos}
                 scopes={scopes}
-                nodes={nodes}
-                nodeCategories={nodeCategories}
                 collections={collections}
                 collectionEntries={collectionEntries}
                 currentDate={currentDate}

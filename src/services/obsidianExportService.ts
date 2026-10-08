@@ -1,5 +1,6 @@
 /**
  * @file obsidianExportService.ts
+ * @updated 2026-10-08: Excludes node metadata from daily, weekly and monthly Markdown exports.
  * @input Obsidian配置, 日志数据, 日期
  * @output Markdown文件路径和内容
  * @pos Service (导出服务)
@@ -10,7 +11,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import { Log, Category, TodoItem, Scope, DailyReview, NodeCategory, NoteNode, WeeklyReview, MonthlyReview } from '../types';
+import { Log, Category, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview } from '../types';
 import { imageService } from './imageService';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { serializeAttributeValues, serializeJsonCell } from '../utils/exportSerialization';
@@ -452,9 +453,7 @@ class ObsidianExportService {
         dailyReview?: DailyReview,
         options: ObsidianExportOptions = this.defaultOptions,
         todoCategories?: any[],
-        imageFilenames?: string[],
-        nodes: NoteNode[] = [],
-        nodeCategories: NodeCategory[] = []
+        imageFilenames?: string[]
     ): string {
         const sections: string[] = [];
 
@@ -482,24 +481,7 @@ class ObsidianExportService {
             sections.push(this.generateImagesSection(imageFilenames));
         }
 
-        if (nodes.length > 0 || nodeCategories.length > 0) {
-            sections.push(this.generateNodesSection(nodes, nodeCategories));
-        }
-
         return sections.join('\n\n');
-    }
-
-    generateNodesSection(nodes: NoteNode[], nodeCategories: NodeCategory[]): string {
-        if (nodes.length === 0 && nodeCategories.length === 0) return '';
-        const categoryNames = new Map(nodeCategories.map(category => [category.id, category.name]));
-        let text = '## 节点\n\n';
-        nodes.forEach(node => {
-            text += `- **${node.name}**${node.categoryId ? ` [${categoryNames.get(node.categoryId) || node.categoryId}]` : ''}`;
-            if (node.aliases.length > 0) text += `；别名: ${node.aliases.join(', ')}`;
-            if (node.description) text += `；${node.description}`;
-            text += '\n';
-        });
-        return text.trimEnd();
     }
 
     generateReviewMetadataMarkdown(review: DailyReview | WeeklyReview | MonthlyReview): string {
@@ -527,9 +509,7 @@ class ObsidianExportService {
         weekEndDate: Date,
         options: ObsidianExportOptions,
         weeklyReview?: any, // WeeklyReview 类型
-        todoCategories?: any[],
-        nodes: NoteNode[] = [],
-        nodeCategories: NodeCategory[] = []
+        todoCategories?: any[]
     ): string {
         // 计算周的开始日期(周日往前推6天,形成完整的7天周)
         const weekStart = new Date(weekEndDate);
@@ -564,7 +544,6 @@ class ObsidianExportService {
             sections.push(this.generateNarrativeMarkdown(weeklyReview?.narrative));
         }
         if (weeklyReview) sections.push(this.generateReviewMetadataMarkdown(weeklyReview));
-        if (nodes.length > 0 || nodeCategories.length > 0) sections.push(this.generateNodesSection(nodes, nodeCategories));
 
         return sections.join('\n\n');
     }
@@ -580,9 +559,7 @@ class ObsidianExportService {
         monthEndDate: Date,
         options: ObsidianExportOptions,
         monthlyReview?: any, // MonthlyReview 类型
-        todoCategories?: any[],
-        nodes: NoteNode[] = [],
-        nodeCategories: NodeCategory[] = []
+        todoCategories?: any[]
     ): string {
         // 计算月的开始日期
         const monthStart = new Date(monthEndDate.getFullYear(), monthEndDate.getMonth(), 1);
@@ -616,7 +593,6 @@ class ObsidianExportService {
             sections.push(this.generateNarrativeMarkdown(monthlyReview?.narrative));
         }
         if (monthlyReview) sections.push(this.generateReviewMetadataMarkdown(monthlyReview));
-        if (nodes.length > 0 || nodeCategories.length > 0) sections.push(this.generateNodesSection(nodes, nodeCategories));
 
         return sections.join('\n\n');
     }
