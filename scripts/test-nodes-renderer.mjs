@@ -1,5 +1,6 @@
 /**
  * @file test-nodes-renderer.mjs
+ * @updated 2026-10-08: Repaints hidden renderer frames before capturing Markdown previews.
  * @updated 2026-10-07: Drives native mouse/touch input for capsule drag and category ordering.
  * @input Real node React renderer harness and production CSS from npm run build
  * @output Offline interaction results and verified-font mobile/desktop screenshots
@@ -56,6 +57,7 @@ app.whenReady().then(async () => {
     if (capture) {
       if (capture.endsWith('-desktop')) win.setSize(1100, 900);
       await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+      win.webContents.invalidate();
       await new Promise(resolve => setTimeout(resolve, 100));
       const screenshot = path.join(__dirname, capture + '.png');
       await fs.writeFile(screenshot, (await win.webContents.capturePage()).toPNG());

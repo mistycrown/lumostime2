@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-08: Styles biography Markdown explicitly so headings and list markers survive the CSS reset.
  * @updated 2026-10-07: Renders daily, weekly and monthly linked answers as filtered independent review cards and routes each card to its matching guide view.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
  * @updated 2026-10-07: Reuses the print-style searchable category picker.
@@ -117,7 +118,24 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
         </div>
       </div>
       {editingDescription ? <textarea aria-label="节点简介" placeholder="写下关于这个节点的简介…" value={draft.value.description} rows={10} onChange={(event) => { revision.current += 1; draft.update({ ...draft.value, description: event.target.value }); }} className="w-full resize-y rounded-none border border-stone-200 bg-transparent px-4 py-3 text-sm leading-7 text-stone-700 outline-none focus:border-stone-400 placeholder:text-stone-300" /> : (
-        draft.value.description.trim() ? <div aria-label="节点简介预览" className="prose prose-stone max-w-none text-sm leading-7 prose-headings:font-semibold prose-headings:text-stone-900 prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0 prose-blockquote:border-stone-300 prose-blockquote:text-stone-500"><ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{draft.value.description}</ReactMarkdown></div> : <button type="button" onClick={() => { descriptionBeforeEdit.current = ''; setEditingDescription(true); }} className="w-full border border-dashed border-stone-200 px-4 py-8 text-left text-sm text-stone-400 hover:border-stone-400">暂无简介，点击编辑</button>
+        draft.value.description.trim() ? <div aria-label="节点简介预览" className="min-w-0 break-words text-sm leading-7 text-stone-700">
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={{
+            h1: ({ node, ...props }) => <h1 className="mb-4 mt-6 text-xl font-semibold text-stone-900 first:mt-0" {...props} />,
+            h2: ({ node, ...props }) => <h2 className="mb-3 mt-5 text-lg font-semibold text-stone-900 first:mt-0" {...props} />,
+            h3: ({ node, ...props }) => <h3 className="mb-2 mt-4 text-base font-semibold text-stone-900 first:mt-0" {...props} />,
+            h4: ({ node, ...props }) => <h4 className="mb-2 mt-4 font-semibold text-stone-900 first:mt-0" {...props} />,
+            h5: ({ node, ...props }) => <h5 className="mb-2 mt-4 font-semibold text-stone-900 first:mt-0" {...props} />,
+            h6: ({ node, ...props }) => <h6 className="mb-2 mt-4 font-semibold text-stone-900 first:mt-0" {...props} />,
+            p: ({ node, ...props }) => <p className="my-2" {...props} />,
+            ul: ({ node, ...props }) => <ul className="my-2 list-disc pl-5" {...props} />,
+            ol: ({ node, ...props }) => <ol className="my-2 list-decimal pl-5" {...props} />,
+            li: ({ node, ...props }) => <li className="my-0 pl-1" {...props} />,
+            blockquote: ({ node, ...props }) => <blockquote className="my-3 border-l-2 border-stone-300 pl-4 text-stone-500" {...props} />,
+            a: ({ node, ...props }) => <a className="underline decoration-stone-300 underline-offset-4 hover:decoration-stone-600" {...props} />,
+            pre: ({ node, ...props }) => <pre className="my-3 overflow-x-auto bg-stone-100 p-3 text-xs" {...props} />,
+            hr: ({ node, ...props }) => <hr className="my-5 border-stone-200" {...props} />
+          }}>{draft.value.description}</ReactMarkdown>
+        </div> : <button type="button" onClick={() => { descriptionBeforeEdit.current = ''; setEditingDescription(true); }} className="w-full border border-dashed border-stone-200 px-4 py-8 text-left text-sm text-stone-400 hover:border-stone-400">暂无简介，点击编辑</button>
       )}
     </section>
     <NodeMergePanel node={node} onBeforeMerge={() => { revision.current += 1; draft.commit(); }} />

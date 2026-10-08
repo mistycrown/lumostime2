@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-08: Checks saved and AI-generated Markdown headings/list styles with production CSS.
  * @updated 2026-10-07: Exercises review-card period filtering, review-kind navigation and cross-kind backlink transforms.
  * @updated 2026-10-07: Exercises merge choices, dirty-editor retention, rapid rename, navigation and persisted complete backlink updates.
  * @updated 2026-10-07: Verifies full-width alias links render, navigate and retain delimiters on rename.
@@ -145,6 +146,23 @@ async function run() {
   check(!nodes.nodes.find((node) => node.id === 'person')?.categoryId, 'Clearing classification failed');
   await select('节点分类', peopleCategory.id);
   await labelledClick('编辑节点简介');
+  const markdownDescription = '# 节点概览\n\n## 基本信息\n\n和小林共同记录的日常与项目讨论。\n\n- 身份：同事\n- 关系：项目伙伴\n  - 每周讨论进展\n\n### 最近交往\n\n1. 讨论项目\n2. 推荐书籍\n\n> 一起记录日常。';
+  await input('节点简介', markdownDescription);
+  await labelledClick('保存节点简介');
+  const preview = document.querySelector<HTMLElement>('[aria-label="节点简介预览"]')!;
+  const paragraph = preview.querySelector('p')!;
+  const headingSizes = ['h1', 'h2', 'h3'].map((tag) => parseFloat(getComputedStyle(preview.querySelector(tag)!).fontSize));
+  check(headingSizes[0] > headingSizes[1] && headingSizes[1] > headingSizes[2] && headingSizes[2] > parseFloat(getComputedStyle(paragraph).fontSize), 'Markdown heading hierarchy lost its styles');
+  check(Number(getComputedStyle(preview.querySelector('h2')!).fontWeight) >= 600, 'Markdown heading is not emphasized');
+  check(getComputedStyle(preview.querySelector('ul')!).listStyleType === 'disc', 'Markdown unordered list has no bullets');
+  check(getComputedStyle(preview.querySelector('ol')!).listStyleType === 'decimal', 'Markdown ordered list has no numbering');
+  check(parseFloat(getComputedStyle(preview.querySelector('ul ul')!).paddingLeft) > 0, 'Nested Markdown list has no indentation');
+  check(parseFloat(getComputedStyle(preview.querySelector('blockquote')!).borderLeftWidth) > 0, 'Markdown blockquote lost its border');
+  check(nodes.nodes.find((node) => node.id === 'person')?.description === markdownDescription, 'Saving Markdown changed the source text');
+  preview.scrollIntoView({ block: 'center' });
+  assertFits(); await capture('node-markdown-mobile');
+  passed.push('saved Markdown heading hierarchy, list markers/nesting, blockquote and unchanged source');
+  await labelledClick('编辑节点简介');
   await input('节点简介', '和小林共同记录的日常与项目讨论。');
   await input('新别名', '小林同学'); await labelledClick('添加别名');
   await labelledClick('编辑别名：小林同学'); await input('新别名', '林同学'); await labelledClick('保存别名');
@@ -178,6 +196,10 @@ async function run() {
   check(JSON.parse(aiRequests[0].prompt).相关记录.length === 3, 'AI prompt omitted backlinks');
   aiRequests[0].resolve('相关记录涉及项目讨论、散步和书籍推荐。'); await delay();
   check(document.querySelector('[aria-label="节点简介预览"]')?.textContent?.includes('书籍推荐'), 'Generated text not rendered');
+  const generatedPreview = document.querySelector('[aria-label="节点简介预览"]')!;
+  check(generatedPreview.querySelector('h2')?.textContent === '基本信息', 'Generated biography did not parse Markdown headings');
+  check(getComputedStyle(generatedPreview.querySelector('ul')!).listStyleType === 'disc', 'Generated biography list has no bullets');
+  passed.push('AI-generated Markdown headings and list markers');
   await click('AI 生成'); await until(() => aiRequests.length === 2, 'second AI request');
   await labelledClick('编辑节点简介');
   await input('节点简介', '生成期间手写的简介。');
@@ -328,6 +350,13 @@ async function run() {
   check(nodes.index.get('new-primary')?.logs.length === 7, 'Reload lost merged/renamed history');
   check(!nodes.nodes.some((node) => ['person', 'merge-source'].includes(node.id)), 'Reload resurrected merged nodes');
   passed.push('both merge-primary choices, cancellation, dirty biographies/AI race, queued log plus rapid rename, all-record retargeting and persisted merged history');
+  data.setNodes((previous) => previous.map((node) => node.id === 'new-primary' ? { ...node, description: markdownDescription } : node)); await delay();
+  nodes.openNode('新主节点'); await delay(); await click('细节');
+  await capture('node-markdown-desktop');
+  const desktopPreview = document.querySelector('[aria-label="节点简介预览"]')!;
+  check(getComputedStyle(desktopPreview.querySelector('ul')!).listStyleType === 'disc' && getComputedStyle(desktopPreview.querySelector('ol')!).listStyleType === 'decimal', 'Desktop Markdown list markers lost their styles');
+  assertFits();
+  passed.push('desktop Markdown preview without horizontal overflow');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });
