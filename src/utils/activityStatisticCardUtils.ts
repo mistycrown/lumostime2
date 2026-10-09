@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.ts
+ * @updated 2026-10-09: Preserves and sanitizes per-card word cloud settings through normalization.
  * @updated 2026-10-06: Shares chart-specific ranges and supports record-duration cards.
  * @input Activity attribute definitions and persisted statistic card settings.
  * @output Normalized card settings, default cards, and chart capability helpers.
@@ -21,6 +22,7 @@ import {
   ActivityStatisticMetric,
   ActivityStatisticRange
 } from '../types';
+import { normalizeWordCloudSettings } from './textSegmentation';
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'week', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
@@ -122,6 +124,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     range,
     metric: normalizedMetric,
     ...(timelineStyle ? { timelineStyle } : {}),
+    ...(item.wordCloudSettings ? { wordCloudSettings: normalizeWordCloudSettings(item.wordCloudSettings) } : {}),
     order: Number.isFinite(item.order) ? Number(item.order) : index
   };
 };

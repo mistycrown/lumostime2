@@ -1,12 +1,24 @@
 /**
  * @file textSegmentation.ts
- * @input User-entered text values.
+ * @updated 2026-10-09: Protects card-specific phrases before segmentation and applies custom stop words afterward.
+ * @input User-entered text values and optional per-cloud phrase/stop-word rules.
  * @output Cross-platform Chinese word terms for text statistics.
  * @pos Shared text analysis utility
  * @description Uses a bundled Segmentit dictionary so desktop and Android do not depend on WebView ICU dictionaries.
  * @updated 2026-09-21: Expands common Chinese function-word stopwords while keeping meaningful short terms available for word clouds.
  */
 import { Segment, useDefault } from 'segmentit';
+import type { WordCloudSettings } from '../types';
+
+export const normalizeWordList = (value: unknown): string[] => Array.isArray(value)
+  ? [...new Set(value.filter((word): word is string => typeof word === 'string')
+    .map((word) => word.trim().replace(/\s+/g, ' ').toLowerCase()).filter(Boolean))]
+  : [];
+
+export const normalizeWordCloudSettings = (value: unknown): WordCloudSettings => {
+  const settings = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  return { mergeWords: normalizeWordList(settings.mergeWords), stopWords: normalizeWordList(settings.stopWords) };
+};
 
 interface SegmentitResult {
   w: string;
@@ -38,7 +50,7 @@ const getFallbackTextTerms = (text: string): string[] => text
   .map((part) => part.toLowerCase())
   .filter(isTextTerm);
 
-export const getTextTerms = (value: string): string[] => {
+const segmentText = (value: string): string[] => {
   const text = value.trim().replace(/[\r\n]+/g, ' ');
   if (!text) return [];
 
@@ -46,4 +58,34 @@ export const getTextTerms = (value: string): string[] => {
     .map((part) => part.w.trim().toLowerCase())
     .filter(isTextTerm);
   return terms.length > 0 ? terms : getFallbackTextTerms(text);
+};
+
+/** Match literal phrases in the original text, preferring the longest at each position. */
+export const getTextTerms = (value: string, settings?: WordCloudSettings): string[] => {
+  if (!settings) return segmentText(value);
+  const mergeWords = normalizeWordList(settings.mergeWords).sort((left, right) => right.length - left.length);
+  const stopWords = new Set(normalizeWordList(settings.stopWords));
+  if (!mergeWords.length) return segmentText(value).filter((term) => !stopWords.has(term));
+  const text = value.trim().replace(/\s+/g, ' ').toLowerCase();
+  const terms: string[] = [];
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const word = mergeWords.find((candidate) => text.startsWith(candidate, index)
+      && (!/^[a-z0-9]/.test(candidate) || !/[a-z0-9]/.test(text[index - 1] || ''))
+      && (!/[a-z0-9]$/.test(candidate) || !/[a-z0-9]/.test(text[index + candidate.length] || '')));
+    if (!word) continue;
+    terms.push(...segmentText(text.slice(start, index)), word);
+    index += word.length - 1;
+    start = index + 1;
+  }
+  terms.push(...segmentText(text.slice(start)));
+  return terms.filter((term) => !stopWords.has(term));
+};
+
+export const getRankedTextTerms = (values: Iterable<string>, settings?: WordCloudSettings): Array<[string, number]> => {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    getTextTerms(value, settings).forEach((term) => counts.set(term, (counts.get(term) || 0) + 1));
+  }
+  return [...counts.entries()].sort((left, right) => right[1] - left[1]);
 };

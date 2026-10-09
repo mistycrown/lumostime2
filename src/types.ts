@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-09: Adds independently persisted merge words and stop words for each word cloud.
  * @updated 2026-10-07: Adds optional node classification and persisted node categories.
  * @updated 2026-10-06: Adds lightweight NoteNode metadata for text-derived wiki links.
  * @updated 2026-10-06: Adds record-duration statistic sources and persisted filter/scope cards.
@@ -134,6 +135,11 @@ export type ActivityStatisticCardSource =
   | { type: 'recordDuration' }
   | { type: 'categoryActivity' };
 
+export interface WordCloudSettings {
+  mergeWords: string[];
+  stopWords: string[];
+}
+
 export interface ActivityStatisticCard {
   id: string;
   source: ActivityStatisticCardSource;
@@ -141,6 +147,7 @@ export interface ActivityStatisticCard {
   range: ActivityStatisticRange;
   metric: ActivityStatisticMetric;
   timelineStyle?: ActivityTimelineStyle;
+  wordCloudSettings?: WordCloudSettings;
   order: number;
 }
 

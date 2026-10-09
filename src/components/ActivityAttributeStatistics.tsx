@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-09: Adds per-cloud word settings for attribute, conditional, and note statistics.
  * @updated 2026-10-06: Adds safe all-time ranges, record-duration sources, and elapsed-hour heatmaps.
  * @input One Activity and its actual Logs.
  * @output Tag-wide statistic cards with type-specific distributions and condition-aware trend visualizations.
@@ -33,8 +34,10 @@
  */
 import React, { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, BarChart3, CalendarDays, Clock3, Layers3, LineChart, Palette, PieChart, Plus, Settings2, Table2, Trash2, Type, X } from 'lucide-react';
-import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, ActivityStatisticCard, ActivityStatisticCardSource, ActivityStatisticCardType, ActivityStatisticPaletteId, ActivityTimelineStyle, Log } from '../types';
+import { Activity, ActivityAttributeDefinition, ActivityAttributeOption, ActivityAttributeType, ActivityAttributeValue, ActivityStatisticCard, ActivityStatisticCardSource, ActivityStatisticCardType, ActivityStatisticPaletteId, ActivityTimelineStyle, Log, WordCloudSettings } from '../types';
 import { CustomSelect } from './CustomSelect';
+import { WordCloudSettingsEditor } from './WordCloudSettingsEditor';
+import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { ChartPaletteSelector } from './ChartPaletteSelector';
 import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils/activityAttributeUtils';
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
@@ -165,6 +168,8 @@ interface ActivityAttributeStatisticsProps {
   allowedSourceTypes?: Array<ActivityStatisticCardSource['type']>;
   categoryActivityOptions?: ActivityAttributeOption[];
   title?: string;
+  wordCloudSettings?: WordCloudSettings;
+  wordCloudSettingsAction?: React.ReactNode;
 }
 
 interface TrendPoint {
@@ -204,21 +209,22 @@ const AttributeSection: React.FC<{
   count: React.ReactNode;
   rangeLabel?: string;
   hideTopBorder?: boolean;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, typeLabel, count, rangeLabel, hideTopBorder = false, children }) => (
+}> = ({ title, typeLabel, count, rangeLabel, hideTopBorder = false, headerAction, children }) => (
   <section className={`${hideTopBorder ? '' : 'border-t border-stone-300'} pt-6`}>
     <div className="mb-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0">
         <h2 className="truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>
         <span className="text-[10px] uppercase tracking-[0.16em] text-stone-400">{typeLabel}{rangeLabel ? <span className="ml-2 normal-case tracking-normal text-stone-400">· {rangeLabel}</span> : null}</span>
       </div>
-      <span className="shrink-0 text-xs text-stone-400">{count}</span>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span className="text-xs text-stone-400">{count}</span>{headerAction}</div>
     </div>
     {children}
   </section>
 );
 
-const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false }) => {
+const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false, wordCloudSettings, wordCloudSettingsAction }) => {
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
   const [selectedMode, setSelectedMode] = useState<StatisticMode>('count');
@@ -320,13 +326,13 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
                 if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'string') return;
                 textValueCount += 1;
-                getTextTerms(value.value).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
+                getTextTerms(value.value, wordCloudSettings).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
               }));
               if (textValueCount === 0) return null;
               const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, MAX_TEXT_TERMS);
               const maxCount = terms[0]?.[1] || 1;
               return (
-                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${textValueCount} 条已填写`}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel="TEXT / 文本" rangeLabel={rangeLabel} count={`${textValueCount} 条已填写`} headerAction={wordCloudSettingsAction}>
                   {terms.length === 0 ? <p className="text-sm text-stone-400">暂无有效文本</p> : (
                     <div className="flex flex-wrap items-baseline gap-x-4 gap-y-3 rounded-xl px-1 py-2">
                       {terms.map(([term, count], index) => {
@@ -846,9 +852,10 @@ interface ConditionalStatisticCardProps {
   rangeLabel: string;
   paletteId?: ActivityStatisticPaletteId;
   chartPalette: ReturnType<typeof getChartPalette>;
+  wordCloudSettingsAction?: React.ReactNode;
 }
 
-const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ activity, attributes, attribute, logs, card, rangeLabel, paletteId, chartPalette }) => {
+const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ activity, attributes, attribute, logs, card, rangeLabel, paletteId, chartPalette, wordCloudSettingsAction }) => {
   const slices = getCardAttributeStatisticSlices(attribute, attributes, logs);
   return <React.Fragment>{slices.map((slice, index) => {
     const sliceAttribute: ActivityAttributeDefinition = {
@@ -870,7 +877,7 @@ const ConditionalStatisticCard: React.FC<ConditionalStatisticCardProps> = ({ act
     if (card.chartType === 'choiceStacked') {
       return <section key={key} className="py-7 first:pt-2">{cardHeading}<ChoiceStackedPreview attribute={sliceAttribute} logs={slice.logs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
-    return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+    return <section key={key} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [sliceAttribute] }} logs={slice.logs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} wordCloudSettingsAction={wordCloudSettingsAction} onChange={undefined} /></section>;
   })}</React.Fragment>;
 };
 
@@ -917,6 +924,18 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const [wordSettingsCardId, setWordSettingsCardId] = useState<string | null>(null);
+  const wordSettingsDialogRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!wordSettingsCardId) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    wordSettingsDialogRef.current?.focus();
+    const unregister = registerHardwareBackHandler(() => { setWordSettingsCardId(null); return true; });
+    return () => { unregister(); previousFocus?.focus(); };
+  }, [wordSettingsCardId]);
+
+  React.useEffect(() => { setWordSettingsCardId(null); }, [activity.id]);
 
   const commit = (next: ActivityStatisticCard[]) => {
     const normalized = next.map((card, index) => ({ ...card, order: index }));
@@ -941,6 +960,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const sourceChoices = availableSourceChoices;
   const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'attribute' ? `attribute:${value.attributeId}` : value.type;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
+  const wordSettingsCard = cards.find((card) => card.id === wordSettingsCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
   const selectedRangeOptions = selectedCard
     ? getStatisticRangesForCard(selectedCard.chartType).map((key) => ({ key, label: getRangeLabel(key) }))
@@ -955,6 +975,18 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const updateCard = (id: string, update: Partial<ActivityStatisticCard>) => commit(cards.map((card) => card.id === id ? { ...card, ...update } : card));
   const updateSelectedCard = (update: Partial<ActivityStatisticCard>) => {
     if (selectedCard) updateCard(selectedCard.id, update);
+  };
+
+  const getWordCloudValues = (card: ActivityStatisticCard): string[] => {
+    const cardLogs = filterLogsByRange(logs, card.range);
+    if (card.source.type === 'note') return cardLogs.map((log) => log.note || '');
+    if (card.source.type !== 'attribute') return [];
+    const attributeId = card.source.attributeId;
+    const attribute = attributes.find((item) => item.id === attributeId);
+    if (!attribute) return [];
+    return getCardAttributeStatisticSlices(attribute, attributes, cardLogs).flatMap((slice) => slice.logs
+      .flatMap((log) => (log.attributeValues || []).flatMap((value) =>
+        value.attributeId === attribute.id && 'value' in value && typeof value.value === 'string' ? [value.value] : [])));
   };
 
   const changeExistingSource = (key: string) => {
@@ -981,6 +1013,9 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     updateSelectedCard({ chartType: type, range: nextRange, ...(type === 'tagDurationPetalTimeline' ? { timelineStyle: selectedCard.timelineStyle || 'petal' } : {}), metric: type === 'numberArea' || type === 'numberHistogram' || type === 'numberCalendar' || type === 'numberKpi' ? 'value' : type === 'choiceBar' || type === 'choiceDonut' || type === 'choiceStacked' ? selectedCard.metric === 'duration' ? 'duration' : 'count' : 'count' });
   };
 
+  const renderWordSettingsButton = (card: ActivityStatisticCard) => card.chartType === 'textCloud'
+    ? <button type="button" aria-label={`词云设置：${getStatisticCardLabel(card, attributes)}`} onClick={() => setWordSettingsCardId(card.id)} className="inline-flex items-center gap-1 text-xs text-[#8f7f70] hover:text-[#77523d]"><Settings2 size={13} />词云设置</button> : undefined;
+
   const renderCard = (card: ActivityStatisticCard) => {
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
@@ -1001,12 +1036,12 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TIME RHYTHM / {card.timelineStyle === 'histogram' ? '24 HOUR BARS' : '12 PETALS'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><PetalTimelineChart logs={logs} range={rhythmRange} palette={chartPalette} timelineStyle={card.timelineStyle || 'petal'} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
-       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar hideSectionBorder chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar hideSectionBorder chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} onChange={undefined} /></section>;
     }
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };
       const noteLogs = cardLogs.map((log) => ({ ...log, attributeValues: log.note ? [{ attributeId: noteAttribute.id, value: log.note }] : undefined }));
-       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [noteAttribute] }} logs={noteLogs} hideToolbar rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} wordCloudSettingsAction={renderWordSettingsButton(card)} onChange={undefined} /></section>;
     }
     const attribute = getCardAttribute(activity, card.source, categoryActivityOptions);
     if (!attribute) return null;
@@ -1021,6 +1056,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         rangeLabel={rangeLabel}
         paletteId={paletteId}
         chartPalette={chartPalette}
+        wordCloudSettingsAction={renderWordSettingsButton(card)}
       />;
     }
     const attributeLogs = card.source.type === 'categoryActivity'
@@ -1038,7 +1074,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     if (card.chartType === 'choiceStacked') {
        return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">CHOICE STACKED / 单选</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><ChoiceStackedPreview attribute={attribute} logs={attributeLogs} mode={card.metric === 'duration' ? 'duration' : 'count'} range={card.range} palette={chartPalette} /></section>;
     }
-      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} onChange={undefined} /></section>;
+      return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [attribute] }} logs={attributeLogs} hideToolbar fixedMode={card.metric === 'duration' ? 'duration' : 'count'} chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} wordCloudSettingsAction={renderWordSettingsButton(card)} onChange={undefined} /></section>;
   };
 
   const addCard = () => {
@@ -1088,12 +1124,27 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         </div>
       )}
       {paletteOpen && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setPaletteOpen(false); }}><div className="w-full max-w-xl rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="配色"><div className="mb-5 flex items-center justify-between"><h2 className="font-serif text-lg text-[#4a3b30]">配色</h2><button type="button" onClick={() => setPaletteOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div><ChartPaletteSelector value={effectivePaletteId} onChange={updatePalette} customSequences={customSequences} unlocked={isSponsorshipUnlocked} /></div></div>}
+      {wordSettingsCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setWordSettingsCardId(null); }}>
+        <div ref={wordSettingsDialogRef} tabIndex={-1} className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl outline-none sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="词云设置" onKeyDown={(event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); setWordSettingsCardId(null); }
+          if (event.key === 'Tab') {
+            const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input'));
+            const first = controls[0]; const last = controls[controls.length - 1];
+            if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }
+        }}>
+          <div className="mb-5 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="font-serif text-lg text-[#4a3b30]">词云设置</h2><p className="mt-1 truncate text-xs text-[#a08f7d]">{getStatisticCardLabel(wordSettingsCard, attributes)}</p></div><button type="button" onClick={() => setWordSettingsCardId(null)} aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div>
+          <WordCloudSettingsEditor key={wordSettingsCard.id} settings={wordSettingsCard.wordCloudSettings} values={getWordCloudValues(wordSettingsCard)} onChange={(wordCloudSettings) => updateCard(wordSettingsCard.id, { wordCloudSettings })} />
+        </div>
+      </div>}
       {editorOpen && selectedCard && <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#3b2e24]/35 p-0 sm:items-center sm:p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditorOpen(false); }}>
         <div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片">
           <div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div>
           <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
           <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>
           <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{selectedRangeOptions.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>
+          {selectedCard.chartType === 'textCloud' && <div className="mt-5 border-t border-[#e0d6ca] pt-4"><WordCloudSettingsEditor key={`${selectedCard.id}-${sourceToKey(selectedCard.source)}-${selectedCard.range}`} settings={selectedCard.wordCloudSettings} values={getWordCloudValues(selectedCard)} onChange={(wordCloudSettings) => updateSelectedCard({ wordCloudSettings })} /></div>}
           {selectedCard.chartType === 'tagDurationPetalTimeline' && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表样式</p><div className="flex flex-wrap gap-1.5">{TIMELINE_STYLE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ timelineStyle: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${(selectedCard.timelineStyle || 'petal') === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
           {(selectedCard.chartType === 'choiceBar' || selectedCard.chartType === 'choiceDonut' || selectedCard.chartType === 'choiceStacked') && <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">统计维度</p><div className="flex gap-1.5">{STATISTIC_MODE_OPTIONS.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ metric: option.key })} className={`rounded-md border px-3 py-1.5 text-xs ${selectedCard.metric === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>}
         </div>

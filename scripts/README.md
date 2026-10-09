@@ -10,6 +10,8 @@
 
 ## test-detail-statistics-renderer.mjs
 
+2026-10-09：补充词云的合并词、停用词、高频词选择、删除规则、独立保存、重新加载、时间范围、备注和条件属性，以及 Escape 和硬件返回检查；截图在桌面与窄屏之间恢复对应尺寸。
+
 `node scripts/test-detail-statistics-renderer.mjs` 在隔离、隐藏的 Electron 中验证筛选器和领域统计的来源限制、历史数据、卡片/配色保存、编辑表达式、清空和恢复卡片，以及跨午夜时长热力图。先运行 `npm run build`；使用已验证的微软雅黑字体，桌面及窄屏截图保存到临时目录。
 
 ## test-feedback-report-renderer.mjs

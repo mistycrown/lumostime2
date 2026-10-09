@@ -1,5 +1,6 @@
 /**
  * @file detailStatisticsRendererHarness.tsx
+ * @updated 2026-10-09: Exercises independent word rules, ordered selection, persistence, notes, and conditional clouds.
  * @input Real filter/scope detail views, cards, selection controls, and isolated settings.
  * @output Browser regression results and screenshot checkpoints.
  * @pos Test (Detail Statistics Renderer)
@@ -7,7 +8,9 @@
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Category, Filter, Log, Scope } from '../../types';
+import type { Activity, Category, Filter, Log, Scope } from '../../types';
+import { ActivityAttributeStatistics } from '../ActivityAttributeStatistics';
+import { runRegisteredHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
 import { FiltersSettingsView } from '../../views/settings/FiltersSettingsView';
 import { ScopeDetailView } from '../../views/ScopeDetailView';
 import { CategoryDetailView } from '../../views/CategoryDetailView';
@@ -75,8 +78,86 @@ const CategoryProbe = () => {
 const openFilter = async () => { const heading = document.querySelector('h4')!; check(heading, 'Missing saved filter'); heading.click(); await delay(); await click('统计'); };
 const editFirst = async () => { await click('管理'); await click('编辑记录时长 · 数值概览', dialog('管理统计卡片')); };
 
+let savedWordActivity: Activity = {
+  id: 'word-activity', name: '吃饭', color: '#996666', icon: '饭',
+  attributes: [
+    { id: 'place', name: '地点', type: 'text', order: 0, createdAt: 1, updatedAt: 1 },
+    { id: 'kind', name: '餐别', type: 'single', options: [{ id: 'lunch', label: '午餐' }], order: 1, createdAt: 1, updatedAt: 1 },
+    { id: 'conditional', name: '午餐地点', type: 'text', displayCondition: { attributeId: 'kind', optionIds: ['lunch'] }, order: 2, createdAt: 1, updatedAt: 1 }
+  ],
+  statisticCards: [
+    { id: 'place-cloud', source: { type: 'attribute', attributeId: 'place' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 0 },
+    { id: 'other-cloud', source: { type: 'attribute', attributeId: 'place' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 1 },
+    { id: 'note-cloud', source: { type: 'note' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 2 },
+    { id: 'conditional-cloud', source: { type: 'attribute', attributeId: 'conditional' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 3 }
+  ]
+};
+const wordLogs = [
+  record('word-old', oldStart, oldStart + 3600000, 3600, { note: '美食广场 咖啡', attributeValues: [{ attributeId: 'place', value: '美食广场 美食广场 咖啡' }, { attributeId: 'kind', optionId: 'lunch' }, { attributeId: 'conditional', value: '美食广场' }] }),
+  record('word-new', now - 3600000, now, 3600, { note: '咖啡', attributeValues: [{ attributeId: 'place', value: '美食和广场' }, { attributeId: 'kind', optionId: 'dinner' }, { attributeId: 'conditional', value: '隐藏地点' }] })
+];
+const WordProbe = () => {
+  const [activity, setActivity] = useState(savedWordActivity);
+  return <ActivityAttributeStatistics activity={activity} logs={wordLogs} onChange={(next) => { savedWordActivity = next; setActivity(next); }} />;
+};
+const setWordInput = async (label: string, value: string) => {
+  const input = dialog('词云设置').querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+  check(input, `Missing word input: ${label}`);
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true })); await delay();
+};
+const cloudTerms = (index: number) => Array.from(host.querySelectorAll('.cursor-default')).filter((node) => {
+  const cloud = host.querySelectorAll('[aria-label^="词云设置："]')[index]?.closest('section');
+  return cloud?.contains(node);
+});
+const findCloudTerm = (index: number, word: string) => cloudTerms(index).find((node) => node.textContent === word);
+
+async function checkWordClouds() {
+  await render(<WordProbe />);
+  await click('词云设置：地点 · 词云');
+  await click('选择高频词：美食', dialog('词云设置')); await click('选择高频词：广场', dialog('词云设置'));
+  check(dialog('词云设置').querySelector<HTMLInputElement>('input[aria-label="合并词"]')?.value === '美食广场', 'Selection order did not build the phrase');
+  await click('添加合并词', dialog('词云设置'));
+  await click('选择高频词：咖啡', dialog('词云设置')); await click('停用所选', dialog('词云设置'));
+  check(savedWordActivity.statisticCards?.[0].wordCloudSettings?.mergeWords[0] === '美食广场', 'Phrase was not persisted');
+  await capture('word-cloud-settings');
+  await click('关闭', dialog('词云设置'));
+  check(findCloudTerm(0, '美食广场')?.getAttribute('title') === '2 次', 'Merged phrase count did not match literal occurrences');
+  check(findCloudTerm(0, '美食')?.getAttribute('title') === '1 次' && !findCloudTerm(0, '咖啡'), 'Split terms were overcounted or stopped term remained');
+  check(findCloudTerm(1, '美食')?.getAttribute('title') === '3 次' && findCloudTerm(1, '咖啡'), 'Settings leaked into another card');
+  await render(null); await render(<WordProbe />);
+  check(findCloudTerm(0, '美食广场') && !findCloudTerm(0, '咖啡'), 'Reopening lost saved word rules');
+  await click('词云设置：地点 · 词云'); await click('移除停用词：咖啡', dialog('词云设置'));
+  await setWordInput('停用词', '美食广场，咖啡'); await click('添加停用词', dialog('词云设置'));
+  await click('关闭', dialog('词云设置'));
+  check(!findCloudTerm(0, '美食广场') && !findCloudTerm(0, '咖啡'), 'Manual stop words failed');
+  await click('词云设置：备注 · 词云'); await setWordInput('合并词', '美食广场'); await click('添加合并词', dialog('词云设置'));
+  await setWordInput('停用词', '咖啡'); await click('添加停用词', dialog('词云设置')); await click('关闭', dialog('词云设置'));
+  check(findCloudTerm(2, '美食广场')?.getAttribute('title') === '1 次' && !findCloudTerm(2, '咖啡'), 'Note cloud rules did not apply');
+  await click('词云设置：午餐地点 · 词云');
+  check(!button('选择高频词：隐藏', dialog('词云设置')), 'Word settings ignored the conditional source');
+  await setWordInput('合并词', '美食广场'); await click('添加合并词', dialog('词云设置'));
+  await capture('word-cloud-settings-mobile'); await click('关闭', dialog('词云设置'));
+  check(findCloudTerm(3, '美食广场')?.getAttribute('title') === '1 次', 'Conditional cloud rules did not apply');
+  await click('词云设置：地点 · 词云'); await click('移除合并词：美食广场', dialog('词云设置')); await click('移除停用词：咖啡', dialog('词云设置')); await click('关闭', dialog('词云设置'));
+  check(!findCloudTerm(0, '美食广场') && findCloudTerm(0, '美食')?.getAttribute('title') === '3 次' && findCloudTerm(0, '咖啡'), 'Removing rules did not restore default segmentation');
+  await click('词云设置：地点 · 词云');
+  dialog('词云设置').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await delay();
+  check(!document.querySelector('[role="dialog"][aria-label="词云设置"]'), 'Escape did not dismiss word settings');
+  await click('词云设置：地点 · 词云'); check(runRegisteredHardwareBackHandler(), 'Word settings did not register hardware back'); await delay();
+  check(!document.querySelector('[role="dialog"][aria-label="词云设置"]'), 'Hardware back did not dismiss word settings');
+  await click('管理'); await click('编辑地点 · 词云', dialog('管理统计卡片')); await click('近 30 天', dialog('编辑所选卡片'));
+  check(!button('选择高频词：咖啡', dialog('编辑所选卡片')), 'High-frequency settings did not follow the card range');
+  await click('全部', dialog('编辑所选卡片')); check(button('选择高频词：咖啡', dialog('编辑所选卡片')), 'All-time word settings lost history');
+  await click('关闭', dialog('编辑所选卡片')); await click('关闭', dialog('管理统计卡片'));
+  await capture('word-cloud-results-mobile');
+  passed.push('Word clouds support ordered merge selection, manual and selected stop words, removal, independent settings, remount persistence, notes, and conditional sources');
+  await render(null);
+}
+
 async function run() {
   await document.fonts.load('16px VerifiedChinese', '领域统计记录时长备注');
+  await checkWordClouds();
   await render(<FiltersProbe />); await openFilter();
   check(host.textContent?.includes('2 条记录'), 'Statistics included planned/unmatched records');
   await editFirst();

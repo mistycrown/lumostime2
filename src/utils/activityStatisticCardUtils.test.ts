@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.test.ts
+ * @updated 2026-10-09: Covers per-cloud word settings round-trips and legacy configurations.
  * @updated 2026-10-06: Covers persisted all-time capability rules and record-duration sources.
  * @input Activity statistic card configurations.
  * @output Regression coverage for default card migration and source capabilities.
@@ -19,6 +20,20 @@ const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
 });
 
 describe('activity statistic cards', () => {
+  it('preserves independently saved word rules for attribute and note clouds', () => {
+    const cards: ActivityStatisticCard[] = [
+      { id: 'text', source: { type: 'attribute', attributeId: 'memo' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 0,
+        wordCloudSettings: { mergeWords: ['美食广场'], stopWords: ['咖啡'] } },
+      { id: 'notes', source: { type: 'note' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 1,
+        wordCloudSettings: { mergeWords: [], stopWords: ['学习'] } }
+    ];
+    expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify(cards))))).toEqual(cards);
+    const legacy = { ...cards[0], wordCloudSettings: undefined };
+    expect(normalizeStatisticCards(activity([legacy]))[0].wordCloudSettings).toBeUndefined();
+    const malformed = { ...cards[0], wordCloudSettings: { mergeWords: [' 美食广场 ', '美食广场', 7], stopWords: null } };
+    expect(normalizeStatisticCards(activity([malformed as unknown as ActivityStatisticCard]))[0].wordCloudSettings)
+      .toEqual({ mergeWords: ['美食广场'], stopWords: [] });
+  });
   it('creates one default card per attribute and is repeatable with persisted cards', () => {
     const first = ensureStatisticCards(activity());
     expect(first.map((card) => card.chartType)).toEqual(['numberHistogram', 'choiceBar', 'choiceBar', 'textCloud']);

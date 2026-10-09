@@ -1,5 +1,6 @@
 /**
  * @file test-detail-statistics-renderer.mjs
+ * @updated 2026-10-09: Restores desktop dimensions between mobile screenshot checkpoints.
  * @input Real detail-statistics React harness, production CSS, and installed Electron/esbuild.
  * @output Offline renderer assertions and desktop/mobile screenshots in a disposable temp directory.
  * @pos Test Runner
@@ -44,6 +45,7 @@ app.whenReady().then(async () => {
     const capture = await window.webContents.executeJavaScript('window.__detailStatisticsCapture');
     if (capture) {
       if (capture.endsWith('-mobile')) window.setSize(390, 844);
+      else window.setSize(1000, 900);
       await new Promise(resolve => setTimeout(resolve, 180));
       const screenshot = path.join(__dirname, capture + '.png');
       await fs.writeFile(screenshot, (await window.webContents.capturePage()).toPNG());

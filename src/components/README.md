@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-09: `ActivityAttributeStatistics` exposes settings on each attribute/note word cloud and inside the card editor. `WordCloudSettingsEditor` supports manual phrase/stop-word entry, ordered high-frequency selection, removal, and immediate per-card persistence; conditional text slices share their parent card's rules.
+
 Update 2026-10-07: `DetailTimelineCard` renders linked daily/weekly/monthly review answers as independent filtered cards above the Log history, keeps Log date grouping Log-only, and uses accessible non-button row containers so inline node links do not create nested buttons; `NodeTextEditor` remains shared by all review and Log text input.
 
 Update 2026-10-07: `NodeTextEditor` is shared by review answers and note editors for bracket insertion, caret restoration and live node suggestions. Review text answers render wiki links as clickable nodes.
