@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-09: Adds single inline history-based note completion with Tab and touch acceptance.
  * @updated 2026-10-07: Adds a selection/caret-preserving node bracket shortcut beside the Note heading.
  * @updated 2026-10-07: Adds contextual guidance for node links, the node directory, and common node workflows.
  * @updated 2026-10-06: Shows opt-in node name/alias suggestions directly below the note draft.
@@ -48,6 +49,7 @@ import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
 import { NodeNoteSuggestions } from './NodeNoteSuggestions';
+import { NoteAutocompleteTextarea } from './NoteAutocompleteTextarea';
 import { FeatureHint } from './FeatureHint';
 import { insertNodeBrackets } from '../utils/nodeUtils';
 import {
@@ -1202,10 +1204,12 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
                 {isNoteExpanded ? <Minimize2 size={16} /> : <Minimize2 size={16} className="rotate-180" />}
               </button>
             </div>
-            <textarea
+            <NoteAutocompleteTextarea
               ref={noteRef}
               value={formState.note}
-              onChange={e => updateField('note', e.target.value)}
+              onValueChange={(note) => updateField('note', note)}
+              history={allLogs}
+              activityId={formState.selectedActivityId}
               className={`w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm shadow-sm focus:outline-none focus:ring-1 focus:border-stone-200 resize-none placeholder:text-stone-300 font-serif transition-[height] duration-150 ease-out ${isNoteExpanded ? 'h-[400px]' : 'h-[100px]'
                 }`}
               style={{

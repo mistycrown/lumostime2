@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Save focus-note drafts on blur/exit/background and discard after completion or cancellation.
  * @file FocusDetailView.tsx
+ * @updated 2026-10-09: Adds inline historical note completion while preserving buffered focus-note commits.
  * @input Active Session Data, Todos, Categories, Scopes
  * @output Session Updates (Note, Association), Completion Event
  * @pos View (Active Focus Overlay)
@@ -28,6 +29,7 @@ import { ImmersiveTimer } from '../components/ImmersiveTimer';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
+import { NoteAutocompleteTextarea } from '../components/NoteAutocompleteTextarea';
 import { ActivityAttributeFields } from '../components/ActivityAttributeFields';
 import { useToast } from '../contexts/ToastContext';
 import { appendTemplateToNote, getRecommendedNoteTemplates, RecommendedNoteTemplate } from '../utils/noteTemplateUtils';
@@ -750,10 +752,12 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 {/* Note Input */}
                 <div className="w-full px-8 mb-8">
                     <span className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block px-1">Note</span>
-                    <textarea
+                    <NoteAutocompleteTextarea
                         ref={noteRef}
                         value={note}
-                        onChange={e => setNote(e.target.value)}
+                        onValueChange={setNote}
+                        history={logs}
+                        activityId={session.activityId}
                         onBlur={noteDraft.commit}
                         placeholder="Add a note..."
                         className="w-full bg-white border border-stone-200 rounded-2xl p-4 text-stone-800 text-sm min-h-[100px] shadow-sm focus:outline-none focus:ring-1 focus:ring-stone-900 focus:border-stone-900 transition-all resize-none placeholder:text-stone-300 font-serif"

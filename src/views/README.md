@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-09: `FocusDetailView` uses the shared inline note completion editor, prioritizes the current activity's historical words and preserves buffered note commits on blur/exit.
+
 Update 2026-10-08: Single-day and range exports pass full log history to daily-check evaluation, including previous-night sleep rules, while report timelines, images and statistics retain their selected-day inputs.
 
 Update 2026-10-08: `SettingsView.tsx` and `ObsidianExportView.tsx` no longer pass node metadata into Obsidian exports, including single-day, date-range, weekly and monthly reports.

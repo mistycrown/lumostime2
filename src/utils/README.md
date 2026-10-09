@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-09: `noteAutocomplete.ts` caches historical note terms and adjacent phrases, counts each word once per actual record, excludes planned records and infrequent terms, and returns one caret-safe suffix ranked by prefix length, activity, frequency and recency.
+
 Update 2026-10-09: `textSegmentation.ts` protects each word cloud's literal merge phrases with longest-match priority, filters its custom stop words, and ranks actual occurrences. `activityStatisticCardUtils.ts` sanitizes and preserves these lists across persistence.
 
 Update 2026-10-07: `exportSerialization.ts` keeps custom activity attribute values readable in exports while preserving their original ID-based JSON representation.
