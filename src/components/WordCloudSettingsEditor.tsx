@@ -55,7 +55,7 @@ export const WordCloudSettingsEditor: React.FC<WordCloudSettingsEditorProps> = (
           if (isMerge) setSelectedWords([]);
         }}>
           <input aria-label={label} value={input} onChange={(event) => setInput(event.target.value)}
-            placeholder={isMerge ? '美食广场' : '输入停用词'}
+            placeholder={isMerge ? '输入合并词，可从下方点选' : '输入停用词'}
             className="min-w-0 flex-1 rounded-md border border-[#d8cabb] bg-[#fffdfa] px-3 py-2 text-sm text-[#5c4b3c] outline-none focus:border-[#b16d4c]" />
           <button type="submit" disabled={!parseWords(input).length} className={actionClass}>添加{label}</button>
         </form>

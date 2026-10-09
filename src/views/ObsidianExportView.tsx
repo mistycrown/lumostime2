@@ -810,7 +810,6 @@ export const ObsidianExportView: React.FC<ObsidianExportViewProps> = ({
                         <ul className="space-y-1 text-xs">
                             <li>• 此功能仅在 Electron (PC端) 环境下可用</li>
                             <li>• 导出会自动创建不存在的目录</li>
-                            <li>• 如果文件已存在，将在末尾追加新内容</li>
                         </ul>
                     </div>
                 </div>
