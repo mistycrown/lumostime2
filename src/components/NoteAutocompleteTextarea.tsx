@@ -4,6 +4,7 @@
  * @output One inline ghost suggestion accepted with Tab or the completion button
  * @pos Component (Record Note Editor)
  * @updated 2026-10-09: Adds caret-aware local completion, IME protection and synchronized multiline/scroll rendering.
+ * @updated 2026-10-09: Keeps mobile text scaling and fractional wrap widths aligned; uses a borderless Tab action on every device.
  */
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Log } from '../types';
@@ -17,11 +18,15 @@ interface NoteAutocompleteTextareaProps extends Omit<React.TextareaHTMLAttribute
 }
 
 const MIRROR_PROPERTIES = [
-  'boxSizing', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariant', 'lineHeight',
-  'letterSpacing', 'textIndent', 'textAlign', 'textTransform', 'tabSize',
+  'boxSizing', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariant', 'fontStretch',
+  'fontKerning', 'fontFeatureSettings', 'fontVariationSettings', 'fontSizeAdjust', 'lineHeight',
+  'letterSpacing', 'wordSpacing', 'textIndent', 'textAlign', 'textTransform', 'textRendering', 'tabSize',
+  'wordBreak', 'lineBreak', 'overflowWrap', 'direction',
   'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
   'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth', 'borderRadius'
 ] as const;
+// Mobile text inflation can affect a div differently from its native textarea.
+const NOTE_TEXT_SCALING: React.CSSProperties = { textSizeAdjust: 'none', WebkitTextSizeAdjust: 'none' };
 
 export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAutocompleteTextareaProps>(({
   value, onValueChange, history = EMPTY_NOTE_HISTORY, activityId,
@@ -58,22 +63,24 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
       const computed = window.getComputedStyle(input);
       const next: Record<string, string | number> = {};
       for (const property of MIRROR_PROPERTIES) next[property] = computed[property];
-      next.width = input.clientWidth + parseFloat(computed.borderLeftWidth) + parseFloat(computed.borderRightWidth);
-      next.height = input.offsetHeight;
+      const borderWidth = parseFloat(computed.borderLeftWidth) + parseFloat(computed.borderRightWidth);
+      const scrollbarWidth = Math.max(0, input.offsetWidth - input.clientWidth - Math.round(borderWidth));
+      next.width = parseFloat(computed.width) - scrollbarWidth;
+      next.height = computed.height;
       next.top = input.offsetTop;
       next.left = input.offsetLeft;
       next.borderStyle = 'solid';
       next.borderColor = 'transparent';
       next.color = 'transparent';
       next.whiteSpace = props.wrap === 'off' ? 'pre' : 'pre-wrap';
-      next.overflowWrap = 'break-word';
-      setMirrorStyle(next);
+      setMirrorStyle({ ...next, ...NOTE_TEXT_SCALING });
       setScroll({ top: input.scrollTop, left: input.scrollLeft });
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(input);
-    return () => observer.disconnect();
+    document.fonts.addEventListener('loadingdone', update);
+    return () => { observer.disconnect(); document.fonts.removeEventListener('loadingdone', update); };
   }, [className, style, props.wrap, focused]);
 
   const accept = () => {
@@ -90,9 +97,9 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
     });
   };
 
-  return <div className="relative">
+  return <div className="relative" style={NOTE_TEXT_SCALING}>
     <textarea {...props} ref={inputRef} value={value} disabled={disabled} readOnly={readOnly}
-      className={className} style={style} aria-autocomplete="inline"
+      className={className} style={{ ...style, ...NOTE_TEXT_SCALING }} aria-autocomplete="inline"
       aria-description={suggestion ? `按 Tab 补全为 ${suggestion.text}` : undefined}
       onChange={(event) => { readCaret(); onValueChange(event.target.value); }}
       onFocus={(event) => { setFocused(true); readCaret(); onFocus?.(event); }}
@@ -121,8 +128,8 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
       </div>
       <button type="button" tabIndex={-1} aria-label="接受备注补全" title="Tab"
         onPointerDown={(event) => event.preventDefault()} onClick={accept}
-        className="absolute bottom-2 right-3 rounded border border-stone-200 bg-white/90 px-2 py-1 text-[11px] text-stone-500 hover:text-stone-800 active:scale-95">
-        <span className="hidden sm:inline">Tab</span><span className="sm:hidden">补全</span>
+        className="absolute bottom-2 right-3 border-0 bg-transparent px-2 py-1 text-[11px] text-stone-500 hover:text-stone-800 active:scale-95">
+        Tab
       </button>
     </>}
   </div>;

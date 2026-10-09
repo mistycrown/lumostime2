@@ -4,6 +4,7 @@
  * @output Browser checks and desktop/mobile screenshots in node_modules/.cache/note-autocomplete-smoke
  * @pos Development verification script
  * @updated 2026-10-09: Runs an isolated browser bundle without development reloads or user browser data.
+ * @updated 2026-10-09: Measures actual mobile caret pixels against the ghost text, including fractional widths and mixed Chinese/English wrapping.
  */
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -12,6 +13,7 @@ import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { build } from 'esbuild';
+import sharp from 'sharp';
 
 const chromePath = process.env.NOTE_TEST_CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const fontPath = 'C:/Windows/Fonts/msyh.ttc';
@@ -102,6 +104,24 @@ try {
   passed.push('Real browser Tab accepts completion without moving focus');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' });
+  const mobileGeometry = await evaluate('window.__noteAutocompleteHarness.prepareMobileCase()');
+  await capture('mobile-wrap');
+  const pixels = await sharp(path.join(output, 'mobile-wrap.png')).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const caretPixels = [];
+  for (let y = Math.ceil(mobileGeometry.input.top); y < mobileGeometry.input.top + mobileGeometry.input.height; y += 1) {
+    for (let x = Math.ceil(mobileGeometry.input.left); x < mobileGeometry.input.left + mobileGeometry.input.width; x += 1) {
+      const offset = (y * pixels.info.width + x) * 4;
+      if (pixels.data[offset] > 200 && pixels.data[offset + 1] < 80 && pixels.data[offset + 2] < 80) caretPixels.push({ x, y });
+    }
+  }
+  if (!caretPixels.length) throw new Error('Native caret was not visible in the mobile screenshot');
+  const caretLeft = Math.min(...caretPixels.map((point) => point.x));
+  const caretTop = Math.min(...caretPixels.map((point) => point.y));
+  console.log(JSON.stringify({ mobileGeometry, nativeCaret: { left: caretLeft, top: caretTop } }));
+  if (Math.abs(caretLeft - mobileGeometry.suffix.left) > 3 || Math.abs(caretTop - mobileGeometry.suffix.top) > mobileGeometry.fontSize / 2) throw new Error('Mobile ghost text does not follow the actual native caret');
+  passed.push('Reported mobile wrap fixture aligns with actual textarea caret pixels');
+  await evaluate('window.__noteAutocompleteHarness.renderEditor()');
   await evaluate('window.__noteAutocompleteHarness.setText("今天修改论")');
   await capture('mobile');
   const button = await evaluate('(() => { const r = document.querySelector("[aria-label=接受备注补全]").getBoundingClientRect(); return { x:r.x+r.width/2,y:r.y+r.height/2 }; })()');

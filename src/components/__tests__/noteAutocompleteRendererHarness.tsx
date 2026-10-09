@@ -4,6 +4,7 @@
  * @output Browser interaction assertions and screenshot fixtures
  * @pos Test (Note Autocomplete Renderer)
  * @updated 2026-10-09: Covers IME, keyboard/touch acceptance, caret restoration, scrolling and draft commits.
+ * @updated 2026-10-09: Adds the reported mobile mixed-language wrap fixture and native-caret screenshot measurements.
  */
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -20,7 +21,7 @@ import '../../index.css';
 const categories: Category[] = [{ id: 'study', name: '学习', icon: '书', themeColor: '#78716c', activities: [
   { id: 'writing', name: '论文', icon: '书', color: '#78716c' }
 ] }];
-const history: Log[] = [1, 2, 3].map((id) => ({ id: `history-${id}`, note: '论文修改 TypeScript',
+const history: Log[] = [1, 2, 3].map((id) => ({ id: `history-${id}`, note: '论文修改 TypeScript 叫做',
   categoryId: 'study', activityId: 'writing', duration: 3600, startTime: Date.now() - id * 86400000, endTime: Date.now() }));
 const root = createRoot(document.getElementById('root')!);
 const passed: string[] = [];
@@ -128,6 +129,7 @@ async function run() {
   check(inputStyle.fontFamily === layerStyle.fontFamily && inputStyle.lineHeight === layerStyle.lineHeight && inputStyle.paddingLeft === layerStyle.paddingLeft, 'Mirror typography differs');
   checkGhostPosition();
   const button = document.querySelector<HTMLButtonElement>('[aria-label="接受备注补全"]')!;
+  check(button.textContent?.trim() === 'Tab' && getComputedStyle(button).borderTopWidth === '0px', 'Completion action is not a borderless Tab label');
   const pointer = new PointerEvent('pointerdown', { bubbles: true, cancelable: true }); button.dispatchEvent(pointer);
   check(pointer.defaultPrevented, 'Completion click could blur the editor'); button.click(); await delay();
   check(input().value.endsWith('最后写论文') && document.activeElement === input(), 'Completion button lost input focus');
@@ -154,8 +156,22 @@ async function run() {
 
 declare global {
   interface Window {
-    __noteAutocompleteHarness?: { run: typeof run; setText: typeof setText; renderEditor: () => Promise<void>; passed: string[] };
+    __noteAutocompleteHarness?: { run: typeof run; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; renderEditor: () => Promise<void>; passed: string[] };
   }
 }
-window.__noteAutocompleteHarness = { run, setText, renderEditor: () => render(<Editor />), passed };
+async function prepareMobileCase() {
+  await render(<Editor />);
+  document.documentElement.style.setProperty('text-size-adjust', '130%');
+  document.documentElement.style.setProperty('-webkit-text-size-adjust', '130%');
+  input().style.width = '342.5px';
+  input().style.wordSpacing = '3px';
+  input().style.caretColor = '#ff0000';
+  await setText('纠结了一会要不要报boss直聘的奖学金，然后欣然就叫');
+  check(visible() === '做', 'Reported mobile fixture did not suggest the expected suffix');
+  const suffix = ghost()!.getClientRects()[0];
+  const rect = input().getBoundingClientRect();
+  const computed = getComputedStyle(input());
+  return { suffix: { left: suffix.left, top: suffix.top }, input: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, fontSize: parseFloat(computed.fontSize) };
+}
+window.__noteAutocompleteHarness = { run, setText, prepareMobileCase, renderEditor: () => render(<Editor />), passed };
 void render(<Editor />);
