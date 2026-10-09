@@ -1,18 +1,19 @@
 /**
  * @file useAIBackfillChatViewport.test.ts
- * @input AI chat scroll metrics and keyboard-resize follow conditions
+ * @input AI chat scroll metrics and keyboard-resize scheduling
  * @output Regression coverage for bottom intent and guarded viewport following
  * @pos Component Support Test (AI Integration)
- * @description Verifies keyboard-driven layout changes keep the latest message visible only when the user was already at the bottom.
+ * @description Verifies layout-generated scroll events retain bottom intent while manual history scrolling cancels it.
  * @updated 2026-09-30: Added bottom-threshold and keyboard-resize follow regression coverage.
+ * @updated 2026-10-09: Covers resize-before-scroll races, content growth, blur-independent following, and history reading.
  */
 
 import { describe, expect, test, vi } from 'vitest';
 import {
   AI_CHAT_BOTTOM_FOLLOW_THRESHOLD_PX,
+  getAIChatBottomFollowIntent,
   isAIChatScrollNearBottom,
-  queueAIChatViewportResizeScroll,
-  shouldFollowAIChatViewportResize
+  queueAIChatViewportResizeScroll
 } from './useAIBackfillChatViewport';
 
 const createScrollMetrics = (distanceFromBottom: number) => ({
@@ -38,23 +39,35 @@ describe('isAIChatScrollNearBottom', () => {
   });
 });
 
-describe('shouldFollowAIChatViewportResize', () => {
-  test('requires both bottom intent and composer focus', () => {
-    const composer = {} as HTMLTextAreaElement;
-    const anotherElement = {} as Element;
+describe('getAIChatBottomFollowIntent', () => {
+  test('preserves bottom intent when the keyboard shrinks the scroller before alignment', () => {
+    const before = createScrollMetrics(0);
+    const after = { ...before, clientHeight: 160 };
 
-    expect(shouldFollowAIChatViewportResize(true, composer, composer)).toBe(true);
-    expect(shouldFollowAIChatViewportResize(false, composer, composer)).toBe(false);
-    expect(shouldFollowAIChatViewportResize(true, anotherElement, composer)).toBe(false);
-    expect(shouldFollowAIChatViewportResize(true, null, composer)).toBe(false);
-    expect(shouldFollowAIChatViewportResize(true, composer, null)).toBe(false);
+    expect(isAIChatScrollNearBottom(after)).toBe(false);
+    expect(getAIChatBottomFollowIntent(before, after, true)).toBe(true);
+    expect(getAIChatBottomFollowIntent(before, after, false)).toBe(false);
   });
 
-  test('remains enabled across repeated keyboard resize notifications', () => {
-    const composer = {} as HTMLTextAreaElement;
+  test('preserves bottom intent when reply parts or images increase content height', () => {
+    const before = createScrollMetrics(0);
+    const after = { ...before, scrollHeight: 1300 };
 
-    expect(shouldFollowAIChatViewportResize(true, composer, composer)).toBe(true);
-    expect(shouldFollowAIChatViewportResize(true, composer, composer)).toBe(true);
+    expect(getAIChatBottomFollowIntent(before, after, true)).toBe(true);
+    expect(getAIChatBottomFollowIntent(before, after, false)).toBe(false);
+  });
+
+  test('cancels following when the user scrolls upward without a layout change', () => {
+    expect(getAIChatBottomFollowIntent(createScrollMetrics(0), createScrollMetrics(200), true)).toBe(false);
+  });
+
+  test('resumes following when the user returns to the bottom', () => {
+    expect(getAIChatBottomFollowIntent(createScrollMetrics(200), createScrollMetrics(0), false)).toBe(true);
+  });
+
+  test('initializes intent from current metrics when no previous layout exists', () => {
+    expect(getAIChatBottomFollowIntent(null, createScrollMetrics(0), false)).toBe(true);
+    expect(getAIChatBottomFollowIntent(null, createScrollMetrics(200), true)).toBe(false);
   });
 });
 
