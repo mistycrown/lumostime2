@@ -1,6 +1,7 @@
 /**
  * @file AIBackfillChatModal.tsx
  * @updated 2026-10-09: Forwards the shortcut settings opener to the AI homepage.
+ * @updated 2026-10-09: Shares overlay visibility across home and conversation composers.
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @updated 2026-10-04: Reuses background-created conversations after the user-active chat is deleted.
@@ -2660,6 +2661,22 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
 
 
+  const isChatOverlayOpen = !isDesktopWidgetMode && Boolean(
+    isHistoryPanelOpen
+    || isNewSessionDialogOpen
+    || isPersonaPanelOpen
+    || isShortcutSettingsOpen
+    || isDreamViewerOpen
+    || isAssistantMemoryViewerOpen
+    || isAssistantLetterHistoryViewerOpen
+    || isNewspaperHistoryViewerOpen
+    || isAssistantLetterDetailSheetOpen
+    || isAssistantBackgroundHistoryViewerOpen
+    || debugViewer
+    || editingPrincipleId
+    || editingSelfBeliefId
+  );
+
   return (
     <div
       className={`ai-chat-shell fixed inset-0 z-[60] overflow-hidden ${isDesktopWidgetMode ? 'p-[4px]' : ''}`}
@@ -2744,6 +2761,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           handleOpenWeeklyReviewNarrative={handleOpenWeeklyReviewNarrative}
           handleRetryMessage={handleRetryMessage}
           isHomeView={isHomeView}
+          isOverlayOpen={isChatOverlayOpen}
           isLoading={isLoading}
           isPersonaPanelOpen={isPersonaPanelOpen}
           isShortcutSettingsOpen={isShortcutSettingsOpen}
@@ -2801,8 +2819,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           isComposerMenuOpen={isComposerMenuOpen}
           isDesktopWidgetMode={isDesktopWidgetMode}
           isHomeView={isHomeView}
+          isOverlayOpen={isChatOverlayOpen}
           isLoading={isLoading}
-          isPersonaPanelOpen={isPersonaPanelOpen}
           isStopActionVisible={isStopActionVisible}
           keyboardBottomInset={keyboardBottomInset}
           scrollToLatestMessage={scrollToLatestMessage}

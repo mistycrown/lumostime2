@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatMainView.tsx
+ * @updated 2026-10-09: Hides the home composer whenever a chat overlay is open.
  * @input Chat home and conversation-pane props
  * @output Main AI chat view
  * @pos Component Support (AI Integration)
@@ -52,8 +53,7 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
     handleRetryMessage,
     isHomeView,
     isLoading,
-    isPersonaPanelOpen,
-    isShortcutSettingsOpen,
+    isOverlayOpen,
     messagesEndRef,
     messagesScrollContainerRef,
     handleConversationScroll,
@@ -104,7 +104,7 @@ export function AIBackfillChatMainView(props: Record<string, any>) {
               sortedSessions={sortedSessions}
               theme={AI_CHAT_THEME}
               isLoading={isLoading}
-              isOverlayOpen={isPersonaPanelOpen || isShortcutSettingsOpen}
+              isOverlayOpen={isOverlayOpen}
               formatConversationTime={formatConversationTime}
               getSessionPersona={resolveSessionPersona}
               onOpenChat={handleOpenChatView}

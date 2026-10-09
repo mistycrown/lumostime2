@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatComposer.tsx
+ * @updated 2026-10-09: Hides the conversation composer on every chat overlay, including debugging.
  * @input Composer state, quick-command callbacks, and theme
  * @output AI chat composer
  * @pos Component Support (AI Integration)
@@ -55,7 +56,7 @@ export function AIBackfillChatComposer(props: Record<string, any>) {
     isDesktopWidgetMode,
     isHomeView,
     isLoading,
-    isPersonaPanelOpen,
+    isOverlayOpen,
     isStopActionVisible,
     keyboardBottomInset,
     scrollToLatestMessage,
@@ -65,7 +66,7 @@ export function AIBackfillChatComposer(props: Record<string, any>) {
   } = props;
   return (
     <>
-          {!isHomeView && !isPersonaPanelOpen && <div
+          {!isHomeView && !isOverlayOpen && <div
             className="absolute inset-x-0 bottom-0 z-30 px-4 pt-3 backdrop-blur-xl sm:px-5"
             style={{
               backgroundColor: AI_CHAT_THEME.shellLayerBg,
