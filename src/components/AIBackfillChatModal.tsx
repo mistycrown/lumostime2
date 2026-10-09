@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatModal.tsx
+ * @updated 2026-10-09: Forwards the shortcut settings opener to the AI homepage.
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @updated 2026-10-04: Reuses background-created conversations after the user-active chat is deleted.
@@ -2759,6 +2760,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
           setIsHistoryPanelOpen={setIsHistoryPanelOpen}
           setIsHomeView={setIsHomeView}
           setIsPersonaPanelOpen={setIsPersonaPanelOpen}
+          setIsShortcutSettingsOpen={setIsShortcutSettingsOpen}
           setSessions={setSessions}
           pendingHomeMessageRef={pendingHomeMessageRef}
           shortcuts={shortcuts}
