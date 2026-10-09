@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatAppliedActionHandlers.ts
+ * @updated 2026-10-09: Restores node metadata and linked logs together when undoing node actions.
  * @input Applied AI action snapshots, local logs/todos, and principle/self-belief editor state
  * @output Undo handlers and knowledge-library editing handlers used by applied-action cards
  * @pos Component Support (AI Integration)
@@ -7,11 +8,12 @@
  * @updated 2026-09-22: Extracted applied-action undo and library editor handlers from AIBackfillChatModal.
  */
 import type { Dispatch, SetStateAction } from 'react';
-import type { Log, TodoItem } from '../../types';
+import type { Log, NoteNode, TodoItem } from '../../types';
 import {
   applyLogDelete,
   applyLogSave,
   applyTodoSave,
+  rollbackAppliedChatActions,
   getStoredPrincipleById,
   getStoredSelfBeliefById,
   removeStoredPrincipleById,
@@ -28,6 +30,7 @@ import {
   type AppliedCreateTodoAction,
   type AppliedEditLogAction,
   type AppliedUpdateTodoAction,
+  type AppliedUpsertNodeAction,
 } from '../../services/assistantActionExecutor';
 import type { AIChatSession } from './AIBackfillChatShared';
 import type { PrincipleEditFormData } from '../PrincipleEditModal';
@@ -49,6 +52,7 @@ export interface AIBackfillChatAppliedActionHandlerOptions {
   selfBeliefDescriptionDrafts: SelfBeliefDescriptionDraft[];
   selfBeliefTitleDraft: string;
   logs: Log[];
+  updateNodeRecords: (transform: (nodes: NoteNode[], logs: Log[]) => { nodes: NoteNode[]; logs: Log[] }) => void;
   todos: TodoItem[];
   updateAppliedActionStatus: (sessionId: string, messageId: string, actionId: string, status: 'undone') => void;
   setEditingPrincipleId: Dispatch<SetStateAction<string | null>>;
@@ -77,6 +81,7 @@ export const useAIBackfillChatAppliedActionHandlers = ({
   selfBeliefDescriptionDrafts,
   selfBeliefTitleDraft,
   logs,
+  updateNodeRecords,
   todos,
   updateAppliedActionStatus,
   setEditingPrincipleId,
@@ -90,6 +95,15 @@ export const useAIBackfillChatAppliedActionHandlers = ({
   setLogs,
   setTodos
 }: AIBackfillChatAppliedActionHandlerOptions) => {
+  const handleUndoNodeAction = (messageId: string, action: AppliedUpsertNodeAction) => {
+    if (action.status !== 'applied' || !activeSession) return;
+    updateNodeRecords((currentNodes, currentLogs) => {
+      const result = rollbackAppliedChatActions([action], currentLogs, [], currentNodes);
+      return { nodes: result.nodes, logs: result.logs };
+    });
+    updateAppliedActionStatus(activeSession.id, messageId, action.actionId, 'undone');
+    addToast('success', '已撤销这次 AI 节点修改');
+  };
   const handleUndoLogAction = (messageId: string, action: AppliedCreateLogAction) => {
     if (action.status !== 'applied' || !activeSession || !action.snapshot.logId) return;
     const liveLog = logs.find((log) => log.id === action.snapshot.logId);
@@ -293,6 +307,7 @@ export const useAIBackfillChatAppliedActionHandlers = ({
   };
 
   return {
+    handleUndoNodeAction,
     handleAddSelfBeliefDescription,
     handleCancelPrincipleEditor,
     handleCancelSelfBeliefDescriptionEdit,

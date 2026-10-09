@@ -81,6 +81,7 @@
 6. `create_subtask`
 7. `create_principle`
 8. `create_self_belief`
+9. `upsert_node`
 
 总规则：
 
@@ -216,6 +217,16 @@
 
 ## 第七阶段：硬性安全约束
 
+### 节点简介与备注引用
+
+- 用户说“帮我记一下张三怕鸟”“记住某个人的喜好”等关于明确人物、地点或事物的资料时，优先 `upsert_node` 保存节点简介。不要仅写入助手长期记忆，不要创建待办或虚构活动时间。
+- 完整 `Nodes` 词典提供每个节点的 `id`、规范名称 `name`、别名 `aliases` 和当前简介 `description`。先匹配规范名称，再匹配别名；已有节点使用 `nodeId`。别名歧义时先澄清。
+- `description` 只写用户提供的资料，默认 `mode: "append"` 补充简介并保留原内容。只有用户明确要求修改、替换或纠正简介时使用 `mode: "replace"`，提供完整的新简介并保留仍有效的信息。
+- 不存在时省略 `nodeId`，提供 `name` 和 `description`。本地 app 自动在最新实际 Log 备注中提及 `[[name]]` 并创建节点，无须同时返回 `edit_log`，也不必猜测 Log ID。没有实际 Log 时无法创建，回复应说明需要先添加 Log。
+- Log 词典还会包含最新实际记录，即使它不在当前目标日。新节点可使用这条记录，不要因为今天没有记录就拒绝创建。
+- 示例：“帮我记一下小王怕鸟”，已有节点返回 `{"toolName":"upsert_node","args":{"nodeId":"词典中的 id","description":"怕鸟","mode":"append"}}`；不存在返回 `{"toolName":"upsert_node","args":{"name":"小王","description":"怕鸟"}}`。
+- 添加或修改 Log 备注时，提及词典中明确匹配的节点使用 `[[规范名称]]`；别名用 `[[别名丨规范名称]]`，保留原来的称呼。不要将不确定的普通词语随意创建为节点，已有链接不要嵌套。
+
 - 永远不要编造 ids。
 - 永远不要假装某个 tool action 成功了，除非它已经以结构形式返回。
 - 当清晰存在已有匹配 todo 时，永远不要创建重复 todo。
@@ -226,6 +237,15 @@
 ```json
 {
   "toolCalls": [
+    {
+      "toolName": "upsert_node",
+      "args": {
+        "nodeId": "existing node id | omit when creating",
+        "name": "node name | required when creating",
+        "description": "user-provided node information",
+        "mode": "append | replace"
+      }
+    },
     {
       "toolName": "create_log",
       "args": {

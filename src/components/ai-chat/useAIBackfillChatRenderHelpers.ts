@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatRenderHelpers.ts
+ * @updated 2026-10-09: Connects node result undo actions to the chat renderer.
  * @input Applied-action rendering dependencies and responsive chat mode
  * @output Render callback and prompt/layout helpers
  * @pos Component Support (AI Integration)
@@ -22,6 +23,7 @@ export function useAIBackfillChatRenderHelpers(options: Record<string, any>) {
     handleOpenTodoDetail,
     handleUndoCreateSubtaskAction,
     handleUndoEditLogAction,
+    handleUndoNodeAction,
     handleUndoLogAction,
     handleUndoPlannedLogAction,
     handleUndoPrincipleAction,
@@ -52,6 +54,7 @@ export function useAIBackfillChatRenderHelpers(options: Record<string, any>) {
       onOpenTodoDetail: handleOpenTodoDetail,
       onUndoCreateSubtaskAction: handleUndoCreateSubtaskAction,
       onUndoEditLogAction: handleUndoEditLogAction,
+      onUndoNodeAction: handleUndoNodeAction,
       onUndoLogAction: handleUndoLogAction,
       onUndoPlannedLogAction: handleUndoPlannedLogAction,
       onUndoPrincipleAction: handleUndoPrincipleAction,

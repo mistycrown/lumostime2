@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatResultHandlers.ts
+ * @updated 2026-10-09: Surfaces failed node writebacks instead of claiming the biography was saved.
  * @input Assistant result state, message mutation callbacks, and memory persistence
  * @output Pending-message replacement, memory patching, and assistant reply normalization helpers
  * @pos Component Support (AI Integration)
@@ -192,6 +193,10 @@ export const useAIBackfillChatResultHandlers = ({
       sourceText: string,
       appliedActions: AppliedChatAction[]
     ): string => {
+      const nodeActions = appliedActions.filter((action) => action.kind === 'upsert_node');
+      if (nodeActions.length > 0 && nodeActions.every((action) => action.status === 'failed')) {
+        return nodeActions[0].errorMessage?.trim() || '这次还没有保存节点简介。';
+      }
       const editLogActions = appliedActions.filter((action) => action.kind === 'edit_log');
       const successfulEditLogCount = editLogActions.filter((action) => action.status === 'applied').length;
       const failedEditLogActions = editLogActions.filter((action) => action.status === 'failed');

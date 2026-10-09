@@ -1,0 +1,65 @@
+/**
+ * @file test-ai-nodes-renderer.mjs
+ * @input AI node renderer harness, production CSS and verified Chinese font
+ * @output Offline interaction assertions and desktop/mobile screenshots in a disposable profile
+ * @pos Test Runner
+ * @updated 2026-10-09: Checks node writeback without user data or network requests.
+ */
+import { build } from 'esbuild';
+import { access, copyFile, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-ai-nodes-'));
+const mocks = path.resolve('src/components/__tests__/nodeRendererMocks.tsx');
+const adapters = ['SettingsContext', 'CategoryScopeContext', 'NavigationContext', 'AIChatWindowContext', 'aiService'];
+await access('C:/Windows/Fonts/msyh.ttc');
+await build({
+  entryPoints: ['src/components/__tests__/aiNodesRendererHarness.tsx'], bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
+  define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env': '{"DEV":false,"VITE_APP_VERSION":"test"}' },
+  plugins: [{ name: 'offline-ai-node-adapters', setup(builder) {
+    builder.onResolve({ filter: /.*/ }, (args) => adapters.includes(path.basename(args.path)) ? { path: mocks } : undefined);
+  } }]
+});
+const css = (await readdir('dist/assets')).find((file) => file.startsWith('index-') && file.endsWith('.css'));
+if (!css) throw new Error('Run npm run build before renderer verification');
+await copyFile(path.join('dist/assets', css), path.join(directory, 'test.css'));
+await copyFile('C:/Windows/Fonts/msyh.ttc', path.join(directory, 'chinese.ttc'));
+await writeFile(path.join(directory, 'index.html'), '<!doctype html><html><meta charset="utf-8"><link rel="stylesheet" href="test.css"><style>@font-face{font-family:VerifiedChinese;src:url(chinese.ttc)}body,.font-serif{font-family:VerifiedChinese,"Microsoft YaHei",serif}body{margin:0;background:#faf9f6}</style><body><div id="root"></div><script src="test.js"></script></body></html>', 'utf8');
+await writeFile(path.join(directory, 'main.cjs'), `
+const { app, BrowserWindow } = require('electron');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+app.setPath('userData', path.join(__dirname, 'profile'));
+setTimeout(() => { console.error('AI node renderer exceeded 60 seconds'); app.exit(1); }, 60000);
+app.whenReady().then(async () => {
+  const win = new BrowserWindow({ show: false, width: 1000, height: 800, webPreferences: { contextIsolation: true, backgroundThrottling: false, offscreen: true } });
+  win.webContents.on('console-message', (event) => { if (event.level === 'error') console.error('RENDERER: ' + event.message); });
+  await win.loadFile(path.join(__dirname, 'index.html'));
+  for (let i = 0; i < 550; i++) {
+    const capture = await win.webContents.executeJavaScript('window.__aiNodesCapture');
+    if (capture) {
+      win.setSize(capture.endsWith('-mobile') ? 390 : 1000, capture.endsWith('-mobile') ? 844 : 800);
+      await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+      win.webContents.invalidate();
+      await new Promise(resolve => setTimeout(resolve, 120));
+      const screenshot = path.join(__dirname, capture + '.png');
+      await fs.writeFile(screenshot, (await win.webContents.capturePage()).toPNG());
+      console.log('AI_NODE_SCREENSHOT=' + screenshot);
+      await win.webContents.executeJavaScript('window.__aiNodesCapture = null');
+    }
+    const result = await win.webContents.executeJavaScript('window.__aiNodesResult');
+    if (result) { console.log(JSON.stringify(result, null, 2)); app.exit(result.error ? 1 : 0); return; }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  throw new Error('AI node renderer timeout');
+}).catch(error => { console.error(error); app.exit(1); });
+`, 'utf8');
+const env = { ...process.env };
+delete env.ELECTRON_RUN_AS_NODE;
+const child = spawn(require('electron'), [path.join(directory, 'main.cjs')], { env, stdio: 'inherit', windowsHide: true });
+child.on('exit', (code) => { process.exitCode = code ?? 1; });
+child.on('error', (error) => { console.error(error); process.exitCode = 1; });

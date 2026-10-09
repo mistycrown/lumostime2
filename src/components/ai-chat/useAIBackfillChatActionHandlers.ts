@@ -1,5 +1,7 @@
 /**
  * @file useAIBackfillChatActionHandlers.ts
+ * @updated 2026-10-09: Applies foreground batches atomically with shared node/log state.
+ * @updated 2026-10-09: Reads live records when an asynchronous AI reply arrives.
  * @input Local logs/todos dictionaries, auto-link settings, and assistant tool-call payloads
  * @output Tool-call application helpers and local-query guards for the AI chat coordinator
  * @pos Component Support (AI Integration)
@@ -7,8 +9,9 @@
  * @updated 2026-09-22: Extracted tool-call application adapters from AIBackfillChatModal.
  */
 import type { Dispatch, SetStateAction } from 'react';
-import type { AutoLinkRule, Category, Log, Scope, TodoCategory, TodoItem } from '../../types';
-import type { AssistantLocalQueryResult } from '../../types/assistant';
+import { useRef } from 'react';
+import type { AutoLinkRule, Category, Log, NoteNode, Scope, TodoCategory, TodoItem } from '../../types';
+import type { AssistantLocalQueryResult, AssistantToolCall } from '../../types/assistant';
 import type {
   AIPlannedLogToolCall,
   AICreatePrincipleToolCall,
@@ -27,6 +30,8 @@ export interface AIBackfillChatActionHandlerOptions {
   categories: Category[];
   defaultDateKey: string;
   logs: Log[];
+  nodes: NoteNode[];
+  updateNodeRecords: (transform: (nodes: NoteNode[], logs: Log[]) => { nodes: NoteNode[]; logs: Log[] }) => void;
   scopes: Scope[];
   setLogs: Dispatch<SetStateAction<Log[]>>;
   setTodos: Dispatch<SetStateAction<TodoItem[]>>;
@@ -40,16 +45,19 @@ export const useAIBackfillChatActionHandlers = ({
   categories,
   defaultDateKey,
   logs,
+  nodes,
+  updateNodeRecords,
   scopes,
   setLogs,
   setTodos,
   todoCategories,
   todos
 }: AIBackfillChatActionHandlerOptions) => {
+  const currentRecordsRef = useRef({ logs, nodes, todos });
+  currentRecordsRef.current = { logs, nodes, todos };
   const buildAssistantActionContext = (): AssistantActionExecutionContext => ({
     defaultDateKey,
-    logs,
-    todos,
+    ...currentRecordsRef.current,
     categories,
     scopes,
     todoCategories,
@@ -159,7 +167,22 @@ export const useAIBackfillChatActionHandlers = ({
     assistantActionExecutor.applySelfBeliefToolCalls(toolCalls)
   );
 
+  const applyUnifiedToolCalls = (toolCalls: AssistantToolCall[], sourceText: string, localQueryHistory?: AssistantLocalQueryResult[]): AppliedChatAction[] => {
+    const result = assistantActionExecutor.applyForegroundToolCalls(buildAssistantActionContext(), toolCalls, sourceText, {
+      principles: hasLocalQueryTarget(localQueryHistory, 'principles'),
+      selfBeliefs: hasLocalQueryTarget(localQueryHistory, 'selfBeliefs')
+    });
+    if (result.actions.some((action) => action.status === 'applied')) {
+      const nextNodes = result.nextNodes || currentRecordsRef.current.nodes;
+      currentRecordsRef.current = { nodes: nextNodes, logs: result.nextLogs, todos: result.nextTodos };
+      updateNodeRecords(() => ({ nodes: nextNodes, logs: result.nextLogs }));
+      setTodos(result.nextTodos);
+    }
+    return result.actions;
+  };
+
   return {
+    applyUnifiedToolCalls,
     applyPlannedCreateSubtaskToolCalls,
     applyPlannedEditLogToolCalls,
     applyPlannedLogToolCalls,

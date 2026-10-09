@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatAppliedActionRenderer.tsx
+ * @updated 2026-10-09: Renders node description writebacks with open and undo actions.
  * @input Applied assistant actions, live log/todo lookups, theme tokens, and action callbacks
  * @output Reusable renderer for in-chat applied-action result cards
  * @pos Component Support (AI Integration)
@@ -11,8 +12,9 @@
  * @updated 2026-09-23: Removes an unreachable create-subtask branch from the create-log renderer.
  */
 import React from 'react';
-import { ListTodo, Pencil, Undo2 } from 'lucide-react';
+import { ArrowUpRight, ListTodo, Pencil, Undo2 } from 'lucide-react';
 import { ActivityAttributeSummary } from '../ActivityAttributeSummary';
+import { useOptionalNodes } from '../../contexts/NodeContext';
 import type { Category, Log, TodoCategory, TodoItem } from '../../types';
 import type {
   AppliedChatAction,
@@ -23,7 +25,8 @@ import type {
   AppliedCreateSubtaskAction,
   AppliedCreateTodoAction,
   AppliedEditLogAction,
-  AppliedUpdateTodoAction
+  AppliedUpdateTodoAction,
+  AppliedUpsertNodeAction
 } from '../../services/assistantActionExecutor';
 
 interface AppliedActionTheme {
@@ -72,6 +75,7 @@ interface AIBackfillChatAppliedActionRendererProps {
   onUndoSelfBeliefAction: (messageId: string, action: AppliedCreateSelfBeliefAction) => void;
   onUndoTodoAction: (messageId: string, action: AppliedCreateTodoAction) => void;
   onUndoUpdateTodoAction: (messageId: string, action: AppliedUpdateTodoAction) => void;
+  onUndoNodeAction?: (messageId: string, action: AppliedUpsertNodeAction) => void;
   theme: AppliedActionTheme;
   todoCategories: TodoCategory[];
   todos: TodoItem[];
@@ -904,10 +908,52 @@ const RenderSelfBeliefAction: React.FC<AIBackfillChatAppliedActionRendererProps 
   </div>
 );
 
+const RenderNodeAction: React.FC<AIBackfillChatAppliedActionRendererProps & { action: AppliedUpsertNodeAction }> = ({ action, messageId, onUndoNodeAction, theme }) => {
+  const context = useOptionalNodes();
+  const node = action.status === 'applied'
+    ? context?.nodes.find((item) => item.id === action.snapshot.nodeId) || action.snapshot.nextNode
+    : action.snapshot.nextNode;
+  const statusLabel = action.status === 'undone' ? '已撤销'
+    : action.status === 'failed' ? '修改失败'
+      : action.snapshot.previousNode ? '已更新简介' : '已创建节点';
+  const buttonStyle = { borderColor: theme.chipBorder, backgroundColor: theme.inputBg, color: theme.textSecondary };
+
+  return (
+    <div key={action.actionId}
+      className={`border-l-2 pl-3 pr-1 py-1 ${action.status === 'undone' ? 'opacity-70' : ''}`}
+      style={{ borderColor: getStatusBorderColor(action.status, theme) }}
+    >
+      <p className="font-serif text-[1rem] leading-6" style={{ color: theme.textPrimary }}>
+        {node?.name || action.snapshot.name || '节点'}
+      </p>
+      <p className="mt-1 text-xs" style={{ color: theme.textMuted }}>{statusLabel}</p>
+      {node?.description && (
+        <p className="mt-1.5 whitespace-pre-wrap break-words text-[13px] leading-6" style={{ color: theme.textSecondary }}>
+          {node.description}
+        </p>
+      )}
+      {action.errorMessage && <p className="mt-2 text-xs" style={{ color: theme.dangerText }}>{action.errorMessage}</p>}
+      <div className="mt-2.5 flex justify-end gap-2">
+        {context && node && (
+          <button title="打开节点" disabled={action.status !== 'applied'} onClick={() => context.openNode(node.name)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border disabled:opacity-40" style={buttonStyle}
+          ><ArrowUpRight size={13} /></button>
+        )}
+        <button title="撤销" disabled={action.status !== 'applied' || !onUndoNodeAction} onClick={() => onUndoNodeAction?.(messageId, action)}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border disabled:opacity-40" style={buttonStyle}
+        ><Undo2 size={13} /></button>
+      </div>
+    </div>
+  );
+};
+
 export const renderAppliedChatAction = ({
   action,
   ...props
 }: AIBackfillChatAppliedActionRendererProps): React.ReactNode => {
+  if (action.kind === 'upsert_node') {
+    return <RenderNodeAction {...props} action={action} />;
+  }
   if (action.kind === 'create_planned_log') {
     return <RenderPlannedLogAction {...props} action={action} />;
   }

@@ -1,5 +1,6 @@
 /**
  * @file aiService.ts
+ * @updated 2026-10-09: Normalizes foreground node-description tool calls.
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
  * @updated 2026-10-06: Preserves shape-normalized custom attributes in create_log tool calls.
@@ -1366,6 +1367,17 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
         const toolCall = item as Record<string, any>;
         const toolName = String(toolCall.toolName || '').trim();
         const args = toolCall.args || {};
+
+        if (toolName === 'upsert_node') {
+            const nodeId = typeof args.nodeId === 'string' ? args.nodeId.trim() : '';
+            const name = typeof args.name === 'string' ? args.name.trim() : '';
+            const description = typeof args.description === 'string' ? args.description.trim() : '';
+            if ((!nodeId && !name) || !description || (args.mode !== undefined && args.mode !== 'append' && args.mode !== 'replace')) return [];
+            return [{ toolName: 'upsert_node', args: {
+                ...(nodeId ? { nodeId } : {}), ...(name ? { name } : {}), description,
+                mode: args.mode === 'replace' ? 'replace' : 'append'
+            } }];
+        }
 
         if (toolName === 'create_log') {
             const normalized = {

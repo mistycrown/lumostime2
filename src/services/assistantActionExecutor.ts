@@ -1,5 +1,6 @@
 /**
  * @file assistantActionExecutor.ts
+ * @updated 2026-10-09: Executes reversible node writes and links AI notes to dictionary nodes.
  * @input Current logs/todos plus runtime dictionaries, principle-library storage, and assistant tool-call payloads
  * @output Applied assistant action summaries together with the next local logs/todos state
  * @pos Service (Assistant Action Executor)
@@ -21,6 +22,7 @@ import type {
   ActivityAttributeValue,
   Category,
   Log,
+  NoteNode,
   Scope,
   TodoCategory,
   TodoItem,
@@ -49,6 +51,16 @@ import {
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { buildTimelinePlannedLog } from '../utils/todoRecurringPlanUtils';
 import { validateAILogAttributeValues } from '../utils/aiLogAttributeUtils';
+import { applyAINodeUpdate, linkAINoteNodes, type AINodeSnapshot } from '../utils/aiNodeUtils';
+import type { AssistantToolCall, AssistantUpsertNodeToolCall } from '../types/assistant';
+
+export interface AppliedUpsertNodeAction {
+  actionId: string;
+  kind: 'upsert_node';
+  status: AppliedActionStatus;
+  snapshot: AINodeSnapshot;
+  errorMessage?: string;
+}
 
 export type AppliedActionStatus = 'applied' | 'undone' | 'failed';
 
@@ -206,6 +218,7 @@ export interface AppliedCreateSelfBeliefAction {
 }
 
 export type AppliedChatAction =
+  | AppliedUpsertNodeAction
   | AppliedCreateLogAction
   | AppliedCreatePlannedLogAction
   | AppliedCreateTodoAction
@@ -216,6 +229,7 @@ export type AppliedChatAction =
   | AppliedCreateSelfBeliefAction;
 
 export interface AssistantActionExecutionContext {
+  nodes?: NoteNode[];
   defaultDateKey: string;
   logs: Log[];
   todos: TodoItem[];
@@ -226,7 +240,8 @@ export interface AssistantActionExecutionContext {
   autoLinkRules: AutoLinkRule[];
 }
 
-interface AssistantActionExecutionResult {
+export interface AssistantActionExecutionResult {
+  nextNodes?: NoteNode[];
   actions: AppliedChatAction[];
   nextLogs: Log[];
   nextTodos: TodoItem[];
@@ -473,12 +488,16 @@ export const applyLogDelete = (
 };
 
 export interface AppliedChatActionRollbackResult {
+  nodes: NoteNode[];
   logs: Log[];
   todos: TodoItem[];
   undoneActionIds: string[];
 }
 
 const assertRollbackSnapshot = (action: AppliedChatAction) => {
+  if (action.kind === 'upsert_node' && (!action.snapshot.nodeId || !action.snapshot.nextNode)) {
+    throw new Error('AI node snapshot is missing its node.');
+  }
   if (action.kind === 'create_log' || action.kind === 'create_planned_log') {
     if (!action.snapshot.logId) {
       throw new Error('AI action snapshot is missing its created item id.');
@@ -740,13 +759,15 @@ export const updateStoredSelfBelief = (selfBelief: StoredSelfBelief): boolean =>
 export const rollbackAppliedChatActions = (
   actions: AppliedChatAction[],
   logs: Log[],
-  todos: TodoItem[]
+  todos: TodoItem[],
+  nodes: NoteNode[] = []
 ): AppliedChatActionRollbackResult => {
   const actionsToUndo = actions.filter((action) => action.status === 'applied');
   actionsToUndo.forEach(assertRollbackSnapshot);
 
   let nextLogs = [...logs];
   let nextTodos = [...todos];
+  let nextNodes = [...nodes];
   let nextPrinciples = loadStoredPrinciples();
   let nextSelfBeliefs = loadStoredSelfBeliefs();
   let principlesChanged = false;
@@ -754,6 +775,16 @@ export const rollbackAppliedChatActions = (
 
   [...actionsToUndo].reverse().forEach((action) => {
     switch (action.kind) {
+      case 'upsert_node': {
+        const { nodeId, previousNode, previousLog } = action.snapshot;
+        nextNodes = previousNode
+          ? nextNodes.some((node) => node.id === nodeId)
+            ? nextNodes.map((node) => node.id === nodeId ? previousNode : node)
+            : [...nextNodes, previousNode]
+          : nextNodes.filter((node) => node.id !== nodeId);
+        if (previousLog) nextLogs = nextLogs.map((log) => log.id === previousLog.id ? previousLog : log);
+        return;
+      }
       case 'create_log':
       case 'create_planned_log': {
         const logId = action.snapshot.logId;
@@ -834,11 +865,57 @@ export const rollbackAppliedChatActions = (
   return {
     logs: nextLogs,
     todos: nextTodos,
+    nodes: nextNodes,
     undoneActionIds: actionsToUndo.map((action) => action.actionId)
   };
 };
 
 export const assistantActionExecutor = {
+  applyForegroundToolCalls(
+    context: AssistantActionExecutionContext,
+    toolCalls: AssistantToolCall[],
+    sourceText: string,
+    queriedLibraries: { principles: boolean; selfBeliefs: boolean }
+  ): AssistantActionExecutionResult {
+    let current = context;
+    const actions: AppliedChatAction[] = [];
+    const collect = (result: AssistantActionExecutionResult) => {
+      actions.push(...result.actions);
+      current = { ...current, logs: result.nextLogs, todos: result.nextTodos, nodes: result.nextNodes || current.nodes };
+    };
+    collect(assistantActionExecutor.applyLogToolCalls(current, toolCalls.filter((call): call is AIBackfillToolCall => call.toolName === 'create_log')));
+    collect(assistantActionExecutor.applyTodoAndPlannedLogToolCalls(current, toolCalls.filter((call): call is AITodoToolCall | AIPlannedLogToolCall => call.toolName === 'create_todo' || call.toolName === 'create_planned_log'), sourceText));
+    collect(assistantActionExecutor.applyTodoUpdateToolCalls(current, toolCalls.filter((call): call is AITodoUpdateToolCall => call.toolName === 'update_todo')));
+    collect(assistantActionExecutor.applyCreateSubtaskToolCalls(current, toolCalls.filter((call): call is AICreateSubtaskToolCall => call.toolName === 'create_subtask'), sourceText));
+    collect(assistantActionExecutor.applyEditLogToolCalls(current, toolCalls.filter((call): call is AIEditLogToolCall => call.toolName === 'edit_log')));
+    collect(assistantActionExecutor.applyNodeToolCalls(current, toolCalls.filter((call): call is AssistantUpsertNodeToolCall => call.toolName === 'upsert_node')));
+    const principles = toolCalls.filter((call): call is AICreatePrincipleToolCall => call.toolName === 'create_principle');
+    const selfBeliefs = toolCalls.filter((call): call is AICreateSelfBeliefToolCall => call.toolName === 'create_self_belief');
+    actions.push(...(queriedLibraries.principles
+      ? assistantActionExecutor.applyPrincipleToolCalls(principles)
+      : assistantActionExecutor.buildRejectedPrincipleActions(principles, '添加或修改原则前需要先查询现有原则库。')));
+    actions.push(...(queriedLibraries.selfBeliefs
+      ? assistantActionExecutor.applySelfBeliefToolCalls(selfBeliefs)
+      : assistantActionExecutor.buildRejectedSelfBeliefActions(selfBeliefs, '添加或修改自我认知前需要先查询现有自我认知。')));
+    return { actions, nextLogs: current.logs, nextTodos: current.todos, nextNodes: current.nodes };
+  },
+  applyNodeToolCalls(context: AssistantActionExecutionContext, toolCalls: AssistantUpsertNodeToolCall[]): AssistantActionExecutionResult {
+    let nextNodes = context.nodes || [];
+    let nextLogs = context.logs;
+    const actions: AppliedChatAction[] = [];
+    toolCalls.forEach(({ args }) => {
+      try {
+        const result = applyAINodeUpdate(nextNodes, nextLogs, args);
+        nextNodes = result.nodes;
+        nextLogs = result.logs;
+        actions.push({ actionId: buildActionId(), kind: 'upsert_node', status: 'applied', snapshot: result.snapshot });
+      } catch (error) {
+        actions.push({ actionId: buildActionId(), kind: 'upsert_node', status: 'failed',
+          snapshot: { nodeId: args.nodeId, name: args.name || '' }, errorMessage: error instanceof Error ? error.message : '节点修改失败。' });
+      }
+    });
+    return { actions, nextNodes, nextLogs, nextTodos: context.todos };
+  },
   buildRejectedPrincipleActions(toolCalls: AICreatePrincipleToolCall[], errorMessage: string): AppliedChatAction[] {
     return toolCalls.map((toolCall) => ({
       actionId: buildActionId(),
@@ -1093,7 +1170,7 @@ export const assistantActionExecutor = {
         }
 
         const currentItems = groupedItems.get(targetLog.id) || [];
-        groupedItems.set(targetLog.id, [...currentItems, text]);
+        groupedItems.set(targetLog.id, [...currentItems, linkAINoteNodes(text, context.nodes || [], item.nodeIds)]);
       });
 
       groupedItems.forEach((items, logId) => {
@@ -1225,7 +1302,7 @@ export const assistantActionExecutor = {
         startTime,
         endTime,
         duration: Math.max(0, (endTime - startTime) / 1000),
-        note: args.description,
+        note: linkAINoteNodes(args.description || '', context.nodes || []),
         ...(attributeValues.length > 0 ? { attributeValues } : {}),
         ...(scopeIds.length > 0 ? { scopeIds } : {}),
         ...(linkedTodo ? { linkedTodoId: linkedTodo.id } : {}),
@@ -1825,7 +1902,7 @@ export const assistantActionExecutor = {
         startTime,
         endTime,
         duration: Math.max(0, (endTime - startTime) / 1000),
-        ...(args.patch.note !== undefined ? { note: args.patch.note || '' } : {}),
+        ...(args.patch.note !== undefined ? { note: linkAINoteNodes(args.patch.note || '', context.nodes || []) } : {}),
         ...(args.patch.linkedTodoId !== undefined ? { linkedTodoId: nextLinkedTodoId } : {}),
         ...(args.patch.scopeIds !== undefined ? { scopeIds: nextScopeIds } : {})
       };

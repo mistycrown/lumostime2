@@ -1,5 +1,6 @@
 /**
  * @file aiService.test.ts
+ * @updated 2026-10-09: Verifies node tool parsing and verbatim quick-note node references.
  * @input Mock AI transport responses and assistant request contracts
  * @output Coverage for general and quick-add AI request normalization
  * @pos Service test
@@ -92,6 +93,39 @@ describe('aiService unified turn normalization', () => {
       })).output.toolCalls?.[0]
       : (await quickAddService.requestQuickAddBackfillWithDebug('公园跑步五公里')).toolCall;
     expect(toolCall).toMatchObject({ toolName: 'create_log', args: { attributeValues } });
+  });
+
+  it('normalizes valid node tools and drops malformed requests', async () => {
+    Object.defineProperty(globalThis, 'fetch', {
+      value: vi.fn().mockResolvedValue(createJsonTextResponse({ choices: [{ message: { content: JSON.stringify({
+        outcome: 'reply', assistantReply: '已记录', memoryAction: 'no_update', toolCalls: [
+          { toolName: 'upsert_node', args: { nodeId: ' wang ', description: ' 怕鸟 ' } },
+          { toolName: 'upsert_node', args: { name: ' 小李 ', description: '喜欢猫', mode: 'replace' } },
+          { toolName: 'upsert_node', args: { name: '小李', description: ' ' } },
+          { toolName: 'upsert_node', args: { description: '怕鸟' } },
+          { toolName: 'upsert_node', args: { name: '小李', description: '怕鸟', mode: 'delete' } }
+        ]
+      }) } }] })), configurable: true
+    });
+    const result = await aiService.requestAssistantUnifiedTurnWithDebug({ mode: 'foreground', systemPrompt: 'system', userPrompt: 'user' });
+    expect(result.output.toolCalls).toEqual([
+      { toolName: 'upsert_node', args: { nodeId: 'wang', description: '怕鸟', mode: 'append' } },
+      { toolName: 'upsert_node', args: { name: '小李', description: '喜欢猫', mode: 'replace' } }
+    ]);
+  });
+
+  it('passes node dictionaries into quick notes and preserves exact fragments with node ids', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({ choices: [{ message: { content: JSON.stringify({
+      toolCalls: [{ toolName: 'append_log_notes', args: { items: [{ logId: 'log', text: ' 小王怕鸟 ', nodeIds: [' wang ', 'wang', null, 7] }] } }]
+    }) } }] }));
+    Object.defineProperty(globalThis, 'fetch', { value: fetchSpy, configurable: true });
+    const result = await quickAddService.requestQuickAddNoteWithDebug(' 小王怕鸟 ', {}, { nodes: [
+      { id: 'wang', name: '王小明', aliases: ['小王'], description: '喜欢咖啡' }
+    ] });
+    expect(result.toolCall?.args.items).toEqual([{ logId: 'log', text: ' 小王怕鸟 ', nodeIds: ['wang'] }]);
+    const request = JSON.parse(fetchSpy.mock.calls[0][1].body);
+    expect(request.messages[0].content).toContain('王小明');
+    expect(request.messages[0].content).toContain('nodeIds');
   });
 
   it('preserves native HTTP error text through the Fetch-compatible adapter', async () => {

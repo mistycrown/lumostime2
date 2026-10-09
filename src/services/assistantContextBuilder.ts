@@ -1,5 +1,6 @@
 ﻿/**
  * @file assistantContextBuilder.ts
+ * @updated 2026-10-09: Exposes the full node dictionary in JSON and lossless table contexts.
  * @input App runtime dictionaries, logs, todos, conversation turns, and current session state
  * @output Shared assistant state-context and dictionary-context snapshots for unified turns
  * @pos Service (Assistant Context Builder)
@@ -21,6 +22,7 @@ import type {
   Category,
   DailyReview,
   Log,
+  NoteNode,
   Scope,
   TodoCategory,
   TodoItem
@@ -54,6 +56,7 @@ interface BuildStateContextParams {
 }
 
 interface BuildDictionaryContextParams {
+  nodes?: NoteNode[];
   categories?: Category[];
   scopes?: Scope[];
   todoCategories?: TodoCategory[];
@@ -431,6 +434,7 @@ export const assistantContextBuilder = {
       buildExactTableSection('ActivityCategories', ['id', 'name'], activityCategoryRows),
       buildExactTableSection('Activities', ['categoryId', 'id', 'name', 'attributes'], activityRows),
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
+      buildExactTableSection('Nodes', ['id', 'name', 'aliases', 'description', 'categoryId'], (context.nodes || []).map((node) => [node.id, node.name, node.aliases, node.description, node.categoryId])),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
       buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
       buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
@@ -520,6 +524,7 @@ export const assistantContextBuilder = {
 
     return {
       ...(activityCategories.length > 0 ? { activityCategories } : {}),
+      nodes: (params.nodes || []).map(({ id, name, aliases, description, categoryId }) => ({ id, name, aliases: [...aliases], description, ...(categoryId ? { categoryId } : {}) })),
       ...(scopes.length > 0 ? { scopes } : {}),
       ...(todoCategories.length > 0 ? { todoCategories } : {}),
       ...(todos.length > 0 ? { todos } : {}),

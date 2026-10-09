@@ -2,6 +2,7 @@
  * @file AIBackfillChatModal.tsx
  * @updated 2026-10-09: Forwards the shortcut settings opener to the AI homepage.
  * @updated 2026-10-09: Shares overlay visibility across home and conversation composers.
+ * @updated 2026-10-09: Shares node dictionaries and reversible foreground node actions with chat and quick notes.
  * @input Unified AI chat sessions, local logs/todos/categories/scopes, and user natural-language messages
  * @output Full-screen AI time assistant with session history, persona settings, quick context cache, and direct log/todo application
  * @updated 2026-10-04: Reuses background-created conversations after the user-active chat is deleted.
@@ -66,16 +67,8 @@ import {
 import {
   aiService,
   type AIDebugExchange,
-  type AIPlannedLogToolCall,
-  type AIConversationTurn,
-  type AITodoToolCall,
-  type AITodoUpdateToolCall,
-  type AICreateSubtaskToolCall,
-  type AIEditLogToolCall,
-  type AICreatePrincipleToolCall,
-  type AICreateSelfBeliefToolCall
+  type AIConversationTurn
 } from '../services/aiService';
-import type { AIBackfillToolCall } from '../services/quickAddService';
 import { useData } from '../contexts/DataContext';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { useNavigation } from '../contexts/NavigationContext';
@@ -90,7 +83,6 @@ import type {
   AssistantAgentConfig,
   AssistantLetter,
   AssistantLetterResultCard,
-  AssistantLocalQueryResult,
   AssistantMemory,
   AssistantReminder,
   AssistantSystemTrigger,
@@ -143,9 +135,7 @@ import {
   aiChatStorageService
 } from '../services/aiChatStorageService';
 import {
-  assistantActionExecutor,
   rollbackAppliedChatActions,
-  type AppliedChatAction,
 } from '../services/assistantActionExecutor';
 import { PrincipleEditModal } from './PrincipleEditModal';
 import { SelfBeliefEditModal } from './SelfBeliefEditModal';
@@ -161,7 +151,7 @@ import {
   type MonthlyReviewTemplateSessionMeta
 } from '../services/monthlyReviewTemplateService';
 import { dailyReviewTemplateService } from '../services/dailyReviewTemplateService';
-import type { AssistantToolCall, AssistantUnifiedTurnOutput } from '../types/assistant';
+import type { AssistantUnifiedTurnOutput } from '../types/assistant';
 import {
   AIChatDebugViewerOverlay,
   AssistantBackgroundHistoryOverlay,
@@ -462,7 +452,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const isStopActionVisible = isLoading || activeRequestId !== null;
   const isDesktopWidgetMode = displayMode === 'desktop-widget';
 
-  const { logs, setLogs, todos, setTodos, todoCategories, isReady: isDataReady } = useData();
+  const { logs, setLogs, nodes, updateNodeRecords, todos, setTodos, todoCategories, isReady: isDataReady } = useData();
   const {
     dailyReviews,
     setDailyReviews,
@@ -1102,6 +1092,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const buildDreamRangeDictionaryContext = useCallback((rangeStartDate: string, rangeEndDate: string) => (
     assistantContextBuilder.buildDictionaryContext({
+      nodes,
       categories,
       scopes,
       todoCategories,
@@ -1123,18 +1114,24 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
         .sort((left, right) => left.startTime - right.startTime)
         .slice(0, 200)
     })
-  ), [categories, logs, scopes, todoCategories, todos]);
+  ), [categories, logs, nodes, scopes, todoCategories, todos]);
 
-  const buildAssistantDictionaryContext = useCallback((logsInput: Log[] = logs) => assistantContextBuilder.buildDictionaryContext({
-    categories,
-    scopes,
-    todoCategories,
-    todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
-    logs: logsInput
+  const buildAssistantDictionaryContext = useCallback((logsInput: Log[] = logs) => {
+    const candidateLogs = logsInput
       .filter((log) => formatDateKey(new Date(log.startTime)) === defaultDateKey)
       .sort((left, right) => left.startTime - right.startTime)
-      .slice(0, 60)
-  }), [categories, defaultDateKey, logs, scopes, todoCategories, todos]);
+      .slice(0, 60);
+    const latestActualLog = [...logsInput].filter((log) => !log.isPlanned).sort((left, right) => right.startTime - left.startTime)[0];
+    if (latestActualLog && !candidateLogs.some((log) => log.id === latestActualLog.id)) candidateLogs.push(latestActualLog);
+    return assistantContextBuilder.buildDictionaryContext({
+      nodes,
+      categories,
+      scopes,
+      todoCategories,
+      todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
+      logs: candidateLogs
+    });
+  }, [categories, defaultDateKey, logs, nodes, scopes, todoCategories, todos]);
 
   const buildQuickAddNoteDictionaryContext = useCallback(() => {
     const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -1144,13 +1141,14 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       .slice(0, 80);
 
     return assistantContextBuilder.buildDictionaryContext({
+      nodes,
       categories,
       scopes,
       todoCategories,
       todos: todos.filter((todo) => !todo.isCompleted).slice(0, 60),
       logs: candidateLogs
     });
-  }, [categories, defaultDateKey, logs, scopes, todoCategories, todos]);
+  }, [categories, defaultDateKey, logs, nodes, scopes, todoCategories, todos]);
 
   useEffect(() => {
     if (dreamMonthSelectionState && !sessions.some((session) => session.id === dreamMonthSelectionState.sessionId)) {
@@ -1924,19 +1922,16 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   }, [handleAIInternalBack, isOpen, registerBackHandler]);
 
   const {
-    applyPlannedCreateSubtaskToolCalls,
-    applyPlannedEditLogToolCalls,
+    applyUnifiedToolCalls,
     applyPlannedLogToolCalls,
-    applyPlannedPrincipleToolCalls,
-    applyPlannedSelfBeliefToolCalls,
-    applyPlannedTodoUpdateToolCalls,
     applyQuickAddNoteToolCalls,
     applyTodoAndPlannedTimelineLogToolCalls,
     getActivityById,
     getActivityCategory,
-    getScopeNames,
-    hasLocalQueryTarget
+    getScopeNames
   } = useAIBackfillChatActionHandlers({
+    nodes,
+    updateNodeRecords,
     autoApplyAutoLinkRules,
     autoLinkRules,
     categories,
@@ -1962,6 +1957,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleSaveSelfBeliefEditor,
     handleStartEditSelfBeliefDescription,
     handleUndoCreateSubtaskAction,
+    handleUndoNodeAction,
     handleUndoEditLogAction,
     handleUndoLogAction,
     handleUndoPlannedLogAction,
@@ -1970,6 +1966,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     handleUndoTodoAction,
     handleUndoUpdateTodoAction
   } = useAIBackfillChatAppliedActionHandlers({
+    updateNodeRecords,
     activeSession,
     addToast,
     createChatLibraryId,
@@ -1996,36 +1993,6 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     setLogs,
     setTodos
   });
-
-  const applyUnifiedToolCalls = (
-    toolCalls: AssistantToolCall[],
-    sourceText: string,
-    localQueryHistory?: AssistantLocalQueryResult[]
-  ): AppliedChatAction[] => {
-    const logCalls = toolCalls.filter((toolCall): toolCall is AIBackfillToolCall => toolCall.toolName === 'create_log');
-    const todoAndPlannedLogCalls = toolCalls.filter((toolCall): toolCall is AITodoToolCall | AIPlannedLogToolCall => (
-      toolCall.toolName === 'create_todo' || toolCall.toolName === 'create_planned_log'
-    ));
-    const todoUpdateCalls = toolCalls.filter((toolCall): toolCall is AITodoUpdateToolCall => toolCall.toolName === 'update_todo');
-    const subtaskCalls = toolCalls.filter((toolCall): toolCall is AICreateSubtaskToolCall => toolCall.toolName === 'create_subtask');
-    const editLogCalls = toolCalls.filter((toolCall): toolCall is AIEditLogToolCall => toolCall.toolName === 'edit_log');
-    const principleCalls = toolCalls.filter((toolCall): toolCall is AICreatePrincipleToolCall => toolCall.toolName === 'create_principle');
-    const selfBeliefCalls = toolCalls.filter((toolCall): toolCall is AICreateSelfBeliefToolCall => toolCall.toolName === 'create_self_belief');
-
-    return [
-      ...applyPlannedLogToolCalls(logCalls),
-      ...applyTodoAndPlannedTimelineLogToolCalls(todoAndPlannedLogCalls, sourceText),
-      ...applyPlannedTodoUpdateToolCalls(todoUpdateCalls),
-      ...applyPlannedCreateSubtaskToolCalls(subtaskCalls, sourceText),
-      ...applyPlannedEditLogToolCalls(editLogCalls),
-      ...(hasLocalQueryTarget(localQueryHistory, 'principles')
-        ? applyPlannedPrincipleToolCalls(principleCalls)
-        : assistantActionExecutor.buildRejectedPrincipleActions(principleCalls, '添加或修改原则前需要先查询现有原则库。')),
-      ...(hasLocalQueryTarget(localQueryHistory, 'selfBeliefs')
-        ? applyPlannedSelfBeliefToolCalls(selfBeliefCalls)
-        : assistantActionExecutor.buildRejectedSelfBeliefActions(selfBeliefCalls, '添加或修改自我认知前需要先查询现有自我认知。'))
-    ];
-  };
 
   const applyUnifiedReminders = (output: AssistantUnifiedTurnOutput): {
     before: AssistantReminder[];
@@ -2521,6 +2488,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   };
 
   const handleRetryMessage = useAIBackfillChatRetry({
+    nodes,
+    updateNodeRecords,
 
     activeSession,
     addToast,
@@ -2633,6 +2602,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
     emptyStateMaxWidthClassName,
     composerContainerClassName
   } = useAIBackfillChatRenderHelpers({
+    handleUndoNodeAction,
     AI_CHAT_THEME,
     categories,
     formatActionDate,

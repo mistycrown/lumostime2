@@ -1,5 +1,6 @@
 /**
  * @file assistant.ts
+ * @updated 2026-10-09: Adds node dictionaries and foreground node-description writeback.
  * @input None
  * @output Shared type definitions for the background AI agent, memory, reminders, and system triggers
  * @pos Type Definitions (Assistant Agent)
@@ -428,11 +429,30 @@ export interface AssistantLogDictionaryItem {
 }
 
 export interface AssistantTurnDictionaryContext {
+  nodes?: AssistantNodeDictionaryItem[];
   activityCategories?: AssistantActivityCategoryDictionaryItem[];
   scopes?: AssistantScopeDictionaryItem[];
   todoCategories?: AssistantTodoCategoryDictionaryItem[];
   todos?: AssistantTodoDictionaryItem[];
   logs?: AssistantLogDictionaryItem[];
+}
+
+export interface AssistantNodeDictionaryItem {
+  id: string;
+  name: string;
+  aliases: string[];
+  description: string;
+  categoryId?: string;
+}
+
+export interface AssistantUpsertNodeToolCall {
+  toolName: 'upsert_node';
+  args: {
+    nodeId?: string;
+    name?: string;
+    description: string;
+    mode?: 'append' | 'replace';
+  };
 }
 
 export interface AssistantLocalQueryRequest {
@@ -614,6 +634,7 @@ export interface AssistantCreateSelfBeliefToolCall {
 }
 
 export type AssistantToolCall =
+  | AssistantUpsertNodeToolCall
   | AssistantCreateLogToolCall
   | AssistantCreatePlannedLogToolCall
   | AssistantCreateTodoToolCall

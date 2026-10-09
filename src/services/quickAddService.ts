@@ -1,5 +1,6 @@
 /**
  * @file quickAddService.ts
+ * @updated 2026-10-09: Accepts dictionary node references while keeping note fragments verbatim.
  * @input AI configuration, user quick-add descriptions, and runtime dictionaries
  * @output Structured one-turn quick-add tool calls for todos, backfills, and notes
  * @pos Service (AI Quick Add)
@@ -72,6 +73,7 @@ export interface AIQuickAddBackfillTimeContext {
 export interface AIQuickAddNoteItem {
   logId?: string;
   text: string;
+  nodeIds?: string[];
 }
 
 export interface AIQuickAddNoteToolCall {
@@ -294,6 +296,7 @@ export const quickAddService = {
       'If a fragment cannot be matched confidently, assign it to the log nearest to the current local time. Never create a log and never edit or delete an existing note.',
       'Return JSON only: {"toolCalls":[{"toolName":"append_log_notes","args":{"items":[{"logId":"existing log id","text":"exact contiguous user fragment"}]}}]}.',
       'The text values must be exact contiguous substrings of the user input. Keep the original order. Do not return empty fragments.',
+      'When a fragment mentions an existing node by its name or alias, include its exact dictionary id in optional nodeIds. Keep text verbatim; the app will add [[name]] or [[alias丨name]] links. Never invent nodes or ids.',
       `Current local time: ${currentDateTime}`,
       JSON.stringify(dictionaryContext)
     ].join('\n');
@@ -313,7 +316,9 @@ export const quickAddService = {
           const text = typeof item?.text === 'string' ? item.text : '';
           if (!text.trim()) return [];
           const logId = normalizeText(item?.logId);
-          return [{ ...(logId ? { logId } : {}), text }];
+          const rawNodeIds: unknown[] = Array.isArray(item.nodeIds) ? item.nodeIds : [];
+          const nodeIds = [...new Set(rawNodeIds.filter((id): id is string => typeof id === 'string' && Boolean(id.trim())).map((id) => id.trim()))];
+          return [{ ...(logId ? { logId } : {}), text, ...(nodeIds?.length ? { nodeIds } : {}) }];
         });
         return items.length > 0
           ? { toolCall: { toolName: 'append_log_notes' as const, args: { items } } }
