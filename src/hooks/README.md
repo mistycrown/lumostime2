@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-09: `usePersonalDictionary.ts` exposes stable dictionary snapshots via `useSyncExternalStore`, refreshing settings, completion and clouds on edits, cloud/import restores and cross-window storage events.
+
 Update 2026-10-07: Node category datasets participate in sync change detection and backup restoration. Offline sync tests cover category-only uploads and restored classification references.
 
 Update 2026-10-06: `useSyncManager.ts` includes node metadata in JSON/cloud backups, restore and change tracking. Its offline renderer tests cover node-only biography edits and restored aliases/descriptions.

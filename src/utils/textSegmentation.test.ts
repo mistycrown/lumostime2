@@ -1,5 +1,6 @@
 /**
  * @file textSegmentation.test.ts
+ * @updated 2026-10-09: Covers global dictionary phrases combined with local merge/stop rules.
  * @input Text values and per-card phrase/stop-word rules.
  * @output Regression coverage for literal phrase counts, isolation, overlaps, and filtering.
  * @pos Test (Text Statistics)
@@ -7,8 +8,24 @@
  */
 import { describe, expect, it } from 'vitest';
 import { getRankedTextTerms, getTextTerms, normalizeWordCloudSettings } from './textSegmentation';
+import type { WordCloudSettings } from '../types';
 
 describe('per-cloud text rules', () => {
+  it('counts global personal words as one term and honors each cloud stop words', () => {
+    const words = ['美食广场', '美食广场复盘', 'New York', 'C++'];
+    const counts = new Map(getRankedTextTerms(['美食广场复盘，美食广场', '美食广场，new york，C++'], undefined, words));
+    expect(counts.get('美食广场复盘')).toBe(1);
+    expect(counts.get('美食广场')).toBe(2);
+    expect(counts.get('美食')).toBeUndefined();
+    expect(counts.get('new york')).toBe(1);
+    expect(counts.get('c++')).toBe(1);
+    expect(getTextTerms('美食广场复盘 咖啡', { mergeWords: ['美食广场复盘 咖啡'], stopWords: [] }, words))
+      .toEqual(['美食广场复盘 咖啡']);
+    expect(getTextTerms('美食广场', { mergeWords: [], stopWords: ['美食广场'] }, words)).toEqual([]);
+    expect(getTextTerms('美食广场', undefined, words)).toEqual(['美食广场']);
+    expect(getTextTerms('美食广场')).not.toContain('美食广场');
+  });
+
   it('counts the complete phrase only where it actually occurs', () => {
     const values = ['美食广场 美食广场', '美食和广场', '广场的美食'];
     const counts = new Map(getRankedTextTerms(values, { mergeWords: ['美食广场'], stopWords: [] }));
@@ -49,5 +66,7 @@ describe('per-cloud text rules', () => {
       .toEqual({ mergeWords: ['美食广场', 'new york'], stopWords: [] });
     expect(normalizeWordCloudSettings(null)).toEqual({ mergeWords: [], stopWords: [] });
     expect(getTextTerms('', { mergeWords: ['美食广场'], stopWords: [] })).toEqual([]);
+    expect(getTextTerms('美食广场', { mergeWords: 7, stopWords: null } as unknown as WordCloudSettings, ['美食广场']))
+      .toEqual(['美食广场']);
   });
 });

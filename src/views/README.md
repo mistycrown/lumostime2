@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-09: `SettingsView.tsx` adds the lazy personal dictionary subpage under Content, using the shared settings back navigation.
+
 Update 2026-10-09: `FocusDetailView` uses the shared inline note completion editor, prioritizes the current activity's historical words and preserves buffered note commits on blur/exit.
 
 Update 2026-10-08: Single-day and range exports pass full log history to daily-check evaluation, including previous-night sleep rules, while report timelines, images and statistics retain their selected-day inputs.

@@ -1,5 +1,6 @@
 /**
  * @file noteAutocomplete.test.ts
+ * @updated 2026-10-09: Covers dictionary priority, punctuation, long phrases, and cache isolation.
  * @input Historical notes and caret positions
  * @output Regression coverage for local single-suggestion completion
  * @pos Test (Note Autocomplete)
@@ -16,6 +17,34 @@ const lookup = (logs: Log[], text: string, activityId?: string, caret = text.len
   getNoteCompletion(getNoteAutocompleteIndex(logs), text, caret, end, activityId);
 
 describe('note autocomplete', () => {
+  it('completes personal terms immediately and prioritizes them over contextual history', () => {
+    const logs = Array.from({ length: 20 }, (_, i) => record(String(i), '文学', { activityId: 'reading' }));
+    const index = getNoteAutocompleteIndex(logs, ['文献管理', 'TypeScript', 'C++', 'New York City']);
+    expect(getNoteCompletion(index, '今天看文', 4, 4, 'reading')).toEqual({ text: '文献管理', suffix: '献管理' });
+    expect(getNoteCompletion(index, 'type', 4)?.suffix).toBe('Script');
+    expect(getNoteCompletion(index, 'C+', 2)?.suffix).toBe('+');
+    expect(getNoteCompletion(index, 'New York C', 10)?.suffix).toBe('ity');
+    expect(getNoteCompletion(index, 'Prototype', 9)).toBeNull();
+    const empty = getNoteAutocompleteIndex([], ['科研项目复盘', '论文', '文献管理']);
+    expect(getNoteCompletion(empty, '科研项', 3)?.suffix).toBe('目复盘');
+    expect(getNoteCompletion(empty, '论文', 2)).toBeNull();
+    expect(getNoteCompletion(empty, '[[科研项', 5)).toBeNull();
+    expect(getNoteCompletion(empty, '科研项后文', 3)).toBeNull();
+  });
+
+  it('keeps dictionary caches isolated and restores historical suggestions after removal', () => {
+    const logs = [record('1', '文学'), record('2', '文学')];
+    const words = ['文献管理'];
+    const index = getNoteAutocompleteIndex(logs, words);
+    expect(getNoteAutocompleteIndex(logs, words)).toBe(index);
+    expect(getNoteCompletion(index, '文', 1)?.text).toBe('文献管理');
+    expect(getNoteCompletion(getNoteAutocompleteIndex(logs, ['文章编辑']), '文', 1)?.text).toBe('文章编辑');
+    expect(getNoteCompletion(getNoteAutocompleteIndex(logs), '文', 1)?.text).toBe('文学');
+    expect(getNoteCompletion(getNoteAutocompleteIndex([], ['论文', '论文修改']), '论文修', 3)?.suffix).toBe('改');
+    expect(getNoteCompletion(getNoteAutocompleteIndex([], ['一个超过二十四字的个性化词典词条用于确认完整长短语也可以补全']), '一个超过二十四字', 8)?.suffix)
+      .toBe('的个性化词典词条用于确认完整长短语也可以补全');
+  });
+
   it('counts records instead of occurrences and excludes planned notes and numbers', () => {
     const logs = [record('1', '论文 论文 论文 1234'), record('p', '论文', { isPlanned: true })];
     expect(lookup(logs, '论')).toBeNull();

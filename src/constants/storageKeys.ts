@@ -1,5 +1,6 @@
 /**
  * @file storageKeys.ts
+ * @updated 2026-10-09: Adds the personal dictionary preference key.
  * @updated 2026-10-05: Stores a persistent anonymous diagnostics identifier.
  * @description localStorage 键名统一管理
  * @updated 2026-07-29: Added persistent Chronicle layout, todo-column state, and width preferences.
@@ -113,6 +114,7 @@ export const USER_DATA_KEYS = {
  * 设置相关的存储键
  */
 export const SETTINGS_KEYS = {
+    PERSONAL_DICTIONARY: 'lumostime_personal_dictionary',
     /** 隐私模式 */
     PRIVACY_MODE: 'lumostime_privacy_mode',
     /** 语言设置 */

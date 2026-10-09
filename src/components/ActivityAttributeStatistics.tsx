@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-09: Reactively protects personal words in every text cloud.
  * @updated 2026-10-09: Adds per-cloud word settings for attribute, conditional, and note statistics.
  * @updated 2026-10-06: Adds safe all-time ranges, record-duration sources, and elapsed-hour heatmaps.
  * @input One Activity and its actual Logs.
@@ -43,6 +44,7 @@ import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
 import { formatDuration } from '../utils/chartUtils';
 import { getTextTerms } from '../utils/textSegmentation';
+import { usePersonalDictionary } from '../hooks/usePersonalDictionary';
 import { ensureStatisticCards, getChartTypesForSource, getDefaultStatisticRange, getStatisticCardLabel, getStatisticRangesForCard, isDurationStatisticSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 import { aggregateWeekHourDurations } from '../utils/hourlyDurationUtils';
 import { getChartPalette } from '../utils/chartPalette';
@@ -225,6 +227,7 @@ const AttributeSection: React.FC<{
 );
 
 const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false, wordCloudSettings, wordCloudSettingsAction }) => {
+  const personalWords = usePersonalDictionary();
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
   const [selectedMode, setSelectedMode] = useState<StatisticMode>('count');
@@ -326,7 +329,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               attributeLogs.forEach((log) => (log.attributeValues || []).forEach((value) => {
                 if (value.attributeId !== attributeId || !('value' in value) || typeof value.value !== 'string') return;
                 textValueCount += 1;
-                getTextTerms(value.value, wordCloudSettings).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
+                getTextTerms(value.value, wordCloudSettings, personalWords).forEach((term) => termCounts.set(term, (termCounts.get(term) || 0) + 1));
               }));
               if (textValueCount === 0) return null;
               const terms = [...termCounts.entries()].sort((left, right) => right[1] - left[1]).slice(0, MAX_TEXT_TERMS);

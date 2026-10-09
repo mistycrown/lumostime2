@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-09: `personalDictionaryService.ts` stores normalized words and emits preference-change events. `preferencesBackupService.ts` includes the dictionary in export/cloud backup, preserving existing words when older backups omit this key.
+
 Update 2026-10-08: Obsidian daily exports refresh automatic checks for the report date, normalize manual count completion, and render Markdown task lists with count progress. Full history supports previous-night rules without adding other dates to daily statistics or changing saved review data.
 
 Update 2026-10-08: `obsidianExportService.ts` excludes the node directory, categories, aliases and biographies from daily, weekly and monthly Markdown exports while retaining wiki links in logs and review text.

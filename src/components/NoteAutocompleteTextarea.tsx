@@ -1,5 +1,6 @@
 /**
  * @file NoteAutocompleteTextarea.tsx
+ * @updated 2026-10-09: Refreshes suggestions after personal dictionary edits and restores.
  * @input Controlled note, historical logs, activity context and native textarea attributes/ref
  * @output One inline ghost suggestion accepted with Tab or the completion button
  * @pos Component (Record Note Editor)
@@ -8,6 +9,7 @@
  */
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Log } from '../types';
+import { usePersonalDictionary } from '../hooks/usePersonalDictionary';
 import { EMPTY_NOTE_HISTORY, getNoteAutocompleteIndex, getNoteCompletion } from '../utils/noteAutocomplete';
 
 interface NoteAutocompleteTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> {
@@ -33,6 +35,7 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
   onFocus, onBlur, onSelect, onScroll, onKeyDown, onCompositionStart, onCompositionEnd,
   disabled, readOnly, className, style, ...props
 }, forwardedRef) => {
+  const personalWords = usePersonalDictionary();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const [isComposing, setIsComposing] = useState(false);
@@ -41,7 +44,7 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [mirrorStyle, setMirrorStyle] = useState<React.CSSProperties>({});
   const [scroll, setScroll] = useState({ top: 0, left: 0 });
-  const index = useMemo(() => getNoteAutocompleteIndex(history), [history]);
+  const index = useMemo(() => getNoteAutocompleteIndex(history, personalWords), [history, personalWords]);
   useImperativeHandle(forwardedRef, () => inputRef.current!, []);
 
   const readCaret = () => {
@@ -51,7 +54,7 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
       return current.value === next.value && current.start === next.start && current.end === next.end ? current : next;
     });
   };
-  useLayoutEffect(() => { readCaret(); setDismissed(null); }, [value, activityId]);
+  useLayoutEffect(() => { readCaret(); setDismissed(null); }, [value, activityId, personalWords]);
   const completionKey = JSON.stringify([value, caret.start, caret.end, activityId]);
   const suggestion = focused && !isComposing && !disabled && !readOnly && caret.value === value && dismissed !== completionKey
     ? getNoteCompletion(index, value, caret.start, caret.end, activityId) : null;

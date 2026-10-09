@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-09: `NavigationContext.tsx` adds the `personal_dictionary` settings submenu; the existing main-list and hardware-back behavior applies.
+
 Update 2026-10-07: NodeContext optionally consumes ReviewContext, indexes daily answers beside logs, discovers bracketed nodes from answers, and retargets answer links during rename/merge without breaking lightweight NodeProvider hosts.
 
 Update 2026-10-07: DataContext stores logs/node metadata in one React state and exposes `updateNodeRecords` for coupled transforms. NodeContext rename/merge use the latest queued snapshot, update every linked log and metadata together, and retain the existing atomic repository/outbox persistence. Merge redirects source navigation IDs to the primary without adjacent duplicate history entries.

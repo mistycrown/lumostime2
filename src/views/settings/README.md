@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-09: Settings → 内容 → 个人词典 opens `PersonalDictionarySettingsView.tsx`, a print-inspired word list with batch entry, case-insensitive deduplication, search and removal. Changes persist immediately and participate in preference backup/restore.
+
 Update 2026-10-07: Node directory and management headers match SearchView's padding (top 16px, bottom 12px), 24px back icon with 4px button padding, 18px title and the shared `--app-safe-area-top` offset.
 
 Update 2026-10-07: NodesSettingsView uses a searchable category popover, defaults to persisted manual order, and adds a top-right management entry. NodeManageView wraps draggable capsules in category sections, supports touch/mouse moves and category ordering, edge scrolling, cancellation and click/button alternatives. Unclassified stays last; search preserves hidden nodes during moves.

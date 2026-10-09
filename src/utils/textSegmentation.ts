@@ -1,5 +1,6 @@
 /**
  * @file textSegmentation.ts
+ * @updated 2026-10-09: Protects personal dictionary words alongside per-cloud phrases.
  * @updated 2026-10-09: Protects card-specific phrases before segmentation and applies custom stop words afterward.
  * @input User-entered text values and optional per-cloud phrase/stop-word rules.
  * @output Cross-platform Chinese word terms for text statistics.
@@ -61,10 +62,9 @@ const segmentText = (value: string): string[] => {
 };
 
 /** Match literal phrases in the original text, preferring the longest at each position. */
-export const getTextTerms = (value: string, settings?: WordCloudSettings): string[] => {
-  if (!settings) return segmentText(value);
-  const mergeWords = normalizeWordList(settings.mergeWords).sort((left, right) => right.length - left.length);
-  const stopWords = new Set(normalizeWordList(settings.stopWords));
+export const getTextTerms = (value: string, settings?: WordCloudSettings, personalWords: readonly string[] = []): string[] => {
+  const mergeWords = normalizeWordList([...personalWords, ...normalizeWordList(settings?.mergeWords)]).sort((left, right) => right.length - left.length);
+  const stopWords = new Set(normalizeWordList(settings?.stopWords));
   if (!mergeWords.length) return segmentText(value).filter((term) => !stopWords.has(term));
   const text = value.trim().replace(/\s+/g, ' ').toLowerCase();
   const terms: string[] = [];
@@ -82,10 +82,10 @@ export const getTextTerms = (value: string, settings?: WordCloudSettings): strin
   return terms.filter((term) => !stopWords.has(term));
 };
 
-export const getRankedTextTerms = (values: Iterable<string>, settings?: WordCloudSettings): Array<[string, number]> => {
+export const getRankedTextTerms = (values: Iterable<string>, settings?: WordCloudSettings, personalWords: readonly string[] = []): Array<[string, number]> => {
   const counts = new Map<string, number>();
   for (const value of values) {
-    getTextTerms(value, settings).forEach((term) => counts.set(term, (counts.get(term) || 0) + 1));
+    getTextTerms(value, settings, personalWords).forEach((term) => counts.set(term, (counts.get(term) || 0) + 1));
   }
   return [...counts.entries()].sort((left, right) => right[1] - left[1]);
 };

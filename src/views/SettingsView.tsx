@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-09: Adds personal dictionary management under Content.
  * @updated 2026-10-08: Removes node metadata from the Obsidian export view inputs.
  * @updated 2026-10-07: Uses a distinct network icon for the node entry.
  * @updated 2026-10-06: Adds the node directory entry to the Content group.
@@ -148,6 +149,7 @@ import type { NavigationModuleVisibility } from '../contexts/SettingsContext';
 
 
 const NodesSettingsView = React.lazy(() => import('./settings/NodesSettingsView').then((module) => ({ default: module.NodesSettingsView })));
+const PersonalDictionarySettingsView = React.lazy(() => import('./settings/PersonalDictionarySettingsView').then((module) => ({ default: module.PersonalDictionarySettingsView })));
 
 interface SettingsViewProps {
     onClose: () => void;
@@ -818,6 +820,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
         );
     }
 
+    if (activeSubmenu === 'personal_dictionary') {
+        return renderLazySettingsSubview(
+            <PersonalDictionarySettingsView onBack={handleBackToMain} />,
+            '正在加载个人词典…'
+        );
+    }
+
     if (activeSubmenu === 'nodes') {
         return renderLazySettingsSubview(
             <NodesSettingsView onBack={settingsSubmenuBackCloses ? handleBackFromShortcutSubview : handleBackToMain} />,
@@ -1323,6 +1332,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                             icon={<Network size={18} className="text-stone-500" />}
                             label="节点"
                             onClick={() => openSettingsSubmenu('nodes')}
+                        />
+                        <MenuItem
+                            icon={<BookOpen size={18} className="text-stone-500" />}
+                            label="个人词典"
+                            onClick={() => openSettingsSubmenu('personal_dictionary')}
                         />
                         <MenuItem
                             icon={<Star size={18} className="text-stone-500" />}
