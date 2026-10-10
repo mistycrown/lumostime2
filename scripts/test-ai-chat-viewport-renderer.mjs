@@ -4,6 +4,7 @@
  * @output Offline regression results in an isolated temporary browser profile
  * @pos Test Runner
  * @updated 2026-10-09: Verifies conversation and keyboard scrolling with real DOM layout.
+ * @updated 2026-10-10: Adds --unread to verify real homepage unread navigation through the chat window provider.
  */
 import { build } from 'esbuild';
 import { mkdtemp, writeFile } from 'node:fs/promises';
@@ -14,10 +15,22 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-ai-chat-viewport-'));
+const testUnreadEntry = process.argv.includes('--unread');
+const harnessPath = path.resolve(`src/components/__tests__/${testUnreadEntry ? 'aiChatUnread' : 'aiChatViewport'}RendererHarness.tsx`);
 await build({
-  entryPoints: [path.resolve('src/components/__tests__/aiChatViewportRendererHarness.tsx')],
+  entryPoints: [harnessPath],
   bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
-  define: { 'process.env.NODE_ENV': '"development"' }
+  define: { 'process.env.NODE_ENV': '"development"' },
+  plugins: testUnreadEntry ? [{
+    name: 'unread-test-modal',
+    setup(plugin) {
+      plugin.onResolve({ filter: /\/AIBackfillChatModal$/ }, () => ({ path: 'test-modal', namespace: 'unread-test' }));
+      plugin.onLoad({ filter: /.*/, namespace: 'unread-test' }, () => ({
+        contents: `export { UnreadViewportModal as AIBackfillChatModal } from ${JSON.stringify(harnessPath)};`,
+        loader: 'ts', resolveDir: process.cwd()
+      }));
+    }
+  }] : []
 });
 await writeFile(path.join(directory, 'index.html'), `<!doctype html><html><meta charset="utf-8"><style>body{margin:0;background:#fdfbf7;font-family:Arial,sans-serif}header{padding:12px;box-sizing:border-box}</style><body><div id="root"></div><script src="test.js"></script></body></html>`, 'utf8');
 await writeFile(path.join(directory, 'main.cjs'), `

@@ -5,6 +5,7 @@
  * @updated 2026-04-26: Added session/message navigation targets so Android assistant notifications can reopen the shared chat at the exact background message.
  * @updated 2026-09-25: Keeps the latest unread assistant message target so AI entry buttons open that message directly.
  * @updated 2026-09-20: Added a one-shot return intent for review detail pages opened from the AI workspace.
+ * @updated 2026-10-10: Opens unread conversations at the latest message while preserving explicit notification message targets.
  */
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AIBackfillChatModal } from '../components/AIBackfillChatModal';
@@ -61,10 +62,15 @@ export const AIChatWindowProvider: React.FC<{ children: ReactNode }> = ({ childr
   const aiChatBackHandlerRef = useRef<(() => boolean) | null>(null);
 
   const openAIChat = useCallback((options?: OpenAIChatOptions) => {
-    const hasUnreadTarget = unreadCount > 0 && Boolean(unreadTarget?.targetSessionId);
+    const explicitSessionId = options?.targetSessionId?.trim() || undefined;
+    const explicitMessageId = options?.targetMessageId?.trim() || undefined;
+    const hasUnreadTarget = !explicitSessionId && !explicitMessageId
+      && unreadCount > 0 && Boolean(unreadTarget?.targetSessionId);
     setTargetDate(hasUnreadTarget ? undefined : options?.targetDate ? new Date(options.targetDate) : undefined);
-    setTargetSessionId(hasUnreadTarget ? unreadTarget?.targetSessionId : options?.targetSessionId?.trim() || undefined);
-    setTargetMessageId(hasUnreadTarget ? unreadTarget?.targetMessageId : options?.targetMessageId?.trim() || undefined);
+    setTargetSessionId(hasUnreadTarget ? unreadTarget?.targetSessionId : explicitSessionId);
+    // Unread badges select a conversation, whose latest content must remain visible
+    // through reply expansion and keyboard resizing. Only explicit links pin a message.
+    setTargetMessageId(explicitMessageId);
     setInitialInputText(hasUnreadTarget ? undefined : options?.initialInputText?.trim() || undefined);
     setUnreadCount(0);
     setUnreadTarget(undefined);
