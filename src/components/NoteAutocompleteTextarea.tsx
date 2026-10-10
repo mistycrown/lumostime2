@@ -1,5 +1,6 @@
 /**
  * @file NoteAutocompleteTextarea.tsx
+ * @updated 2026-10-10: Calibrates Android WebView text zoom before copying computed font size and line height to the ghost layer.
  * @updated 2026-10-10: Includes live node names and aliases in completion candidates.
  * @updated 2026-10-09: Refreshes suggestions after personal dictionary edits and restores.
  * @input Controlled note, historical logs, activity context and native textarea attributes/ref
@@ -67,6 +68,21 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
       const computed = window.getComputedStyle(input);
       const next: Record<string, string | number> = {};
       for (const property of MIRROR_PROPERTIES) next[property] = computed[property];
+      // WebView reports system-zoomed font metrics, then zooms copied px values again.
+      // Measure an explicit 100px probe instead of changing the user's font preferences.
+      const probe = input.ownerDocument.createElement('span');
+      probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;width:0;height:0;overflow:hidden;text-size-adjust:none;-webkit-text-size-adjust:none';
+      probe.style.setProperty('font-size', '100px', 'important');
+      probe.style.setProperty('line-height', '100px', 'important');
+      input.parentElement!.append(probe);
+      const probeStyle = window.getComputedStyle(probe);
+      const fontZoom = parseFloat(probeStyle.fontSize) / 100;
+      const lineZoom = parseFloat(probeStyle.lineHeight) / 100;
+      probe.remove();
+      if (Number.isFinite(fontZoom) && fontZoom > 0) next.fontSize = `${parseFloat(computed.fontSize) / fontZoom}px`;
+      if (Number.isFinite(lineZoom) && lineZoom > 0 && computed.lineHeight.endsWith('px')) {
+        next.lineHeight = `${parseFloat(computed.lineHeight) / lineZoom}px`;
+      }
       const borderWidth = parseFloat(computed.borderLeftWidth) + parseFloat(computed.borderRightWidth);
       const scrollbarWidth = Math.max(0, input.offsetWidth - input.clientWidth - Math.round(borderWidth));
       next.width = parseFloat(computed.width) - scrollbarWidth;

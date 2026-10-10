@@ -1,5 +1,6 @@
 /**
  * @file check-note-autocomplete-smoke.mjs
+ * @updated 2026-10-10: Checks system text zoom separately from CSS text inflation using native caret pixels.
  * @input Installed Chrome, production CSS and real note-editor regression harness
  * @output Browser checks and desktop/mobile screenshots in node_modules/.cache/note-autocomplete-smoke
  * @pos Development verification script
@@ -120,7 +121,8 @@ try {
   const caretTop = Math.min(...caretPixels.map((point) => point.y));
   console.log(JSON.stringify({ mobileGeometry, nativeCaret: { left: caretLeft, top: caretTop } }));
   if (Math.abs(caretLeft - mobileGeometry.suffix.left) > 3 || Math.abs(caretTop - mobileGeometry.suffix.top) > mobileGeometry.fontSize / 2) throw new Error('Mobile ghost text does not follow the actual native caret');
-  passed.push('Reported mobile wrap fixture aligns with actual textarea caret pixels');
+  passed.push('Mobile wrap fixture at 110% WebView text zoom aligns with actual textarea caret pixels');
+  await evaluate('window.__noteAutocompleteHarness.restoreTextZoom()');
   await evaluate('window.__noteAutocompleteHarness.renderEditor()');
   await evaluate('window.__noteAutocompleteHarness.setText("今天修改论")');
   await capture('mobile');

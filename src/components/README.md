@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-10: `NoteAutocompleteTextarea` calibrates WebView system text zoom with a hidden 100px probe before copying computed font size and line height. This prevents 110% Android text zoom from being applied twice to the ghost layer while preserving user font settings. Regression checks emulate zoomed computed metrics and compare placement to the native caret.
+
 Update 2026-10-10: Note autocomplete, all text clouds and the high-frequency word picker use `useTextDictionary`, including live node names/aliases. The personal dictionary editor continues to display only manually entered words.
 
 Update 2026-10-09: `NoteAutocompleteTextarea` reacts to personal dictionary changes. `ActivityAttributeStatistics` protects personal terms in note, attribute and conditional clouds, and `WordCloudSettingsEditor` uses the same terms for its high-frequency picker. Browser coverage lives in `__tests__/personalDictionaryRendererHarness.tsx`.

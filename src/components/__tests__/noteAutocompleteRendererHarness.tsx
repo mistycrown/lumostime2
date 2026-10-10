@@ -1,5 +1,6 @@
 /**
  * @file noteAutocompleteRendererHarness.tsx
+ * @updated 2026-10-10: Emulates WebView's zoomed computed font metrics to catch double-scaling of copied px values.
  * @input Real note editor and log/focus views with isolated historical fixtures
  * @output Browser interaction assertions and screenshot fixtures
  * @pos Test (Note Autocomplete Renderer)
@@ -156,10 +157,23 @@ async function run() {
 
 declare global {
   interface Window {
-    __noteAutocompleteHarness?: { run: typeof run; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; renderEditor: () => Promise<void>; passed: string[] };
+    __noteAutocompleteHarness?: { run: typeof run; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; restoreTextZoom: typeof restoreTextZoom; renderEditor: () => Promise<void>; passed: string[] };
   }
 }
+const originalComputedStyle = window.getComputedStyle.bind(window);
+const restoreTextZoom = () => { window.getComputedStyle = originalComputedStyle; };
 async function prepareMobileCase() {
+  // Real Android WebView returns e.g. 15.4px for CSS 14px at 110% system text zoom.
+  // Copying 15.4px into another element repeats the scaling; desktop emulation does not do this.
+  window.getComputedStyle = (element, pseudo) => new Proxy(originalComputedStyle(element, pseudo), {
+    get(target, property) {
+      const result = Reflect.get(target, property, target);
+      if ((property === 'fontSize' || property === 'lineHeight') && typeof result === 'string' && result.endsWith('px')) {
+        return `${parseFloat(result) * 1.1}px`;
+      }
+      return typeof result === 'function' ? result.bind(target) : result;
+    }
+  });
   await render(<Editor />);
   document.documentElement.style.setProperty('text-size-adjust', '130%');
   document.documentElement.style.setProperty('-webkit-text-size-adjust', '130%');
@@ -173,5 +187,5 @@ async function prepareMobileCase() {
   const computed = getComputedStyle(input());
   return { suffix: { left: suffix.left, top: suffix.top }, input: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, fontSize: parseFloat(computed.fontSize) };
 }
-window.__noteAutocompleteHarness = { run, setText, prepareMobileCase, renderEditor: () => render(<Editor />), passed };
+window.__noteAutocompleteHarness = { run, setText, prepareMobileCase, restoreTextZoom, renderEditor: () => render(<Editor />), passed };
 void render(<Editor />);
