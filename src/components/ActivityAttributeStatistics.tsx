@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-10: Protects node names and aliases alongside manual dictionary words.
  * @updated 2026-10-09: Reactively protects personal words in every text cloud.
  * @updated 2026-10-09: Adds per-cloud word settings for attribute, conditional, and note statistics.
  * @updated 2026-10-06: Adds safe all-time ranges, record-duration sources, and elapsed-hour heatmaps.
@@ -44,7 +45,7 @@ import { getActivityAttributeValue, getSortedActivityAttributes } from '../utils
 import { getLogDurationSeconds } from '../utils/scopeStatsUtils';
 import { formatDuration } from '../utils/chartUtils';
 import { getTextTerms } from '../utils/textSegmentation';
-import { usePersonalDictionary } from '../hooks/usePersonalDictionary';
+import { useTextDictionary } from '../hooks/useTextDictionary';
 import { ensureStatisticCards, getChartTypesForSource, getDefaultStatisticRange, getStatisticCardLabel, getStatisticRangesForCard, isDurationStatisticSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
 import { aggregateWeekHourDurations } from '../utils/hourlyDurationUtils';
 import { getChartPalette } from '../utils/chartPalette';
@@ -227,7 +228,7 @@ const AttributeSection: React.FC<{
 );
 
 const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false, wordCloudSettings, wordCloudSettingsAction }) => {
-  const personalWords = usePersonalDictionary();
+  const personalWords = useTextDictionary();
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
   const [selectedMode, setSelectedMode] = useState<StatisticMode>('count');

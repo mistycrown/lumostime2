@@ -1,5 +1,6 @@
 /**
  * @file personalDictionaryService.test.ts
+ * @updated 2026-10-10: Verifies node-derived words, deduplication and separation from persisted manual words.
  * @input Local storage, dictionary edits, preference restores and malformed data
  * @output Regression coverage for persistence, stable snapshots and reactive restore
  * @pos Test (Personal Dictionary)
@@ -7,7 +8,9 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SETTINGS_KEYS } from '../constants/storageKeys';
-import { normalizePersonalDictionary, parsePersonalDictionaryInput } from '../utils/personalDictionary';
+import { getEffectiveDictionaryWords, normalizePersonalDictionary, parsePersonalDictionaryInput } from '../utils/personalDictionary';
+import { getNoteAutocompleteIndex, getNoteCompletion } from '../utils/noteAutocomplete';
+import { getTextTerms } from '../utils/textSegmentation';
 import { personalDictionaryService } from './personalDictionaryService';
 import { preferencesBackupService } from './preferencesBackupService';
 
@@ -27,6 +30,23 @@ describe('personal dictionary', () => {
       .toEqual(['TypeScript', '科研项目', 'New York', 'C++']);
     expect(normalizePersonalDictionary([null, 4, '', '  ', ' 科研项目 ', '科研项目'])).toEqual(['科研项目']);
     expect(normalizePersonalDictionary({})).toEqual([]);
+  });
+
+  it('includes node names and aliases without mutating or storing derived words', () => {
+    personalDictionaryService.setAll(['TypeScript', '美食广场']);
+    const manual = personalDictionaryService.getAll();
+    const nodes = [{ name: '科研项目复盘', aliases: ['项目复盘', 'typescript', ' '] }];
+    const effective = getEffectiveDictionaryWords(manual, nodes);
+    expect(effective).toEqual(['TypeScript', '美食广场', '科研项目复盘', '项目复盘']);
+    expect(nodes[0].aliases).toEqual(['项目复盘', 'typescript', ' ']);
+    expect(personalDictionaryService.getAll()).toBe(manual);
+    expect(JSON.parse(localStorage.getItem(SETTINGS_KEYS.PERSONAL_DICTIONARY)!)).toEqual(['TypeScript', '美食广场']);
+    expect(getNoteCompletion(getNoteAutocompleteIndex([], effective), '科研项', 3)?.suffix).toBe('目复盘');
+    expect(getNoteCompletion(getNoteAutocompleteIndex([], effective), '项目复', 3)?.suffix).toBe('盘');
+    expect(getTextTerms('科研项目复盘 项目复盘', undefined, effective)).toEqual(['科研项目复盘', '项目复盘']);
+    expect(getTextTerms('科研项目复盘', { mergeWords: [], stopWords: ['科研项目复盘'] }, effective)).toEqual([]);
+    expect(getEffectiveDictionaryWords([], nodes)).toEqual(['科研项目复盘', '项目复盘', 'typescript']);
+    expect(getEffectiveDictionaryWords(manual, [])).toEqual(manual);
   });
 
   it('persists edits, keeps snapshots stable and notifies subscribers until unsubscribed', () => {

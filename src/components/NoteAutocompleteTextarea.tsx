@@ -1,5 +1,6 @@
 /**
  * @file NoteAutocompleteTextarea.tsx
+ * @updated 2026-10-10: Includes live node names and aliases in completion candidates.
  * @updated 2026-10-09: Refreshes suggestions after personal dictionary edits and restores.
  * @input Controlled note, historical logs, activity context and native textarea attributes/ref
  * @output One inline ghost suggestion accepted with Tab or the completion button
@@ -9,7 +10,7 @@
  */
 import React, { forwardRef, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Log } from '../types';
-import { usePersonalDictionary } from '../hooks/usePersonalDictionary';
+import { useTextDictionary } from '../hooks/useTextDictionary';
 import { EMPTY_NOTE_HISTORY, getNoteAutocompleteIndex, getNoteCompletion } from '../utils/noteAutocomplete';
 
 interface NoteAutocompleteTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'> {
@@ -35,7 +36,7 @@ export const NoteAutocompleteTextarea = forwardRef<HTMLTextAreaElement, NoteAuto
   onFocus, onBlur, onSelect, onScroll, onKeyDown, onCompositionStart, onCompositionEnd,
   disabled, readOnly, className, style, ...props
 }, forwardedRef) => {
-  const personalWords = usePersonalDictionary();
+  const personalWords = useTextDictionary();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composing = useRef(false);
   const [isComposing, setIsComposing] = useState(false);

@@ -1,5 +1,6 @@
 /**
  * @file WordCloudSettingsEditor.tsx
+ * @updated 2026-10-10: Keeps node words whole in the high-frequency picker.
  * @updated 2026-10-09: Uses personal words in selectable high-frequency terms.
  * @input Card-specific word rules, source text values, and a persistence callback.
  * @output Editable phrase/stop-word lists and ranked word selection.
@@ -9,7 +10,7 @@
 import React, { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import type { WordCloudSettings } from '../types';
-import { usePersonalDictionary } from '../hooks/usePersonalDictionary';
+import { useTextDictionary } from '../hooks/useTextDictionary';
 import { getRankedTextTerms, normalizeWordCloudSettings, normalizeWordList } from '../utils/textSegmentation';
 
 interface WordCloudSettingsEditorProps {
@@ -22,7 +23,7 @@ const parseWords = (value: string) => normalizeWordList(value.split(/[,，、;�
 const actionClass = 'rounded-md border border-[#d8cabb] px-3 py-2 text-xs text-[#77523d] disabled:opacity-35';
 
 export const WordCloudSettingsEditor: React.FC<WordCloudSettingsEditorProps> = ({ settings, values, onChange }) => {
-  const personalWords = usePersonalDictionary();
+  const personalWords = useTextDictionary();
   const rules = normalizeWordCloudSettings(settings);
   const [mergeInput, setMergeInput] = useState('');
   const [stopInput, setStopInput] = useState('');

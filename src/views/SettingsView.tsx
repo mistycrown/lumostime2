@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-10: Uses the dictionary-specific BookA icon for personal words.
  * @updated 2026-10-09: Adds personal dictionary management under Content.
  * @updated 2026-10-08: Removes node metadata from the Obsidian export view inputs.
  * @updated 2026-10-07: Uses a distinct network icon for the node entry.
@@ -45,6 +46,7 @@ import {
     Settings,
     RotateCcw,
     BookOpen,
+    BookA,
     MessageSquare,
     PenTool,
     FileText,
@@ -1334,7 +1336,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                             onClick={() => openSettingsSubmenu('nodes')}
                         />
                         <MenuItem
-                            icon={<BookOpen size={18} className="text-stone-500" />}
+                            icon={<BookA size={18} className="text-stone-500" />}
                             label="个人词典"
                             onClick={() => openSettingsSubmenu('personal_dictionary')}
                         />

@@ -1,5 +1,6 @@
 /**
  * @file personalDictionaryRendererHarness.tsx
+ * @updated 2026-10-10: Covers hidden node words, aliases and live rename/removal with real providers.
  * @input Real dictionary settings, note editor, statistics and isolated browser storage
  * @output Browser interaction checks and desktop/mobile screenshot fixtures
  * @pos Test (Personal Dictionary Renderer)
@@ -14,6 +15,9 @@ import { WordCloudSettingsEditor } from '../WordCloudSettingsEditor';
 import { personalDictionaryService } from '../../services/personalDictionaryService';
 import { preferencesBackupService } from '../../services/preferencesBackupService';
 import { SETTINGS_KEYS } from '../../constants/storageKeys';
+import { DataProvider, useData } from '../../contexts/DataContext';
+import { NodeProvider, useNodes } from '../../contexts/NodeContext';
+import { dataRepository } from '../../repositories/dataRepository';
 import type { Activity, Log } from '../../types';
 
 const history: Log[] = [1, 2].map((id) => ({ id: String(id), note: '文学 美食广场', categoryId: 'study', activityId: 'writing',
@@ -103,7 +107,45 @@ const prepare = async () => {
   root.render(null); await delay(); root.render(<App />); await delay();
   check(document.documentElement.scrollWidth <= window.innerWidth, 'Dictionary page overflows viewport');
 };
+let dataState: ReturnType<typeof useData>;
+let nodeState: ReturnType<typeof useNodes>;
+const NodeProbe = () => {
+  dataState = useData();
+  nodeState = useNodes();
+  return null;
+};
+const runNodes = async () => {
+  root.render(null); await delay();
+  await dataRepository.saveLogs(history);
+  await dataRepository.saveNodes([{ id: 'node', name: '美食广场', aliases: ['未来城市漫游'], description: '', createdAt: 1, updatedAt: 1 }]);
+  personalDictionaryService.setAll(['手动词条']);
+  root.render(<DataProvider><NodeProvider><NodeProbe /><App /></NodeProvider></DataProvider>);
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await delay();
+    if (dataState?.isReady && nodeState?.nodes.some((node) => node.id === 'node')) break;
+  }
+  check(dataState?.isReady && nodeState?.nodes.some((node) => node.id === 'node'), 'Node provider did not hydrate');
+  check(document.querySelectorAll('li').length === 1 && document.querySelector('li')?.textContent?.includes('手动词条'), 'Derived node words appeared in manual dictionary');
+  check(personalDictionaryService.getAll().join() === '手动词条', 'Node words were copied into manual storage');
+  await click('返回设置');
+  check(cloudHasPhrase(), 'Node name was split in real note cloud');
+  check(document.querySelector('[data-word-rules]')?.textContent?.includes('美食广场'), 'Node name missing from high-frequency picker');
+  await enter('测试备注', '未来城'); check(ghost() === '市漫游', 'Unused node alias did not complete');
+  nodeState.updateNode('node', { aliases: ['城市旅行'], description: '' }); await delay();
+  check(ghost() !== '市漫游', 'Removed alias remained in mounted completion');
+  await enter('测试备注', '城市旅'); check(ghost() === '行', 'Updated alias did not refresh completion');
+  nodeState.rename('node', '科研项目复盘'); await delay();
+  await enter('测试备注', '科研项'); check(ghost() === '目复盘', 'Renamed node did not refresh completion');
+  nodeState.updateNode('node', { aliases: [], description: '' }); await delay();
+  check(!cloudHasPhrase(), 'Removed old-name alias remained in mounted cloud');
+  dataState.setNodes([]); await delay();
+  check(!ghost(), 'Deleted node remained in mounted completion');
+  check(personalDictionaryService.getAll().join() === '手动词条', 'Node edits changed manual dictionary');
+  root.render(null); await delay();
+  return ['Node names and unused aliases participate in completion/clouds while staying hidden in manual dictionary',
+    'Node rename, alias changes and removal refresh mounted consumers without modifying manual words'];
+};
 declare global {
-  interface Window { __personalDictionaryHarness?: { run: typeof run; prepare: typeof prepare }; }
+  interface Window { __personalDictionaryHarness?: { run: typeof run; runNodes: typeof runNodes; prepare: typeof prepare }; }
 }
-window.__personalDictionaryHarness = { run, prepare };
+window.__personalDictionaryHarness = { run, runNodes, prepare };

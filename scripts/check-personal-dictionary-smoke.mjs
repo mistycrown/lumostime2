@@ -1,5 +1,6 @@
 /**
  * @file check-personal-dictionary-smoke.mjs
+ * @updated 2026-10-10: Checks derived node words and live node metadata edits at both viewport widths.
  * @input Installed Chrome, production CSS and real dictionary/consumer harness
  * @output Browser checks and screenshots in node_modules/.cache/personal-dictionary-smoke
  * @pos Development verification script
@@ -87,10 +88,12 @@ try {
     await delay();
   }
   const passed = await evaluate('window.__personalDictionaryHarness.run()');
+  passed.push(...await evaluate('window.__personalDictionaryHarness.runNodes()'));
   await evaluate('window.__personalDictionaryHarness.prepare()'); await capture('desktop');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
   passed.push(...await evaluate('window.__personalDictionaryHarness.run()'));
+  passed.push(...await evaluate('window.__personalDictionaryHarness.runNodes()'));
   await evaluate('window.__personalDictionaryHarness.prepare()'); await capture('mobile');
   const button = await evaluate('(() => { const r = document.querySelector("[aria-label=返回设置]").getBoundingClientRect(); return { x:r.x+r.width/2,y:r.y+r.height/2 }; })()');
   await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [button] });

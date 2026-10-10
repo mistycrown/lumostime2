@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-10: `useTextDictionary.ts` merges manual words with live node names and aliases for completion/cloud consumers. `usePersonalDictionary.ts` remains the manual-only list for the editor; node changes refresh derived candidates without copying them to preference storage.
+
 Update 2026-10-09: `usePersonalDictionary.ts` exposes stable dictionary snapshots via `useSyncExternalStore`, refreshing settings, completion and clouds on edits, cloud/import restores and cross-window storage events.
 
 Update 2026-10-07: Node category datasets participate in sync change detection and backup restoration. Offline sync tests cover category-only uploads and restored classification references.

@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-10: Note autocomplete, all text clouds and the high-frequency word picker use `useTextDictionary`, including live node names/aliases. The personal dictionary editor continues to display only manually entered words.
+
 Update 2026-10-09: `NoteAutocompleteTextarea` reacts to personal dictionary changes. `ActivityAttributeStatistics` protects personal terms in note, attribute and conditional clouds, and `WordCloudSettingsEditor` uses the same terms for its high-frequency picker. Browser coverage lives in `__tests__/personalDictionaryRendererHarness.tsx`.
 
 Update 2026-10-09: `NoteAutocompleteTextarea` suppresses mobile text inflation for both the native input and ghost layer, preserves fractional widths and text-shaping properties, and refreshes after font loading. The completion action is a borderless `Tab` label on desktop and mobile; the browser regression compares ghost placement to actual native caret pixels.

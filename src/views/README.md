@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-10: The personal dictionary entry uses `BookA`, distinct from the principle library's `BookOpen` icon.
+
 Update 2026-10-09: `SettingsView.tsx` adds the lazy personal dictionary subpage under Content, using the shared settings back navigation.
 
 Update 2026-10-09: `FocusDetailView` uses the shared inline note completion editor, prioritizes the current activity's historical words and preserves buffered note commits on blur/exit.

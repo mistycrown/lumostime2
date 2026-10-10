@@ -1,10 +1,13 @@
 /**
  * @file personalDictionary.ts
- * @input Unknown dictionary data or manually entered words
- * @output Trimmed, case-insensitively deduplicated words with original casing
+ * @updated 2026-10-10: Combines manual words with node names and aliases without persisting derived entries.
+ * @input Unknown dictionary data, manually entered words and node names/aliases
+ * @output Normalized manual or combined words with case-insensitive deduplication and original casing
  * @pos Shared personal dictionary utility
  * @updated 2026-10-09: Adds safe normalization and batch entry parsing.
  */
+import type { NoteNode } from '../types';
+
 export const normalizePersonalDictionary = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
@@ -20,3 +23,11 @@ export const normalizePersonalDictionary = (value: unknown): string[] => {
 
 export const parsePersonalDictionaryInput = (value: string): string[] =>
   normalizePersonalDictionary(value.split(/[,，、;；\r\n]+/));
+
+export const getEffectiveDictionaryWords = (
+  personalWords: readonly string[],
+  nodes: readonly Pick<NoteNode, 'name' | 'aliases'>[]
+): string[] => normalizePersonalDictionary([
+  ...personalWords,
+  ...nodes.flatMap((node) => [node.name, ...(node.aliases || [])])
+]);

@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-10：个人词典浏览器验证还使用真实 DataProvider/NodeProvider 检查节点名称和未使用过的别名参与补全、节点词保留完整分词、改名/别名变更/删除即时刷新，以及节点词不显示或存入手动词典。
+
 2026-10-09：`node scripts/check-personal-dictionary-smoke.mjs` uses an isolated Chrome profile and a verified Microsoft YaHei font to check dictionary entry/search/removal, note completion, actual word clouds and preference restore at desktop/mobile widths. Screenshots and results are saved under `node_modules/.cache/personal-dictionary-smoke`.
 
 2026-10-07：节点渲染验证还覆盖可搜索分类选择器、胶囊布局、通过原生鼠标及触屏事件进行的跨分类拖动、空分类接收、节点/分类排序、取消和重新加载。管理页包含手机与桌面截图。
