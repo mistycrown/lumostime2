@@ -5,6 +5,7 @@
  * @pos Service (Data Synchronization)
  * @description Manages WebDAV connections and file operations, handling platform-specific networking (Cordova HTTP for native, Proxy for web).
  * @updated 2026-08-11: Keeps nested-directory failures explicit for manual WebDAV folder setup and generates safe native download paths.
+ * @updated 2026-10-10: Uses canonical WebDAV paths without cache-busting queries and retains fresh reads through cache-control headers.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -24,6 +25,13 @@ if (typeof window !== 'undefined') {
 const STORAGE_KEY_URL = 'lumos_webdav_url';
 const STORAGE_KEY_USER = 'lumos_webdav_user';
 const STORAGE_KEY_PASS = 'lumos_webdav_pass';
+
+// WebDAV servers may treat query strings as invalid filenames. Keep paths canonical.
+const READ_CACHE_HEADERS = {
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+};
 
 export interface WebDAVConfig {
     url: string;
@@ -278,15 +286,9 @@ export class WebDAVService {
     async statFile(filename: string = 'lumostime_backup.json'): Promise<Date | null> {
         if (!this.client) return null;
         try {
-            // Add cache-busting to force fresh stat
-            const cacheBuster = `?_=${Date.now()}`;
             // @ts-ignore - stat method may not have proper types for headers
-            const stat = await this.client.stat(`/${filename}${cacheBuster}`, {
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
+            const stat = await this.client.stat(`/${filename}`, {
+                headers: { ...READ_CACHE_HEADERS }
             }) as any;
             if (stat && stat.lastmod) {
                 return new Date(stat.lastmod);
@@ -436,9 +438,7 @@ export class WebDAVService {
         if (Capacitor.isNativePlatform() && this.config) {
             console.log(`[WebDAV] Mobile Upload Data: ${filename}, size: ${content.length}`);
             try {
-                const baseUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
-                const url = `${baseUrl}?_=${Date.now()}`;
-                const tempPath = `temp/${filename}.${Date.now()}.json`;
+                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
                 console.log('[WebDAV] Upload URL:', url);
@@ -504,7 +504,8 @@ export class WebDAVService {
                     url: url,
                     directory: Directory.Data,
                     headers: {
-                        'Authorization': `Basic ${auth}`
+                        'Authorization': `Basic ${auth}`,
+                        ...READ_CACHE_HEADERS
                     }
                 });
                 
@@ -538,15 +539,9 @@ export class WebDAVService {
 
         // Browser/Electron: Use webdav client with cache control
         try {
-            // Add cache-busting query parameter and headers to force fresh download
-            const cacheBuster = `?_=${Date.now()}`;
-            const content = await this.client!.getFileContents(`/${filename}${cacheBuster}`, { 
+            const content = await this.client!.getFileContents(`/${filename}`, {
                 format: 'text',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
+                headers: { ...READ_CACHE_HEADERS }
             });
             return JSON.parse(content as string);
         } catch (error) {
@@ -654,7 +649,8 @@ export class WebDAVService {
                     url: url,
                     directory: Directory.Data,
                     headers: {
-                        'Authorization': `Basic ${auth}`
+                        'Authorization': `Basic ${auth}`,
+                        ...READ_CACHE_HEADERS
                     }
                 });
 
@@ -680,15 +676,9 @@ export class WebDAVService {
         
         try {
             console.log(`[WebDAV] 尝试从路径下载: ${path}`);
-            // Add cache-busting to force fresh download
-            const cacheBuster = `?_=${Date.now()}`;
-            const buffer = await this.client.getFileContents(`${path}${cacheBuster}`, { 
+            const buffer = await this.client.getFileContents(path, {
                 format: 'binary',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
+                headers: { ...READ_CACHE_HEADERS }
             });
             console.log(`[WebDAV] ✓ 图片下载成功: ${filename} from ${path}`);
             return buffer as ArrayBuffer;
@@ -717,9 +707,7 @@ export class WebDAVService {
             // NATIVE: Use put method with Uint8Array for WebDAV
             if (Capacitor.isNativePlatform() && this.config) {
                 console.log(`[WebDAV] Mobile Upload Image List: ${filename}, size: ${content.length}`);
-                const baseUrl = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
-                const url = `${baseUrl}?_=${Date.now()}`;
-                const tempPath = `temp/${filename}.${Date.now()}.json`;
+                const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
                 const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
 
                 const encoder = new TextEncoder();
@@ -772,7 +760,8 @@ export class WebDAVService {
                     url: url,
                     directory: Directory.Data,
                     headers: {
-                        'Authorization': `Basic ${auth}`
+                        'Authorization': `Basic ${auth}`,
+                        ...READ_CACHE_HEADERS
                     }
                 });
                 
@@ -799,14 +788,9 @@ export class WebDAVService {
             }
 
             // Browser/Electron fallback with cache control
-            const cacheBuster = `?_=${Date.now()}`;
-            const content = await this.client!.getFileContents(`/${filename}${cacheBuster}`, { 
+            const content = await this.client!.getFileContents(`/${filename}`, {
                 format: 'text',
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0'
-                }
+                headers: { ...READ_CACHE_HEADERS }
             });
             const data = JSON.parse(content as string);
             console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
