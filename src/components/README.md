@@ -8,6 +8,8 @@ Update 2026-10-09: `NoteAutocompleteTextarea` reacts to personal dictionary chan
 
 Update 2026-10-09: `NoteAutocompleteTextarea` suppresses mobile text inflation for both the native input and ghost layer, preserves fractional widths and text-shaping properties, and refreshes after font loading. The completion action is a borderless `Tab` label on desktop and mobile; the browser regression compares ghost placement to actual native caret pixels.
 
+Update 2026-10-10: `AddLogModal` places the note input near the visible scroll area's top for Total Time shortcuts and automatic focus, and realigns it after keyboard viewport resizing.
+
 Update 2026-10-09: `NoteAutocompleteTextarea` adds one history-based inline ghost suggestion to record notes. Tab or the touch button accepts it, Esc dismisses it, and IME composition suppresses it. Text, caret/ref, scrolling and buffered blur commits stay native; `AddLogModal` and `ModalManager` supply history and activity context.
 
 Update 2026-10-09: `ActivityAttributeStatistics` exposes settings on each attribute/note word cloud and inside the card editor. `WordCloudSettingsEditor` supports manual phrase/stop-word entry, ordered high-frequency selection, removal, and immediate per-card persistence; conditional text slices share their parent card's rules.

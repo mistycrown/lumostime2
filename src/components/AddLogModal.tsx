@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-10: Aligns note shortcuts near the visible scroll area's top and corrects their position after keyboard viewport changes.
  * @updated 2026-10-09: Adds single inline history-based note completion with Tab and touch acceptance.
  * @updated 2026-10-07: Adds a selection/caret-preserving node bracket shortcut beside the Note heading.
  * @updated 2026-10-07: Adds contextual guidance for node links, the node directory, and common node workflows.
@@ -25,7 +26,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2, Scissors } from 'lucide-react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -204,11 +205,59 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // Refs
   const sliderRef = useRef<HTMLDivElement>(null);
   const noteRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const noteBracketCaretRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const endHourInputRef = useRef<HTMLInputElement>(null);
   const startMinuteInputRef = useRef<HTMLInputElement>(null);
   const endMinuteInputRef = useRef<HTMLInputElement>(null);
+
+  const scrollNoteIntoView = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const noteElement = noteRef.current;
+    const container = scrollContainerRef.current;
+    if (!noteElement || !container || document.activeElement !== noteElement) return;
+
+    const visibleTop = Math.max(container.getBoundingClientRect().top, window.visualViewport?.offsetTop ?? 0);
+    container.scrollTo({
+      top: container.scrollTop + noteElement.getBoundingClientRect().top - visibleTop - 24,
+      behavior
+    });
+  }, []);
+
+  const focusNoteInput = useCallback(() => {
+    const noteElement = noteRef.current;
+    if (!noteElement) return;
+    noteElement.focus({ preventScroll: true });
+    const noteLength = noteElement.value.length;
+    noteElement.setSelectionRange(noteLength, noteLength);
+    scrollNoteIntoView();
+  }, [scrollNoteIntoView]);
+
+  useEffect(() => {
+    const noteElement = noteRef.current;
+    if (!noteElement) return;
+    const viewport = window.visualViewport;
+    let timer: number | undefined;
+    const cancelScroll = () => window.clearTimeout(timer);
+    const scheduleScroll = (delay: number) => {
+      cancelScroll();
+      if (document.activeElement !== noteElement) return;
+      timer = window.setTimeout(() => scrollNoteIntoView('auto'), delay);
+    };
+    const handleFocus = () => scheduleScroll(350);
+    const handleResize = () => scheduleScroll(100);
+    noteElement.addEventListener('focus', handleFocus);
+    noteElement.addEventListener('blur', cancelScroll);
+    viewport?.addEventListener('resize', handleResize);
+    window.addEventListener('resize', handleResize);
+    return () => {
+      cancelScroll();
+      noteElement.removeEventListener('focus', handleFocus);
+      noteElement.removeEventListener('blur', cancelScroll);
+      viewport?.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [scrollNoteIntoView]);
 
   useLayoutEffect(() => {
     const caret = noteBracketCaretRef.current;
@@ -237,12 +286,10 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   // Auto-focus note on new log
   useEffect(() => {
     if (!initialLog && noteRef.current && autoFocusNote) {
-      setTimeout(() => {
-        noteRef.current?.focus();
-        noteRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 400);
+      const timer = window.setTimeout(focusNoteInput, 400);
+      return () => window.clearTimeout(timer);
     }
-  }, [initialLog, autoFocusNote]);
+  }, [initialLog, autoFocusNote, focusNoteInput]);
 
   useEffect(() => {
     if (!canUseManualProgressIncrement && formState.progressIncrement !== 0) {
@@ -364,17 +411,6 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     if (type === 'start') {
       focusTimeInput(endHourInputRef);
     }
-  };
-
-  const focusNoteInput = () => {
-    window.setTimeout(() => {
-      const noteElement = noteRef.current;
-      if (!noteElement) return;
-      noteElement.focus();
-      const noteLength = noteElement.value.length;
-      noteElement.setSelectionRange(noteLength, noteLength);
-      noteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 0);
   };
 
   const handleInsertNodeBrackets = () => {
@@ -770,7 +806,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 no-scrollbar pb-60">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-8 no-scrollbar pb-60">
 
           {/* Time Input & Slider */}
           <div className="space-y-6">
