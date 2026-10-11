@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.test.tsx
+ * @updated 2026-10-11: Supplies the shared single-date selection callback.
  * @input TodoQuickActionsModal props
  * @output Regression coverage for quick category move visibility and Maybe-date summary rendering in the shared todo quick-actions sheet
  * @pos Test
@@ -40,6 +41,7 @@ const baseProps = {
   isOpen: true,
   todoCategories,
   onMoveDate: vi.fn(),
+  onSelectDate: vi.fn(),
   onClearDate: vi.fn(),
   onOpenDetail: vi.fn(),
   onComplete: vi.fn(),

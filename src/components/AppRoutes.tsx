@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-11: Wires arrange/due date selection for route-level todo quick actions.
  * @updated 2026-08-28: Refreshes daily-check auto states whenever logs or filter context changes.
  * @input Application view state, shared data contexts, and route-level handlers
  * @output Active page view rendering for the main application shell
@@ -430,6 +431,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         openQuickActions,
         closeQuickActions,
         handleQuickActionMove,
+        handleQuickActionSelectDate,
         handleQuickActionOpenDetail,
         handleQuickActionComplete,
         handleQuickActionUndoComplete,
@@ -938,6 +940,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todo={quickActionTodo}
                     todoCategories={getRealTodoCategories(todoCategories)}
                     onMoveDate={handleQuickActionMove}
+                    onSelectDate={handleQuickActionSelectDate}
                     onClearDate={handleQuickActionClearDate}
                     onOpenDetail={handleQuickActionOpenDetail}
                     onComplete={handleQuickActionComplete}

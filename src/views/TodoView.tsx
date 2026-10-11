@@ -1,5 +1,6 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-11: Wires arrange/due date selection into the shared quick-actions sheet.
  * @updated 2026-10-04: Wires searchable main-task association into shared todo quick actions.
  * @updated 2026-07-21: Kept week-view date columns transparent in dark mode.
  * @updated 2026-07-22: Preserved custom background images behind readable dark-mode page overlays.
@@ -1131,6 +1132,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     openQuickActions,
     closeQuickActions,
     handleQuickActionMove,
+    handleQuickActionSelectDate,
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
@@ -2245,6 +2247,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       todos={todos}
       todoCategories={standardTodoCategories}
       onMoveDate={handleQuickActionMove}
+      onSelectDate={handleQuickActionSelectDate}
       onClearDate={handleQuickActionClearDate}
       onOpenDetail={handleQuickActionOpenDetail}
       onComplete={handleQuickActionComplete}

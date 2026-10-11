@@ -1,5 +1,6 @@
 /**
  * @file todoParentLinkHarness.tsx
+ * @updated 2026-10-11: Supplies the arrange/due date selection callback in the renderer fixture.
  * @input Real quick-actions sheet, picker and save hook in an isolated renderer
  * @output Interaction regression results and narrow-screen capture checkpoints
  * @pos Test (Renderer)
@@ -32,7 +33,7 @@ const Probe = () => {
   actions = useTodoQuickActions({ todos, onSaveTodo: (todo) => saves.push(todo), onEditTodo: noop, onDeleteTodo: noop });
   return <TodoQuickActionsModal
     isOpen={Boolean(actions.quickActionTodo)} todo={actions.quickActionTodo} todos={todos} todoCategories={categories}
-    onMoveDate={noop} onClearDate={noop} onOpenDetail={noop} onComplete={noop} onUndoComplete={noop}
+    onMoveDate={noop} onSelectDate={noop} onClearDate={noop} onOpenDetail={noop} onComplete={noop} onUndoComplete={noop}
     onTogglePin={noop} onDuplicate={noop} onEditMaybeDates={noop} onSkipNextRecurrence={noop}
     onSkipToMaybeDate={noop} onMoveCategory={noop} onDelete={noop} onClose={actions.closeQuickActions}
     onForceClose={() => actions.closeQuickActions(true)} onLinkParent={actions.handleQuickActionLinkParent}

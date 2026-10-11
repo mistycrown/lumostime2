@@ -3,6 +3,7 @@
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
+ * @updated 2026-10-11: Opens the shared single-date picker from arrange/due headers, including for quick todos.
  * @updated 2026-10-04: Captures the quick-actions sheet height when opening the fixed-height main-task picker.
  * @updated 2026-10-04: Adds a main-task association shortcut beside duplicate with category and search selection.
  * @description A reusable bottom sheet that exposes lightweight todo planning and completion actions without opening the full todo detail editor first.
@@ -58,6 +59,7 @@ interface TodoQuickActionsModalProps {
   todos?: TodoItem[];
   onLinkParent?: (parentTodoId: string) => void;
   onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => void;
+  onSelectDate: (type: 'scheduled' | 'deadline', dateKey: string) => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
   onComplete: () => void;
@@ -85,6 +87,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   todos = [],
   onLinkParent,
   onMoveDate,
+  onSelectDate,
   onClearDate,
   onOpenDetail,
   onComplete,
@@ -109,6 +112,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const [parentPickerHeight, setParentPickerHeight] = useState(0);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
+  const [datePickerType, setDatePickerType] = useState<'scheduled' | 'deadline' | null>(null);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
@@ -125,6 +129,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     setIsParentPickerOpen(false);
     setCategoryPickerMode(null);
     setIsMaybePickerOpen(false);
+    setDatePickerType(null);
     setIsSkipToPickerOpen(false);
     setIsEditingTitle(false);
     setEditedTitle(todo?.title || '');
@@ -146,6 +151,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       if (isMaybePickerOpen) {
         setIsMaybePickerOpen(false);
+        return true;
+      }
+
+      if (datePickerType) {
+        setDatePickerType(null);
         return true;
       }
 
@@ -193,7 +203,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, datePickerType, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -450,6 +460,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       return;
     }
 
+    if (datePickerType) {
+      setDatePickerType(null);
+      return;
+    }
+
     if (isSkipToPickerOpen) {
       setIsSkipToPickerOpen(false);
       return;
@@ -550,10 +565,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           <div className="space-y-2">
             <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
-                <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                <button
+                  type="button"
+                  onClick={withActionGuard(() => setDatePickerType('scheduled'))}
+                  className="flex w-full items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                >
                   <CalendarDays size={12} className="text-stone-400" />
                   <span>安排到</span>
-                </div>
+                </button>
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
@@ -580,10 +599,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
-                <div className="flex items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400">
+                <button
+                  type="button"
+                  onClick={withActionGuard(() => setDatePickerType('deadline'))}
+                  className="flex w-full items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                >
                   <Flag size={12} className="text-stone-400" />
                   <span>截止到</span>
-                </div>
+                </button>
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
@@ -810,6 +833,19 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
           onClose={() => setIsParentPickerOpen(false)}
         />
       )}
+
+      <TodoDatePickerModal
+        isOpen={datePickerType !== null}
+        title={datePickerType === 'scheduled' ? '选择安排日期' : '选择截止日期'}
+        value={datePickerType === 'scheduled' ? todo.scheduledDate : todo.deadlineDate}
+        onSelect={(dateKey) => {
+          if (datePickerType) onSelectDate(datePickerType, dateKey);
+        }}
+        onClear={() => {
+          if (datePickerType) onClearDate(datePickerType);
+        }}
+        onClose={() => setDatePickerType(null)}
+      />
 
       <TodoDatePickerModal
         isOpen={isMaybePickerOpen}

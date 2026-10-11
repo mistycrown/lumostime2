@@ -3,6 +3,7 @@
  * @input Todo save/edit callbacks from TodoView
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
+ * @updated 2026-10-11: Saves arbitrary arrange/due dates selected directly from the quick-actions sheet.
  * @updated 2026-10-04: Associates existing tasks with validated main tasks through the shared save pipeline.
  * @description Centralizes todo quick-actions sheet state so multiple entry points can open the same modal without duplicating move/complete/detail logic inside the view.
  * @updated 2026-06-13: Added handleQuickActionUpdateTitle to support updating todo title directly from the quick actions modal on blur.
@@ -107,6 +108,17 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     setQuickActionTodo(null);
   };
 
+  const handleQuickActionSelectDate = (type: 'scheduled' | 'deadline', dateKey: string) => {
+    if (!quickActionTodo) return;
+
+    onSaveTodo({
+      ...quickActionTodo,
+      scheduledDate: type === 'scheduled' ? dateKey : quickActionTodo.scheduledDate,
+      deadlineDate: type === 'deadline' ? dateKey : quickActionTodo.deadlineDate
+    });
+    closeQuickActions(true);
+  };
+
   const handleQuickActionMove = (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => {
     if (!quickActionTodo) return;
 
@@ -127,13 +139,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
       targetDate.setDate(targetDate.getDate() + 7);
     }
 
-    const dateKey = formatDateKey(targetDate);
-    onSaveTodo({
-      ...quickActionTodo,
-      scheduledDate: type === 'scheduled' ? dateKey : quickActionTodo.scheduledDate,
-      deadlineDate: type === 'deadline' ? dateKey : quickActionTodo.deadlineDate
-    });
-    closeQuickActions(true);
+    handleQuickActionSelectDate(type, formatDateKey(targetDate));
   };
 
   const handleQuickActionOpenDetail = () => {
@@ -300,6 +306,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     openQuickActions,
     closeQuickActions,
     handleQuickActionMove,
+    handleQuickActionSelectDate,
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
