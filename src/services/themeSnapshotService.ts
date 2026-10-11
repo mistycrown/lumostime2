@@ -1,5 +1,6 @@
 /**
  * @file themeSnapshotService.ts
+ * @updated 2026-10-11: Saved theme snapshots retain original assets without thumbnail dependencies.
  * @input Current appearance storage and saved theme snapshots
  * @output Complete local theme snapshots, application, default fallback, and snapshot image references
  * @pos Service (Theme Management)
@@ -225,7 +226,6 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
   const add = (filename: unknown) => {
     if (typeof filename !== 'string' || !filename.trim()) return;
     references.add(filename);
-    references.add(`thumb_${filename}`);
   };
   const parse = (key: string): unknown => {
     try {
@@ -239,7 +239,6 @@ export const getThemeSnapshotImageReferences = (snapshot: ThemeSettingsSnapshot 
     if (!Array.isArray(list)) return;
     list.forEach((item) => {
       add(item?.imageFilename);
-      add(item?.thumbnailFilename);
       if (Array.isArray(item?.stageFilenames)) item.stageFilenames.forEach(add);
     });
   };

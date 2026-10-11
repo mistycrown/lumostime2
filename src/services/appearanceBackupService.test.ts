@@ -1,5 +1,6 @@
 /**
  * @file appearanceBackupService.test.ts
+ * @updated 2026-10-11: Verifies theme sync uses originals even when old thumbnails still exist locally.
  * @input Modern navigation settings and appearance backup snapshots
  * @output Regression coverage for navigation backup, image references, and restore hydration
  * @pos Test (Cloud Sync)
@@ -119,7 +120,7 @@ describe('modern navigation appearance sync', () => {
 
   it('collects destination image references from the backup without local navigation settings', () => {
     expect(appearanceBackupService.getReferencedImageFilenames({ version: 1, storage: navigationStorage })).toEqual([
-      'navigation.webp', 'thumb_navigation.webp'
+      'navigation.webp'
     ]);
     expect(localStorage.getItem('navigation_new_background_custom_list')).toBeNull();
   });
@@ -165,8 +166,8 @@ describe('modern navigation appearance sync', () => {
       uploadImageList: vi.fn(async (next: ImageManifestGroups) => { groups = next; return true; }),
       downloadImageList: vi.fn(async () => ({ groups, images: [...groups.content, ...groups.theme], timestamp: 1 }))
     };
-    const filenames = ['navigation.webp', 'thumb_navigation.webp'];
-    const listImages = vi.spyOn(imageService, 'listImages').mockResolvedValue(filenames);
+    const filenames = ['navigation.webp'];
+    const listImages = vi.spyOn(imageService, 'listImages').mockResolvedValue([...filenames, 'thumb_navigation.webp']);
     vi.spyOn(imageService, 'readImage').mockResolvedValue(new Uint8Array([1, 2, 3]).buffer);
     const payload = {
       logs: [], todos: [], categories: [{ id: 'cat-1', name: 'Category', activities: [] }], timestamp: 1,
@@ -175,7 +176,7 @@ describe('modern navigation appearance sync', () => {
     const service = cloud as unknown as CloudService;
     const upload = await uploadDataToCloud(service, payload);
     expect(upload.success).toBe(true);
-    expect(upload.imageStats?.uploaded).toBe(2);
+    expect(upload.imageStats?.uploaded).toBe(1);
     expect(groups).toEqual({ content: [], theme: filenames });
     expect([...images.keys()].sort()).toEqual(filenames);
 
@@ -184,7 +185,7 @@ describe('modern navigation appearance sync', () => {
     const writeImage = vi.spyOn(imageService, 'writeImage').mockResolvedValue(undefined);
     const download = await downloadWithBackup(service, { logs: [], todos: [], categories: payload.categories, timestamp: 2 });
     expect(download.success).toBe(true);
-    expect(download.imageStats?.downloaded).toBe(2);
+    expect(download.imageStats?.downloaded).toBe(1);
     expect(writeImage.mock.calls.map(([filename]) => filename).sort()).toEqual(filenames);
     expect(download.data.appearanceData.storage).toMatchObject(syncedNavigationStorage);
     expect(download.data.appearanceData.storage).not.toHaveProperty('navigation_new_background_settings');

@@ -1,5 +1,6 @@
 /**
  * @file IconRenderer.tsx
+ * @updated 2026-10-11: Displays managed theme icons and stickers from their original files.
  * @description 通用图标渲染组件 - 支持双图标系统（emoji + uiIcon）
  * @updated 2026-08-06: Added an explicit UI-icon precedence option for scene time-slot rendering while preserving emoji fallback data.
  * @updated 2026-10-05: Refreshes loaded icons and clears failed-image state on theme or asset changes.
@@ -98,7 +99,7 @@ export const IconRenderer: React.FC<IconRendererProps> = ({
             };
         }
 
-        imageService.getImageUrl(customImagePath, 'thumbnail')
+        imageService.getImageUrl(customImagePath, 'original')
             .then((src) => {
                 if (!disposed) {
                     setResolvedManagedImageSrc(src || null);

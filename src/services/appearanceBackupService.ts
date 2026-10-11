@@ -1,5 +1,6 @@
 /**
  * @file appearanceBackupService.ts
+ * @updated 2026-10-11: Includes theme originals without generated thumbnail references.
  * @input Theme, background, navigation, TimePal, font, and style preferences from localStorage
  * @output Versioned appearance backup payloads, restore helpers, and referenced theme image filenames
  * @pos Service (Backup and Sync)
@@ -135,12 +136,9 @@ const normalizeStorageForRestore = (snapshot: AppearanceStorage): AppearanceStor
   return next;
 };
 
-const addImageReference = (set: Set<string>, value: unknown, includeThumbnail = true): void => {
+const addImageReference = (set: Set<string>, value: unknown): void => {
   if (typeof value === 'string' && value.trim()) {
     set.add(value.trim());
-    if (includeThumbnail) {
-      set.add(`thumb_${value.trim()}`);
-    }
   }
 };
 
@@ -163,7 +161,7 @@ const collectImageReferencesFromSnapshot = (snapshot: AppearanceStorage): string
   if (Array.isArray(customTimePalItems)) {
     customTimePalItems.forEach((item) => {
       if (Array.isArray(item?.stageFilenames)) {
-        item.stageFilenames.forEach((filename: unknown) => addImageReference(referenced, filename, false));
+        item.stageFilenames.forEach((filename: unknown) => addImageReference(referenced, filename));
       }
     });
   }

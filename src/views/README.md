@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-11: Custom sticker uploads in `SponsorshipView` use the original image file for previews, matching original-only theme storage and synchronization.
+
 Update 2026-10-11: Daily, weekly and monthly review guide answers receive full log history for the shared note-style inline autocomplete, alongside personal dictionary words and node names/aliases.
 
 Update 2026-10-11: `StatsView.tsx` keeps daily-check scrolling within its selected range, skips unrelated log statistics and hidden activity matrices, and reuses six recent check ranges until reviews or templates change. Other views track gestures with refs and ignore vertical/canceled swipes.

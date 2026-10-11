@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-11: Theme images are saved, referenced, and synchronized as originals only. Legacy theme thumbnails are excluded from manifests; sticker metadata and saved snapshots use original files. Content photos and todo covers retain thumbnail support.
+
 Update 2026-10-11: WebDAV requests share a serialized queue; Nutstore requests start at least 3.1 seconds apart. HTTP 429/503 triggers a shared cooldown (respecting Retry-After), and unavailable image inventories stop the upload rather than triggering more transfers. Native HTTP/filesystem and Web/Electron clients use the same queue.
 
 Update 2026-10-11: `syncService.ts` deletes only known cloud images absent from the current backup references, skips old deletion records for absent or restored images, and retains failed deletions for retries. `webdavService.ts` treats DELETE 404 as an already completed deletion.

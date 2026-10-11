@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-11: `CardBackgroundSelector` and managed images in `IconRenderer` load original theme assets directly, without thumbnail file dependencies.
+
 Update 2026-10-11: `NodeTextEditor` reuses `NoteAutocompleteTextarea` for guide answers, preserving node shortcuts, inline ghost suggestions, Tab/touch acceptance and IME protection. `ReviewGuideTab` forwards full log history from daily, weekly and monthly views.
 
 Update 2026-10-11: `stats/CheckView.tsx` memoizes rendering, shares one annual week layout across habits and defers offscreen card layout. `__tests__/checkStatsRendererHarness.tsx` covers native mobile scrolling, year arrows, fresh cached totals and week/month/desktop layouts.

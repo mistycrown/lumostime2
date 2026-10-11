@@ -1,5 +1,6 @@
 /**
  * @file settingsImageReferenceService.test.ts
+ * @updated 2026-10-11: Verifies original-only settings references across theme image categories.
  * @input Persisted settings image filenames
  * @output Regression coverage for settings image references used by sync and cleanup
  * @pos Test (Image Management)
@@ -91,14 +92,10 @@ describe('getSettingsReferencedImages', () => {
       'custom-mood-calendar-fill.png',
       'custom-navigation-icon.webp',
       'custom-navigation.png',
-      'thumb_custom-background.png',
-      'thumb_custom-mood-calendar-fill.png',
-      'thumb_custom-navigation-icon.webp',
-      'thumb_custom-navigation.png'
     ]);
   });
 
-  it('keeps imported theme package images and thumbnails protected', () => {
+  it('keeps imported theme package originals protected', () => {
     localStorage.setItem('lumostime_theme_packages_v1', JSON.stringify([
       {
         imageAssets: {
@@ -111,8 +108,6 @@ describe('getSettingsReferencedImages', () => {
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'theme-background.webp',
       'theme-sticker.webp',
-      'thumb_theme-background.webp',
-      'thumb_theme-sticker.webp'
     ]);
   });
 
@@ -127,13 +122,11 @@ describe('getSettingsReferencedImages', () => {
 
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'modern-navigation.png',
-      'thumb_modern-navigation.png',
-      'thumb_unused-navigation.webp',
       'unused-navigation.webp'
     ]);
   });
 
-  it('keeps named custom achievement icon-pack images and thumbnails protected', () => {
+  it('keeps named custom achievement icon-pack originals protected', () => {
     localStorage.setItem('lumostime_achievement_bottle_custom_icon_packs_v1', JSON.stringify({
       'custom-comet': {
         name: 'Comet Pack',
@@ -144,12 +137,10 @@ describe('getSettingsReferencedImages', () => {
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'frame-1.png',
       'frame-2.webp',
-      'thumb_frame-1.png',
-      'thumb_frame-2.webp'
     ]);
   });
 
-  it('keeps custom card-background group images and thumbnails', () => {
+  it('keeps custom card-background group originals', () => {
     localStorage.setItem('lumostime_card_background_groups_v1', JSON.stringify([
       { imageFilenames: ['card-background-1.webp', 'card-background-2.png'] }
     ]));
@@ -157,8 +148,6 @@ describe('getSettingsReferencedImages', () => {
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'card-background-1.webp',
       'card-background-2.png',
-      'thumb_card-background-1.webp',
-      'thumb_card-background-2.png'
     ]);
   });
 
@@ -169,7 +158,6 @@ describe('getSettingsReferencedImages', () => {
 
     expect(Array.from(getSettingsReferencedImages()).sort()).toEqual([
       'legacy-frame.png',
-      'thumb_legacy-frame.png'
     ]);
   });
 });

@@ -3,6 +3,7 @@
  * @input local custom sticker metadata, daily reviews
  * @output helper functions for custom sticker sets and protected image filenames
  * @description Centralizes custom sticker metadata parsing, slot normalization, and image reference calculation for picker rendering, sync manifests, and image cleanup.
+ * @updated 2026-10-11: Uses original sticker assets for picker thumbnails and protects only originals during sync and cleanup.
  * @updated 2026-04-19: Added slot index metadata, normalization for legacy custom sticker state, and optional empty-set inclusion for the sticker set editor.
  * @updated 2026-10-02: Separates tag sticker groups from the general mood sticker picker while preserving shared assets.
  * @updated 2026-10-04: Includes resources from every imported theme without requiring theme application.
@@ -96,7 +97,7 @@ export const normalizeCustomStickerState = (
     list.push({
       ...sticker,
       status: 'active',
-      thumbnailFilename: sticker.thumbnailFilename || `thumb_${sticker.imageFilename}`
+      thumbnailFilename: sticker.imageFilename
     });
     stickersBySetId.set(sticker.setId, list);
   });
@@ -169,7 +170,7 @@ export const buildThemePackageStickerState = (record: ImportedThemePackageRecord
       if (!imageFilename) return [];
       return [{
         id: `theme:${record.id}:sticker-${setKey}-${String(item.id || itemIndex)}`,
-        setId, imageFilename, thumbnailFilename: `thumb_${imageFilename}`,
+        setId, imageFilename, thumbnailFilename: imageFilename,
         label: typeof item.name === 'string' ? item.name : undefined,
         sortOrder: itemIndex, status: 'active' as const, createdAt: timestamp, updatedAt: timestamp
       }];
@@ -235,7 +236,7 @@ export const buildCustomStickerViewSets = (
           id: sticker.id,
           path: sticker.imageFilename,
           label: sticker.label,
-          thumbnail: sticker.thumbnailFilename,
+          thumbnail: sticker.imageFilename,
           slotIndex: sticker.sortOrder
         }));
 
@@ -268,11 +269,6 @@ export const collectCustomStickerReferencedImages = (
 
     if (sticker.status === 'active' && activeSetIds.has(sticker.setId)) {
       referencedImages.add(sticker.imageFilename);
-      if (sticker.thumbnailFilename) {
-        referencedImages.add(sticker.thumbnailFilename);
-      } else {
-        referencedImages.add(`thumb_${sticker.imageFilename}`);
-      }
     }
   });
 
@@ -289,11 +285,6 @@ export const collectCustomStickerReferencedImages = (
     }
 
     referencedImages.add(sticker.imageFilename);
-    if (sticker.thumbnailFilename) {
-      referencedImages.add(sticker.thumbnailFilename);
-    } else {
-      referencedImages.add(`thumb_${sticker.imageFilename}`);
-    }
   });
 
   return referencedImages;

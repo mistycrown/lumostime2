@@ -1,5 +1,6 @@
 /**
  * @file CardBackgroundSelector.tsx
+ * @updated 2026-10-11: Loads card-background previews directly from original theme images.
  * @input User card-background groups, uploaded images, alignment and opacity controls
  * @output Selected synchronized card backgrounds and group management actions
  * @pos Component (Sponsorship Personalization)
@@ -69,7 +70,7 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
     setOpacity(cardBackgroundService.getOpacity());
     const nextUrls: Record<string, string> = {};
     await Promise.all(nextGroups.map(async (group) => {
-      const url = await imageService.getImageUrl(group.imageFilenames[0], 'thumbnail').catch((error) => {
+      const url = await imageService.getImageUrl(group.imageFilenames[0], 'original').catch((error) => {
         console.warn('[CardBackgroundSelector] Failed to load group preview', group.id, error);
         return '';
       });
@@ -134,7 +135,7 @@ export const CardBackgroundSelector: React.FC<CardBackgroundSelectorProps> = ({ 
     setIsModalOpen(true);
     const urls: Record<string, string> = {};
     await Promise.all(group.imageFilenames.map(async (filename) => {
-      const url = await imageService.getImageUrl(filename, 'thumbnail').catch((error) => {
+      const url = await imageService.getImageUrl(filename, 'original').catch((error) => {
         console.warn('[CardBackgroundSelector] Failed to load editor image', filename, error);
         return '';
       });

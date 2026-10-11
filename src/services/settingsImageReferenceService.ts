@@ -4,6 +4,7 @@
  * @output Referenced image filenames used by settings features
  * @pos Service (Image Management)
  * @description Collects persisted settings-level image filenames so cleanup and sync manifest rebuild can keep user-owned assets.
+ * @updated 2026-10-11: Protects original theme resources only, including legacy stickers and saved snapshots.
  * @updated 2026-10-04: Protects modern navigation background images and thumbnails during sync and cleanup.
  * @updated 2026-09-25: Included active custom sticker assets and custom navigation icon assets so legacy flat manifests can be migrated into the theme group.
  * @updated 2026-09-26: Protects custom Memoir mood-calendar background images from cleanup.
@@ -53,7 +54,6 @@ interface StoredImageAsset {
 
 interface StoredCustomSticker {
   imageFilename?: unknown;
-  thumbnailFilename?: unknown;
   status?: unknown;
 }
 
@@ -111,14 +111,12 @@ export const getSettingsReferencedImages = (): Set<string> => {
 
   if (isValidFilename(floatingButtonBackground)) {
     referencedImages.add(floatingButtonBackground);
-    referencedImages.add(`thumb_${floatingButtonBackground}`);
   }
   const floatingButtonSchemes = readRawJson<Array<{ imageFilename?: unknown }>>(FLOATING_BUTTON_BACKGROUND_SCHEMES_KEY, []);
   if (Array.isArray(floatingButtonSchemes)) {
     floatingButtonSchemes.forEach((scheme) => {
       if (!isValidFilename(scheme?.imageFilename)) return;
       referencedImages.add(scheme.imageFilename);
-      referencedImages.add(`thumb_${scheme.imageFilename}`);
     });
   }
 
@@ -142,7 +140,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
       group.imageFilenames.forEach((filename) => {
         if (isValidFilename(filename)) {
           referencedImages.add(filename);
-          referencedImages.add(`thumb_${filename}`);
         }
       });
     });
@@ -163,14 +160,12 @@ export const getSettingsReferencedImages = (): Set<string> => {
   [...customBackgrounds, ...customNavigationDecorations, ...customNavigationBackgrounds, ...customMoodCalendarFillBackgrounds].forEach((asset) => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
-      referencedImages.add(`thumb_${asset.imageFilename}`);
     }
   });
 
   customNavigationIcons.forEach((asset) => {
     if (isValidFilename(asset?.imageFilename)) {
       referencedImages.add(asset.imageFilename);
-      referencedImages.add(`thumb_${asset.imageFilename}`);
     }
   });
 
@@ -179,11 +174,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
       return;
     }
     referencedImages.add(sticker.imageFilename);
-    referencedImages.add(
-      isValidFilename(sticker.thumbnailFilename)
-        ? sticker.thumbnailFilename
-        : `thumb_${sticker.imageFilename}`
-    );
   });
 
   importedThemePackages.forEach((themePackage) => {
@@ -196,7 +186,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
         return;
       }
       referencedImages.add(filename);
-      referencedImages.add(`thumb_${filename}`);
     });
   });
 
@@ -205,7 +194,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
     Object.values(mapping).forEach((filename) => {
       if (isValidFilename(filename)) {
         referencedImages.add(filename);
-        referencedImages.add(`thumb_${filename}`);
       }
     });
   });
@@ -220,7 +208,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
     filenames.forEach((filename) => {
       if (isValidFilename(filename)) {
         referencedImages.add(filename);
-        referencedImages.add(`thumb_${filename}`);
       }
     });
   });
@@ -249,9 +236,7 @@ export const getSettingsReferencedImages = (): Set<string> => {
         value.forEach((item) => {
           if (isValidFilename(item?.imageFilename)) {
             referencedImages.add(item.imageFilename);
-            referencedImages.add(`thumb_${item.imageFilename}`);
           }
-          if (isValidFilename(item?.thumbnailFilename)) referencedImages.add(item.thumbnailFilename);
           if (Array.isArray(item?.stageFilenames)) {
             item.stageFilenames.forEach((filename: unknown) => {
               if (isValidFilename(filename)) referencedImages.add(filename);
@@ -263,7 +248,6 @@ export const getSettingsReferencedImages = (): Set<string> => {
       const collect = (candidate: unknown) => {
         if (typeof candidate === 'string' && isValidFilename(candidate)) {
           referencedImages.add(candidate);
-          referencedImages.add(`thumb_${candidate}`);
         } else if (Array.isArray(candidate)) {
           candidate.forEach(collect);
         } else if (candidate && typeof candidate === 'object') {

@@ -1,5 +1,6 @@
 /**
  * @file themePackageImportService.ts
+ * @updated 2026-10-11: Imported sticker previews reference the original image file.
  * @input Valid LumoTime theme ZIP files
  * @output Persisted theme package metadata, synchronized image resources, and local-only font resources
  * @pos Service (Theme Package Import)
@@ -374,7 +375,7 @@ const migratePackageStickers = async (
       return [{
         ...rawSticker,
         imageFilename,
-        thumbnailFilename: `thumb_${imageFilename}`,
+        thumbnailFilename: imageFilename,
         updatedAt: now
       }];
     });

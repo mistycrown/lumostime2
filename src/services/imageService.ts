@@ -5,6 +5,7 @@
  * @pos Service (Local Storage)
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
+ * @updated 2026-10-11: Saves theme assets without thumbnails and migrates legacy theme references to originals only.
  * @updated 2026-09-25: Split local image manifests into content and theme groups, and added explicit group-aware registration for uploads and cleanup.
  * @updated 2026-05-05: Reused settings-level protected image references during manifest rebuild so AI assistant avatars participate in cleanup protection and sync.
  * @updated 2026-08-10: Supports original-only image-list registration for TimePal stage images that have no thumbnail files.
@@ -124,26 +125,20 @@ class ImageService {
             throw new Error(`Failed to save original image: ${e.message}`);
         }
 
-        // 2. Generate & Save Thumbnail (Best effort)
-        try {
-            // console.log(`[ImageService] 开始生成缩略图: thumb_${filename}`);
-            const thumbBlob = await this.generateThumbnail(file, mimeType);
-            // console.log(`[ImageService] 缩略图生成成功，大小: ${thumbBlob.size} bytes`);
-
-            await this.writeImage(`thumb_${filename}`, thumbBlob);
-            // console.log(`[ImageService] ✓ 缩略图保存成功: thumb_${filename}`);
-
-            // 验证缩略图是否存在
-            const thumbExists = await this.checkFileExists(`thumb_${filename}`);
-            // console.log(`[ImageService] 缩略图存在性验证: thumb_${filename} -> ${thumbExists}`);
-        } catch (e) {
-            console.error(`[ImageService] ✗ 缩略图生成/保存失败: thumb_${filename}`, e);
-            // 缩略图失败不影响主流程
+        // Content photos retain thumbnails; theme assets use their originals.
+        if (group === 'content') {
+            try {
+                const thumbBlob = await this.generateThumbnail(file, mimeType);
+                await this.writeImage(`thumb_${filename}`, thumbBlob);
+                await this.checkFileExists(`thumb_${filename}`);
+            } catch (e) {
+                console.error(`[ImageService] ✗ 缩略图生成/保存失败: thumb_${filename}`, e);
+            }
         }
 
         // 3. 添加到引用列表
         // console.log(`[ImageService] 添加到引用列表: ${filename}`);
-        this.addToReferencedList(filename, true, group);
+        this.addToReferencedList(filename, group === 'content', group);
 
         // 4. 触发全局事件通知图片已上传，需要同步
         if (typeof window !== 'undefined') {
@@ -195,15 +190,17 @@ class ImageService {
             throw new Error(`Failed to save original image: ${e.message}`);
         }
 
-        try {
-            const originalBlob = this.base64ToBlob(originalBase64, mimeType);
-            const thumbBlob = await this.generateThumbnail(originalBlob, mimeType);
-            await this.writeImage(`thumb_${filename}`, thumbBlob);
-        } catch (e) {
-            console.error(`[ImageService] ✗ 相机缩略图生成/保存失败: thumb_${filename}`, e);
+        if (group === 'content') {
+            try {
+                const originalBlob = this.base64ToBlob(originalBase64, mimeType);
+                const thumbBlob = await this.generateThumbnail(originalBlob, mimeType);
+                await this.writeImage(`thumb_${filename}`, thumbBlob);
+            } catch (e) {
+                console.error(`[ImageService] ✗ 相机缩略图生成/保存失败: thumb_${filename}`, e);
+            }
         }
 
-        this.addToReferencedList(filename, true, group);
+        this.addToReferencedList(filename, group === 'content', group);
 
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('imageUploaded', {
@@ -832,6 +829,9 @@ class ImageService {
                     }
                     if (themeReferences.has(filename)) {
                         theme.push(filename);
+                    } else if (filename.startsWith('thumb_') && themeReferences.has(filename.substring(6))) {
+                        // Old flat manifests included generated theme thumbnails.
+                        return;
                     } else {
                         content.push(filename);
                     }
@@ -889,7 +889,7 @@ class ImageService {
             }
 
             // 同时添加缩略图
-            if (includeThumbnail) {
+            if (includeThumbnail && group === 'content') {
                 const thumbName = `thumb_${filename}`;
                 if (!list.includes(thumbName)) {
                     list.push(thumbName);

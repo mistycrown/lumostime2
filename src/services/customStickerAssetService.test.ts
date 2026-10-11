@@ -1,8 +1,26 @@
+/**
+ * @file customStickerAssetService.test.ts
+ * @input Legacy sticker metadata and theme sticker images
+ * @output Slot normalization and original-only sticker preview checks
+ * @pos Test (Theme Images)
+ * @updated 2026-10-11: Verifies original assets replace obsolete thumbnail filenames.
+ */
 import { describe, expect, test } from 'vitest';
-import { normalizeCustomStickerState } from './customStickerAssetService';
+import { buildCustomStickerViewSets, collectCustomStickerReferencedImages, normalizeCustomStickerState } from './customStickerAssetService';
 import { CustomStickerRecord, CustomStickerSetRecord } from '../types';
 
 describe('normalizeCustomStickerState', () => {
+  test('legacy sticker previews and references use the original even when metadata names a thumbnail', () => {
+    const sets: CustomStickerSetRecord[] = [{ id: 'set-1', name: 'Stickers', stickerIds: ['s1'], status: 'active', createdAt: 1, updatedAt: 1 }];
+    const stickers: CustomStickerRecord[] = [{
+      id: 's1', setId: 'set-1', imageFilename: 'sticker.webp', thumbnailFilename: 'legacy-small.webp',
+      sortOrder: 0, status: 'active', createdAt: 1, updatedAt: 1
+    }];
+    expect([...collectCustomStickerReferencedImages([], sets, stickers)]).toEqual(['sticker.webp']);
+    expect(buildCustomStickerViewSets(sets, stickers)[0].stickers[0].thumbnail).toBe('sticker.webp');
+    expect(normalizeCustomStickerState(sets, stickers).customStickers[0].thumbnailFilename).toBe('sticker.webp');
+  });
+
   test('reassigns duplicate and out-of-range slot indices into free positions', () => {
     const customStickerSets: CustomStickerSetRecord[] = [
       {
@@ -93,6 +111,6 @@ describe('normalizeCustomStickerState', () => {
     expect(result.customStickerSets[0].stickerIds).toEqual(['s1']);
     expect(result.customStickers).toHaveLength(1);
     expect(result.customStickers[0].status).toBe('active');
-    expect(result.customStickers[0].thumbnailFilename).toBe('thumb_archived.png');
+    expect(result.customStickers[0].thumbnailFilename).toBe('archived.png');
   });
 });

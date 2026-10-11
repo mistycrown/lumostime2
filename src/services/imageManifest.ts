@@ -4,6 +4,7 @@
  * @output Normalized content/theme image groups and cloud manifest payloads
  * @pos Service (Image Management)
  * @description Defines the versioned image manifest format shared by local indexing, cloud sync, and cleanup.
+ * @updated 2026-10-11: Normalizes grouped theme assets to originals only while preserving content thumbnails.
  * @updated 2026-09-25: Added version 2 content/theme image groups with legacy flat-list compatibility.
  */
 
@@ -44,7 +45,7 @@ export const normalizeImageManifestGroups = (value: unknown): ImageManifestGroup
   }
 
   const candidate = value as Partial<ImageManifestGroups>;
-  const theme = normalizeList(candidate.theme);
+  const theme = normalizeList(candidate.theme).filter((filename) => !filename.startsWith('thumb_'));
   const themeSet = new Set(theme);
 
   return {

@@ -1,5 +1,6 @@
 /**
  * @file themePackageImportService.test.ts
+ * @updated 2026-10-11: Verifies package sticker upgrades use original image filenames for previews.
  * @input Minimal version-two theme package ZIP files
  * @output Regression coverage for package replacement, name conflicts, and resource deletion
  * @pos Test (Theme Package Import)
@@ -419,7 +420,7 @@ describe('themePackageImportService', () => {
       id: stickerId,
       setId,
       imageFilename: 'image-sticker-2.0.0.webp',
-      thumbnailFilename: 'thumb_image-sticker-2.0.0.webp'
+      thumbnailFilename: 'image-sticker-2.0.0.webp'
     }]);
     expect(JSON.parse(localStorage.getItem('lumostime_custom_sticker_sets_v2') || '[]')).toMatchObject([{
       id: setId,

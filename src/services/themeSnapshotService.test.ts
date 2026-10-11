@@ -1,5 +1,6 @@
 /**
  * @file themeSnapshotService.test.ts
+ * @updated 2026-10-11: Verifies legacy snapshot thumbnail metadata does not create image dependencies.
  * @input Current theme settings in local storage
  * @output Regression coverage for complete saved-theme snapshots
  * @pos Test (Theme Management)
@@ -68,6 +69,14 @@ const makeLocalStorage = () => {
 };
 
 describe('themeSettingsSnapshot', () => {
+  it('retains original sticker and background files without snapshot thumbnail references', async () => {
+    const { getThemeSnapshotImageReferences } = await import('./themeSnapshotService');
+    expect(getThemeSnapshotImageReferences({ storage: {
+      lumos_custom_backgrounds: JSON.stringify([{ imageFilename: 'background.webp' }]),
+      lumostime_custom_stickers_v2: JSON.stringify([{ imageFilename: 'sticker.webp', thumbnailFilename: 'thumb_sticker.webp' }])
+    } } as any)).toEqual(['background.webp', 'sticker.webp']);
+  });
+
   afterEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();

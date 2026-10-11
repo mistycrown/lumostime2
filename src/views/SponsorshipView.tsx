@@ -1,5 +1,6 @@
 /**
  * @file SponsorshipView.tsx
+ * @updated 2026-10-11: Stores original image filenames for custom sticker previews.
  * @input onBack (callback), onToast (callback), categories (Category[])
  * @output Navigation (onBack), Toast Messages (onToast), Theme Changes (localStorage, service calls)
  * @pos View
@@ -1223,7 +1224,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                             id: crypto.randomUUID(),
                             setId,
                             imageFilename: filename,
-                            thumbnailFilename: `thumb_${filename}`,
+                            thumbnailFilename: filename,
                             label: image.label,
                             sortOrder: slotIndex,
                             status: 'active',
@@ -1309,7 +1310,7 @@ export const SponsorshipView: React.FC<SponsorshipViewProps> = ({ onBack, onToas
                 id: stickerId,
                 setId: targetSetId,
                 imageFilename: filename,
-                thumbnailFilename: `thumb_${filename}`,
+                thumbnailFilename: filename,
                 label: file.name.replace(/\.[^.]+$/, ''),
                 sortOrder: slotIndex,
                 status: 'active' as const,
