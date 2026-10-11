@@ -5,6 +5,7 @@
  * @pos Service
  * @description Handles one-way image sync for WebDAV, Tencent COS, and compatible S3 storage.
  * @updated 2026-10-11: Skips absent/referenced remote deletions and preserves failed deletion records for retries.
+ * @updated 2026-10-11: Reuses supplied cloud inventories and stops image batches when WebDAV is unavailable.
  * @updated 2026-09-25: Supports grouped content/theme image manifests while preserving flat-list compatibility.
  * @updated 2026-04-19: Added compatible S3 support and allow callers to explicitly choose the target storage service so multiple configured providers do not cross-write images.
  */
@@ -16,6 +17,7 @@ import { compatibleS3Service } from './compatibleS3Service';
 import { imageService } from './imageService';
 import { SYNC_CONFIG } from '../config/syncConfig';
 import { CloudImageManifest, ImageManifestUpload } from './imageManifest';
+import { isWebDAVUnavailable } from './webdavRequestQueue';
 
 export interface SyncResult {
   uploaded: number;
@@ -113,10 +115,11 @@ export const syncService = {
     try {
       onProgress?.('正在初始化图片上传...');
 
-      if (targetService === webdavService) {
+      if (targetService === webdavService && cloudReferencedImages === undefined) {
         try {
           await webdavService.getDirectoryContents('/images');
-        } catch (error) {
+        } catch (error: any) {
+          if (Number(error?.status ?? error?.response?.status) !== 404) throw error;
           const errorMessage = '图片上传失败：云端缺少 /images 目录，请先在 WebDAV 根目录创建该目录。';
           result.errors.push(errorMessage);
           throw new Error(errorMessage);
@@ -155,6 +158,7 @@ export const syncService = {
       const toUpload = Array.from(localSet).filter((filename) => localFileSet.has(filename) && !cloudSet.has(filename));
       const concurrentUploads = SYNC_CONFIG.CONCURRENT_OPERATIONS;
       const batch: Promise<void>[] = [];
+      let serviceUnavailable: unknown;
 
       for (let index = 0; index < toUpload.length; index += 1) {
         const filename = toUpload[index];
@@ -162,13 +166,15 @@ export const syncService = {
           onProgress?.(`正在上传 (${index + 1}/${toUpload.length}): ${filename}...`);
           try {
             const data = await imageService.readImage(filename);
-            await targetService.uploadImage(filename, data as any);
+            const uploaded = await targetService.uploadImage(filename, data as any);
+            if (!uploaded) throw new Error('Storage service rejected the image upload');
             result.uploaded += 1;
             result.uploadedFiles.push(filename);
           } catch (error: any) {
             console.error(`[Sync] Failed to upload image: ${filename}`, error);
             result.errors.push(`Upload failed: ${filename} - ${error?.message || 'unknown error'}`);
             result.failedFiles.push(filename);
+            if (isWebDAVUnavailable(error)) serviceUnavailable = error;
           }
         })();
 
@@ -177,11 +183,13 @@ export const syncService = {
         if (batch.length >= concurrentUploads) {
           await Promise.all(batch);
           batch.length = 0;
+          if (serviceUnavailable) throw serviceUnavailable;
         }
       }
 
       if (batch.length > 0) {
         await Promise.all(batch);
+        if (serviceUnavailable) throw serviceUnavailable;
       }
 
       if (result.failedFiles.length > 0) {
@@ -192,6 +200,7 @@ export const syncService = {
       return result;
     } catch (error: any) {
       console.error('[Sync] Image upload error', error);
+      if (isWebDAVUnavailable(error)) throw error;
       result.errors.push(`Upload error: ${error?.message || 'unknown error'}`);
       return result;
     }

@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-11: `syncUtils.ts` propagates WebDAV HTTP 429/503 when reading cloud image manifests or inventories, stopping uploads before more image requests are sent to unavailable storage.
+
 Update 2026-10-11: `checkStatsUtils.ts` aggregates daily-check reviews in one pass using constant-time date membership and preserves template metadata/count semantics. Its per-view cache retains six recent ranges and invalidates on review/template identity changes.
 
 Update 2026-10-10: `getEffectiveDictionaryWords` combines manual entries with node names/aliases, deduplicating case-insensitively while preserving manual spelling and keeping source arrays unchanged.

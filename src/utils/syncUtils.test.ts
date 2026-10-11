@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.test.ts
  * @updated 2026-10-02: Covers exact-snapshot restores, missing-object classification, and destination identity.
+ * @updated 2026-10-11: Ensures unavailable image inventories stop further uploads.
  * @input Mock cloud services and local sync payloads
  * @output Regression coverage for main-backup upload verification
  * @pos Test
@@ -22,6 +23,8 @@ const { storage } = vi.hoisted(() => {
 });
 
 import { downloadWithBackup, uploadDataToCloud, readCloudSnapshot, getCloudDestinationIdentity } from './syncUtils';
+import { syncService } from '../services/syncService';
+import { imageService } from '../services/imageService';
 
 vi.mock('../services/imageService', () => ({
   imageService: {
@@ -102,6 +105,34 @@ describe('uploadDataToCloud', () => {
     expect(result.success).toBe(true);
     expect(cloud.uploadData).toHaveBeenCalledWith(expect.objectContaining({ timestamp: 10 }), 'lumostime_backup.json');
     expect(cloud.downloadData).toHaveBeenCalledWith('lumostime_backup.json');
+  });
+
+  test.each(['manifest', 'inventory'])('stops when the cloud image %s returns 503', async source => {
+    let uploadedData: any;
+    const cloud = createMockCloudService(vi.fn(async () => uploadedData));
+    cloud.uploadData.mockImplementation(async data => { uploadedData = data; return true; });
+    if (source === 'manifest') cloud.downloadImageList.mockRejectedValue({ status: 503 });
+    else cloud.getDirectoryContents.mockRejectedValue({ status: 503 });
+
+    const result = await uploadDataToCloud(cloud as any, buildValidPayload(10));
+
+    expect(result.success).toBe(false);
+    expect(syncService.uploadImages).not.toHaveBeenCalled();
+    expect(cloud.uploadImageList).not.toHaveBeenCalled();
+    if (source === 'manifest') expect(cloud.getDirectoryContents).not.toHaveBeenCalled();
+  });
+
+  test('does not publish a new manifest after image transfers become unavailable', async () => {
+    let uploadedData: any;
+    const cloud = createMockCloudService(vi.fn(async () => uploadedData));
+    cloud.uploadData.mockImplementation(async data => { uploadedData = data; return true; });
+    vi.mocked(imageService.buildReferencedImagesList).mockReturnValueOnce(['photo.webp']);
+    vi.mocked(syncService.uploadImages).mockRejectedValueOnce({ status: 503 });
+
+    const result = await uploadDataToCloud(cloud as any, buildValidPayload(10));
+
+    expect(result.success).toBe(false);
+    expect(cloud.uploadImageList).not.toHaveBeenCalled();
   });
 });
 

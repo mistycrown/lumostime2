@@ -4,6 +4,7 @@
  * @output Regression coverage for safe image deletion during backup uploads
  * @pos Test (Cloud Sync)
  * @updated 2026-10-11: Covers empty clouds, restored references, unknown inventories, and deletion retries.
+ * @updated 2026-10-11: Ensures unavailable storage stops remaining batches instead of continuing transfers.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { syncService, type StorageService } from './syncService';
@@ -102,5 +103,18 @@ describe('image deletion during backup upload', () => {
     expect(retry.deletedRemote).toBe(2);
     expect(service.deleteImage).toHaveBeenCalledTimes(4);
     expect(pendingDeletions).toEqual([]);
+  });
+
+  it.each([2, 5])('stops after a 503 in a batch of %s pending uploads', async count => {
+    const service = createStorageService();
+    const files = Array.from({ length: count }, (_, index) => `photo_${index}.webp`);
+    pendingDeletions = [];
+    vi.mocked(imageService.listImages).mockResolvedValue(files);
+    service.uploadImage.mockRejectedValue({ status: 503 });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(syncService.uploadImages(service as unknown as StorageService, undefined, files, []))
+      .rejects.toMatchObject({ status: 503 });
+    expect(service.uploadImage).toHaveBeenCalledTimes(Math.min(3, count));
   });
 });

@@ -9,6 +9,7 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { WebDAVRequestQueue } from './webdavRequestQueue';
 
 const adapters = vi.hoisted(() => ({
   isNativePlatform: vi.fn(),
@@ -39,6 +40,7 @@ const { createServer } = process.getBuiltinModule('node:http') as typeof import(
 let server: Server;
 let serverUrl: string;
 const requests: { method: string; path: string; cacheControl?: string; body: string }[] = [];
+let unavailable = false;
 const backup = { timestamp: 123, notes: '坚果云同步测试' };
 const freshReadHeaders = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -64,7 +66,9 @@ beforeAll(async () => {
       response.writeHead(400).end('the nutstore path is not valid');
       return;
     }
-    if (request.method === 'DELETE') {
+    if (unavailable) {
+      response.writeHead(503, { 'Retry-After': '120' }).end();
+    } else if (request.method === 'DELETE') {
       response.writeHead(path.endsWith('missing.webp') ? 404 : 500).end();
     } else if (request.method === 'PROPFIND') {
       response.writeHead(207, { 'Content-Type': 'application/xml' });
@@ -97,6 +101,7 @@ beforeEach(() => {
     setItem: (key: string, value: string) => storage.set(key, value)
   });
   requests.length = 0;
+  unavailable = false;
   adapters.isNativePlatform.mockReturnValue(false);
   adapters.sendRequest.mockImplementation(async (url: string) => {
     if (url.includes('?')) throw { status: 400, error: 'the nutstore path is not valid' };
@@ -120,10 +125,24 @@ afterAll(async () => {
 const configure = (url: string) => {
   const service = new WebDAVService();
   service.saveConfig({ url, username: 'test-user', password: 'test-password' });
+  // Path/transport tests omit real-time pacing; the queue suite verifies its timing.
+  (service as any).requestQueue = new WebDAVRequestQueue();
   return service;
 };
 
 describe('native WebDAV paths', () => {
+  it('blocks native backup reads after a manifest PUT resolves with status 503', async () => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    const service = configure('https://dav.jianguoyun.com/dav/Lumostime');
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    adapters.sendRequest.mockResolvedValueOnce({ status: 503, headers: { 'retry-after': '120' } });
+
+    await expect(service.uploadImageList(['photo.webp'])).rejects.toMatchObject({ status: 503 });
+    await expect(service.downloadData()).rejects.toMatchObject({ status: 503 });
+    expect(adapters.sendRequest).toHaveBeenCalledTimes(1);
+    expect(adapters.downloadFile).not.toHaveBeenCalled();
+  });
+
   it.each(['', '/'])('uploads UTF-8 backups and image manifests with base URL suffix "%s"', async (suffix) => {
     adapters.isNativePlatform.mockReturnValue(true);
     const baseUrl = 'https://dav.jianguoyun.com/dav/Lumostime';
@@ -167,6 +186,18 @@ describe('native WebDAV paths', () => {
 });
 
 describe('Web/Electron real WebDAV requests', () => {
+  it('shares a 503 cooldown between manifest uploads and subsequent backup reads', async () => {
+    const service = configure(serverUrl);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    unavailable = true;
+
+    await expect(service.uploadImageList(['photo.webp'])).rejects.toMatchObject({ status: 503 });
+    await expect(service.downloadData()).rejects.toMatchObject({ status: 503 });
+    await expect(service.downloadImageList()).rejects.toMatchObject({ status: 503 });
+    await expect(service.getDirectoryContents('/images')).rejects.toMatchObject({ status: 503 });
+    expect(requests).toHaveLength(1);
+  });
+
   it('treats an already absent image as deleted without reporting an error', async () => {
     const service = configure(serverUrl);
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});

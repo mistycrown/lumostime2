@@ -7,6 +7,7 @@
  * @updated 2026-08-11: Keeps nested-directory failures explicit for manual WebDAV folder setup and generates safe native download paths.
  * @updated 2026-10-10: Uses canonical WebDAV paths without cache-busting queries and retains fresh reads through cache-control headers.
  * @updated 2026-10-11: Treats missing files as completed deletions without reporting WebDAV errors.
+ * @updated 2026-10-11: Spaces Nutstore requests, shares HTTP 429/503 cooldown across transports, and propagates failed image inventory reads.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -16,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Buffer } from 'buffer';
+import { isWebDAVUnavailable, WebDAVRequestQueue } from './webdavRequestQueue';
 
 // Ensure Buffer is available globally for webdav lib
 // Note: In Electron, we polyfilled this in preload.js and index.tsx as well.
@@ -43,6 +45,22 @@ export interface WebDAVConfig {
 export class WebDAVService {
     private client: WebDAVClient | null = null;
     private config: WebDAVConfig | null = null;
+    private requestQueue = new WebDAVRequestQueue(() => {
+        // Nutstore's free tier allows 600 requests per 30 minutes.
+        try {
+            return new URL(this.config?.url || '').hostname === 'dav.jianguoyun.com' ? 3100 : 0;
+        } catch {
+            return 0;
+        }
+    });
+
+    private sendNativeRequest(url: string, options: Parameters<typeof HTTP.sendRequest>[1]) {
+        return this.requestQueue.run(() => HTTP.sendRequest(url, options));
+    }
+
+    private downloadNativeFile(options: Parameters<typeof Filesystem.downloadFile>[0]) {
+        return this.requestQueue.run(() => Filesystem.downloadFile(options));
+    }
 
     private buildNativeTempPath(filename: string): string {
         const safeFilename = filename.split('/').pop()?.replace(/[^a-zA-Z0-9._-]/g, '_') || 'download.json';
@@ -143,7 +161,7 @@ export class WebDAVService {
                     let data = init.body;
                     if (typeof data === 'undefined' || data === null) data = "";
 
-                    const response = await HTTP.sendRequest(url, {
+                    const response = await this.sendNativeRequest(url, {
                         method: method,
                         data: data,
                         headers: headers,
@@ -182,7 +200,18 @@ export class WebDAVService {
             console.log('[WebDAV] Using development proxy for CORS bypass');
         }
 
-        this.client = createClient(this.getEffectiveUrl(config.url), options);
+        const client = createClient(this.getEffectiveUrl(config.url), options);
+        const queuedMethods = new Set([
+            'getDirectoryContents', 'stat', 'createDirectory', 'deleteFile', 'putFileContents', 'getFileContents'
+        ]);
+        this.client = new Proxy(client, {
+            get: (target, property) => {
+                const method = Reflect.get(target, property);
+                return queuedMethods.has(String(property))
+                    ? (...args: any[]) => this.requestQueue.run(() => method(...args))
+                    : method;
+            }
+        });
     }
 
     getConfig(): WebDAVConfig | null {
@@ -234,7 +263,7 @@ export class WebDAVService {
                 HTTP.setDataSerializer('raw');
                 
                 // Try to upload the test file
-                const uploadResponse = await HTTP.sendRequest(testUrl, {
+                const uploadResponse = await this.sendNativeRequest(testUrl, {
                     method: 'put',
                     data: testData.buffer,
                     headers: {
@@ -249,7 +278,7 @@ export class WebDAVService {
                 // If upload succeeded, try to delete the test file
                 if (uploadResponse.status === 200 || uploadResponse.status === 201 || uploadResponse.status === 204) {
                     try {
-                        await HTTP.sendRequest(testUrl, {
+                        await this.sendNativeRequest(testUrl, {
                             method: 'delete',
                             headers: {
                                 'Authorization': `Basic ${auth}`
@@ -325,7 +354,7 @@ export class WebDAVService {
                     HTTP.setDataSerializer('raw');
                     const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
                     
-                    const uploadResponse = await HTTP.sendRequest(tempUrl, {
+                    const uploadResponse = await this.sendNativeRequest(tempUrl, {
                         method: 'put',
                         data: emptyData,
                         headers: {
@@ -339,7 +368,7 @@ export class WebDAVService {
 
                     // 立即删除临时文件
                     try {
-                        const deleteResponse = await HTTP.delete(tempUrl, {}, {});
+                        const deleteResponse = await this.requestQueue.run(() => HTTP.delete(tempUrl, {}, {}));
                         console.log(`[WebDAV] ✓ 临时文件已删除，状态: ${deleteResponse.status}`);
                     } catch (deleteError: any) {
                         console.warn(`[WebDAV] 删除临时文件失败（不影响功能）:`, deleteError?.message);
@@ -410,7 +439,7 @@ export class WebDAVService {
             return Array.isArray(results) ? results : [results];
         } catch (error) {
             console.error('WebDAV List Error:', error);
-            return [];
+            throw error;
         }
     }
 
@@ -456,7 +485,7 @@ export class WebDAVService {
                 // Set global serializer before sending request
                 HTTP.setDataSerializer('raw');
                 
-                const response = await HTTP.sendRequest(url, {
+                const response = await this.sendNativeRequest(url, {
                     method: 'put',
                     data: uint8Data.buffer,
                     headers: {
@@ -503,7 +532,7 @@ export class WebDAVService {
                 console.log(`[WebDAV] 移动端下载数据（原生方式）: ${filename}`);
                 
                 // Download directly to filesystem
-                await Filesystem.downloadFile({
+                await this.downloadNativeFile({
                     path: tempPath,
                     url: url,
                     directory: Directory.Data,
@@ -596,7 +625,7 @@ export class WebDAVService {
                 try {
                     HTTP.setDataSerializer('raw');
                     
-                    const response = await HTTP.sendRequest(url, {
+                    const response = await this.sendNativeRequest(url, {
                         method: 'put',
                         data: uint8Data.buffer,
                         headers: {
@@ -609,6 +638,7 @@ export class WebDAVService {
                     console.log(`[WebDAV] ✓ 原生上传成功: ${filename}, Status: ${response.status}`);
                     return response.status === 200 || response.status === 201 || response.status === 204;
                 } catch (error: any) {
+                    if (isWebDAVUnavailable(error)) throw error;
                     if (error?.status === 409) {
                         throw new Error(`图片上传失败：请确保WebDAV根目录下存在 "images" 文件夹 (HTTP 409)`);
                     }
@@ -648,7 +678,7 @@ export class WebDAVService {
                 
                 // Use Capacitor Filesystem.downloadFile - downloads directly to filesystem
                 // This is much faster than HTTP.sendRequest with arraybuffer
-                await Filesystem.downloadFile({
+                await this.downloadNativeFile({
                     path: `images/${filename}`,
                     url: url,
                     directory: Directory.Data,
@@ -666,6 +696,7 @@ export class WebDAVService {
                 
             } catch (error: any) {
                 console.error(`[WebDAV] 移动端下载失败: ${filename}`, error);
+                if (isWebDAVUnavailable(error)) throw error;
                 
                 if (error?.message?.includes('404') || error?.message?.includes('Not Found')) {
                     throw new Error(`图片不存在: ${filename}。请确保图片已上传到 /images/ 目录。`);
@@ -719,7 +750,7 @@ export class WebDAVService {
 
                 HTTP.setDataSerializer('raw');
                 
-                const response = await HTTP.sendRequest(url, {
+                const response = await this.sendNativeRequest(url, {
                     method: 'put',
                     data: uint8Data.buffer,
                     headers: {
@@ -759,7 +790,7 @@ export class WebDAVService {
                 const tempPath = this.buildNativeTempPath(filename);
                 
                 // Download directly to filesystem
-                await Filesystem.downloadFile({
+                await this.downloadNativeFile({
                     path: tempPath,
                     url: url,
                     directory: Directory.Data,
@@ -799,9 +830,13 @@ export class WebDAVService {
             const data = JSON.parse(content as string);
             console.log(`[WebDAV] ✓ 图片列表下载成功: ${data.images?.length || 0} 个图片, 时间戳: ${new Date(data.timestamp).toLocaleString()}`);
             return data;
-        } catch (e) {
-            console.log('[WebDAV] 图片列表文件不存在或下载失败');
-            return null;
+        } catch (e: any) {
+            if (Number(e?.status ?? e?.response?.status) === 404) {
+                console.log('[WebDAV] 图片列表文件不存在');
+                return null;
+            }
+            console.error('[WebDAV] 图片列表下载失败', e);
+            throw e;
         }
     }
 

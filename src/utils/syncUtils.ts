@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.ts
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-10-11: Stops uploads after WebDAV inventory failures instead of treating unavailable storage as empty.
  * @updated 2026-10-02: Publishes unique revisions, distinguishes missing objects from read failures, and restores the exact selected snapshot.
  * @updated 2026-09-25: Builds and uploads separate content/theme image manifest groups with legacy cloud-list compatibility.
  * @updated 2026-06-21: Added write-after-read verification for main backup uploads so stale cloud reads or failed overwrites cannot be reported as a successful sync.
@@ -16,6 +17,7 @@ import { compatibleS3Service } from '../services/compatibleS3Service';
 import { imageService } from '../services/imageService';
 import { appearanceBackupService } from '../services/appearanceBackupService';
 import { syncService } from '../services/syncService';
+import { isWebDAVUnavailable } from '../services/webdavRequestQueue';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
 import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
@@ -151,6 +153,7 @@ async function listCloudImageFiles(service: CloudService): Promise<string[] | nu
       .map((item: any) => String(item.Key).split('/').pop() || '')
       .filter(Boolean);
   } catch (error) {
+    if (isWebDAVUnavailable(error)) throw error;
     console.warn('[syncUtils] Failed to list actual cloud image files, fallback to manifest.', error);
     return null;
   }
@@ -346,6 +349,7 @@ export async function uploadDataToCloud(
       const cloudImageData = await service.downloadImageList();
       oldCloudImageList = normalizeCloudImageManifest(cloudImageData).images;
     } catch (error) {
+      if (isWebDAVUnavailable(error)) throw error;
       console.warn('[syncUtils] Failed to read cloud image manifest before upload, treat as empty.', error);
     }
 

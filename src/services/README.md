@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-11: WebDAV requests share a serialized queue; Nutstore requests start at least 3.1 seconds apart. HTTP 429/503 triggers a shared cooldown (respecting Retry-After), and unavailable image inventories stop the upload rather than triggering more transfers. Native HTTP/filesystem and Web/Electron clients use the same queue.
+
 Update 2026-10-11: `syncService.ts` deletes only known cloud images absent from the current backup references, skips old deletion records for absent or restored images, and retains failed deletions for retries. `webdavService.ts` treats DELETE 404 as an already completed deletion.
 
 Update 2026-10-10: `webdavService.ts` uses canonical paths for uploads, downloads, and file metadata, fixing Nutstore HTTP 400 failures caused by timestamp query strings. Native and Web/Electron reads retain cache-control headers without changing filenames.
