@@ -1,6 +1,6 @@
 /**
  * @file NodeManageView.tsx
- * @updated 2026-10-11: Adds inline category renaming, confirmed category deletion and selected-node deletion.
+ * @updated 2026-10-11: Adds inline category renaming and confirmed category deletion; selected-node controls only move/order nodes.
  * @updated 2026-10-07: Matches the search-page header and shared top safe-area spacing.
  * @input Node metadata, category order and shared pointer drag lifecycle
  * @output Wrapping capsules for drag classification and node/category ordering
@@ -10,7 +10,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronLeft, GripVertical, Pencil, Search, Trash2, X } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
-import { NodeDeleteButton } from '../../components/NodeDeleteButton';
 import { NodeCategoryCreator } from '../../components/NodeCategoryCreator';
 import { NodeCategorySelect } from '../../components/NodeCategorySelect';
 import { useNodes } from '../../contexts/NodeContext';
@@ -138,7 +137,6 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
         {selected && <div className="sticky top-0 z-10 mb-5 flex flex-wrap items-center gap-3 border-y border-stone-200 bg-[#faf9f6] py-3" data-testid="node-move-controls">
           <span className={`max-w-24 truncate text-xs font-medium text-stone-800 ${isPrivacyMode ? 'blur-sm' : ''}`}>{selected.name}</span>
           <NodeCategorySelect value={getNodeCategoryId(selected, nodeCategories)} label="移动选中节点到分类" onChange={(categoryId) => moveNode(selected.id, categoryId)} />
-          <NodeDeleteButton node={selected} />
           <div className="ml-auto flex items-center gap-1"><button type="button" aria-label="节点向前移动" disabled={selectedIndex <= 0} onClick={() => moveSelected(-1)} className="p-2 text-stone-600 disabled:opacity-25"><ArrowLeft size={15} /></button><button type="button" aria-label="节点向后移动" disabled={selectedIndex >= siblings.length - 1} onClick={() => moveSelected(1)} className="p-2 text-stone-600 disabled:opacity-25"><ArrowRight size={15} /></button><button type="button" aria-label="取消选择节点" onClick={() => setSelectedId(null)} className="p-2 text-stone-400"><X size={14} /></button></div>
         </div>}
         {groups.map((group, groupIndex) => {

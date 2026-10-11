@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-11: Checks management omits node deletion, keeps detail deletion coverage and mirrors the app's data-ready startup gate.
  * @updated 2026-10-11: Covers category rename/removal, deletion cancellation/back keys, cross-review unlinking and deletion persistence.
  * @updated 2026-10-08: Checks saved and AI-generated Markdown headings/list styles with production CSS.
  * @updated 2026-10-07: Exercises review-card period filtering, review-kind navigation and cross-kind backlink transforms.
@@ -99,7 +100,12 @@ const Probe = () => {
     <div className="fixed bottom-0 z-[210]" data-testid="saved-suggestions">{data.logs.find((log) => log.id === 'candidate') && <NodeSuggestions log={data.logs.find((log) => log.id === 'candidate')!} />}</div>
   </>;
 };
-const Providers = () => <ToastProvider><DataProvider><ReviewProvider><PrivacyProvider><NodeProvider><Probe /></NodeProvider></PrivacyProvider></ReviewProvider></DataProvider></ToastProvider>;
+const ReadyNodes = () => {
+  const { isReady: isDataReady } = useData();
+  const { isReady: isReviewReady } = useReview();
+  return isDataReady && isReviewReady ? <NodeProvider><Probe /></NodeProvider> : null;
+};
+const Providers = () => <ToastProvider><DataProvider><ReviewProvider><PrivacyProvider><ReadyNodes /></PrivacyProvider></ReviewProvider></DataProvider></ToastProvider>;
 const render = () => root.render(<Providers />);
 const fixture = (id: string, note: string, day: number): Log => ({ id, note, startTime: new Date(2026, 9, day, 12).getTime(), endTime: new Date(2026, 9, day, 13).getTime(), duration: 3600, categoryId: 'c', activityId: 'a' });
 
@@ -400,17 +406,20 @@ async function run() {
   await labelledClick('返回节点列表');
   check(document.querySelector('[aria-label="筛选节点分类"]')?.textContent === '全部分类', 'Deleted category filter did not reset');
   await labelledClick('管理节点分类与排序');
-  await labelledClick('管理节点：删除测试'); await labelledClick('删除节点');
+  await labelledClick('管理节点：删除测试');
+  check(!document.querySelector('[data-testid="node-management"] [aria-label="删除节点"]'), 'Management still exposes node deletion');
   document.querySelectorAll<HTMLButtonElement>('[class*="pointer-events-auto"] button').forEach((element) => element.click()); await delay();
+  await capture('node-move-controls-mobile');
+  await labelledClick('返回节点列表');
+  nodes.openNode('新主节点'); nodes.openNode('删除测试'); await until(() => document.querySelector('[data-node-name]')?.textContent === '删除测试', 'deletion detail'); await click('细节');
+  await labelledClick('删除节点');
   await capture('node-delete-confirm-mobile');
   document.querySelector('[aria-label="确认删除节点"] button')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await delay();
-  check(!document.querySelector('[aria-label="确认删除节点"]') && document.querySelector('[data-testid="node-management"]'), 'Escape closed manager instead of confirmation');
+  check(!document.querySelector('[aria-label="确认删除节点"]') && nodes.selectedNodeId === deletionNode.id, 'Escape closed detail instead of confirmation');
   check(nodes.nodes.some((node) => node.id === deletionNode.id), 'Escape deleted node');
   await labelledClick('删除节点');
   check(runRegisteredHardwareBackHandler(), 'Node confirmation did not handle back'); await delay();
   check(!document.querySelector('[aria-label="确认删除节点"]') && nodes.nodes.some((node) => node.id === deletionNode.id), 'Hardware back deleted node');
-  await labelledClick('返回节点列表');
-  nodes.openNode('新主节点'); nodes.openNode('删除测试'); await until(() => document.querySelector('[data-node-name]')?.textContent === '删除测试', 'deletion detail'); await click('细节');
   await labelledClick('编辑节点简介'); await input('节点简介', '未提交的简介');
   const requestCount = aiRequests.length; await click('AI 生成'); await until(() => aiRequests.length > requestCount, 'AI pending during deletion');
   await labelledClick('删除节点'); await click('取消');
@@ -424,10 +433,12 @@ async function run() {
   }
   aiRequests[requestCount].resolve('不应恢复节点的过期简介'); await delay();
   check(!nodes.nodes.some((node) => node.id === deletionNode.id), 'Stale AI resurrected deleted node');
-  nodes.closeNode(); await delay(); await labelledClick('管理节点分类与排序');
-  await labelledClick('管理节点：节点 2'); await labelledClick('删除节点'); await click('确认删除节点');
-  check(!nodes.nodes.some((node) => node.id === 'sample-1') && !document.querySelector('[data-testid="node-move-controls"]'), 'Manager failed to delete unlinked node/clear selection');
-  await labelledClick('返回节点列表'); await delay(350);
+  nodes.closeNode(); await delay(); nodes.openNode('节点 2'); await until(() => button('细节'), 'unlinked node detail'); await click('细节');
+  await labelledClick('删除节点'); await click('确认删除节点');
+  check(!nodes.nodes.some((node) => node.id === 'sample-1') && nodes.selectedNodeId === null, 'Detail failed to delete unlinked node/clear selection');
+  await delay(350);
+  const beforeDeletionRemount = await dataRepository.loadDataContextSnapshot();
+  check(beforeDeletionRemount.nodes.some((node) => node.id === 'new-primary') && beforeDeletionRemount.nodeCategories.some((category) => category.id === retainedCategory.id), 'Deletion snapshot lost metadata before remount');
   const deletedData = data;
   mergedRoot.unmount(); await delay();
   const deletionRoot = createRoot(document.getElementById('root')!); deletionRoot.render(<Providers />);
@@ -437,7 +448,7 @@ async function run() {
   check(nodes.nodeCategories.find((category) => category.id === retainedCategory.id)?.name === '保留改名', 'Category rename did not persist');
   check([reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews].every((entries) => entries[0].answers[0].answer === '显示别名 删除测试 [[新主节点]]'), 'Reload lost unlinked review text');
   check(data.logs.some((log) => log.id === 'delete-log' && log.note === '保留 显示别名 与 [[新主节点]]。'), 'Reload lost retained log');
-  passed.push('category rename validation/cancel/persistence, category deletion preserves members, filter reset, node delete from manager/details, Escape/hardware back, pending AI, all review kinds and reload without rediscovery');
+  passed.push('category rename validation/cancel/persistence, category deletion preserves members, filter reset, management omits node deletion, detail deletion, Escape/hardware back, pending AI, all review kinds and reload without rediscovery');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });

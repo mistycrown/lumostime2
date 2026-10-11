@@ -1,6 +1,6 @@
 # Settings Views
 
-Update 2026-10-11: `NodeManageView` adds category title edit/delete buttons and deletion for the selected node. Category names edit inline; destructive actions require confirmation. `NodesSettingsView` resets a removed category filter to all categories. Node details also offer deletion in the 细节 tab, discarding pending biography/AI edits before removal.
+Update 2026-10-11: `NodeManageView` adds category title edit/delete buttons; selected-node controls retain only classification and ordering. Category names edit inline; destructive actions require confirmation. `NodesSettingsView` resets a removed category filter to all categories. Node deletion is available in the details 细节 tab, discarding pending biography/AI edits before removal.
 
 Update 2026-10-09: Settings → 内容 → 个人词典 opens `PersonalDictionarySettingsView.tsx`, a print-inspired word list with batch entry, case-insensitive deduplication, search and removal. Changes persist immediately and participate in preference backup/restore.
 
