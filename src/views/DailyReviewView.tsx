@@ -1,5 +1,6 @@
 /**
  * @file DailyReviewView.tsx
+ * @updated 2026-10-11: Enables note-style autocomplete in guide answers using full log history.
  * @input Daily Review Data, Logs, Templates
  * @output Updated Review Data, Generated Narrative
  * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
@@ -964,6 +965,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                 {activeTab === 'guide' && (
                     <div className="space-y-6 animate-in fade-in duration-300 pb-40">
                         <ReviewGuideTab
+                            history={logs}
                             templates={templatesForDisplay}
                             answers={answers}
                             isReadingMode={isReadingMode}

@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
  * @file WeeklyReviewView.tsx
+ * @updated 2026-10-11: Enables note-style autocomplete in guide answers using full log history.
  * @input WeeklyReview Data, Logs, Stats, Templates
  * @output Review Updates, Narrative Generation
  * @pos View (Review Modal)
@@ -530,6 +531,7 @@ export const WeeklyReviewView: React.FC<WeeklyReviewViewProps> = ({
                 {activeTab === 'guide' && (
                     <div className="flex-1 overflow-y-auto no-scrollbar space-y-6 animate-in fade-in duration-300 pb-40 px-7">
                         <ReviewGuideTab
+                            history={logs}
                             templates={templatesForDisplay}
                             answers={answers}
                             isReadingMode={isReadingMode}

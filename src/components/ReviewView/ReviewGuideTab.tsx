@@ -1,10 +1,13 @@
 /**
  * @file ReviewGuideTab.tsx
  * @description Shared Guide Tab component for Review Views
+ * @input Review templates, answers, optional log history and answer update callbacks
+ * @output Shared reading/editing guide with inline answer completion
+ * @updated 2026-10-11: Passes log history through to text-answer editors for note-style completion.
  */
 import React from 'react';
 import { Calendar } from 'lucide-react';
-import { ReviewTemplateSnapshot, ReviewAnswer } from '../../types';
+import { ReviewTemplateSnapshot, ReviewAnswer, Log } from '../../types';
 import { IconRenderer } from '../IconRenderer';
 import { ReviewQuestionRenderer } from './ReviewQuestionRenderer';
 import { getTemplateDisplayInfo } from './reviewUtils';
@@ -12,6 +15,7 @@ import { getTemplateDisplayInfo } from './reviewUtils';
 interface ReviewGuideTabProps {
     templates: ReviewTemplateSnapshot[];
     answers: ReviewAnswer[];
+    history?: readonly Log[];
     isReadingMode: boolean;
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
     onToggleSyncToTimeline?: (templateId: string) => void;
@@ -20,6 +24,7 @@ interface ReviewGuideTabProps {
 export const ReviewGuideTab: React.FC<ReviewGuideTabProps> = ({
     templates,
     answers,
+    history,
     isReadingMode,
     onUpdateAnswer,
     onToggleSyncToTimeline
@@ -109,6 +114,7 @@ export const ReviewGuideTab: React.FC<ReviewGuideTabProps> = ({
                                             question={q}
                                             answer={answer}
                                             isReadingMode={false}
+                                            history={history}
                                             onUpdateAnswer={onUpdateAnswer}
                                         />
                                     );

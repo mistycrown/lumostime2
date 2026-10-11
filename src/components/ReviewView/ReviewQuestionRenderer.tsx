@@ -1,12 +1,13 @@
 /**
  * @file ReviewQuestionRenderer.tsx
- * @input Review question definitions, saved answers, reading/editing mode, answer update callback
+ * @input Review question definitions, saved answers, reading/editing mode, log history, answer update callback
  * @output Question UI for Review guide tabs
  * @description Shared component for rendering review questions in both edit and reading modes
+ * @updated 2026-10-11: Supplies log history for inline completion in guide text answers.
  * @updated 2026-08-06: Added per-text-question expand/collapse controls so long guide answers have more room while editing.
  */
 import React from 'react';
-import { ReviewQuestion, ReviewAnswer } from '../../types';
+import { ReviewQuestion, ReviewAnswer, Log } from '../../types';
 import { COLOR_OPTIONS } from '../../constants';
 import * as LucideIcons from 'lucide-react';
 import { NodeText } from '../NodeText';
@@ -16,6 +17,7 @@ interface ReviewQuestionRendererProps {
     question: ReviewQuestion;
     answer?: ReviewAnswer;
     isReadingMode: boolean;
+    history?: readonly Log[];
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
 }
 
@@ -23,20 +25,22 @@ export const ReviewQuestionRenderer: React.FC<ReviewQuestionRendererProps> = ({
     question: q,
     answer,
     isReadingMode,
+    history,
     onUpdateAnswer
 }) => {
     if (isReadingMode) {
         return <ReadingModeQuestion question={q} answer={answer} />;
     }
-    return <EditModeQuestion question={q} answer={answer} onUpdateAnswer={onUpdateAnswer} />;
+    return <EditModeQuestion question={q} answer={answer} history={history} onUpdateAnswer={onUpdateAnswer} />;
 };
 
 // Edit Mode Question Component
 const EditModeQuestion: React.FC<{
     question: ReviewQuestion;
     answer?: ReviewAnswer;
+    history?: readonly Log[];
     onUpdateAnswer: (questionId: string, question: string, answer: string) => void;
-}> = ({ question: q, answer, onUpdateAnswer }) => {
+}> = ({ question: q, answer, history, onUpdateAnswer }) => {
     const [isTextAnswerExpanded, setIsTextAnswerExpanded] = React.useState(false);
     const textareaId = React.useId();
     if (q.type === 'text') {
@@ -62,6 +66,7 @@ const EditModeQuestion: React.FC<{
                     id={textareaId}
                     ariaLabel={q.question}
                     value={answer?.answer || ''}
+                    history={history}
                     onChange={(value) => onUpdateAnswer(q.id, q.question, value)}
                     className={`w-full resize-none rounded-xl border border-stone-200 bg-white px-4 py-3 pr-10 text-[15px] leading-relaxed text-stone-800 shadow-sm outline-none transition-[height,border-color] duration-150 ease-out placeholder:text-stone-300 focus:border-stone-400 ${
                         isTextAnswerExpanded ? 'h-[320px]' : 'h-[112px]'

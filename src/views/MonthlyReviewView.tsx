@@ -1,5 +1,6 @@
 /**
  * @file MonthlyReviewView.tsx
+ * @updated 2026-10-11: Enables note-style autocomplete in guide answers using full log history.
  * @input Month Log Data, Review Data, Templates
  * @output Update Review Data, Generate Narrative
  * @updated 2026-10-04: Buffer review edits until exit/backgrounding and discard drafts before deletion.
@@ -538,6 +539,7 @@ export const MonthlyReviewView: React.FC<MonthlyReviewViewProps> = ({
                     activeTab === 'guide' && (
                         <div className="space-y-6 animate-in fade-in duration-300 pb-40">
                             <ReviewGuideTab
+                                history={logs}
                                 templates={templatesForDisplay}
                                 answers={answers}
                                 isReadingMode={isReadingMode}

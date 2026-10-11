@@ -1,5 +1,6 @@
 /**
  * @file check-note-autocomplete-smoke.mjs
+ * @updated 2026-10-11: Checks review guide completion at desktop/mobile widths, with native touch and screenshots.
  * @updated 2026-10-10: Checks system text zoom separately from CSS text inflation using native caret pixels.
  * @input Installed Chrome, production CSS and real note-editor regression harness
  * @output Browser checks and desktop/mobile screenshots in node_modules/.cache/note-autocomplete-smoke
@@ -96,6 +97,7 @@ try {
     await delay();
   }
   const passed = await evaluate('window.__noteAutocompleteHarness.run()');
+  passed.push((await evaluate('window.__noteAutocompleteHarness.runReview()')).at(-1));
   await capture('desktop');
   // Real Tab input exercises focus routing in addition to the harness's synthetic IME events.
   await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
@@ -132,6 +134,25 @@ try {
   await delay(300);
   if (!await evaluate('document.querySelector("textarea").value.endsWith("论文") && document.activeElement === document.querySelector("textarea")')) throw new Error('Real touch acceptance lost text or focus');
   passed.push('Mobile touch button accepts completion and preserves editor focus');
+  passed.push((await evaluate('window.__noteAutocompleteHarness.runReview()')).at(-1));
+  await evaluate('window.__noteAutocompleteHarness.renderReview()');
+  await evaluate('window.__noteAutocompleteHarness.setText("今天修改论")');
+  await capture('review-mobile');
+  const reviewButton = await evaluate('(() => { const r = document.querySelector("[aria-label=接受备注补全]").getBoundingClientRect(); return { x:r.x+r.width/2,y:r.y+r.height/2 }; })()');
+  await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [reviewButton] });
+  await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await delay(300);
+  if (!await evaluate('document.querySelector("textarea").value === "今天修改论文" && document.activeElement === document.querySelector("textarea")')) throw new Error('Review touch completion did not update the answer');
+  passed.push('Review guide native mobile touch accepts completion and keeps answer focus');
+  await send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 760, deviceScaleFactor: 1, mobile: false });
+  await evaluate('window.__noteAutocompleteHarness.renderReview()');
+  await evaluate('window.__noteAutocompleteHarness.setText("今天修改论")');
+  await capture('review-desktop');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 });
+  await delay();
+  if (!await evaluate('document.querySelector("textarea").value === "今天修改论文" && document.activeElement === document.querySelector("textarea")')) throw new Error('Review native Tab lost the answer or focus');
+  passed.push('Review guide native desktop Tab accepts completion and keeps answer focus');
   await writeFile(path.join(output, 'result.json'), JSON.stringify({ passed }, null, 2));
   console.log(JSON.stringify({ passed, screenshots: output }, null, 2));
 } catch (error) {

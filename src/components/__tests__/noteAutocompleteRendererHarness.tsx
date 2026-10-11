@@ -1,5 +1,6 @@
 /**
  * @file noteAutocompleteRendererHarness.tsx
+ * @updated 2026-10-11: Exercises review guide answer completion, expansion, node shortcuts and reading/choice modes.
  * @updated 2026-10-10: Emulates WebView's zoomed computed font metrics to catch double-scaling of copied px values.
  * @input Real note editor and log/focus views with isolated historical fixtures
  * @output Browser interaction assertions and screenshot fixtures
@@ -9,8 +10,9 @@
  */
 import React, { useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { ActiveSession, Category, Log } from '../../types';
+import type { ActiveSession, Category, Log, ReviewAnswer, ReviewTemplateSnapshot } from '../../types';
 import { NoteAutocompleteTextarea } from '../NoteAutocompleteTextarea';
+import { ReviewGuideTab } from '../ReviewView/ReviewGuideTab';
 import { AddLogModal } from '../AddLogModal';
 import { FocusDetailView } from '../../views/FocusDetailView';
 import { ToastProvider } from '../../contexts/ToastContext';
@@ -56,6 +58,22 @@ const LogEditor = ({ editing = false }: { editing?: boolean }) => <SettingsProvi
     categories={categories} todos={[]} todoCategories={[]} scopes={[]} onSave={(next) => { savedLog = next; }} onClose={() => {}} />
 </ToastProvider></NavigationProvider></DataProvider></SettingsProvider>;
 
+const reviewTemplates: ReviewTemplateSnapshot[] = [{ id: 'guide', title: '回顾引导', questions: [
+  { id: 'answer', question: '今天有什么收获？', type: 'text' },
+  { id: 'choice', question: '今天状态如何？', type: 'choice', choices: ['很好', '一般'] }
+] }];
+let reviewAnswers: ReviewAnswer[] = [];
+const ReviewEditor = ({ reading = false }: { reading?: boolean }) => {
+  const [answers, setAnswers] = useState<ReviewAnswer[]>([]);
+  reviewAnswers = answers;
+  return <main className="mx-auto mt-12 max-w-md px-5">
+    <ReviewGuideTab templates={reviewTemplates} answers={answers} history={history} isReadingMode={reading}
+      onUpdateAnswer={(questionId, question, answer) => setAnswers((current) => [
+        ...current.filter((entry) => entry.questionId !== questionId), { questionId, question, answer }
+      ])} />
+  </main>;
+};
+
 const render = async (node: React.ReactNode) => { root.render(node); await delay(); };
 const input = () => document.querySelector<HTMLTextAreaElement>('textarea')!;
 const ghost = () => document.querySelector('[data-note-completion-suffix]');
@@ -86,6 +104,36 @@ const checkGhostPosition = () => {
   reference.remove();
   check(Math.abs(expected.left - actual.left) < 1 && Math.abs(expected.top - actual.top) < 1, 'Ghost text moved away from the input caret');
 };
+
+async function runReview() {
+  await render(null); await render(<ReviewEditor />);
+  await setText('今天写论');
+  check(visible() === '文' && reviewAnswers[0]?.answer === '今天写论', 'Review history completion missing or ghost was saved');
+  checkGhostPosition(); await accept();
+  check(reviewAnswers[0]?.answer === '今天写论文' && input().selectionStart === 5 && document.activeElement === input(), 'Review Tab acceptance lost answer/caret/focus');
+  await setText('今天写论'); await key('Escape'); check(!ghost(), 'Review Escape did not dismiss');
+  await setText('今天修改论');
+  input().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true })); await delay();
+  check(!ghost(), 'Review IME displayed a suggestion');
+  input().dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); await delay();
+  check(visible() === '文', 'Review IME completion did not return');
+  document.querySelector<HTMLButtonElement>('[aria-label="扩展输入框"]')!.click(); await delay();
+  check(input().classList.contains('h-[320px]') && input().value === '今天修改论', 'Review expansion lost answer or height');
+  input().focus(); await delay(); checkGhostPosition();
+  document.querySelector<HTMLButtonElement>('[aria-label="接受备注补全"]')!.click(); await delay();
+  check(reviewAnswers[0]?.answer === '今天修改论文' && document.activeElement === input(), 'Review click acceptance lost answer or focus');
+  input().setSelectionRange(4, 6);
+  document.querySelector<HTMLButtonElement>('[aria-label="插入节点括号"]')!.click(); await delay();
+  check(input().value === '今天修改[[论文]]' && !ghost(), 'Review node shortcut lost selected text or showed completion');
+  check(input().selectionStart === 10 && document.activeElement === input(), 'Review node shortcut lost caret/focus');
+  [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === '很好')!.click(); await delay();
+  check(reviewAnswers.find((answer) => answer.questionId === 'choice')?.answer === '很好', 'Review choice answer changed');
+  await render(null); await render(<ReviewEditor reading />);
+  check(!document.querySelector('textarea') && !ghost(), 'Review reading mode contains an editor');
+  passed.push(`Review guide (${window.innerWidth}px): history, actual answer updates, Tab/click, IME, expansion, node shortcut and reading/choice modes`);
+  await render(null); await render(<Editor />); await setText('今天修改论');
+  return passed;
+}
 
 async function run() {
   await document.fonts.load('16px VerifiedChinese', '备注今天修改论文补全');
@@ -157,7 +205,7 @@ async function run() {
 
 declare global {
   interface Window {
-    __noteAutocompleteHarness?: { run: typeof run; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; restoreTextZoom: typeof restoreTextZoom; renderEditor: () => Promise<void>; passed: string[] };
+    __noteAutocompleteHarness?: { run: typeof run; runReview: typeof runReview; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; restoreTextZoom: typeof restoreTextZoom; renderEditor: () => Promise<void>; renderReview: () => Promise<void>; passed: string[] };
   }
 }
 const originalComputedStyle = window.getComputedStyle.bind(window);
@@ -187,5 +235,5 @@ async function prepareMobileCase() {
   const computed = getComputedStyle(input());
   return { suffix: { left: suffix.left, top: suffix.top }, input: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, fontSize: parseFloat(computed.fontSize) };
 }
-window.__noteAutocompleteHarness = { run, setText, prepareMobileCase, restoreTextZoom, renderEditor: () => render(<Editor />), passed };
+window.__noteAutocompleteHarness = { run, runReview, setText, prepareMobileCase, restoreTextZoom, renderEditor: () => render(<Editor />), renderReview: async () => { await render(null); await render(<ReviewEditor />); }, passed };
 void render(<Editor />);
