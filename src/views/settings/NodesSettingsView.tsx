@@ -1,5 +1,6 @@
 /**
  * @file NodesSettingsView.tsx
+ * @updated 2026-10-11: Uses the Lucide Orbit icon for nodes in the directory list.
  * @updated 2026-10-11: Falls back to all categories after the active filter category is removed.
  * @updated 2026-10-07: Matches the search-page header spacing, title size and shared top safe area.
  * @updated 2026-10-07: Uses a searchable category picker and adds capsule management with manual ordering.
@@ -10,7 +11,7 @@
  * @updated 2026-10-06: Added the print-inspired node directory.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Orbit, Search, SlidersHorizontal } from 'lucide-react';
 import { useNodes } from '../../contexts/NodeContext';
 import { usePrivacy } from '../../contexts/PrivacyContext';
 import { NodeCategoryCreator } from '../../components/NodeCategoryCreator';
@@ -73,7 +74,7 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
           {group.nodes.map((node) => {
             const entry = index.get(node.id);
             return <button type="button" key={node.id} onClick={() => openNode(node.name)} className="group flex w-full items-center gap-3 py-3 text-left">
-              <span aria-hidden="true" className="font-serif text-sm text-stone-300">[[]]</span>
+              <Orbit aria-hidden="true" size={18} strokeWidth={1.7} className="shrink-0 text-stone-300" />
               <div className={`min-w-0 flex-1 ${isPrivacyMode ? 'blur-sm select-none' : ''}`}>
                 <h2 className="break-words text-sm font-medium leading-5 text-stone-900">{node.name}</h2>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] leading-4 text-stone-400">

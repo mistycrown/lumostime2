@@ -200,10 +200,10 @@ export const NodeDetailView: React.FC<{
           <input aria-label="节点名称" autoFocus value={name} onChange={(event) => setName(event.target.value)} className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-stone-900 outline-none" />
           <button type="submit" aria-label="保存名称" className="p-2 text-stone-600"><Check size={18} /></button>
           <button type="button" aria-label="取消重命名" onClick={() => setRenaming(false)} className="p-2 text-stone-400"><X size={18} /></button>
-        </form> : <div className="flex items-start gap-3">
-          <Orbit aria-hidden="true" size={20} strokeWidth={1.7} className="mt-0.5 shrink-0 text-stone-300" />
+        </form> : <div className="flex items-center gap-3">
+          <Orbit aria-hidden="true" size={20} strokeWidth={1.7} className="shrink-0 text-stone-300" />
           <h1 data-node-name className="min-w-0 break-words text-2xl font-bold text-stone-900">{node.name}</h1>
-          <button type="button" aria-label="重命名节点" onClick={() => { setName(node.name); setRenaming(true); }} className="mt-0.5 shrink-0 p-1.5 text-stone-400 hover:text-stone-700"><Pencil size={14} /></button>
+          <button type="button" aria-label="重命名节点" onClick={() => { setName(node.name); setRenaming(true); }} className="shrink-0 p-1.5 text-stone-400 hover:text-stone-700"><Pencil size={14} /></button>
         </div>}
         <p className="mt-2 text-sm text-stone-400">{linkedLogs.length} 条记录{entry?.latestAt ? ` · 最近出现 ${new Date(entry.latestAt).toLocaleDateString('zh-CN')}` : ''}</p>
       </header>
