@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-11: Exposes validated manual node creation with immediate category assignment and existing metadata persistence.
  * @updated 2026-10-11: Deletes nodes across logs/reviews/history and edits/removes categories while retaining member nodes.
  * @updated 2026-10-07: Indexes and mutates node links across daily, weekly and monthly reviews.
  * @updated 2026-10-07: Atomically renames/merges nodes with every referenced record and redirects merged navigation history.
@@ -15,11 +16,12 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useData } from './DataContext';
 import { useOptionalReview } from './ReviewContext';
 import type { NoteNode, NodeCategory, ReviewAnswer } from '../types';
-import { buildNodeIndex, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
+import { buildNodeIndex, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
   nodeCategories: NodeCategory[];
+  addNode: (name: string, categoryId?: string) => void;
   addCategory: (name: string, nodeId?: string) => NodeCategory;
   renameCategory: (id: string, name: string) => void;
   removeCategory: (id: string) => void;
@@ -73,6 +75,10 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [nodes]);
   const goBack = useCallback(() => setHistory((previous) => previous.slice(0, -1)), []);
   const closeNode = useCallback(() => setHistory([]), []);
+  const addNode = (name: string, categoryId = '') => {
+    const node = createNode(nodes, nodeCategories, name, categoryId);
+    setNodes((previous) => previous.some((item) => item.name === node.name) ? previous : [...previous, node]);
+  };
   const addCategory = (name: string, nodeId?: string) => {
     const category = createNodeCategory(nodeCategories, name);
     setNodeCategories((previous) => [...previous, category]);
@@ -167,5 +173,5 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else if (kind === 'weekly') setWeeklyReviews((previous) => linkAnswer(previous));
     else setMonthlyReviews((previous) => linkAnswer(previous));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, renameCategory, removeCategory, removeNode, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addNode, addCategory, renameCategory, removeCategory, removeNode, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
 };

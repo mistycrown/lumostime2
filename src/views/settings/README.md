@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-11: `NodeManageView` adds “新增节点” below each category, including empty categories and 未分类. Names edit inline, save into that category, and reject invalid/duplicate names. Cancel, Escape and hardware back dismiss the draft; successful creation clears search so the new capsule is visible.
+
 Update 2026-10-11: `NodeManageView` adds category title edit/delete buttons; selected-node controls retain only classification and ordering. Category names edit inline; destructive actions require confirmation. `NodesSettingsView` resets a removed category filter to all categories. Node deletion is available in the details 细节 tab, discarding pending biography/AI edits before removal.
 
 Update 2026-10-09: Settings → 内容 → 个人词典 opens `PersonalDictionarySettingsView.tsx`, a print-inspired word list with batch entry, case-insensitive deduplication, search and removal. Changes persist immediately and participate in preference backup/restore.

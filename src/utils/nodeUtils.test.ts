@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-11: Covers manual node creation, name validation, global duplicate checks and category assignment.
  * @updated 2026-10-11: Verifies deletion preserves record text/alias labels, prevents rediscovery and retains category members.
  * @updated 2026-10-07: Covers daily, weekly and monthly review indexing plus cross-kind rename/merge transforms.
  * @updated 2026-10-07: Covers primary-node merge, complete backlink retargeting and rename across all records.
@@ -12,10 +13,41 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Log, MonthlyReview, NoteNode, ReviewAnswer, WeeklyReview } from '../types';
-import { buildNodeIndex, buildNodeReviewAnswers, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers, unlinkNodeInText } from './nodeUtils';
+import { buildNodeIndex, buildNodeReviewAnswers, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers, unlinkNodeInText } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
+
+describe('manual node creation', () => {
+  it('creates trimmed metadata in the requested category without changing existing nodes', () => {
+    const category = createNodeCategory([], '人物', 1);
+    const existing = [node('小林')];
+    const created = createNode(existing, [category], '  小明  ', category.id, 2);
+    expect(created).toMatchObject({ name: '小明', aliases: [], description: '', categoryId: category.id, createdAt: 2, updatedAt: 2 });
+    expect(created.id).toBeTruthy();
+    expect(created.id).not.toBe(existing[0].id);
+    expect(existing).toEqual([node('小林')]);
+    const withCreated = [...existing, created];
+    expect(discoverNodes(withCreated, [])).toBe(withCreated);
+    expect(buildNodeIndex(withCreated, []).get(created.id)?.logs).toEqual([]);
+  });
+
+  it('creates uncategorized nodes and rejects missing destination categories', () => {
+    expect(createNode([], [], '项目').categoryId).toBeUndefined();
+    expect(() => createNode([], [], '项目', 'removed-category')).toThrow('分类不存在');
+  });
+
+  it('rejects duplicate names across categories after trimming', () => {
+    const category = createNodeCategory([], '人物');
+    expect(() => createNode([node('小林')], [category], ' 小林 ', category.id)).toThrow('已存在同名节点');
+  });
+
+  it('rejects empty names and names that cannot be used in node links', () => {
+    for (const name of [' ', '[[节点]]', '［［节点］］', '别名丨节点', '别名|节点', '两个\n节点', '两个\r节点']) {
+      expect(() => createNode([], [], name)).toThrow('有效名称');
+    }
+  });
+});
 
 describe('node and category deletion', () => {
   it('unlinks exact targets in every delimiter form while retaining labels and unrelated syntax', () => {

@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-11: `__tests__/nodeRendererHarness.tsx` verifies category-local manual node creation, empty/uncategorized groups, name validation, cancellation/back keys, search reset, unchanged records and reload persistence, with mobile/desktop form screenshots.
+
 Update 2026-10-11: `DetailTimelineCard` lets users collapse linked reviews beside the section title, initially renders up to ten cards and adds up to ten per “查看更多” click. Reopening reviews or switching entity/period resets the batch; record history stays visible below. `__tests__/nodeRendererHarness.tsx` covers batching, collapse, period filtering and mobile/desktop layouts.
 
 Update 2026-10-11: `CardBackgroundSelector` and managed images in `IconRenderer` load original theme assets directly, without thumbnail file dependencies.

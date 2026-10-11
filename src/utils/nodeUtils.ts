@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-11: Validates manually created nodes and their destination category without requiring a linked record.
  * @updated 2026-10-11: Removes node links without losing display text and supports category rename/removal.
  * @updated 2026-10-07: Indexes daily, weekly and monthly review answers with typed periods and applies node mutations across all review kinds.
  * @updated 2026-10-07: Merges nodes into a chosen primary, preserving labels/metadata and retargeting every linked log.
@@ -27,6 +28,14 @@ export interface NodeReviewAnswer {
 export interface NodeIndexEntry { logs: Log[]; reviewAnswers: NodeReviewAnswer[]; latestAt: number; related: Map<string, number> }
 
 export const isValidNodeName = (name: string): boolean => Boolean(name.trim()) && !/[\[\]［］\r\n|丨]/.test(name);
+
+export const createNode = (nodes: NoteNode[], categories: NodeCategory[], name: string, categoryId = '', now = Date.now()): NoteNode => {
+  const normalized = name.trim();
+  if (!isValidNodeName(normalized)) throw new Error('请输入有效名称，名称不能包含方括号、竖线或换行');
+  if (nodes.some((node) => node.name === normalized)) throw new Error('已存在同名节点');
+  if (categoryId && !categories.some((category) => category.id === categoryId)) throw new Error('分类不存在');
+  return { id: crypto.randomUUID(), name: normalized, aliases: [], description: '', categoryId: categoryId || undefined, createdAt: now, updatedAt: now };
+};
 
 export const parseNodeLinks = (text = ''): NodeLink[] => {
   const links: NodeLink[] = [];

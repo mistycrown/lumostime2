@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-11: `nodeUtils.createNode` creates empty metadata for manually added nodes, trims names, enforces link syntax and global name uniqueness, and validates the destination category. It uses the same node fields as automatic discovery.
+
 Update 2026-10-11: `syncUtils.ts` propagates WebDAV HTTP 429/503 when reading cloud image manifests or inventories, stopping uploads before more image requests are sent to unavailable storage.
 
 Update 2026-10-11: `checkStatsUtils.ts` aggregates daily-check reviews in one pass using constant-time date membership and preserves template metadata/count semantics. Its per-view cache retains six recent ranges and invalidates on review/template identity changes.

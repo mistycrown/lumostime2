@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-11: Checks inline categorized/uncategorized creation, validation, cancellation, search reset and reload persistence.
  * @updated 2026-10-11: Covers linked-review ten-card batches, collapse/reopen, period resets, preserved data and mobile/desktop layouts.
  * @updated 2026-10-11: Checks management omits node deletion, keeps detail deletion coverage and mirrors the app's data-ready startup gate.
  * @updated 2026-10-11: Covers category rename/removal, deletion cancellation/back keys, cross-review unlinking and deletion persistence.
@@ -339,6 +340,44 @@ async function run() {
   const sample2 = capsule('sample-1').getBoundingClientRect();
   check(sample1.top === sample2.top && sample1.width < window.innerWidth / 2, 'Capsules do not share a compact row');
   await labelledClick('取消选择节点');
+  const nodesBeforeCreation = nodes.nodes.length;
+  await labelledClick('在人物下新增节点');
+  check(document.activeElement?.getAttribute('aria-label') === '新节点名称', 'New node input was not focused');
+  check(document.querySelector<HTMLButtonElement>('[aria-label="保存新节点"]')?.disabled, 'Blank node name can be submitted');
+  await input('新节点名称', '林老师'); await labelledClick('保存新节点');
+  check(nodes.nodes.length === nodesBeforeCreation && document.querySelector('[aria-label="新节点名称"]'), 'Duplicate node creation mutated data or discarded the draft');
+  await input('新节点名称', '[[无效]]'); await labelledClick('保存新节点');
+  check(nodes.nodes.length === nodesBeforeCreation, 'Invalid node syntax was accepted');
+  await input('新节点名称', '  分类新节点  ');
+  document.querySelector<HTMLInputElement>('[aria-label="新节点名称"]')!.form!.requestSubmit(); await delay();
+  const manuallyCreated = nodes.nodes.find((node) => node.name === '分类新节点')!;
+  check(manuallyCreated?.categoryId === peopleCategory.id && group(peopleCategory.id).querySelector(`[data-node-capsule="${manuallyCreated.id}"]`), 'New node was not placed under its category');
+  check(nodes.index.get(manuallyCreated.id)?.logs.length === 0, 'Manual creation required/fabricated linked records');
+  await labelledClick('在人物下新增节点'); await input('新节点名称', '取消草稿'); await labelledClick('取消新增节点');
+  check(!nodes.nodes.some((node) => node.name === '取消草稿'), 'Cancelling created a node');
+  await labelledClick('在人物下新增节点');
+  document.querySelector('[aria-label="新节点名称"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await delay();
+  check(!document.querySelector('[aria-label="新节点名称"]') && document.querySelector('[data-testid="node-management"]'), 'Escape closed management instead of cancelling creation');
+  await labelledClick('在人物下新增节点');
+  check(runRegisteredHardwareBackHandler(), 'Creation did not handle hardware back'); await delay();
+  check(!document.querySelector('[aria-label="新节点名称"]') && document.querySelector('[data-testid="node-management"]'), 'Hardware back closed management instead of cancelling creation');
+  await input('搜索管理节点', '不匹配的搜索');
+  await labelledClick('在未分类下新增节点'); await input('新节点名称', '未分类新节点'); await labelledClick('保存新节点');
+  const uncategorizedCreated = nodes.nodes.find((node) => node.name === '未分类新节点')!;
+  check(uncategorizedCreated && !uncategorizedCreated.categoryId && group('').querySelector(`[data-node-capsule="${uncategorizedCreated.id}"]`), 'Uncategorized creation failed');
+  check(document.querySelector<HTMLInputElement>('[aria-label="搜索管理节点"]')?.value === '', 'Creation left the new node hidden by search');
+  await click('新建分类'); await input('新分类名称', '空白分类'); await labelledClick('保存分类');
+  const emptyCategory = nodes.nodeCategories.find((category) => category.name === '空白分类')!;
+  await labelledClick('在空白分类下新增节点'); await input('新节点名称', '空分类首个节点'); await labelledClick('保存新节点');
+  check(nodes.nodes.find((node) => node.name === '空分类首个节点')?.categoryId === emptyCategory.id, 'Creating the first node of an empty category failed');
+  check(JSON.stringify(data.logs) === notesBeforeManagement, 'Manual node creation changed records');
+  document.querySelectorAll<HTMLButtonElement>('[class*="pointer-events-auto"] button').forEach((element) => element.click()); await delay();
+  await labelledClick('在人物下新增节点');
+  await input('新节点名称', '待保存节点');
+  document.querySelector('[aria-label="新节点名称"]')!.scrollIntoView({ block: 'center' });
+  assertFits(); await capture('node-create-mobile');
+  await labelledClick('取消新增节点');
+  passed.push('inline categorized/uncategorized/empty-category node creation, auto-focus, disabled blank save, syntax/duplicate rejection, form submit, cancel/Escape/hardware back, search reset and unchanged records');
   document.querySelector('[data-testid="node-management"] main')!.scrollTop = 0;
   document.querySelectorAll<HTMLButtonElement>('[class*="pointer-events-auto"] button').forEach((element) => element.click()); await delay();
   assertFits(); await capture('node-management-mobile');
@@ -362,12 +401,19 @@ async function run() {
   check(nodes.nodeCategories[0].id === friendCategory.id, 'Reload lost category order');
   check(nodes.nodes.filter((node) => node.categoryId === friendCategory.id)[0].id === beijing.id, 'Reload lost capsule order');
   check(nodes.nodes.findIndex((node) => node.id === 'sample-0') > nodes.nodes.findIndex((node) => node.id === 'sample-1'), 'Reload lost accessible reorder');
+  check(nodes.nodes.find((node) => node.id === manuallyCreated.id)?.categoryId === peopleCategory.id, 'Reload lost the manually created categorized node');
+  check(nodes.nodes.find((node) => node.id === uncategorizedCreated.id)?.categoryId === undefined, 'Reload lost the manually created uncategorized node');
+  check(nodes.nodes.find((node) => node.name === '空分类首个节点')?.categoryId === emptyCategory.id, 'Reload lost the empty-category node');
   await capture('nodes-classified-directory-mobile');
   passed.push('persisted rename, aliases, biography and remount hydration');
   nodes.openNode('林老师'); await until(() => button('细节'), 'restored detail'); await click('细节');
   await capture('node-details-desktop');
   nodes.closeNode(); await delay(); await labelledClick('管理节点分类与排序');
   assertFits(); await capture('node-management-desktop');
+  await labelledClick('在人物下新增节点'); await input('新节点名称', '桌面新增节点');
+  document.querySelector('[aria-label="新节点名称"]')!.scrollIntoView({ block: 'center' });
+  assertFits(); await capture('node-create-desktop');
+  await labelledClick('取消新增节点');
   await labelledClick('返回节点列表');
   data.setNodes((previous) => [...previous, { id: 'merge-source', name: '浩特', aliases: ['小浩'], description: '待合并简介', categoryId: friendCategory.id, createdAt: 1, updatedAt: 1 }]);
   data.setLogs((previous) => [...previous, fixture('merge-source-log', '和 [[浩特]] 见面。', 1), fixture('merge-overlap', '[[林老师]] 和 ［［小浩丨浩特］］ 讨论。', 2)]); await delay();

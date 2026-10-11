@@ -1,5 +1,6 @@
 /**
  * @file NodeManageView.tsx
+ * @updated 2026-10-11: Adds inline node creation below each category, including uncategorized, with cancellation and hardware-back support.
  * @updated 2026-10-11: Adds inline category renaming and confirmed category deletion; selected-node controls only move/order nodes.
  * @updated 2026-10-07: Matches the search-page header and shared top safe-area spacing.
  * @input Node metadata, category order and shared pointer drag lifecycle
@@ -8,7 +9,7 @@
  * @updated 2026-10-07: Adds touch/mouse dragging, edge scrolling and accessible move controls.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronLeft, GripVertical, Pencil, Search, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronLeft, GripVertical, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { NodeCategoryCreator } from '../../components/NodeCategoryCreator';
 import { NodeCategorySelect } from '../../components/NodeCategorySelect';
@@ -24,7 +25,7 @@ type DropTarget = { categoryId: string; targetId?: string; after: boolean };
 const resolveIntent = () => 'drag' as const;
 
 export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
-  const { nodes, nodeCategories, moveNode, reorderCategory, renameCategory, removeCategory } = useNodes();
+  const { nodes, nodeCategories, addNode, moveNode, reorderCategory, renameCategory, removeCategory } = useNodes();
   const { isPrivacyMode } = usePrivacy();
   const { addToast } = useToast();
   const [query, setQuery] = useState('');
@@ -32,6 +33,7 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
   const [active, setActive] = useState<DragItem | null>(null);
   const [target, setTarget] = useState<DropTarget | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [creatingNode, setCreatingNode] = useState<{ categoryId: string; name: string } | null>(null);
   const [editingCategory, setEditingCategory] = useState<{ id: string; name: string } | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<{ id: string; name: string } | null>(null);
   const activeRef = useRef<DragItem | null>(null);
@@ -42,9 +44,9 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
   const clear = useCallback(() => { activeRef.current = null; setActive(null); setTarget(null); }, []);
   useEffect(() => registerHardwareBackHandler(() => { if (activeRef.current) clear(); else onBack(); return true; }), [clear, onBack]);
   useEffect(() => {
-    if (!editingCategory && !deletingCategory) return;
-    return registerHardwareBackHandler(() => { setEditingCategory(null); setDeletingCategory(null); return true; });
-  }, [editingCategory, deletingCategory]);
+    if (!editingCategory && !deletingCategory && !creatingNode) return;
+    return registerHardwareBackHandler(() => { setEditingCategory(null); setDeletingCategory(null); setCreatingNode(null); return true; });
+  }, [editingCategory, deletingCategory, creatingNode]);
   const locate = useCallback((x: number, y: number): DropTarget | null => {
     const source = activeRef.current;
     if (!source) return null;
@@ -125,7 +127,7 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
   };
   const siblings = selected ? nodes.filter((node) => getNodeCategoryId(node, nodeCategories) === getNodeCategoryId(selected, nodeCategories)) : [];
   const selectedIndex = siblings.findIndex((node) => node.id === selectedId);
-  return <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf9f6] pt-[var(--app-safe-area-top,0px)]" data-testid="node-management" onPointerCancel={clear} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); if (deletingCategory) setDeletingCategory(null); else if (editingCategory) setEditingCategory(null); else if (activeRef.current) clear(); else onBack(); } }}>
+  return <div className="fixed inset-0 z-[60] flex flex-col bg-[#faf9f6] pt-[var(--app-safe-area-top,0px)]" data-testid="node-management" onPointerCancel={clear} onKeyDown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); if (deletingCategory) setDeletingCategory(null); else if (editingCategory) setEditingCategory(null); else if (creatingNode) setCreatingNode(null); else if (activeRef.current) clear(); else onBack(); } }}>
     <header className="flex shrink-0 items-center gap-3 border-b border-stone-100 bg-[#faf9f6]/80 px-4 pb-3 pt-4 backdrop-blur-md">
       <button type="button" aria-label="返回节点列表" onClick={onBack} className="p-1 text-stone-400 hover:text-stone-600"><ChevronLeft size={24} /></button>
       <h1 className="text-lg font-bold text-stone-800">管理节点</h1><span className="ml-auto font-mono text-xs text-stone-400">{nodes.length}</span>
@@ -156,8 +158,8 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
               </form> : <h2 className="min-w-0 break-words text-xs font-semibold text-stone-700">{group.name}</h2>}
               <span className="font-mono text-[10px] text-stone-400">{visible.length}</span>
               {group.id && <div className="ml-auto flex shrink-0 gap-1">
-                <button type="button" aria-label={`修改分类：${group.name}`} onClick={() => setEditingCategory({ id: group.id, name: group.name })} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil size={13} /></button>
-                <button type="button" aria-label={`删除分类：${group.name}`} onClick={() => { setEditingCategory(null); setDeletingCategory({ id: group.id, name: group.name }); }} className="p-1.5 text-stone-400 hover:text-red-500"><Trash2 size={13} /></button>
+                <button type="button" aria-label={`修改分类：${group.name}`} onClick={() => { setCreatingNode(null); setEditingCategory({ id: group.id, name: group.name }); }} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil size={13} /></button>
+                <button type="button" aria-label={`删除分类：${group.name}`} onClick={() => { setCreatingNode(null); setEditingCategory(null); setDeletingCategory({ id: group.id, name: group.name }); }} className="p-1.5 text-stone-400 hover:text-red-500"><Trash2 size={13} /></button>
                 <button type="button" aria-label={`上移分类：${group.name}`} disabled={groupIndex === 0} onClick={() => reorderCategory(group.id, nodeCategories[groupIndex - 1].id)} className="p-1.5 text-stone-400 disabled:opacity-20"><ArrowUp size={13} /></button><button type="button" aria-label={`下移分类：${group.name}`} disabled={groupIndex === nodeCategories.length - 1} onClick={() => reorderCategory(group.id, nodeCategories[groupIndex + 1].id, true)} className="p-1.5 text-stone-400 disabled:opacity-20"><ArrowDown size={13} /></button>
               </div>}
             </div>
@@ -169,6 +171,22 @@ export const NodeManageView: React.FC<{ onBack: () => void }> = ({ onBack }) => 
               </button>)}
               {!visible.length && <span className="py-2 text-xs text-stone-400">{search ? '没有找到节点' : '暂无节点'}</span>}
             </div>
+            {creatingNode?.categoryId === group.id ? <form className="flex min-w-0 items-center gap-1 border-b border-stone-300" onSubmit={(event) => {
+              event.preventDefault();
+              try {
+                addNode(creatingNode.name, group.id);
+                setAnnouncement(`${creatingNode.name.trim()}已添加到${group.name}`);
+                setCreatingNode(null);
+                setQuery('');
+                addToast('success', '节点已新增');
+              } catch (error) {
+                addToast('error', error instanceof Error ? error.message : '新增节点失败');
+              }
+            }}>
+              <input autoFocus aria-label="新节点名称" placeholder="节点名称" value={creatingNode.name} onChange={(event) => setCreatingNode({ categoryId: group.id, name: event.target.value })} className="min-w-0 flex-1 bg-transparent py-2 text-sm text-stone-700 outline-none placeholder:text-stone-400" />
+              <button type="submit" aria-label="保存新节点" disabled={!creatingNode.name.trim()} className="p-2 text-stone-600 disabled:opacity-30"><Check size={14} /></button>
+              <button type="button" aria-label="取消新增节点" onClick={() => setCreatingNode(null)} className="p-2 text-stone-400"><X size={14} /></button>
+            </form> : <button type="button" aria-label={`在${group.name}下新增节点`} onClick={() => { setSelectedId(null); setEditingCategory(null); setCreatingNode({ categoryId: group.id, name: '' }); }} className="inline-flex items-center gap-1 py-2 text-xs text-stone-500 hover:text-stone-900"><Plus size={13} />新增节点</button>}
           </section>;
         })}
       </div>
