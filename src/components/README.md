@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-11: `DetailTimelineCard` lets users collapse linked reviews beside the section title, initially renders up to ten cards and adds up to ten per “查看更多” click. Reopening reviews or switching entity/period resets the batch; record history stays visible below. `__tests__/nodeRendererHarness.tsx` covers batching, collapse, period filtering and mobile/desktop layouts.
+
 Update 2026-10-11: `CardBackgroundSelector` and managed images in `IconRenderer` load original theme assets directly, without thumbnail file dependencies.
 
 Update 2026-10-11: `NodeTextEditor` reuses `NoteAutocompleteTextarea` for guide answers, preserving node shortcuts, inline ghost suggestions, Tab/touch acceptance and IME protection. `ReviewGuideTab` forwards full log history from daily, weekly and monthly views.

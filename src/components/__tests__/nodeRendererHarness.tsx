@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-11: Covers linked-review ten-card batches, collapse/reopen, period resets, preserved data and mobile/desktop layouts.
  * @updated 2026-10-11: Checks management omits node deletion, keeps detail deletion coverage and mirrors the app's data-ready startup gate.
  * @updated 2026-10-11: Covers category rename/removal, deletion cancellation/back keys, cross-review unlinking and deletion persistence.
  * @updated 2026-10-08: Checks saved and AI-generated Markdown headings/list styles with production CSS.
@@ -146,6 +147,64 @@ async function run() {
   check(document.querySelector('[aria-label="查看节点：杭州"]'), 'Timeline wiki-link is not clickable');
   check([...document.querySelectorAll('[aria-label="查看节点：小林"]')].some((element) => element.textContent === '林林'), 'Alias label was replaced by node name');
   assertFits(); await capture('node-timeline-mobile');
+  const reviewDate = new Date();
+  const reviewYear = reviewDate.getFullYear();
+  const reviewMonth = String(reviewDate.getMonth() + 1).padStart(2, '0');
+  const previousMonth = new Date(reviewYear, reviewDate.getMonth() - 1, 1);
+  const previousPeriod = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}`;
+  const batchReviews = Array.from({ length: 23 }, (_, index) => ({
+    id: `batch-review-${index}`, date: `${reviewYear}-${reviewMonth}-${String(index + 1).padStart(2, '0')}`, createdAt: 1, updatedAt: 1,
+    answers: [{ questionId: 'batch-question', question: `回顾问题 ${index + 1}`, answer: `和 [[小林]] 的第 ${index + 1} 次回顾。` }]
+  }));
+  reviews.setDailyReviews(batchReviews);
+  reviews.setWeeklyReviews([{ id: 'batch-weekly', weekStartDate: `${previousPeriod}-01`, weekEndDate: `${previousPeriod}-07`, createdAt: 1, updatedAt: 1, answers: [{ questionId: 'weekly-question', question: '上月周报', answer: '与 [[小林]] 的每周回顾。' }] }]);
+  reviews.setMonthlyReviews([{ id: 'batch-monthly', monthStartDate: `${previousPeriod}-01`, monthEndDate: `${previousPeriod}-28`, createdAt: 1, updatedAt: 1, answers: [{ questionId: 'monthly-question', question: '上月月报', answer: '与 [[小林]] 的每月回顾。' }] }]);
+  await delay();
+  const reviewCards = () => document.querySelectorAll('[aria-label="关联回顾"] article');
+  const moreReviews = () => [...document.querySelectorAll<HTMLButtonElement>('[aria-label="关联回顾"] button')].find((element) => element.textContent?.trim() === '查看更多');
+  const timelineScroll = document.querySelector<HTMLElement>('[role="dialog"] .overflow-y-auto')!;
+  const batchSnapshot = JSON.stringify([reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews, data.logs]);
+  check(reviewCards().length === 10 && moreReviews(), 'Initial review batch did not stop at ten');
+  check(reviewCards()[0].textContent?.includes('回顾问题 23'), 'Review batching lost newest-first ordering');
+  check(document.getElementById(document.querySelector('[aria-label="收起关联回顾"]')!.getAttribute('aria-controls')!), 'Collapse control is not associated with its review list');
+  assertFits(); await capture('node-review-batches-mobile');
+  await click('查看更多'); check(reviewCards().length === 20 && moreReviews(), 'Second review batch did not add ten');
+  // Unrelated updates must not reset an already expanded batch.
+  data.setNodes((previous) => [...previous]); await delay();
+  check(reviewCards().length === 20, 'Rerender unexpectedly reset review pagination');
+  await click('查看更多'); check(reviewCards().length === 25 && !moreReviews(), 'Final partial batch or end-of-list control is incorrect');
+  check(document.querySelector('[aria-label="关联回顾"]')?.textContent?.includes('上月周报') && document.querySelector('[aria-label="关联回顾"]')?.textContent?.includes('上月月报'), 'Older weekly/monthly reviews are missing from later batches');
+  timelineScroll.scrollTop = 0;
+  await labelledClick('收起关联回顾');
+  check(reviewCards().length === 0 && !moreReviews(), 'Collapsing reviews left review content visible');
+  check(document.querySelector('[aria-label="展开关联回顾"]')?.getAttribute('aria-expanded') === 'false', 'Collapsed accessibility state is incorrect');
+  check(document.querySelector('[aria-label^="打开记录："]'), 'Collapsing reviews hid record history');
+  const historyHeading = [...document.querySelectorAll<HTMLElement>('[role="dialog"] span')].find((element) => element.textContent?.trim() === 'History (All)')!;
+  check(historyHeading.getBoundingClientRect().bottom < window.innerHeight, 'Collapsed reviews still push history outside the mobile viewport');
+  assertFits(); await capture('node-review-collapsed-mobile');
+  await labelledClick('展开关联回顾'); check(reviewCards().length === 10, 'Reopening reviews did not restore the first batch');
+  await click('查看更多');
+  await click(`${reviewDate.getMonth() + 1}月`);
+  check(reviewCards().length === 10 && document.querySelector('[aria-label="关联回顾"]')?.textContent?.includes('23'), 'Month filtering did not reset the first batch/count');
+  await click('查看更多'); check(reviewCards().length === 20, 'Filtered review batch did not add ten');
+  const monthHeading = () => [...document.querySelectorAll<HTMLSpanElement>('[role="dialog"] span')].find((element) => /^\d{4}\.\d{2}$/.test(element.textContent?.trim() || ''))!;
+  monthHeading().parentElement!.querySelectorAll<HTMLButtonElement>('button')[0].click(); await delay();
+  check(reviewCards().length === 2 && !moreReviews(), 'Changing month retained cards from the previous period');
+  monthHeading().parentElement!.querySelectorAll<HTMLButtonElement>('button')[1].click(); await delay();
+  check(reviewCards().length === 10 && moreReviews(), 'Changing back to the month did not reset pagination');
+  await click('查看更多');
+  await click('全部'); check(reviewCards().length === 10, 'Returning to all reviews did not reset pagination');
+  timelineScroll.scrollTop = 0;
+  assertFits(); await capture('node-review-batches-desktop');
+  await labelledClick('收起关联回顾');
+  timelineScroll.scrollTop = 0;
+  assertFits(); await capture('node-review-collapsed-desktop');
+  check(JSON.stringify([reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews, data.logs]) === batchSnapshot, 'Review pagination/collapse mutated saved data');
+  reviews.setDailyReviews([]); reviews.setWeeklyReviews([]); reviews.setMonthlyReviews([]); await delay();
+  check(!document.querySelector('[aria-label="关联回顾"]'), 'Empty review section is still visible');
+  timelineScroll.scrollTop = 0;
+  await capture('node-timeline-mobile');
+  passed.push('review batches 10/20/25, newest-first mixed review kinds, stable rerenders, collapse with visible history, reopen/month/all reset, unchanged data and mobile/desktop layouts');
   await click('细节');
   await select('节点分类', peopleCategory.id);
   check(nodes.nodes.find((node) => node.id === 'person')?.categoryId === peopleCategory.id, 'Category assignment failed');

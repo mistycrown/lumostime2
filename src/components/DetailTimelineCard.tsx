@@ -1,5 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-10-11: Adds collapsible linked reviews with ten-card batches and resets pagination when the entity or period changes.
  * @updated 2026-10-07: Renders linked daily-review answers as independent cards above the Log history and keeps Log rows keyboard-accessible without nested buttons.
  * @updated 2026-10-06: Renders node links, current-node highlights and saved-note suggestions.
  * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
@@ -27,7 +28,7 @@
  */
 import React, { useMemo } from 'react';
 import { ActivityAttributeDefinition, ActivityKeyword, Log, Category } from '../types';
-import { Clock, Zap, Heart, MessageCircle, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
+import { Clock, Zap, Heart, MessageCircle, ChevronDown, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
 import { useData } from '../contexts/DataContext';
@@ -80,6 +81,7 @@ const handleKeyboardActivation = (
 };
 
 const REVIEW_KIND_LABEL: Record<NodeReviewKind, string> = { daily: '日报', weekly: '周报', monthly: '月报' };
+const REVIEW_BATCH_SIZE = 10;
 
 const formatReviewPeriod = (entry: Pick<DetailReviewEntry, 'kind' | 'startDate' | 'endDate'>): string => {
     if (entry.kind === 'daily') return entry.startDate;
@@ -229,6 +231,9 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
     const { timelineStyleTheme, timelineStyleConfigs, customStickerSets, customStickers } = useSettings();
     const activeConfig = timelineStyleConfigs[timelineStyleTheme];
     const [viewMode, setViewMode] = React.useState<DetailTimelineViewMode>(defaultViewMode);
+    const [reviewsCollapsed, setReviewsCollapsed] = React.useState(false);
+    const [visibleReviewCount, setVisibleReviewCount] = React.useState(REVIEW_BATCH_SIZE);
+    const reviewListId = React.useId();
     const [calendarViewMode, setCalendarViewMode] = React.useState<'heatmap' | 'gallery' | 'keywords'>(tagStickerEnabled ? 'keywords' : 'heatmap');
     const timelineKeywordRecords = useMemo(
         () => keywordRecords || getDetailTimelineKeywordRecords(keywords),
@@ -255,6 +260,15 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     const displayMonth = displayDate.getMonth();
     const displayYear = displayDate.getFullYear();
+    const reviewPeriodKey = viewMode === 'month' ? `${displayYear}-${displayMonth}` : 'all';
+
+    React.useEffect(() => {
+        setVisibleReviewCount(REVIEW_BATCH_SIZE);
+    }, [entityInfo.id, entityInfo.type, reviewPeriodKey]);
+
+    React.useEffect(() => {
+        setReviewsCollapsed(false);
+    }, [entityInfo.id, entityInfo.type]);
 
     const logCollectionNames = useMemo(() => {
         const collectionById = new Map(collections.map((collection) => [collection.id, collection]));
@@ -1215,9 +1229,24 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                         <Clock size={14} className="text-stone-400" />
                         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-400">关联回顾</h2>
                         <span className="font-mono text-[10px] text-stone-300">{reviewsToDisplay.length}</span>
+                        <button
+                            type="button"
+                            aria-label={reviewsCollapsed ? '展开关联回顾' : '收起关联回顾'}
+                            aria-expanded={!reviewsCollapsed}
+                            aria-controls={reviewListId}
+                            onClick={() => {
+                                setReviewsCollapsed((collapsed) => !collapsed);
+                                setVisibleReviewCount(REVIEW_BATCH_SIZE);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-2 text-xs text-stone-400 hover:text-stone-700"
+                        >
+                            <ChevronDown size={14} aria-hidden="true" className={`transition-transform ${reviewsCollapsed ? '-rotate-90' : ''}`} />
+                            {reviewsCollapsed ? '展开' : '收起'}
+                        </button>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {reviewsToDisplay.map((entry) => {
+                    {!reviewsCollapsed && <div id={reviewListId} className="space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {reviewsToDisplay.slice(0, visibleReviewCount).map((entry) => {
                             const entryDate = new Date(`${entry.startDate}T12:00:00`);
                             const dateLabel = Number.isNaN(entryDate.getTime())
                                 ? entry.startDate
@@ -1245,7 +1274,18 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                 </article>
                             );
                         })}
-                    </div>
+                      </div>
+                      {visibleReviewCount < reviewsToDisplay.length && (
+                          <button
+                              type="button"
+                              onClick={() => setVisibleReviewCount((count) => count + REVIEW_BATCH_SIZE)}
+                              className="flex w-full items-center justify-center gap-1 py-3 text-xs text-stone-500 hover:text-stone-900"
+                          >
+                              查看更多
+                              <ChevronDown size={14} aria-hidden="true" />
+                          </button>
+                      )}
+                    </div>}
                 </section>
             )}
 
