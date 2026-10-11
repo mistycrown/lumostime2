@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-11: Adds confirmed node deletion and discards pending biography/AI edits before removal.
  * @updated 2026-10-08: Styles biography Markdown explicitly so headings and list markers survive the CSS reset.
  * @updated 2026-10-07: Renders daily, weekly and monthly linked answers as filtered independent review cards and routes each card to its matching guide view.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
@@ -25,6 +26,7 @@ import { NodeText } from '../components/NodeText';
 import { NodeCategoryCreator } from '../components/NodeCategoryCreator';
 import { NodeCategorySelect } from '../components/NodeCategorySelect';
 import { NodeMergePanel } from '../components/NodeMergePanel';
+import { NodeDeleteButton } from '../components/NodeDeleteButton';
 import { buildNodeReviewAnswers, getNodeCandidates, getNodeCategoryId, isValidNodeName } from '../utils/nodeUtils';
 import type { NodeReviewAnswer, NodeReviewKind } from '../utils/nodeUtils';
 import { formatNodeDescription, generateNodeDescriptionResult } from '../services/nodeDescriptionService';
@@ -139,6 +141,7 @@ const NodeDetailsEditor: React.FC<{ node: NoteNode; logs: Log[]; reviewAnswers?:
       )}
     </section>
     <NodeMergePanel node={node} onBeforeMerge={() => { revision.current += 1; draft.commit(); }} />
+    <NodeDeleteButton node={node} onBeforeDelete={() => { revision.current += 1; draft.discard(); }} />
   </div>;
 };
 

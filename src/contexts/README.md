@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-11: `NodeContext` supports category renaming/removal and node deletion. Removing a category retains its nodes under 未分类; deleting a node unlinks its logs and all daily/weekly/monthly review answers, preserving display text and clearing deleted navigation entries.
+
 Update 2026-10-09: `NavigationContext.tsx` adds the `personal_dictionary` settings submenu; the existing main-list and hardware-back behavior applies.
 
 Update 2026-10-07: NodeContext optionally consumes ReviewContext, indexes daily answers beside logs, discovers bracketed nodes from answers, and retargets answer links during rename/merge without breaking lightweight NodeProvider hosts.

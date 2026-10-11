@@ -1,5 +1,6 @@
 /**
  * @file NodesSettingsView.tsx
+ * @updated 2026-10-11: Falls back to all categories after the active filter category is removed.
  * @updated 2026-10-07: Matches the search-page header spacing, title size and shared top safe area.
  * @updated 2026-10-07: Uses a searchable category picker and adds capsule management with manual ordering.
  * @updated 2026-10-07: Groups compact node rows by user-created categories and an uncategorized fallback.
@@ -8,7 +9,7 @@
  * @pos View (Settings / Content)
  * @updated 2026-10-06: Added the print-inspired node directory.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
 import { useNodes } from '../../contexts/NodeContext';
 import { usePrivacy } from '../../contexts/PrivacyContext';
@@ -24,6 +25,9 @@ export const NodesSettingsView: React.FC<{ onBack: () => void }> = ({ onBack }) 
   const [sort, setSort] = useState<'manual' | 'recent' | 'count' | 'name'>('manual');
   const [managing, setManaging] = useState(false);
   const [categoryId, setCategoryId] = useState('all');
+  useEffect(() => {
+    if (categoryId && categoryId !== 'all' && !nodeCategories.some((category) => category.id === categoryId)) setCategoryId('all');
+  }, [categoryId, nodeCategories]);
   const visibleNodes = useMemo(() => {
     const search = query.trim().toLocaleLowerCase();
     return nodes.filter((node) => (categoryId === 'all' || getNodeCategoryId(node, nodeCategories) === categoryId)

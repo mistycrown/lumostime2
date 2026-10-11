@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-11: Verifies deletion preserves record text/alias labels, prevents rediscovery and retains category members.
  * @updated 2026-10-07: Covers daily, weekly and monthly review indexing plus cross-kind rename/merge transforms.
  * @updated 2026-10-07: Covers primary-node merge, complete backlink retargeting and rename across all records.
  * @updated 2026-10-07: Covers full-width links and quick insertion selections, caret positions and bracket completion.
@@ -11,10 +12,68 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Log, MonthlyReview, NoteNode, ReviewAnswer, WeeklyReview } from '../types';
-import { buildNodeIndex, buildNodeReviewAnswers, createNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeInAnswers } from './nodeUtils';
+import { buildNodeIndex, buildNodeReviewAnswers, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, getNodeCategoryId, getNodeNames, insertNodeBrackets, linkNodeInText, mergeNodes, moveNodeToCategory, parseNodeLinks, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers, unlinkNodeInText } from './nodeUtils';
 
 const node = (name: string, aliases: string[] = []): NoteNode => ({ id: name, name, aliases, description: '已有简介', createdAt: 1, updatedAt: 1 });
 const log = (id: string, note: string, startTime = 1): Log => ({ id, note, startTime, endTime: startTime + 1000, duration: 1, categoryId: 'c', activityId: 'a' });
+
+describe('node and category deletion', () => {
+  it('unlinks exact targets in every delimiter form while retaining labels and unrelated syntax', () => {
+    const text = '[[小林]] ［［ 林林 丨 小林 ］］ [［小林]］ [[小林同学]] [[小林丨杭州]] [[[小林]]] [[小林|错误]] 小林';
+    expect(unlinkNodeInText(text, '小林')).toBe('小林 林林 小林 [[小林同学]] [[小林丨杭州]] [[[小林]]] [[小林|错误]] 小林');
+    expect(unlinkNodeInText('[[C++]] [[C++项目]]', 'C++')).toBe('C++ [[C++项目]]');
+  });
+
+  it('removes metadata and all linked historical logs without removing records or rediscovering the node', () => {
+    const source = node('小林', ['林林']);
+    const other = node('杭州');
+    const records = [log('old', '[[小林]] [[杭州]]', -100), log('alias', '［［林林丨小林］］'), log('ordinary', '小林'), { ...log('empty', ''), note: undefined }];
+    const result = deleteNode([source, other], records, source.id);
+    expect(result.nodes).toEqual([other]);
+    expect(result.nodes[0]).toBe(other);
+    expect(result.logs).toHaveLength(records.length);
+    expect(result.logs[0]).toEqual({ ...records[0], note: '小林 [[杭州]]' });
+    expect(result.logs[1].note).toBe('林林');
+    expect(result.logs[2]).toBe(records[2]);
+    expect(result.logs[3]).toBe(records[3]);
+    expect(discoverNodes(result.nodes, result.logs)).toBe(result.nodes);
+    expect(records[0].note).toContain('[[小林]]');
+    expect(deleteNode(result.nodes, result.logs, source.id)).toEqual(result);
+  });
+
+  it('unlinks review answers with alias preservation and unchanged-answer identity', () => {
+    const answers: ReviewAnswer[] = [{ questionId: 'q', question: 'Q', answer: '[[林林丨小林]] [[小林]] [[杭州]]' }, { questionId: 'other', question: 'Q', answer: '小林' }];
+    const result = unlinkNodeInAnswers(answers, '小林');
+    expect(result[0]).toEqual({ ...answers[0], answer: '林林 小林 [[杭州]]' });
+    expect(result[1]).toBe(answers[1]);
+    expect(answers[0].answer).toContain('[[小林]]');
+  });
+
+  it('renames categories without changing identity/order and validates conflicting names', () => {
+    const categories = [createNodeCategory([], '人物', 1), createNodeCategory([], '地点', 2)];
+    const result = renameNodeCategory(categories, categories[0].id, ' 朋友 ', 10);
+    expect(result[0]).toEqual({ ...categories[0], name: '朋友', updatedAt: 10 });
+    expect(result[1]).toBe(categories[1]);
+    expect(renameNodeCategory(result, categories[0].id, '朋友')).toBe(result);
+    for (const name of ['地点', '未分类', '全部', '全部分类', '  ', '甲\n乙']) expect(() => renameNodeCategory(categories, categories[0].id, name)).toThrow();
+    expect(() => renameNodeCategory(categories, 'missing', '朋友')).toThrow('不存在');
+    expect(categories[0].name).toBe('人物');
+  });
+
+  it('deletes a category while preserving node metadata/order and moving only its members to uncategorized', () => {
+    const categories = [createNodeCategory([], '人物'), createNodeCategory([], '地点')];
+    const nodes = [{ ...node('小林', ['林林']), categoryId: categories[0].id }, { ...node('杭州'), categoryId: categories[1].id }, node('项目')];
+    const result = deleteNodeCategory(nodes, categories, categories[0].id, 10);
+    expect(result.categories).toEqual([categories[1]]);
+    expect(result.nodes[0]).toEqual({ ...nodes[0], categoryId: undefined, updatedAt: 10 });
+    expect(result.nodes[1]).toBe(nodes[1]);
+    expect(result.nodes[2]).toBe(nodes[2]);
+    expect(nodes[0].categoryId).toBe(categories[0].id);
+    expect(deleteNodeCategory(nodes, categories, '')).toEqual({ nodes, categories });
+    expect(deleteNodeCategory(nodes, categories, 'missing')).toEqual({ nodes, categories });
+    expect(deleteNodeCategory([], categories, categories[0].id).categories).toEqual([categories[1]]);
+  });
+});
 
 describe('node text relationships', () => {
   it('merges into the chosen primary without dropping aliases, biographies, category, order or record metadata', () => {

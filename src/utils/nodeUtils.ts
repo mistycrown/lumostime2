@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-11: Removes node links without losing display text and supports category rename/removal.
  * @updated 2026-10-07: Indexes daily, weekly and monthly review answers with typed periods and applies node mutations across all review kinds.
  * @updated 2026-10-07: Merges nodes into a chosen primary, preserving labels/metadata and retargeting every linked log.
  * @updated 2026-10-07: Recognizes full-width brackets and supplies caret-aware quick bracket insertion.
@@ -224,12 +225,61 @@ export const renameNodeInAnswers = (answers: ReviewAnswer[], oldName: string, ne
   return next === text ? answer : { ...answer, answer: next };
 });
 
-export const createNodeCategory = (categories: NodeCategory[], name: string, now = Date.now()): NodeCategory => {
+export const unlinkNodeInText = (text: string, name: string): string => {
+  let result = '';
+  let offset = 0;
+  for (const link of parseNodeLinks(text)) {
+    result += text.slice(offset, link.start) + (link.name === name ? link.label || link.name : text.slice(link.start, link.end));
+    offset = link.end;
+  }
+  return result + text.slice(offset);
+};
+
+export const unlinkNodeInAnswers = (answers: ReviewAnswer[], name: string): ReviewAnswer[] => answers.map((answer) => {
+  const text = answer.answer || '';
+  const next = unlinkNodeInText(text, name);
+  return next === text ? answer : { ...answer, answer: next };
+});
+
+export const deleteNode = (nodes: NoteNode[], logs: Log[], id: string) => {
+  const source = nodes.find((node) => node.id === id);
+  if (!source) return { nodes, logs };
+  return {
+    nodes: nodes.filter((node) => node.id !== id),
+    logs: logs.map((log) => {
+      const note = unlinkNodeInText(log.note || '', source.name);
+      return note === (log.note || '') ? log : { ...log, note };
+    })
+  };
+};
+
+const validateNodeCategoryName = (categories: NodeCategory[], name: string, id?: string): string => {
   const normalized = name.trim();
   if (!normalized || /[\r\n]/.test(normalized)) throw new Error('请输入有效分类名称');
-  if (normalized === '未分类' || normalized === '全部') throw new Error('请使用其他分类名称');
-  if (categories.some((category) => category.name === normalized)) throw new Error('已存在同名分类');
+  if (['未分类', '全部', '全部分类'].includes(normalized)) throw new Error('请使用其他分类名称');
+  if (categories.some((category) => category.id !== id && category.name === normalized)) throw new Error('已存在同名分类');
+  return normalized;
+};
+
+export const createNodeCategory = (categories: NodeCategory[], name: string, now = Date.now()): NodeCategory => {
+  const normalized = validateNodeCategoryName(categories, name);
   return { id: crypto.randomUUID(), name: normalized, createdAt: now, updatedAt: now };
+};
+
+export const renameNodeCategory = (categories: NodeCategory[], id: string, name: string, now = Date.now()): NodeCategory[] => {
+  const source = categories.find((category) => category.id === id);
+  if (!source) throw new Error('分类不存在');
+  const normalized = validateNodeCategoryName(categories, name, id);
+  if (normalized === source.name) return categories;
+  return categories.map((category) => category.id === id ? { ...category, name: normalized, updatedAt: now } : category);
+};
+
+export const deleteNodeCategory = (nodes: NoteNode[], categories: NodeCategory[], id: string, now = Date.now()) => {
+  if (!id || !categories.some((category) => category.id === id)) return { nodes, categories };
+  return {
+    nodes: nodes.map((node) => node.categoryId === id ? { ...node, categoryId: undefined, updatedAt: now } : node),
+    categories: categories.filter((category) => category.id !== id)
+  };
 };
 
 export const getNodeCategoryId = (node: NoteNode, categories: NodeCategory[]): string => categories.some((category) => category.id === node.categoryId) ? node.categoryId! : '';

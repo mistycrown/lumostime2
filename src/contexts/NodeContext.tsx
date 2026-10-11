@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-11: Deletes nodes across logs/reviews/history and edits/removes categories while retaining member nodes.
  * @updated 2026-10-07: Indexes and mutates node links across daily, weekly and monthly reviews.
  * @updated 2026-10-07: Atomically renames/merges nodes with every referenced record and redirects merged navigation history.
  * @updated 2026-10-07: Exposes persisted node moves and category ordering for capsule management.
@@ -14,12 +15,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useData } from './DataContext';
 import { useOptionalReview } from './ReviewContext';
 import type { NoteNode, NodeCategory, ReviewAnswer } from '../types';
-import { buildNodeIndex, createNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeInAnswers } from '../utils/nodeUtils';
+import { buildNodeIndex, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
   nodeCategories: NodeCategory[];
   addCategory: (name: string, nodeId?: string) => NodeCategory;
+  renameCategory: (id: string, name: string) => void;
+  removeCategory: (id: string) => void;
+  removeNode: (id: string) => void;
   assignCategory: (nodeId: string, categoryId: string) => void;
   moveNode: (nodeId: string, categoryId: string, targetId?: string, after?: boolean) => void;
   reorderCategory: (categoryId: string, targetId: string, after?: boolean) => void;
@@ -78,6 +82,28 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const assignCategory = (nodeId: string, categoryId: string) => {
     if (categoryId && !nodeCategories.some((category) => category.id === categoryId)) throw new Error('分类不存在');
     setNodes((previous) => previous.map((node) => node.id === nodeId ? { ...node, categoryId: categoryId || undefined, updatedAt: Date.now() } : node));
+  };
+  const renameCategory = (id: string, name: string) => {
+    renameNodeCategory(nodeCategories, id, name);
+    setNodeCategories((previous) => renameNodeCategory(previous, id, name));
+  };
+  const removeCategory = (id: string) => {
+    if (!id || !nodeCategories.some((category) => category.id === id)) return;
+    setNodes((previous) => deleteNodeCategory(previous, nodeCategories, id).nodes);
+    setNodeCategories((previous) => previous.filter((category) => category.id !== id));
+  };
+  const removeNode = (id: string) => {
+    const source = nodes.find((node) => node.id === id);
+    if (!source) return;
+    updateNodeRecords((previousNodes, previousLogs) => deleteNode(previousNodes, previousLogs, id));
+    const unlinkReviews = <T extends { answers: ReviewAnswer[]; updatedAt: number }>(reviews: T[]): T[] => reviews.map((review) => {
+      const answers = unlinkNodeInAnswers(review.answers || [], source.name);
+      return answers.every((answer, index) => answer === review.answers?.[index]) ? review : { ...review, answers, updatedAt: Date.now() };
+    });
+    setDailyReviews((previous) => unlinkReviews(previous));
+    setWeeklyReviews((previous) => unlinkReviews(previous));
+    setMonthlyReviews((previous) => unlinkReviews(previous));
+    setHistory((previous) => previous.filter((nodeId) => nodeId !== id));
   };
   const updateNode = (id: string, patch: Pick<NoteNode, 'aliases' | 'description'>) => {
     setNodes((previous) => previous.map((node) => node.id === id ? {
@@ -141,5 +167,5 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else if (kind === 'weekly') setWeeklyReviews((previous) => linkAnswer(previous));
     else setMonthlyReviews((previous) => linkAnswer(previous));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addCategory, renameCategory, removeCategory, removeNode, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
 };

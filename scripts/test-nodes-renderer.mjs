@@ -1,5 +1,6 @@
 /**
  * @file test-nodes-renderer.mjs
+ * @updated 2026-10-11: Restores mobile viewport for late category/deletion screenshots.
  * @updated 2026-10-08: Repaints hidden renderer frames before capturing Markdown previews.
  * @updated 2026-10-07: Drives native mouse/touch input for capsule drag and category ordering.
  * @input Real node React renderer harness and production CSS from npm run build
@@ -56,6 +57,7 @@ app.whenReady().then(async () => {
     const capture = await win.webContents.executeJavaScript('window.__nodeRendererCapture');
     if (capture) {
       if (capture.endsWith('-desktop')) win.setSize(1100, 900);
+      if (capture.endsWith('-mobile')) win.setSize(390, 844);
       await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
       win.webContents.invalidate();
       await new Promise(resolve => setTimeout(resolve, 100));
