@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatBackgroundRecovery.test.ts
+ * @updated 2026-10-11: Verifies toast names use the recovered reply destination rather than a missing or obsolete session.
  * @input Background dispatch callbacks with a deleted conversation target
  * @output Regression coverage for reminder and system-trigger delivery without an existing chat
  * @pos Test (AI Background Workflow)
@@ -37,7 +38,7 @@ const createOptions = () => ({
   refreshAssistantNativeDiagnostics: vi.fn(),
   isOpenRef: { current: false },
   onUnreadAssistantMessage: vi.fn(),
-  getBackgroundPersonaDisplayName: vi.fn(() => 'AI'),
+  getBackgroundPersonaDisplayName: vi.fn((session) => session === 'recovered-session' ? '半两' : 'AI'),
   addToast: vi.fn()
 });
 
@@ -53,6 +54,7 @@ describe('background delivery after conversation deletion', () => {
     expect(options.onUnreadAssistantMessage).toHaveBeenCalledWith(1, {
       targetSessionId: 'recovered-session', targetMessageId: 'recovered-message'
     });
+    expect(options.addToast).toHaveBeenCalledWith('info', '半两：Reminder');
     expect(options.assistantScheduledTaskService.consumeTriggeredReminder).toHaveBeenCalledWith('reminder-1', expect.any(String));
   });
 
@@ -69,6 +71,7 @@ describe('background delivery after conversation deletion', () => {
     expect(options.onUnreadAssistantMessage).toHaveBeenCalledWith(1, {
       targetSessionId: 'recovered-session', targetMessageId: 'recovered-message'
     });
+    expect(options.addToast).toHaveBeenCalledWith('info', '半两：Reminder');
     expect(options.processingAssistantTriggerIdsRef.current.size).toBe(0);
   });
 

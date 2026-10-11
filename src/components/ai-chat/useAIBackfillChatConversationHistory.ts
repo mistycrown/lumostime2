@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatConversationHistory.ts
+ * @updated 2026-10-11: Resolves recovered background conversation names from persisted storage instead of falling back to AI for missing in-memory sessions.
  * @input Chat sessions, personas, and conversation-history helpers
  * @output Persona resolution, cached histories, retry histories, and time-sensitive history helpers
  * @pos Component Support (AI Integration)
@@ -49,9 +50,11 @@ export const useAIBackfillChatConversationHistory = ({
     buildConversationHistoryFromMessages(session, session.messages)
   ), [buildConversationHistoryFromMessages]);
 
-  const getBackgroundPersonaDisplayName = useCallback((targetSession?: AIChatSession): string => {
-    if (!targetSession) {
-      return 'AI';
+  const getBackgroundPersonaDisplayName = useCallback((targetSession?: AIChatSession | string): string => {
+    if (typeof targetSession === 'string' || !targetSession) {
+      return assistantOrchestratorService.getBackgroundPersonaDisplayName(
+        typeof targetSession === 'string' ? targetSession : undefined
+      );
     }
 
     return personaMap.get(targetSession.personaId)?.name

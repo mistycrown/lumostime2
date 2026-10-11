@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatModal.tsx
+ * @updated 2026-10-11: Defers native reply hydration until chat storage loads and resolves toast names from the persisted message destination.
  * @updated 2026-10-09: Forwards the shortcut settings opener to the AI homepage.
  * @updated 2026-10-09: Shares overlay visibility across home and conversation composers.
  * @updated 2026-10-09: Shares node dictionaries and reversible foreground node actions with chat and quick notes.
@@ -528,7 +529,8 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
   const defaultDateKey = useMemo(() => formatDateKey(defaultTargetDate), [defaultTargetDate]);
   const isAssistantBackgroundContextReady = isDataReady
     && isReviewReady
-    && isCategoryScopeReady;
+    && isCategoryScopeReady
+    && isChatStorageReady;
   const personaMap = useMemo(() => new Map(personas.map((persona) => [persona.id, persona])), [personas]);
   const {
     assistantAgentIntervalErrors,
@@ -998,6 +1000,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
 
   const refreshAssistantNativeDiagnostics = useCallback(async () => {
     try {
+      await aiChatStorageService.initialize();
       const result = await AssistantAgent.listDiagnostics();
       const normalizedEntries = normalizeAssistantNativeDiagnostics(result.entries);
       const backgroundTargetSessionId = resolveAssistantBackgroundSession(sessions)?.id;
@@ -1020,8 +1023,7 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
               ? { targetSessionId: latestLocation.sessionId, targetMessageId: latestLocation.messageId }
               : undefined
           );
-          const backgroundTargetSession = sessions.find((session) => session.id === backgroundTargetSessionId);
-          const personaName = getBackgroundPersonaDisplayName(backgroundTargetSession);
+          const personaName = getBackgroundPersonaDisplayName(latestLocation?.sessionId || backgroundTargetSessionId);
           addToast('info', `${personaName}：${hydrationResult.surfacedMessages[hydrationResult.surfacedMessages.length - 1]}`);
         }
       }

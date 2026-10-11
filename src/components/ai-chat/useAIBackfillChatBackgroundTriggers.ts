@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatBackgroundTriggers.ts
+ * @updated 2026-10-11: Uses recovered reply destinations for toast names and avoids stale persona callbacks.
  * @input Background assistant triggers, conversation history, and persistence callbacks
  * @output Background trigger processing handlers
  * @pos Component Support (AI Integration)
@@ -147,7 +148,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
               targetSessionId: result.targetSessionId || targetSession.id,
               ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
             });
-            addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+            addToast('info', `${getBackgroundPersonaDisplayName(result.targetSessionId || targetSession)}：${result.surfacedMessage}`);
           }
           return;
         }
@@ -174,7 +175,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
             targetSessionId: result.targetSessionId || targetSession?.id || '',
             ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
           });
-          addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+          addToast('info', `${getBackgroundPersonaDisplayName(result.targetSessionId || targetSession)}：${result.surfacedMessage}`);
         }
       } catch (error) {
         console.error('[AIBackfillChatModal] Assistant system turn failed', error);
@@ -286,7 +287,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
             targetSessionId: result.targetSessionId || targetSession.id,
             ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
           });
-          addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+          addToast('info', `${getBackgroundPersonaDisplayName(result.targetSessionId || targetSession)}：${result.surfacedMessage}`);
         }
       } catch (error) {
         console.error('[AIBackfillChatModal] Submitted-log assistant trigger failed', error);
@@ -297,6 +298,7 @@ export function useAIBackfillChatBackgroundTriggers(options: Record<string, any>
       buildBackgroundTurnRequest,
       categories,
       conversationHistoryCache,
+      getBackgroundPersonaDisplayName,
       getBackgroundTargetSession,
       isAssistantBackgroundContextReady,
       logs,

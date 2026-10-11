@@ -1,5 +1,6 @@
 /**
  * @file assistantOrchestratorService.ts
+ * @updated 2026-10-11: Waits for chat storage readiness and persists native reply deduplication independently of the capped debug history.
  * @input Assistant system triggers, local todo/log/session summaries, AI service access, and assistant memory
  * @output Background assistant turn decisions plus applied reminder or memory side effects
  * @pos Service (Assistant Orchestrator)
@@ -167,6 +168,8 @@ const CHAT_PERSONAS_KEY = 'lumostime_ai_chat_personas_v1';
 const ASSISTANT_DECISION_EVENT = 'lumostime:assistant-chat-updated';
 const ASSISTANT_BACKGROUND_CALL_HISTORY_KEY = 'lumostime_assistant_background_call_history_v1';
 const MAX_BACKGROUND_CALL_HISTORY = 100;
+const NATIVE_HANDLED_TRIGGER_IDS_KEY = 'lumostime_assistant_native_handled_trigger_ids_v1';
+const MAX_NATIVE_HANDLED_TRIGGER_IDS = 1000;
 const DEFAULT_PERSONA_ID = 'builtin-default';
 
 const createEphemeralMemory = (): AssistantMemory => ({
@@ -780,11 +783,27 @@ export const assistantOrchestratorService = {
     didUpdateMemory: boolean;
     didUpdateReminders: boolean;
   } {
+    if (!aiChatStorageService.isReady()) {
+      return {
+        surfacedMessages: [],
+        surfacedMessageLocations: [],
+        didHydrateHistory: false,
+        didUpdateMemory: false,
+        didUpdateReminders: false
+      };
+    }
+
+    const storedTriggerIds = safeParseJson<unknown>(localStorage.getItem(NATIVE_HANDLED_TRIGGER_IDS_KEY), []);
     const knownTriggerIds = new Set(
-      loadBackgroundCallHistory()
-        .map((entry) => entry.triggerId?.trim() || '')
+      [
+        ...(Array.isArray(storedTriggerIds) ? storedTriggerIds.filter((id): id is string => typeof id === 'string') : []),
+        ...loadBackgroundCallHistory().map((entry) => entry.triggerId?.trim() || '')
+      ]
         .filter(Boolean)
     );
+    const knownMessageHistoryIds = new Set(loadPersistedSessions().flatMap((session) => (
+      session.messages.map((message) => message.backgroundDebugHistoryId).filter(Boolean)
+    )));
     const assistantConfig = assistantAgentConfigService.getConfig();
     const surfacedMessages: string[] = [];
     const surfacedMessageLocations: PersistedAssistantMessageLocation[] = [];
@@ -797,7 +816,13 @@ export const assistantOrchestratorService = {
       .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
       .forEach((entry) => {
         const triggerId = entry.triggerId?.trim();
-        if (!triggerId || knownTriggerIds.has(triggerId)) {
+        if (!triggerId) {
+          return;
+        }
+        if (knownTriggerIds.has(triggerId) || knownMessageHistoryIds.has(buildNativeHydratedHistoryId(triggerId))) {
+          // Refresh recency while the trigger is still retained in native diagnostics.
+          knownTriggerIds.delete(triggerId);
+          knownTriggerIds.add(triggerId);
           return;
         }
 
@@ -955,6 +980,17 @@ export const assistantOrchestratorService = {
           surfacedMessageLocations.push(persistedLocation);
         }
       });
+
+    const serializedTriggerIds = JSON.stringify(
+      [...knownTriggerIds].slice(-MAX_NATIVE_HANDLED_TRIGGER_IDS)
+    );
+    if (localStorage.getItem(NATIVE_HANDLED_TRIGGER_IDS_KEY) !== serializedTriggerIds) {
+      try {
+        localStorage.setItem(NATIVE_HANDLED_TRIGGER_IDS_KEY, serializedTriggerIds);
+      } catch (error) {
+        console.warn('[assistantOrchestratorService] Failed to persist native reply deduplication', error);
+      }
+    }
 
     return {
       surfacedMessages,

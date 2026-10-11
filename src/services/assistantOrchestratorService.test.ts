@@ -1,5 +1,6 @@
 /**
  * @file assistantOrchestratorService.test.ts
+ * @updated 2026-10-11: Covers startup readiness, persistent native deduplication after history pruning, and migration from existing messages.
  * @input Mocked assistant turns, native diagnostics, memory, reminders, and persisted chats
  * @output Regression coverage for background assistant orchestration and native result hydration
  * @pos Test (Assistant Orchestrator)
@@ -121,13 +122,14 @@ const debugExchange = {
 };
 
 describe('assistantOrchestratorService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: createLocalStorageMock(),
       configurable: true
     });
 
     vi.clearAllMocks();
+    await aiChatStorageService.initialize();
 
     vi.mocked(assistantAgentConfigService.getConfig).mockReturnValue({
       enabled: true,
@@ -640,6 +642,77 @@ describe('assistantOrchestratorService', () => {
     expect(first.surfacedMessageLocations[0].sessionId).toBe(persisted[0].id);
     expect(second.surfacedMessages).toEqual([]);
     expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+  });
+
+  it('defers native replies until persisted storage is ready without consuming them', () => {
+    const entries: AssistantNativeDiagnosticEntry[] = [{
+      id: 'startup-reply', createdAt: '2026-10-11T10:00:01.000Z',
+      type: 'native_request_completed', level: 'success', message: 'Completed',
+      triggerId: 'startup-trigger', triggerType: 'checkin',
+      context: { outcome: 'reply', assistantReply: 'New reply' }
+    }];
+    const readiness = vi.spyOn(aiChatStorageService, 'isReady').mockReturnValueOnce(false);
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies(entries).surfacedMessages).toEqual([]);
+    expect(localStorage.getItem('lumostime_assistant_native_handled_trigger_ids_v1')).toBeNull();
+    expect(aiChatStorageService.getSessions()).toEqual([]);
+    readiness.mockRestore();
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies(entries).surfacedMessages).toEqual(['New reply']);
+  });
+
+  it('does not replay a delivered native reply after debug history and its conversation are cleared', () => {
+    const entries: AssistantNativeDiagnosticEntry[] = [{
+      id: 'read-reply', createdAt: '2026-10-11T10:00:01.000Z',
+      type: 'native_request_completed', level: 'success', message: 'Completed',
+      triggerId: 'read-trigger', triggerType: 'checkin',
+      context: { outcome: 'reply', assistantReply: 'Already read' }
+    }];
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies(entries).surfacedMessages).toEqual(['Already read']);
+    assistantOrchestratorService.clearBackgroundCallHistory();
+    aiChatStorageService.setSessions([]);
+    // Simulate a restarted WebView using only its persisted local data.
+    const savedTriggerIds = localStorage.getItem('lumostime_assistant_native_handled_trigger_ids_v1')!;
+    Object.defineProperty(globalThis, 'localStorage', { value: createLocalStorageMock(), configurable: true });
+    localStorage.setItem('lumostime_assistant_native_handled_trigger_ids_v1', savedTriggerIds);
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { showSystemNotification: true })).toMatchObject({
+      surfacedMessages: [], didHydrateHistory: false, didUpdateMemory: false, didUpdateReminders: false
+    });
+    expect(aiChatStorageService.getSessions()).toEqual([]);
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies([{
+      ...entries[0], id: 'new-reply', triggerId: 'new-trigger',
+      context: { outcome: 'reply', assistantReply: 'New unread reply' }
+    }]).surfacedMessages).toEqual(['New unread reply']);
+  });
+
+  it('recognizes legacy delivered messages when their capped debug history no longer contains the trigger', () => {
+    aiChatStorageService.setSessions([{
+      id: 'read-session', title: 'Chat', createdAt: 1, updatedAt: 1,
+      personaId: 'persona-1', contextCacheEnabled: true,
+      messages: [{ id: 'read-message', role: 'assistant', content: 'Already read', createdAt: 1,
+        backgroundDebugHistoryId: 'native:legacy-read-trigger' }]
+    }]);
+    const result = assistantOrchestratorService.hydrateNativeCompletedReplies([{
+      id: 'legacy-reply', createdAt: '2026-10-11T10:00:01.000Z',
+      type: 'native_request_completed', level: 'success', message: 'Completed',
+      triggerId: 'legacy-read-trigger', triggerType: 'checkin',
+      context: { outcome: 'reply', assistantReply: 'Already read' }
+    }], { showSystemNotification: true });
+    expect(result.surfacedMessages).toEqual([]);
+    expect((aiChatStorageService.getSessions()[0] as any).messages).toHaveLength(1);
+    expect(JSON.parse(localStorage.getItem('lumostime_assistant_native_handled_trigger_ids_v1')!)).toContain('legacy-read-trigger');
+    expect(assistantMemoryService.appendDecisionSummary).not.toHaveBeenCalled();
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+  });
+
+  it('resolves a recovered conversation name from persisted personas', () => {
+    aiChatStorageService.setSessions([{
+      id: 'recovered-session', title: 'Chat', createdAt: 1, updatedAt: 1,
+      personaId: 'renamed-persona', contextCacheEnabled: true,
+      messages: [{ id: 'user-message', role: 'user', content: 'Hello', createdAt: 1 }]
+    }]);
+    localStorage.setItem('lumostime_ai_chat_personas_v1', JSON.stringify([{ id: 'renamed-persona', name: '半两' }]));
+    expect(assistantOrchestratorService.getBackgroundPersonaDisplayName('recovered-session')).toBe('半两');
+    expect(assistantOrchestratorService.getBackgroundPersonaDisplayName()).toBe('半两');
   });
 
   it('persists a submitted-log user message when its target no longer exists', () => {

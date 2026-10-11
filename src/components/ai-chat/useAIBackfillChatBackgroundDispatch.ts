@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatBackgroundDispatch.ts
+ * @updated 2026-10-11: Uses completed reply destinations for toast names and refreshes persona callbacks after settings changes.
  * @input Native snapshot, assistant letter, and reminder dispatch dependencies
  * @output Background dispatch callbacks
  * @pos Component Support (AI Integration)
@@ -185,7 +186,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
             targetSessionId: result.targetSessionId || targetSession.id,
             ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
           });
-          addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+          addToast('info', `${getBackgroundPersonaDisplayName(result.targetSessionId || targetSession)}：${result.surfacedMessage}`);
         }
       }).catch((error) => {
         console.error('[AIBackfillChatModal] Assistant letter generation failed', error);
@@ -243,7 +244,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
             targetSessionId: result.targetSessionId || targetSession?.id || '',
             ...(result.persistedMessageId ? { targetMessageId: result.persistedMessageId } : {})
           });
-          addToast('info', `${getBackgroundPersonaDisplayName(targetSession)}：${result.surfacedMessage}`);
+          addToast('info', `${getBackgroundPersonaDisplayName(result.targetSessionId || targetSession)}：${result.surfacedMessage}`);
         }
       }).catch((error) => {
         console.error('[AIBackfillChatModal] Due reminder dispatch failed', error);
@@ -259,6 +260,7 @@ export function useAIBackfillChatBackgroundDispatch(options: Record<string, any>
       addToast,
       buildBackgroundTurnRequest,
       conversationHistoryCache,
+      getBackgroundPersonaDisplayName,
       getBackgroundTargetSession,
       isAssistantBackgroundContextReady,
       onUnreadAssistantMessage,
