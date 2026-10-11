@@ -1,6 +1,7 @@
 /**
  * @file NodeDetailView.tsx
  * @updated 2026-10-11: Adds confirmed node deletion and discards pending biography/AI edits before removal.
+ * @updated 2026-10-11: Uses the Lucide Orbit icon for node identity in the header and timeline metadata.
  * @updated 2026-10-08: Styles biography Markdown explicitly so headings and list markers survive the CSS reset.
  * @updated 2026-10-07: Renders daily, weekly and monthly linked answers as filtered independent review cards and routes each card to its matching guide view.
  * @updated 2026-10-07: Adds merging with primary-node choice and commits/invalidate pending biography edits.
@@ -12,7 +13,7 @@
  * @updated 2026-10-06: Added node details, buffered biography editing, AI generation and rename.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronRight, Loader2, Pencil, Plus, Save, Sparkles, X } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Orbit, Pencil, Plus, Save, Sparkles, X } from 'lucide-react';
 import type { DailyReview, Log, NoteNode } from '../types';
 import { useNodes } from '../contexts/NodeContext';
 import { useData } from '../contexts/DataContext';
@@ -200,7 +201,7 @@ export const NodeDetailView: React.FC<{
           <button type="submit" aria-label="保存名称" className="p-2 text-stone-600"><Check size={18} /></button>
           <button type="button" aria-label="取消重命名" onClick={() => setRenaming(false)} className="p-2 text-stone-400"><X size={18} /></button>
         </form> : <div className="flex items-start gap-3">
-          <span aria-hidden="true" className="pt-0.5 font-serif text-xl text-stone-300">[[]]</span>
+          <Orbit aria-hidden="true" size={20} strokeWidth={1.7} className="mt-0.5 shrink-0 text-stone-300" />
           <h1 data-node-name className="min-w-0 break-words text-2xl font-bold text-stone-900">{node.name}</h1>
           <button type="button" aria-label="重命名节点" onClick={() => { setName(node.name); setRenaming(true); }} className="mt-0.5 shrink-0 p-1.5 text-stone-400 hover:text-stone-700"><Pencil size={14} /></button>
         </div>}

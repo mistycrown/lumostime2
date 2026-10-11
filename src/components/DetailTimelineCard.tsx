@@ -1,6 +1,7 @@
 /**
  * @file DetailTimelineCard.tsx
  * @updated 2026-10-11: Adds collapsible linked reviews with ten-card batches and resets pagination when the entity or period changes.
+ * @updated 2026-10-11: Uses the Lucide Orbit icon for node identity in timeline metadata.
  * @updated 2026-10-07: Renders linked daily-review answers as independent cards above the Log history and keeps Log rows keyboard-accessible without nested buttons.
  * @updated 2026-10-06: Renders node links, current-node highlights and saved-note suggestions.
  * @updated 2026-10-02: Replaces keyword calendar colors with linked tag stickers when enabled, retaining color fallback and date navigation.
@@ -28,7 +29,7 @@
  */
 import React, { useMemo } from 'react';
 import { ActivityAttributeDefinition, ActivityKeyword, Log, Category } from '../types';
-import { Clock, Zap, Heart, MessageCircle, ChevronDown, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash } from 'lucide-react';
+import { Clock, Zap, Heart, MessageCircle, ChevronDown, ChevronLeft, ChevronRight, Grid, Image as ImageIcon, Hash, Orbit } from 'lucide-react';
 import { TimelineImage } from './TimelineImage';
 import { IconRenderer } from './IconRenderer';
 import { useData } from '../contexts/DataContext';
@@ -1480,7 +1481,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                             ))}
                                                             <span className="text-[10px] font-medium text-stone-500 border border-stone-200 px-2 py-0.5 rounded flex items-center gap-1 bg-stone-50/30">
                                                                 <span className="font-bold text-stone-400">
-                                                                    {entityInfo.type === 'node' ? '[[]]' : entityInfo.type === 'category' || entityInfo.type === 'activity' ? '#' : '%'}
+                                                                    {entityInfo.type === 'node' ? <Orbit aria-hidden="true" size={11} strokeWidth={1.7} /> : entityInfo.type === 'category' || entityInfo.type === 'activity' ? '#' : '%'}
                                                                 </span>
                                                                 <IconRenderer icon={entityInfo.icon || ''} uiIcon={category?.uiIcon} className="text-xs" />
                                                                 <span>{entityInfo.name}</span>

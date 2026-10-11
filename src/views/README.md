@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-11: `NodeDetailView.tsx` uses Lucide `Orbit` in place of the bracket glyph beside the node name.
+
 Update 2026-10-11: Custom sticker uploads in `SponsorshipView` use the original image file for previews, matching original-only theme storage and synchronization.
 
 Update 2026-10-11: Daily, weekly and monthly review guide answers receive full log history for the shared note-style inline autocomplete, alongside personal dictionary words and node names/aliases.
