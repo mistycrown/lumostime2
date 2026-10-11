@@ -5,6 +5,7 @@
  * @pos Test (UI Customization)
  * @description Guards the two integration edges that keep persisted mood-calendar backgrounds visible and synchronized.
  * @updated 2026-09-29: Added cold-start hydration and appearance-event contract coverage.
+ * @updated 2026-10-11: Checks the shared sync event list without depending on its historical variable name.
  */
 import { describe, expect, it } from 'vitest';
 import moodCalendarSource from '../components/MoodCalendar.tsx?raw';
@@ -17,6 +18,6 @@ describe('mood calendar background integration', () => {
 
   it('registers mood-calendar changes with appearance auto sync', () => {
     expect(syncManagerSource).toContain('MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT');
-    expect(syncManagerSource).toMatch(/appearanceEvents\s*=\s*\[[\s\S]*MOOD_CALENDAR_BACKGROUND_CHANGE_EVENT[\s\S]*\]/);
+    expect(syncManagerSource).toMatch(/\bconst\s+\w+\s*=\s*\[[^\]]*\bMOOD_CALENDAR_BACKGROUND_CHANGE_EVENT\b[^\]]*\]/);
   });
 });
