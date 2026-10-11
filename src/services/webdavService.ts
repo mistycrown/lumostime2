@@ -6,6 +6,7 @@
  * @description Manages WebDAV connections and file operations, handling platform-specific networking (Cordova HTTP for native, Proxy for web).
  * @updated 2026-08-11: Keeps nested-directory failures explicit for manual WebDAV folder setup and generates safe native download paths.
  * @updated 2026-10-10: Uses canonical WebDAV paths without cache-busting queries and retains fresh reads through cache-control headers.
+ * @updated 2026-10-11: Treats missing files as completed deletions without reporting WebDAV errors.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -423,7 +424,10 @@ export class WebDAVService {
             console.log(`[WebDAV] Deleting file: ${path}`);
             await this.client.deleteFile(path);
             return true;
-        } catch (error) {
+        } catch (error: any) {
+            if (Number(error?.status ?? error?.response?.status) === 404) {
+                return true;
+            }
             console.error('WebDAV Delete Error:', error);
             return false;
         }

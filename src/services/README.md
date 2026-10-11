@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-11: `syncService.ts` deletes only known cloud images absent from the current backup references, skips old deletion records for absent or restored images, and retains failed deletions for retries. `webdavService.ts` treats DELETE 404 as an already completed deletion.
+
 Update 2026-10-10: `webdavService.ts` uses canonical paths for uploads, downloads, and file metadata, fixing Nutstore HTTP 400 failures caused by timestamp query strings. Native and Web/Electron reads retain cache-control headers without changing filenames.
 
 Update 2026-10-09: `personalDictionaryService.ts` stores normalized words and emits preference-change events. `preferencesBackupService.ts` includes the dictionary in export/cloud backup, preserving existing words when older backups omit this key.

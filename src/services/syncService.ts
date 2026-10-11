@@ -4,6 +4,7 @@
  * @output Image sync operations and storage service selection
  * @pos Service
  * @description Handles one-way image sync for WebDAV, Tencent COS, and compatible S3 storage.
+ * @updated 2026-10-11: Skips absent/referenced remote deletions and preserves failed deletion records for retries.
  * @updated 2026-09-25: Supports grouped content/theme image manifests while preserving flat-list compatibility.
  * @updated 2026-04-19: Added compatible S3 support and allow callers to explicitly choose the target storage service so multiple configured providers do not cross-write images.
  */
@@ -129,18 +130,26 @@ export const syncService = {
 
       const deletedImages = imageService.getDeletedImages();
       if (deletedImages.length > 0) {
-        onProgress?.(`正在同步删除 ${deletedImages.length} 张图片...`);
-        for (const filename of deletedImages) {
+        // A restored reference takes precedence over a stale local deletion record.
+        // Only send DELETE for files known to exist at the current destination.
+        const completedDeletions = deletedImages.filter((filename) => localSet.has(filename)
+          || (cloudReferencedImages !== undefined && !cloudSet.has(filename)));
+        const toDelete = deletedImages.filter((filename) => !localSet.has(filename) && cloudSet.has(filename));
+        if (toDelete.length > 0) {
+          onProgress?.(`正在同步删除 ${toDelete.length} 张图片...`);
+        }
+        for (const filename of toDelete) {
           try {
             const deleted = await targetService.deleteImage(filename);
             if (deleted) {
               result.deletedRemote += 1;
+              completedDeletions.push(filename);
             }
           } catch (error) {
-            console.warn(`[Sync] Failed to delete remote image, ignore: ${filename}`, error);
+            console.warn(`[Sync] Failed to delete remote image, retry next upload: ${filename}`, error);
           }
         }
-        imageService.clearDeletedImages(deletedImages);
+        imageService.clearDeletedImages(completedDeletions);
       }
 
       const toUpload = Array.from(localSet).filter((filename) => localFileSet.has(filename) && !cloudSet.has(filename));

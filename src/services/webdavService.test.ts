@@ -4,6 +4,7 @@
  * @output Regression coverage for canonical backup/image paths, UTF-8 uploads, and fresh reads
  * @pos Test (Cloud Sync)
  * @updated 2026-10-10: Covers Nutstore-compatible native uploads and real WebDAV client requests.
+ * @updated 2026-10-11: Covers idempotent DELETE 404 and retained failures with a real WebDAV client.
  */
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -63,7 +64,9 @@ beforeAll(async () => {
       response.writeHead(400).end('the nutstore path is not valid');
       return;
     }
-    if (request.method === 'PROPFIND') {
+    if (request.method === 'DELETE') {
+      response.writeHead(path.endsWith('missing.webp') ? 404 : 500).end();
+    } else if (request.method === 'PROPFIND') {
       response.writeHead(207, { 'Content-Type': 'application/xml' });
       response.end(`<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"><d:response>
         <d:href>${path}</d:href><d:propstat><d:prop>
@@ -164,6 +167,25 @@ describe('native WebDAV paths', () => {
 });
 
 describe('Web/Electron real WebDAV requests', () => {
+  it('treats an already absent image as deleted without reporting an error', async () => {
+    const service = configure(serverUrl);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await service.deleteImage('missing.webp')).toBe(true);
+    expect(requests.map(({ method, path }) => `${method} ${path}`)).toEqual([
+      'DELETE /dav/Lumostime/images/missing.webp'
+    ]);
+    expect(errorLog).not.toHaveBeenCalled();
+  });
+
+  it('reports real server deletion failures for later retry', async () => {
+    const service = configure(serverUrl);
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    expect(await service.deleteImage('failure.webp')).toBe(false);
+    expect(errorLog).toHaveBeenCalled();
+  });
+
   it('uploads then reads backups, image manifests, images and metadata using valid resource paths', async () => {
     const service = configure(serverUrl);
     expect(await service.uploadData(backup)).toBe(true);
