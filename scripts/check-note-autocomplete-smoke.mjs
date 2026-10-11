@@ -1,5 +1,6 @@
 /**
  * @file check-note-autocomplete-smoke.mjs
+ * @updated 2026-10-11: Checks real log-modal first-tap positioning during delayed keyboard movement and respects manual navigation at desktop/mobile widths.
  * @updated 2026-10-11: Checks review guide completion at desktop/mobile widths, with native touch and screenshots.
  * @updated 2026-10-10: Checks system text zoom separately from CSS text inflation using native caret pixels.
  * @input Installed Chrome, production CSS and real note-editor regression harness
@@ -97,6 +98,7 @@ try {
     await delay();
   }
   const passed = await evaluate('window.__noteAutocompleteHarness.run()');
+  passed.push(await evaluate('window.__noteAutocompleteHarness.runNoteFocus()'));
   passed.push((await evaluate('window.__noteAutocompleteHarness.runReview()')).at(-1));
   await capture('desktop');
   // Real Tab input exercises focus routing in addition to the harness's synthetic IME events.
@@ -106,6 +108,7 @@ try {
   if (!await evaluate('document.querySelector("textarea").value.endsWith("论文") && document.activeElement === document.querySelector("textarea")')) throw new Error('Real Tab did not accept inline completion');
   passed.push('Real browser Tab accepts completion without moving focus');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  passed.push(await evaluate('window.__noteAutocompleteHarness.runNoteFocus()'));
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
   await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36' });
   const mobileGeometry = await evaluate('window.__noteAutocompleteHarness.prepareMobileCase()');

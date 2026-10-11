@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-11：`node scripts/check-note-autocomplete-smoke.mjs` 增加真实补记弹窗在桌面/手机宽度下的首次定位回归，模拟键盘缩放、延迟移动和原生过度滚动，并检查手动滚动、输入、失焦、超时和卸载会停止校正。
+
 2026-10-11：`node scripts/check-note-autocomplete-smoke.mjs` 同时验证回顾引导回答的历史补全、真实回答更新、Tab/点击/原生触屏接受、输入法、展开、节点括号及阅读/选择题模式，输出桌面和手机截图。
 
 2026-10-11：`node scripts/test-check-stats-renderer.mjs` 在隔离的 Electron 窗口中验证日课年视图的原生横向触屏滚动、年份箭头、缓存更新、周/月视图和桌面布局。运行前执行 `npm run build`；截图明确加载并验证微软雅黑字体，输出到临时目录。

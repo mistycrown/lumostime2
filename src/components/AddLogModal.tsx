@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-11: Settles note positioning after delayed keyboard panning/native scroll and stops correction on manual navigation.
  * @updated 2026-10-10: Aligns note shortcuts near the visible scroll area's top and corrects their position after keyboard viewport changes.
  * @updated 2026-10-09: Adds single inline history-based note completion with Tab and touch acceptance.
  * @updated 2026-10-07: Adds a selection/caret-preserving node bracket shortcut beside the Note heading.
@@ -26,7 +27,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2, Scissors } from 'lucide-react';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -45,6 +46,7 @@ import { DataCollectionSelector } from './DataCollectionSelector';
 import { ActivityAttributeFields } from './ActivityAttributeFields';
 import { SplitLogModal } from './SplitLogModal';
 import { useLogForm, useTimeCalculation, useImageManager, useSuggestions, LogFormState } from '../hooks';
+import { useNoteFocus } from '../hooks/useNoteFocus';
 import { useNavigation } from '../contexts/NavigationContext';
 import { useToast } from '../contexts/ToastContext';
 import { imageService } from '../services/imageService';
@@ -212,52 +214,7 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
   const startMinuteInputRef = useRef<HTMLInputElement>(null);
   const endMinuteInputRef = useRef<HTMLInputElement>(null);
 
-  const scrollNoteIntoView = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    const noteElement = noteRef.current;
-    const container = scrollContainerRef.current;
-    if (!noteElement || !container || document.activeElement !== noteElement) return;
-
-    const visibleTop = Math.max(container.getBoundingClientRect().top, window.visualViewport?.offsetTop ?? 0);
-    container.scrollTo({
-      top: container.scrollTop + noteElement.getBoundingClientRect().top - visibleTop - 24,
-      behavior
-    });
-  }, []);
-
-  const focusNoteInput = useCallback(() => {
-    const noteElement = noteRef.current;
-    if (!noteElement) return;
-    noteElement.focus({ preventScroll: true });
-    const noteLength = noteElement.value.length;
-    noteElement.setSelectionRange(noteLength, noteLength);
-    scrollNoteIntoView();
-  }, [scrollNoteIntoView]);
-
-  useEffect(() => {
-    const noteElement = noteRef.current;
-    if (!noteElement) return;
-    const viewport = window.visualViewport;
-    let timer: number | undefined;
-    const cancelScroll = () => window.clearTimeout(timer);
-    const scheduleScroll = (delay: number) => {
-      cancelScroll();
-      if (document.activeElement !== noteElement) return;
-      timer = window.setTimeout(() => scrollNoteIntoView('auto'), delay);
-    };
-    const handleFocus = () => scheduleScroll(350);
-    const handleResize = () => scheduleScroll(100);
-    noteElement.addEventListener('focus', handleFocus);
-    noteElement.addEventListener('blur', cancelScroll);
-    viewport?.addEventListener('resize', handleResize);
-    window.addEventListener('resize', handleResize);
-    return () => {
-      cancelScroll();
-      noteElement.removeEventListener('focus', handleFocus);
-      noteElement.removeEventListener('blur', cancelScroll);
-      viewport?.removeEventListener('resize', handleResize);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [scrollNoteIntoView]);
+  const focusNoteInput = useNoteFocus(noteRef, scrollContainerRef);
 
   useLayoutEffect(() => {
     const caret = noteBracketCaretRef.current;

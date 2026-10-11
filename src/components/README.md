@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-11: `AddLogModal` uses `useNoteFocus` for instant note jumps and short-lived correction after keyboard viewport movement, resizing and native container scrolling; manual navigation or typing cancels correction. The note renderer harness covers first-tap positioning and cancellation in the actual modal.
+
 Update 2026-10-11: `DetailTimelineCard` uses Lucide `Orbit` in place of the bracket glyph in node history metadata.
 
 Update 2026-10-11: `__tests__/nodeRendererHarness.tsx` verifies category-local manual node creation, empty/uncategorized groups, name validation, cancellation/back keys, search reset, unchanged records and reload persistence, with mobile/desktop form screenshots.

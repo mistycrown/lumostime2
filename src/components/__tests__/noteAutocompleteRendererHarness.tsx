@@ -1,5 +1,6 @@
 /**
  * @file noteAutocompleteRendererHarness.tsx
+ * @updated 2026-10-11: Checks first-tap note positioning after delayed keyboard panning/native scroll, plus manual navigation, typing, blur, timeout and unmount cancellation.
  * @updated 2026-10-11: Exercises review guide answer completion, expansion, node shortcuts and reading/choice modes.
  * @updated 2026-10-10: Emulates WebView's zoomed computed font metrics to catch double-scaling of copied px values.
  * @input Real note editor and log/focus views with isolated historical fixtures
@@ -105,6 +106,67 @@ const checkGhostPosition = () => {
   check(Math.abs(expected.left - actual.left) < 1 && Math.abs(expected.top - actual.top) < 1, 'Ghost text moved away from the input caret');
 };
 
+async function runNoteFocus() {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'visualViewport');
+  const viewport = Object.assign(new EventTarget(), { offsetTop: 0, height: window.innerHeight, width: window.innerWidth });
+  Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  try {
+    await render(null); await render(<LogEditor editing />); await wait(400);
+    const note = input();
+    const container = document.querySelector<HTMLDivElement>('.record-detail-modal .overflow-y-auto')!;
+    const shortcut = [...document.querySelectorAll<HTMLSpanElement>('span')].find((element) => element.textContent === 'Total Time')!;
+    const assertAligned = (label: string) => {
+      const visibleTop = Math.max(container.getBoundingClientRect().top, viewport.offsetTop);
+      check(Math.abs(note.getBoundingClientRect().top - visibleTop - 24) < 2, `${label}: note missed the visible target`);
+      check(document.activeElement === note && note.selectionStart === note.value.length, `${label}: focus/caret lost`);
+    };
+    shortcut.click(); await wait(180); assertAligned('Stable first tap');
+    container.style.maxHeight = '280px';
+    viewport.height = 400; viewport.dispatchEvent(new Event('resize'));
+    await wait(180); assertAligned('Keyboard resize');
+    // The late position-only change comes after the old 350ms focus correction.
+    await wait(200);
+    viewport.offsetTop = container.getBoundingClientRect().top + 120;
+    viewport.dispatchEvent(new Event('scroll'));
+    await wait(180); assertAligned('Delayed keyboard pan, without a second tap');
+    container.scrollTop += 100;
+    await wait(180); assertAligned('Delayed native overscroll, without a second tap');
+
+    for (const event of [new WheelEvent('wheel'), new PointerEvent('pointerdown'), new Event('touchmove')]) {
+      shortcut.click(); await wait(150);
+      container.dispatchEvent(event); container.scrollTop += 60;
+      const manualTop = container.scrollTop;
+      viewport.dispatchEvent(new Event('scroll')); await wait(180);
+      check(Math.abs(container.scrollTop - manualTop) < 1, `${event.type}: manual position was pulled back`);
+    }
+    shortcut.click(); await wait(180); assertAligned('Already focused shortcut');
+    note.dispatchEvent(new Event('input', { bubbles: true })); container.scrollTop += 60;
+    const typingTop = container.scrollTop;
+    viewport.dispatchEvent(new Event('resize')); await wait(180);
+    check(container.scrollTop === typingTop, 'Typing did not stop position correction');
+    shortcut.click(); note.blur(); container.scrollTop += 60;
+    const blurredTop = container.scrollTop;
+    viewport.dispatchEvent(new Event('scroll')); await wait(180);
+    check(container.scrollTop === blurredTop, 'Blur did not cancel position correction');
+    shortcut.click(); await wait(1600); container.scrollTop += 60;
+    const expiredTop = container.scrollTop;
+    viewport.dispatchEvent(new Event('scroll')); await wait(180);
+    check(container.scrollTop === expiredTop, 'Position correction outlived its settling window');
+    shortcut.click(); await wait(180); assertAligned('Shortcut restarts after expiry');
+    viewport.dispatchEvent(new Event('resize'));
+    await render(null);
+    const removedTop = container.scrollTop;
+    viewport.dispatchEvent(new Event('scroll')); await wait(180);
+    check(container.scrollTop === removedTop, 'Unmount left a pending scroll correction');
+    return `Record note (${window.innerWidth}px): one-tap keyboard resize/pan/native overscroll; focused re-tap; manual/typing/blur/expiry/unmount cancellation`;
+  } finally {
+    await render(null);
+    if (descriptor) Object.defineProperty(window, 'visualViewport', descriptor);
+    else delete (window as unknown as { visualViewport?: unknown }).visualViewport;
+  }
+}
+
 async function runReview() {
   await render(null); await render(<ReviewEditor />);
   await setText('今天写论');
@@ -205,7 +267,7 @@ async function run() {
 
 declare global {
   interface Window {
-    __noteAutocompleteHarness?: { run: typeof run; runReview: typeof runReview; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; restoreTextZoom: typeof restoreTextZoom; renderEditor: () => Promise<void>; renderReview: () => Promise<void>; passed: string[] };
+    __noteAutocompleteHarness?: { run: typeof run; runNoteFocus: typeof runNoteFocus; runReview: typeof runReview; setText: typeof setText; prepareMobileCase: typeof prepareMobileCase; restoreTextZoom: typeof restoreTextZoom; renderEditor: () => Promise<void>; renderReview: () => Promise<void>; passed: string[] };
   }
 }
 const originalComputedStyle = window.getComputedStyle.bind(window);
@@ -235,5 +297,5 @@ async function prepareMobileCase() {
   const computed = getComputedStyle(input());
   return { suffix: { left: suffix.left, top: suffix.top }, input: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, fontSize: parseFloat(computed.fontSize) };
 }
-window.__noteAutocompleteHarness = { run, runReview, setText, prepareMobileCase, restoreTextZoom, renderEditor: () => render(<Editor />), renderReview: async () => { await render(null); await render(<ReviewEditor />); }, passed };
+window.__noteAutocompleteHarness = { run, runNoteFocus, runReview, setText, prepareMobileCase, restoreTextZoom, renderEditor: () => render(<Editor />), renderReview: async () => { await render(null); await render(<ReviewEditor />); }, passed };
 void render(<Editor />);
