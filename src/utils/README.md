@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-11: `checkStatsUtils.ts` aggregates daily-check reviews in one pass using constant-time date membership and preserves template metadata/count semantics. Its per-view cache retains six recent ranges and invalidates on review/template identity changes.
+
 Update 2026-10-10: `getEffectiveDictionaryWords` combines manual entries with node names/aliases, deduplicating case-insensitively while preserving manual spelling and keeping source arrays unchanged.
 
 Update 2026-10-09: `personalDictionary.ts` normalizes words while preserving spelling. `noteAutocomplete.ts` caches personal candidates separately from history and prioritizes them without a usage threshold. `textSegmentation.ts` protects global personal words alongside card phrases, preferring the longest literal match and applying card stop words afterward.

@@ -13,10 +13,11 @@
  * - 2026-04-25: 为矩阵视图新增日范围切换和 editorial 时间格子图，使用活动标签颜色与本地书法字体。
  * - 2026-04-25: check 统计视图仅统计仍存在于启用日课模板中的条目，隐藏停用或已删除模板项。
  * - 2026-08-09: 日课统计优先使用日课模板条目颜色，旧模板继续使用名称颜色兜底。
+ * - 2026-10-11: 日课横滑仅滚动内容，按需计算其他统计，缓存日课范围并避免滑动时重绘。
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Log, Category, Activity, Scope, TodoItem, TodoCategory, DailyReview, CheckTemplate } from '../types';
 import { COLOR_OPTIONS } from '../constants';
 import { Minimize2, Share, PieChart, Grid, Calendar, ChevronLeft, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Smile } from 'lucide-react';
@@ -40,6 +41,10 @@ import { LineChartView } from '../components/stats/LineChartView';
 import { EmojiStatsView } from '../components/stats/EmojiStatsView';
 import { getDateRange as getSharedDateRange, getDynamicTitle as getSharedDynamicTitle } from '../components/StatsView/statsUtils';
 import { formatDuration, getHexColor, getScheduleStyle } from '../utils/chartUtils';
+import { createCheckStatsCache, EMPTY_CHECK_STATS } from '../utils/checkStatsUtils';
+
+const EMPTY_STATS_ITEMS: never[] = [];
+const EMPTY_DAILY_REVIEWS: DailyReview[] = [];
 
 const toRgba = (hexColor: string, alpha: number): string => {
   const normalized = hexColor.replace('#', '');
@@ -116,7 +121,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = [], checkTemplates, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = EMPTY_DAILY_REVIEWS, checkTemplates, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const { setIsExportViewOpen } = useNavigation();
   const { scheduleStyle } = useSettings();
@@ -191,25 +196,38 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   // 瑙︽懜婊戝姩鎵嬪娍澶勭悊
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const touchEnd = useRef<{ x: number; y: number } | null>(null);
 
   // 鏈€灏忔粦鍔ㄨ窛绂伙紙鍍忕礌锛? 澧炲姞闃堝€间互闄嶄綆鐏垫晱搴︼紝鍑忓皯璇Е
   const minSwipeDistance = 100;
 
   const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    touchStart.current = null;
+    touchEnd.current = null;
+    if (viewType === 'check' || e.touches.length !== 1) return;
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (!touchStart.current) return;
+    if (e.touches.length !== 1) {
+      touchStart.current = null;
+      touchEnd.current = null;
+      return;
+    }
+    touchEnd.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
   const onTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    const start = touchStart.current;
+    const end = touchEnd.current;
+    touchStart.current = null;
+    touchEnd.current = null;
+    if (viewType === 'check' || !start || !end) return;
 
-    const distance = touchStart - touchEnd;
+    const distance = start.x - end.x;
+    if (Math.abs(distance) <= Math.abs(start.y - end.y)) return;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
@@ -276,30 +294,32 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   }, [currentDate, viewType, pieRange, scheduleRange, lineRange, emojiRange, matrixRange, onTitleChange]);
 
   const { start: rangeStart, end: rangeEnd } = effectiveRange;
+  // Daily-check statistics use reviews only. Export controls belong to the pie view.
+  const needsLogStats = viewType !== 'check';
 
   // 浣跨敤鏂扮殑缁熻璁＄畻 Hooks
   const { stats, previousStats, filteredLogs } = useStatsCalculation({
-    logs,
-    categories,
+    logs: needsLogStats ? logs : EMPTY_STATS_ITEMS,
+    categories: needsLogStats ? categories : EMPTY_STATS_ITEMS,
     dateRange: effectiveRange,
     excludedCategoryIds,
-    includePrevious: true
+    includePrevious: needsLogStats
   });
 
   const { todoStats, previousTodoStats } = useTodoStats({
-    logs,
-    todos,
-    todoCategories,
+    logs: needsLogStats ? logs : EMPTY_STATS_ITEMS,
+    todos: needsLogStats ? todos : EMPTY_STATS_ITEMS,
+    todoCategories: needsLogStats ? todoCategories : EMPTY_STATS_ITEMS,
     dateRange: effectiveRange,
-    includePrevious: true
+    includePrevious: needsLogStats
   });
 
   const { scopeStats, previousScopeStats } = useScopeStats({
-    logs,
-    scopes,
-    categories,
+    logs: needsLogStats ? logs : EMPTY_STATS_ITEMS,
+    scopes: needsLogStats ? scopes : EMPTY_STATS_ITEMS,
+    categories: needsLogStats ? categories : EMPTY_STATS_ITEMS,
     dateRange: effectiveRange,
-    includePrevious: true
+    includePrevious: needsLogStats
   });
 
   const getExportRangeLabel = () => {
@@ -439,6 +459,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
   };
 
   const matrixData = useMemo(() => {
+    if (viewType !== 'matrix' || matrixRange !== 'week') return { days: [], rows: [] };
     const days: Date[] = [];
     let curr = new Date(rangeStart);
     while (curr <= rangeEnd) {
@@ -463,9 +484,12 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       return { ...item, cells };
     });
     return { days, rows };
-  }, [rangeStart, rangeEnd, filteredLogs, categories]);
+  }, [rangeStart, rangeEnd, filteredLogs, categories, viewType, matrixRange]);
 
   const editorialTimeline = useMemo(() => {
+    if (viewType !== 'matrix' || matrixRange !== 'day') {
+      return { displayDate: rangeStart, rows: [], legendItems: [] };
+    }
     const chunksPerHour = 6;
     const minutesPerChunk = 10;
     const timelineStart = new Date(rangeStart);
@@ -581,147 +605,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       rows,
       legendItems
     };
-  }, [rangeStart, filteredLogs, categories]);
+  }, [rangeStart, filteredLogs, categories, viewType, matrixRange]);
 
-  // --- Check Stats Logic ---
-  const checkStats = useMemo(() => {
-    if (viewType !== 'check') return { categories: [], allDays: [], dateMap: {} };
-
-    // 1. Collect all dates in range
-    const days: string[] = [];
-    const dateMap: Record<string, Date> = {};
-    let curr = new Date(rangeStart);
-
-    // 鏍规嵁瑙嗗浘绫诲瀷闄愬埗澶╂暟锛岄槻姝㈡孩鍑?
-    let maxDays = 366; // 榛樿骞磋鍥炬渶澶уぉ鏁?
-    if (pieRange === 'week') maxDays = 7;
-    else if (pieRange === 'month') maxDays = 31;
-
-    let dayCount = 0;
-    while (curr <= rangeEnd && dayCount < maxDays) {
-      const dStr = `${curr.getFullYear()}-${String(curr.getMonth() + 1).padStart(2, '0')}-${String(curr.getDate()).padStart(2, '0')}`;
-      days.push(dStr);
-      dateMap[dStr] = new Date(curr);
-      curr.setDate(curr.getDate() + 1);
-      dayCount++;
-    }
-
-    // 2. Identify unique habits (by content + category)
-    // Structure: Category -> Habit -> Date -> Status
-    const habits: Record<string, Record<string, Record<string, boolean>>> = {};
-    const habitDayDetails: Record<string, Record<string, { value: number; target: number }>> = {}; // Key: "Category|Habit" -> Date -> Count Detail
-    const habitStats: Record<string, { total: number, checked: number, countTotal: number, isCountMode: boolean }> = {}; // Key: "Category|Habit"
-    const activeTemplates = (checkTemplates || []).filter(template => template.enabled && template.isDaily);
-    const activeTemplateItemKeys = new Set(
-      activeTemplates.flatMap(template => template.items.map(item => `${template.title}|${item.content}`))
-    );
-    const shouldFilterByTemplates = Array.isArray(checkTemplates);
-    const templateIconMap: Record<string, { icon: string; uiIcon?: string; color?: string }> = {};
-
-    activeTemplates.forEach((template) => {
-      template.items.forEach((item) => {
-        const key = `${template.title}|${item.content}`;
-        templateIconMap[key] = {
-          icon: item.icon || '🔵',
-          uiIcon: item.uiIcon,
-          color: item.color
-        };
-      });
-    });
-
-    // Track insertion order for categories and habits
-    const categoryOrder: string[] = [];
-    const habitOrder: Record<string, string[]> = {}; // Category -> Habit names in order
-
-    dailyReviews.forEach(review => {
-      // Normalize review date to fit our range
-      // Review date is string YYYY-MM-DD
-      if (days.includes(review.date) && review.checkItems) {
-        review.checkItems.forEach(item => {
-          // 鍙寘鍚湁 category 鐨勯」鐩?(鎺掗櫎鎵嬪姩娣诲姞鐨勪复鏃堕」)
-          if (!item.category) return;
-
-          const category = item.category;
-          const content = item.content;
-          const key = `${category}|${content}`;
-          if (shouldFilterByTemplates && !activeTemplateItemKeys.has(key)) return;
-
-          if (!habits[category]) {
-            habits[category] = {};
-            categoryOrder.push(category); // Track category order
-            habitOrder[category] = [];
-          }
-          if (!habits[category][content]) {
-            habits[category][content] = {};
-            habitOrder[category].push(content); // Track habit order within category
-          }
-
-          const isCountMode = item.type !== 'auto' && item.manualMode === 'count';
-          let isChecked = item.isCompleted;
-
-          if (!habitStats[key]) {
-            habitStats[key] = { total: 0, checked: 0, countTotal: 0, isCountMode: false };
-          }
-          habitStats[key].total++;
-
-          if (isCountMode) {
-            habitStats[key].isCountMode = true;
-            const target = Math.max(1, Math.floor(item.targetCount || 1));
-            const currentRaw = typeof item.currentCount === 'number'
-              ? item.currentCount
-              : (item.isCompleted ? target : 0);
-            const current = Math.min(target, Math.max(0, Math.floor(currentRaw)));
-            if (!habitDayDetails[key]) habitDayDetails[key] = {};
-            habitDayDetails[key][review.date] = { value: current, target };
-            habitStats[key].countTotal += current;
-            isChecked = current > 0;
-          }
-
-          habits[category][content][review.date] = isChecked;
-          if (isChecked) habitStats[key].checked++;
-        });
-      }
-    });
-
-    // Prefer current active template icons so stats stay in sync with the latest template UI icon selection.
-    const habitIcons: Record<string, { icon: string, uiIcon?: string, color?: string }> = { ...templateIconMap };
-
-    dailyReviews.forEach(review => {
-      if (days.includes(review.date) && review.checkItems) {
-        review.checkItems.forEach(item => {
-          if (!item.category) return;
-          const key = `${item.category}|${item.content}`;
-          if (shouldFilterByTemplates && !activeTemplateItemKeys.has(key)) return;
-          // Fall back to historical review data only when the active template does not provide icon metadata.
-          if (!habitIcons[key] && (item.icon || item.uiIcon)) {
-            habitIcons[key] = { icon: item.icon || '🔵', uiIcon: item.uiIcon };
-          }
-        });
-      }
-    });
-
-    // Convert to array using insertion order (first encountered)
-    const sortedCategories = categoryOrder.map(cat => {
-      const catHabits = habitOrder[cat].map(hab => {
-        const key = `${cat}|${hab}`;
-        const stats = habitStats[key] || { total: 0, checked: 0, countTotal: 0, isCountMode: false };
-        const iconData = habitIcons[key] || { icon: '🔵' };
-
-        return {
-          name: hab,
-          icon: iconData.icon,
-          uiIcon: iconData.uiIcon,
-          color: iconData.color,
-          days: habits[cat][hab], // Map of DateStr -> Boolean
-          dayDetails: habitDayDetails[key],
-          stats
-        };
-      });
-      return { name: cat, items: catHabits };
-    });
-
-    return { categories: sortedCategories, allDays: days, dateMap };
-  }, [checkTemplates, dailyReviews, pieRange, rangeEnd, rangeStart, viewType]);
+  // Keep recent ranges when navigating away and back; review/template changes invalidate them.
+  const [getCachedCheckStats] = useState(createCheckStatsCache);
+  const checkStats = useMemo(() => viewType === 'check'
+    ? getCachedCheckStats({ dailyReviews, checkTemplates, rangeStart, rangeEnd })
+    : EMPTY_CHECK_STATS,
+  [getCachedCheckStats, checkTemplates, dailyReviews, rangeEnd, rangeStart, viewType]);
 
   // If ChronoPrint view is active, render it instead
   if (showChronoPrint) {
@@ -740,6 +631,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
+      onTouchCancel={() => { touchStart.current = null; touchEnd.current = null; }}
     >
 
       {/* Fullscreen Exit Button - Only visible in fullscreen mode */}
@@ -865,6 +757,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                   <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-lg">
                     <button
                       onClick={() => handleNavigateDate('prev')}
+                      aria-label="上一时间段"
                       className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
                       title="涓婁竴涓椂闂存"
                     >
@@ -872,6 +765,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
                     </button>
                     <button
                       onClick={() => handleNavigateDate('next')}
+                      aria-label="下一时间段"
                       className="p-1.5 rounded-md transition-all text-stone-400 hover:text-stone-800 hover:bg-white"
                       title="涓嬩竴涓椂闂存"
                     >

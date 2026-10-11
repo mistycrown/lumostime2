@@ -1,7 +1,18 @@
+/**
+ * @file StatsView.test.tsx
+ * @input Server-rendered statistics views and isolated hooks
+ * @output Range, template filtering and inactive-statistics regression checks
+ * @pos Test (Statistics View)
+ * @updated 2026-10-11: Verifies check views never scan activity inputs and other views keep their original inputs.
+ */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { StatsView } from './StatsView';
+import { useStatsCalculation } from '../hooks/useStatsCalculation';
+import { useTodoStats } from '../hooks/useTodoStats';
+import { useScopeStats } from '../hooks/useScopeStats';
+import type { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
 
 vi.hoisted(() => {
   const storage = new Map<string, string>();
@@ -41,25 +52,25 @@ vi.mock('../components/IconRenderer', () => ({
 }));
 
 vi.mock('../hooks/useStatsCalculation', () => ({
-  useStatsCalculation: () => ({
+  useStatsCalculation: vi.fn(() => ({
     stats: { totalDuration: 0, categoryStats: [] },
     previousStats: null,
     filteredLogs: [],
-  }),
+  })),
 }));
 
 vi.mock('../hooks/useTodoStats', () => ({
-  useTodoStats: () => ({
-    todoStats: [],
-    previousTodoStats: [],
-  }),
+  useTodoStats: vi.fn(() => ({
+    todoStats: { totalDuration: 0, categoryStats: [] },
+    previousTodoStats: null,
+  })),
 }));
 
 vi.mock('../hooks/useScopeStats', () => ({
-  useScopeStats: () => ({
-    scopeStats: [],
-    previousScopeStats: [],
-  }),
+  useScopeStats: vi.fn(() => ({
+    scopeStats: { totalDuration: 0, categoryStats: [] },
+    previousScopeStats: null,
+  })),
 }));
 
 vi.mock('./ChronoPrintView', () => ({
@@ -73,6 +84,38 @@ vi.mock('../components/stats/MatrixView', () => ({
 }));
 
 describe('StatsView matrix date range', () => {
+  it('avoids scanning unrelated logs, categories, todos and scopes in the annual check view', () => {
+    const category: Category = {
+      id: 'unused', name: 'unused', icon: '', themeColor: '#123456',
+      get activities(): Category['activities'] { throw new Error('The hidden activity matrix must not read categories'); }
+    };
+    const logs = [{ id: 'unused' }] as Log[];
+    const todos = [{ id: 'unused' }] as TodoItem[];
+    const scopes = [{ id: 'unused' }] as Scope[];
+    const todoCategories = [{ id: 'unused' }] as TodoCategory[];
+    renderToStaticMarkup(<StatsView
+      logs={logs} categories={[category]} todos={todos} todoCategories={todoCategories} scopes={scopes}
+      currentDate={new Date(2026, 5, 1)} onBack={() => {}} isFullScreen={false} onToggleFullScreen={() => {}}
+      forcedView="check" forcedRange="year"
+    />);
+    expect(useStatsCalculation).toHaveBeenLastCalledWith(expect.objectContaining({ logs: [], categories: [], includePrevious: false }));
+    expect(useTodoStats).toHaveBeenLastCalledWith(expect.objectContaining({ logs: [], todos: [], todoCategories: [], includePrevious: false }));
+    expect(useScopeStats).toHaveBeenLastCalledWith(expect.objectContaining({ logs: [], categories: [], scopes: [], includePrevious: false }));
+  });
+
+  it('preserves real log inputs and comparisons in the pie view', () => {
+    const logs = [{ id: 'real-log' }] as Log[];
+    const categories = [{ id: 'real-category', activities: [] }] as Category[];
+    renderToStaticMarkup(<StatsView
+      logs={logs} categories={categories} todos={[]} todoCategories={[]} scopes={[]}
+      currentDate={new Date(2026, 5, 1)} onBack={() => {}} isFullScreen={false} onToggleFullScreen={() => {}}
+      forcedView="pie"
+    />);
+    expect(useStatsCalculation).toHaveBeenLastCalledWith(expect.objectContaining({ logs, categories, includePrevious: true }));
+    expect(useTodoStats).toHaveBeenLastCalledWith(expect.objectContaining({ logs, includePrevious: true }));
+    expect(useScopeStats).toHaveBeenLastCalledWith(expect.objectContaining({ logs, categories, includePrevious: true }));
+  });
+
   it('keeps matrix weeks to 7 days when the week spans two months', () => {
     const markup = renderToStaticMarkup(
       <StatsView

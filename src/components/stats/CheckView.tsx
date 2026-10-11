@@ -10,9 +10,10 @@
  * - 2026-03-03: 月视图中数字类型日课的完成天数改为按“达标天数（value >= target）”计算并渲染。
  * - 2026-07-22: Added semantic hooks for dark-mode weekly, monthly, and yearly habit-stat grids.
  * - 2026-08-09: Applied custom daily-check template colors across week, month, and year views.
+ * - 2026-10-11: Memoized check rendering and shared annual week layout; deferred offscreen annual card layout.
  */
 
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { CheckCircle2, ListChecks, Target } from 'lucide-react';
 import { getWeekColorStyle, getMonthYearColorStyle } from '../../utils/checkViewUtils';
 import { IconRenderer } from '../IconRenderer';
@@ -46,11 +47,27 @@ export interface CheckViewProps {
   rangeStart: Date;
 }
 
-export const CheckView: React.FC<CheckViewProps> = ({
+export const CheckView = memo(function CheckView({
   checkStats,
   pieRange,
   rangeStart
-}) => {
+}: CheckViewProps) {
+  const yearWeeks = useMemo(() => {
+    if (pieRange !== 'year') return [];
+    const weeks: (string | null)[][] = [];
+    let week: (string | null)[] = Array(7).fill(null);
+    let dayIndex = rangeStart.getDay();
+    checkStats.allDays.forEach(day => {
+      week[dayIndex++] = day;
+      if (dayIndex === 7) {
+        weeks.push(week);
+        week = Array(7).fill(null);
+        dayIndex = 0;
+      }
+    });
+    if (dayIndex > 0) weeks.push(week);
+    return weeks;
+  }, [checkStats.allDays, pieRange, rangeStart]);
   if (checkStats.categories.length === 0) {
     return (
       <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
@@ -255,7 +272,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
               : habit.stats.checked;
 
             return (
-              <div key={`${cat.name}-${habit.name}`} className="daily-check-stat-card bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden">
+              <div key={`${cat.name}-${habit.name}`} className="daily-check-stat-card bg-white rounded-xl py-4 shadow-sm border border-stone-100 overflow-hidden" style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 184px' }}>
                 <div className="flex items-center gap-3 mb-4 px-4">
                   <IconRenderer
                     icon={habit.icon}
@@ -271,27 +288,9 @@ export const CheckView: React.FC<CheckViewProps> = ({
                 </div>
 
                 <div className="px-4">
-                  <div className="overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="overflow-x-auto overscroll-x-contain pb-2 scrollbar-hide">
                     <div className="flex gap-1 min-w-fit">
-                      {(() => {
-                        const weeks: string[][] = [];
-                        let currentWeek: string[] = Array(7).fill(null);
-
-                        const startDay = new Date(rangeStart).getDay();
-                        let dayIndex = startDay;
-
-                        checkStats.allDays.forEach((dayStr) => {
-                          currentWeek[dayIndex] = dayStr;
-                          dayIndex++;
-                          if (dayIndex > 6) {
-                            weeks.push(currentWeek);
-                            currentWeek = Array(7).fill(null);
-                            dayIndex = 0;
-                          }
-                        });
-                        if (dayIndex > 0) weeks.push(currentWeek);
-
-                        return weeks.map((week, wIdx) => (
+                      {yearWeeks.map((week, wIdx) => (
                           <div key={wIdx} className="flex flex-col gap-1">
                             {week.map((dayStr, dIdx) => {
                               if (!dayStr) return <div key={dIdx} className="w-3 h-3" />;
@@ -321,8 +320,7 @@ export const CheckView: React.FC<CheckViewProps> = ({
                               );
                             })}
                           </div>
-                        ));
-                      })()}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -333,4 +331,4 @@ export const CheckView: React.FC<CheckViewProps> = ({
       )}
     </div>
   );
-};
+});

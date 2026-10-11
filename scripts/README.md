@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-11：`node scripts/test-check-stats-renderer.mjs` 在隔离的 Electron 窗口中验证日课年视图的原生横向触屏滚动、年份箭头、缓存更新、周/月视图和桌面布局。运行前执行 `npm run build`；截图明确加载并验证微软雅黑字体，输出到临时目录。
+
 2026-10-10：个人词典浏览器验证还使用真实 DataProvider/NodeProvider 检查节点名称和未使用过的别名参与补全、节点词保留完整分词、改名/别名变更/删除即时刷新，以及节点词不显示或存入手动词典。
 
 2026-10-09：`node scripts/check-personal-dictionary-smoke.mjs` uses an isolated Chrome profile and a verified Microsoft YaHei font to check dictionary entry/search/removal, note completion, actual word clouds and preference restore at desktop/mobile widths. Screenshots and results are saved under `node_modules/.cache/personal-dictionary-smoke`.
