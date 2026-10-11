@@ -6,6 +6,7 @@
  * @description Handles saving, retrieving, and deleting images.
  * Uses Capacitor Filesystem for Native/Electron, and IndexedDB for Web fallback.
  * @updated 2026-10-11: Saves theme assets without thumbnails and migrates legacy theme references to originals only.
+ * @updated 2026-10-11: Supports deleting one obsolete image file without deleting its retained counterpart.
  * @updated 2026-09-25: Split local image manifests into content and theme groups, and added explicit group-aware registration for uploads and cleanup.
  * @updated 2026-05-05: Reused settings-level protected image references during manifest rebuild so AI assistant avatars participate in cleanup protection and sync.
  * @updated 2026-08-10: Supports original-only image-list registration for TimePal stage images that have no thumbnail files.
@@ -353,6 +354,20 @@ class ImageService {
             window.dispatchEvent(new CustomEvent('imageDeleted', {
                 detail: { filename }
             }));
+        }
+    }
+
+    /** Delete one file for cleanup, retaining its original/thumbnail counterpart. */
+    async deleteSingleImage(filename: string): Promise<void> {
+        this.trackDeletion(filename);
+        await this.deleteImageLocalOnly(filename);
+        const manifest = this.getReferencedImageManifest();
+        this.updateReferencedImageManifest({
+            content: manifest.content.filter(file => file !== filename),
+            theme: manifest.theme.filter(file => file !== filename)
+        });
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('imageDeleted', { detail: { filename } }));
         }
     }
 

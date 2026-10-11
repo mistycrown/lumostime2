@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-11: The settings cleanup checker lists obsolete theme thumbnails even when their originals remain referenced. Cleanup removes those thumbnails individually on every platform, preserves referenced counterpart files, and reports original-only theme assets without missing-thumbnail warnings.
+
 Update 2026-10-11: Theme images are saved, referenced, and synchronized as originals only. Legacy theme thumbnails are excluded from manifests; sticker metadata and saved snapshots use original files. Content photos and todo covers retain thumbnail support.
 
 Update 2026-10-11: WebDAV requests share a serialized queue; Nutstore requests start at least 3.1 seconds apart. HTTP 429/503 triggers a shared cooldown (respecting Retry-After), and unavailable image inventories stop the upload rather than triggering more transfers. Native HTTP/filesystem and Web/Electron clients use the same queue.

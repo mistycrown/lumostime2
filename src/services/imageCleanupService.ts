@@ -4,13 +4,13 @@
  * @output Cleanup operations
  * @pos Service (Image Management)
  * @description Automatically detects and removes unreferenced images to free up storage space with separate content/theme reference strategies.
+ * @updated 2026-10-11: Detects obsolete theme thumbnails, preserves referenced counterparts, and supports single-file cleanup on Web/Electron.
  * @updated 2026-09-25: Applies separate content/theme reference strategies and reports cleanup candidates by group.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
 import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
 import { imageService } from './imageService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
@@ -165,6 +165,7 @@ export class ImageCleanupService {
         unreferencedThemeImages: string[];
         orphanedThumbnails: string[];
         orphanedOriginals: string[];
+        obsoleteThemeThumbnails: string[];
     }> {
         try {
             // 获取所有本地图片
@@ -187,7 +188,7 @@ export class ImageCleanupService {
                 return referencedImages.has(filename);
             };
             
-            // 找出未被引用的原图（只检查原图，缩略图会自动跟随）
+            // Check every file independently: a retained theme original does not retain its thumbnail.
             const unreferencedOriginals = originalImages.filter(imageName => !isReferenced(imageName));
             const unreferencedContentImages = unreferencedOriginals.filter((filename) => manifest.content.includes(filename));
             const unreferencedThemeImages = unreferencedOriginals.filter((filename) => manifest.theme.includes(filename));
@@ -202,25 +203,13 @@ export class ImageCleanupService {
             // 找出孤立的原图（没有对应缩略图的原图，但这不算错误，只是统计信息）
             const orphanedOriginals = originalImages.filter(originalName => {
                 const pair = pairedImages.get(originalName);
-                return !pair?.thumbnail; // 没有对应的缩略图
+                return !pair?.thumbnail && !referencedGroups.theme.includes(originalName);
             });
-            
-            // 计算未引用的图片总数（原图 + 对应的缩略图 + 孤立的缩略图）
-            const unreferencedImages: string[] = [];
-            
-            // 添加未引用的原图及其缩略图
-            unreferencedOriginals.forEach(originalName => {
-                unreferencedImages.push(originalName);
-                const pair = pairedImages.get(originalName);
-                if (pair?.thumbnail) {
-                    unreferencedImages.push(this.getThumbnailFilename(originalName));
-                }
-            });
-            
-            // 添加孤立的缩略图
-            orphanedThumbnails.forEach(thumbName => {
-                unreferencedImages.push(thumbName);
-            });
+
+            const unreferencedImages = allImageFiles.filter(filename => !isReferenced(filename));
+            const obsoleteThemeThumbnails = thumbnailImages.filter(filename => (
+                referencedGroups.theme.includes(this.getOriginalFilename(filename)) && !isReferenced(filename)
+            ));
             
             console.log(`[ImageCleanup] 检查完成:`);
             console.log(`  - 总图片文件数: ${allImageFiles.length}`);
@@ -245,7 +234,8 @@ export class ImageCleanupService {
                 unreferencedContentImages,
                 unreferencedThemeImages,
                 orphanedThumbnails,
-                orphanedOriginals
+                orphanedOriginals,
+                obsoleteThemeThumbnails
             };
         } catch (error) {
             console.error('[ImageCleanup] 检查未引用图片失败:', error);
@@ -309,11 +299,26 @@ export class ImageCleanupService {
                 console.log(`[ImageCleanup] 试运行模式 - 发现 ${checkResult.unreferencedImages.length} 个未引用图片，但不会删除`);
                 return result;
             }
+
+            // Native directory listing is unavailable; Web/Electron can skip absent remote files.
+            let remoteFiles: Set<string> | null = null;
+            if (deleteRemote && !Capacitor.isNativePlatform()) {
+                try {
+                    const contents = await webdavService.getDirectoryContents('/images');
+                    remoteFiles = new Set(contents
+                        .filter(item => item?.type === 'file')
+                        .map(item => item.basename || String(item.filename || '').split('/').pop() || ''));
+                } catch (error: any) {
+                    if (Number(error?.status ?? error?.response?.status) !== 404) throw error;
+                    remoteFiles = new Set();
+                }
+            }
+            const existsRemotely = (filename: string) => deleteRemote && (remoteFiles === null || remoteFiles.has(filename));
             
             console.log(`[ImageCleanup] 开始清理 ${checkResult.unreferencedImages.length} 个未引用图片...`);
             
             // 按原图分组处理删除操作
-            const { originalImages, pairedImages } = this.groupImagesByPairs(checkResult.unreferencedImages);
+            const { pairedImages } = this.groupImagesByPairs(checkResult.unreferencedImages);
             const processedOriginals = new Set<string>();
             
             // 删除未引用的图片
@@ -333,7 +338,7 @@ export class ImageCleanupService {
                             }
                             
                             // 删除远程缩略图
-                            if (deleteRemote) {
+                            if (existsRemotely(imageName)) {
                                 try {
                                     const success = await webdavService.deleteImage(imageName);
                                     if (success) {
@@ -355,7 +360,11 @@ export class ImageCleanupService {
                             
                             // 删除本地图片（imageService.deleteImage 会同时删除原图和缩略图）
                             if (deleteLocal) {
-                                await imageService.deleteImage(imageName);
+                                if (pairedImages.get(imageName)?.thumbnail) {
+                                    await imageService.deleteImage(imageName);
+                                } else {
+                                    await this.deleteSingleImageFile(imageName);
+                                }
                                 result.deletedLocal++; // 原图
                                 console.log(`[ImageCleanup] ✓ 本地删除原图: ${imageName}`);
                                 
@@ -368,7 +377,7 @@ export class ImageCleanupService {
                             }
                             
                             // 删除远程图片
-                            if (deleteRemote) {
+                            if (existsRemotely(imageName)) {
                                 try {
                                     const success = await webdavService.deleteImage(imageName);
                                     if (success) {
@@ -381,18 +390,19 @@ export class ImageCleanupService {
                                     console.warn(`[ImageCleanup] 远程删除失败 (可能不存在): ${imageName}`, remoteError?.message);
                                 }
                                 
-                                // 删除远程缩略图
-                                const pair = pairedImages.get(imageName);
-                                if (pair?.thumbnail) {
-                                    try {
-                                        const thumbSuccess = await webdavService.deleteImage(`thumb_${imageName}`);
-                                        if (thumbSuccess) {
-                                            result.deletedRemote++; // 缩略图
-                                            console.log(`[ImageCleanup] ✓ 远程删除对应缩略图: thumb_${imageName}`);
-                                        }
-                                    } catch (thumbError: any) {
-                                        console.warn(`[ImageCleanup] 远程删除缩略图失败: thumb_${imageName}`, thumbError?.message);
+                            }
+
+                            // The thumbnail can exist remotely even when the original is absent there.
+                            const pair = pairedImages.get(imageName);
+                            if (pair?.thumbnail && existsRemotely(`thumb_${imageName}`)) {
+                                try {
+                                    const thumbSuccess = await webdavService.deleteImage(`thumb_${imageName}`);
+                                    if (thumbSuccess) {
+                                        result.deletedRemote++; // 缩略图
+                                        console.log(`[ImageCleanup] ✓ 远程删除对应缩略图: thumb_${imageName}`);
                                     }
+                                } catch (thumbError: any) {
+                                    console.warn(`[ImageCleanup] 远程删除缩略图失败: thumb_${imageName}`, thumbError?.message);
                                 }
                             }
                         }
@@ -420,25 +430,10 @@ export class ImageCleanupService {
     }
     
     /**
-     * 删除单个图片文件（不处理配对关系）- 仅用于孤立缩略图
+     * 删除单个未引用文件，保留仍被引用的配对文件。
      */
     private async deleteSingleImageFile(filename: string): Promise<void> {
-        try {
-            if (Capacitor.isNativePlatform()) {
-                await Filesystem.deleteFile({
-                    path: `images/${filename}`,
-                    directory: Directory.Data,
-                }).catch(() => { }); // 忽略文件不存在的错误
-            } else {
-                // Web 环境下，对于孤立缩略图，我们直接使用 imageService 的内部逻辑
-                // 但需要小心不要触发配对删除
-                console.warn(`[ImageCleanup] Web环境下删除孤立缩略图: ${filename}`);
-                // 暂时跳过 Web 环境下的孤立缩略图删除，这种情况应该很少见
-            }
-        } catch (error) {
-            console.error(`[ImageCleanup] 删除单个文件失败: ${filename}`, error);
-            throw error;
-        }
+        await imageService.deleteSingleImage(filename);
     }
     
     /**
@@ -552,6 +547,14 @@ export class ImageCleanupService {
                     report += `## 🔍 孤立的缩略图 (${checkResult.orphanedThumbnails.length} 个)\n`;
                     checkResult.orphanedThumbnails.forEach((thumbName, index) => {
                         report += `${index + 1}. \`${thumbName}\` (无对应原图)\n`;
+                    });
+                    report += `\n`;
+                }
+
+                if (checkResult.obsoleteThemeThumbnails.length > 0) {
+                    report += `## 多余的主题缩略图 (${checkResult.obsoleteThemeThumbnails.length} 个)\n`;
+                    checkResult.obsoleteThemeThumbnails.forEach((filename, index) => {
+                        report += `${index + 1}. \`${filename}\` (保留原图)\n`;
                     });
                     report += `\n`;
                 }
