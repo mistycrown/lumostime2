@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-11: Verifies bulk associations across logs and all review kinds, latest edits, existing-link protection and persistence.
  * @updated 2026-10-11: Checks inline categorized/uncategorized creation, validation, cancellation, search reset and reload persistence.
  * @updated 2026-10-11: Covers linked-review ten-card batches, collapse/reopen, period resets, preserved data and mobile/desktop layouts.
  * @updated 2026-10-11: Checks management omits node deletion, keeps detail deletion coverage and mirrors the app's data-ready startup gate.
@@ -554,6 +555,41 @@ async function run() {
   check([reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews].every((entries) => entries[0].answers[0].answer === '显示别名 删除测试 [[新主节点]]'), 'Reload lost unlinked review text');
   check(data.logs.some((log) => log.id === 'delete-log' && log.note === '保留 显示别名 与 [[新主节点]]。'), 'Reload lost retained log');
   passed.push('category rename validation/cancel/persistence, category deletion preserves members, filter reset, management omits node deletion, detail deletion, Escape/hardware back, pending AI, all review kinds and reload without rediscovery');
+  const bulkNode = { id: 'bulk-node', name: '批量测试', aliases: ['批量别名'], description: '', createdAt: 1, updatedAt: 1 };
+  data.setNodes((previous) => [...previous, bulkNode]);
+  const alreadyLinkedLog = fixture('bulk-existing', '[[批量测试]] 和批量别名', 2);
+  const unrelatedLog = fixture('bulk-unrelated', '普通正文 [[新主节点]]', 2);
+  data.setLogs((previous) => [...previous, fixture('bulk-name', '与批量测试交流 [[新主节点]]', 2), fixture('bulk-alias', '与批量别名讨论', 2), alreadyLinkedLog, unrelatedLog]);
+  const bulkAnswers = [{ questionId: 'name', question: '名称', answer: '回顾批量测试' }, { questionId: 'alias', question: '别名', answer: '回顾批量别名' }, { questionId: 'linked', question: '已关联', answer: '［［批量测试］］ 和批量别名' }, { questionId: 'unrelated', question: '其他', answer: '没有匹配' }];
+  reviews.setDailyReviews((previous) => [...previous, { id: 'bulk-daily', date: '2026-10-02', createdAt: 1, updatedAt: 1, answers: bulkAnswers }]);
+  reviews.setWeeklyReviews((previous) => [...previous, { id: 'bulk-weekly', weekStartDate: '2026-10-01', weekEndDate: '2026-10-07', createdAt: 1, updatedAt: 1, answers: [bulkAnswers[1]] }]);
+  reviews.setMonthlyReviews((previous) => [...previous, { id: 'bulk-monthly', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', createdAt: 1, updatedAt: 1, answers: [bulkAnswers[0]] }]); await delay();
+  nodes.openNode(bulkNode.name); await until(() => button('关联'), 'bulk node detail'); await click('关联');
+  const potentialSection = document.querySelector('[aria-label="全部关联潜在记录"]')!.closest('section')!;
+  check(potentialSection.querySelectorAll('article').length === 6, 'Bulk action does not cover every candidate kind');
+  potentialSection.scrollIntoView({ block: 'start' }); assertFits(); await capture('node-associate-all-mobile'); await capture('node-associate-all-desktop');
+  data.setLogs((previous) => previous.map((log) => log.id === 'bulk-alias' ? { ...log, note: `${log.note}，刚修改` } : log));
+  await labelledClick('全部关联潜在记录');
+  check(data.logs.find((log) => log.id === 'bulk-name')?.note === '与[[批量测试]]交流 [[新主节点]]', 'Bulk linking lost canonical text/other links');
+  check(data.logs.find((log) => log.id === 'bulk-alias')?.note === '与[[批量别名丨批量测试]]讨论，刚修改', 'Bulk linking lost alias label/latest edit');
+  check(data.logs.find((log) => log.id === alreadyLinkedLog.id) === alreadyLinkedLog && data.logs.find((log) => log.id === unrelatedLog.id) === unrelatedLog, 'Bulk linking changed existing/unrelated logs');
+  const linkedDaily = reviews.dailyReviews.find((review) => review.id === 'bulk-daily')!;
+  check(linkedDaily.answers[0].answer === '回顾[[批量测试]]' && linkedDaily.answers[1].answer === '回顾[[批量别名丨批量测试]]', 'Bulk linking missed daily answers');
+  check(linkedDaily.answers[2] === bulkAnswers[2] && linkedDaily.answers[3] === bulkAnswers[3], 'Bulk linking changed existing/unrelated answers');
+  check(reviews.weeklyReviews.find((review) => review.id === 'bulk-weekly')?.answers[0].answer === '回顾[[批量别名丨批量测试]]', 'Bulk linking missed weekly answers');
+  check(reviews.monthlyReviews.find((review) => review.id === 'bulk-monthly')?.answers[0].answer === '回顾[[批量测试]]', 'Bulk linking missed monthly answers');
+  check(!document.querySelector('[aria-label="全部关联潜在记录"]') && document.body.textContent?.includes('暂无潜在关联'), 'Bulk action remained after candidates were linked');
+  check(nodes.index.get(bulkNode.id)?.logs.length === 3 && nodes.index.get(bulkNode.id)?.reviewAnswers.length === 5, 'Bulk association backlink count is incorrect');
+  const afterBulk = JSON.stringify({ logs: data.logs, daily: reviews.dailyReviews, weekly: reviews.weeklyReviews, monthly: reviews.monthlyReviews });
+  const afterBulkCollections = [data.logs, reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews];
+  nodes.associateAll(bulkNode.id); await delay();
+  check(JSON.stringify({ logs: data.logs, daily: reviews.dailyReviews, weekly: reviews.weeklyReviews, monthly: reviews.monthlyReviews }) === afterBulk, 'Repeated bulk action changed linked records');
+  check([data.logs, reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews].every((records, index) => records === afterBulkCollections[index]), 'Empty bulk action rewrote unchanged collections');
+  await delay(350);
+  check((await dataRepository.loadDataContextSnapshot()).logs.find((log) => log.id === 'bulk-alias')?.note?.includes('[[批量别名丨批量测试]]'), 'Bulk linked log did not persist');
+  const savedBulkReviews = await dataRepository.loadReviewEntriesSnapshot();
+  check(savedBulkReviews.dailyReviews.find((review) => review.id === 'bulk-daily')?.answers[0].answer === '回顾[[批量测试]]' && savedBulkReviews.weeklyReviews.find((review) => review.id === 'bulk-weekly')?.answers[0].answer === '回顾[[批量别名丨批量测试]]' && savedBulkReviews.monthlyReviews.find((review) => review.id === 'bulk-monthly')?.answers[0].answer === '回顾[[批量测试]]', 'Bulk linked reviews did not persist');
+  passed.push('all-associations button, every log/review kind, alias labels, latest text, untouched existing links, updated counts, no candidates, repeated action and persistence');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });

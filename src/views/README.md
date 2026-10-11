@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-11: `NodeDetailView` provides 全部关联 beside the 潜在关联 heading, linking all matched logs and daily/weekly/monthly answers through a batched context action. The button disappears after the candidates are associated.
+
 Update 2026-10-11: `NodeDetailView.tsx` uses Lucide `Orbit` in place of the bracket glyph beside the node name.
 
 Update 2026-10-11: `NodeDetailView.tsx` vertically centers its node icon and title, and `settings/NodesSettingsView.tsx` uses the same Lucide `Orbit` icon in directory rows.

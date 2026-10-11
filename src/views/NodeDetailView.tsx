@@ -1,5 +1,6 @@
 /**
  * @file NodeDetailView.tsx
+ * @updated 2026-10-11: Adds an all-associations action beside the potential-associations heading.
  * @updated 2026-10-11: Adds confirmed node deletion and discards pending biography/AI edits before removal.
  * @updated 2026-10-11: Uses the Lucide Orbit icon for node identity in the header and timeline metadata.
  * @updated 2026-10-08: Styles biography Markdown explicitly so headings and list markers survive the CSS reset.
@@ -161,7 +162,7 @@ export const NodeDetailView: React.FC<{
   onOpenWeeklyReview?: (startDate: string, endDate: string) => void;
   onOpenMonthlyReview?: (startDate: string, endDate: string) => void;
 }> = ({ node, onEditLog, onOpenDailyReview, onOpenWeeklyReview, onOpenMonthlyReview }) => {
-  const { nodes, index, openNode, rename, associate, associateReviewAnswer } = useNodes();
+  const { nodes, index, openNode, rename, associate, associateAll, associateReviewAnswer } = useNodes();
   const { logs, todos } = useData();
   const reviewContext = useOptionalReview();
   const dailyReviews = reviewContext?.dailyReviews || [];
@@ -224,7 +225,12 @@ export const NodeDetailView: React.FC<{
             {!relatedNodes.length && <p className="py-6 text-sm text-stone-400">暂无相关节点</p>}
           </section>
           <section>
-            <h2 className="mb-3 flex justify-between text-sm font-semibold text-stone-900">潜在关联<span className="font-mono text-xs font-normal text-stone-400">{candidates.length}</span></h2>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-stone-900">潜在关联<span className="font-mono text-xs font-normal text-stone-400">{candidates.length}</span></h2>
+              {candidates.length > 0 && <button type="button" aria-label="全部关联潜在记录" onClick={() => {
+                associateAll(node.id); addToast('success', `已关联 ${candidates.length} 条记录`);
+              }} className="shrink-0 py-1 text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">全部关联</button>}
+            </div>
             <div className="divide-y divide-stone-200 border-y border-stone-200">{candidates.map((candidate) => candidate.kind === 'log' ? <article key={candidate.log.id} className="py-5">
               <div className="mb-2 flex items-center justify-between gap-3"><button type="button" aria-label="打开潜在关联记录" onClick={() => onEditLog(candidate.log)} className="font-mono text-xs text-stone-400 hover:text-stone-700">{new Date(candidate.log.startTime).toLocaleDateString('zh-CN')}</button><div className="flex items-center gap-3"><button type="button" aria-label="打开详情" onClick={() => onEditLog(candidate.log)} className="text-xs text-stone-500 hover:text-stone-900">打开详情</button><button type="button" onClick={() => associate(candidate.log.id, node.id)} className="text-xs font-medium text-stone-600 underline decoration-stone-300 underline-offset-4 hover:text-stone-900">关联</button></div></div>
               <p className="whitespace-pre-wrap break-words text-sm leading-7 text-stone-600"><NodeText text={candidate.log.note || ''} /></p>

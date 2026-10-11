@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-11: `NodeContext.associateAll` batches potential associations across logs and daily/weekly/monthly review answers, rechecking the latest text, preserving alias labels and leaving unrelated/already-linked records unchanged.
+
 Update 2026-10-11: `NodeContext.addNode` creates a validated node directly in a selected category (or 未分类), retaining metadata without requiring a linked record. The existing DataContext persistence, export and sync paths store these nodes.
 
 Update 2026-10-11: `NodeContext` supports category renaming/removal and node deletion. Removing a category retains its nodes under 未分类; deleting a node unlinks its logs and all daily/weekly/monthly review answers, preserving display text and clearing deleted navigation entries.

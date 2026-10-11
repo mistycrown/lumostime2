@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-11: Associates all potential log/review matches in one update per collection, preserving unrelated and existing links.
  * @updated 2026-10-11: Exposes validated manual node creation with immediate category assignment and existing metadata persistence.
  * @updated 2026-10-11: Deletes nodes across logs/reviews/history and edits/removes categories while retaining member nodes.
  * @updated 2026-10-07: Indexes and mutates node links across daily, weekly and monthly reviews.
@@ -16,7 +17,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useData } from './DataContext';
 import { useOptionalReview } from './ReviewContext';
 import type { NoteNode, NodeCategory, ReviewAnswer } from '../types';
-import { buildNodeIndex, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
+import { buildNodeIndex, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
@@ -38,6 +39,7 @@ interface NodeContextValue {
   rename: (id: string, name: string) => void;
   merge: (sourceId: string, primaryId: string) => void;
   associate: (logId: string, nodeId: string) => void;
+  associateAll: (nodeId: string) => void;
   associateReviewAnswer: (kind: 'daily' | 'weekly' | 'monthly', reviewId: string, questionId: string, nodeId: string) => void;
 }
 
@@ -173,5 +175,30 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     else if (kind === 'weekly') setWeeklyReviews((previous) => linkAnswer(previous));
     else setMonthlyReviews((previous) => linkAnswer(previous));
   };
-  return <NodeContext.Provider value={{ nodes, nodeCategories, addNode, addCategory, renameCategory, removeCategory, removeNode, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateReviewAnswer }}>{children}</NodeContext.Provider>;
+  const associateAll = (nodeId: string) => {
+    const node = nodes.find((item) => item.id === nodeId);
+    if (!node) return;
+    const linkCandidate = (text: string) => getNodeCandidates(text, [node]).length ? linkNodeInText(text, node) : text;
+    setLogs((previous) => {
+      const next = previous.map((log) => {
+        const note = linkCandidate(log.note || '');
+        return note === (log.note || '') ? log : { ...log, note };
+      });
+      return next.every((log, index) => log === previous[index]) ? previous : next;
+    });
+    const linkReviews = <T extends { answers: ReviewAnswer[]; updatedAt: number }>(previous: T[]): T[] => {
+      const next = previous.map((review) => {
+        const answers = (review.answers || []).map((answer) => {
+          const text = linkCandidate(answer.answer || '');
+          return text === (answer.answer || '') ? answer : { ...answer, answer: text };
+        });
+        return answers.every((answer, index) => answer === review.answers?.[index]) ? review : { ...review, answers, updatedAt: Date.now() };
+      });
+      return next.every((review, index) => review === previous[index]) ? previous : next;
+    };
+    setDailyReviews((previous) => linkReviews(previous));
+    setWeeklyReviews((previous) => linkReviews(previous));
+    setMonthlyReviews((previous) => linkReviews(previous));
+  };
+  return <NodeContext.Provider value={{ nodes, nodeCategories, addNode, addCategory, renameCategory, removeCategory, removeNode, assignCategory, moveNode, reorderCategory, index, selectedNodeId: history.at(-1) || null, openNode, goBack, closeNode, updateNode, rename, merge, associate, associateAll, associateReviewAnswer }}>{children}</NodeContext.Provider>;
 };
