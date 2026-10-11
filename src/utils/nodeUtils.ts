@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.ts
+ * @updated 2026-10-11: Allows unlinking only removed alias labels while preserving canonical and unrelated node links.
  * @updated 2026-10-11: Validates manually created nodes and their destination category without requiring a linked record.
  * @updated 2026-10-11: Removes node links without losing display text and supports category rename/removal.
  * @updated 2026-10-07: Indexes daily, weekly and monthly review answers with typed periods and applies node mutations across all review kinds.
@@ -234,19 +235,20 @@ export const renameNodeInAnswers = (answers: ReviewAnswer[], oldName: string, ne
   return next === text ? answer : { ...answer, answer: next };
 });
 
-export const unlinkNodeInText = (text: string, name: string): string => {
+export const unlinkNodeInText = (text: string, name: string, aliases?: readonly string[]): string => {
   let result = '';
   let offset = 0;
   for (const link of parseNodeLinks(text)) {
-    result += text.slice(offset, link.start) + (link.name === name ? link.label || link.name : text.slice(link.start, link.end));
+    const shouldUnlink = link.name === name && (aliases === undefined || (link.label !== undefined && aliases.includes(link.label)));
+    result += text.slice(offset, link.start) + (shouldUnlink ? link.label || link.name : text.slice(link.start, link.end));
     offset = link.end;
   }
   return result + text.slice(offset);
 };
 
-export const unlinkNodeInAnswers = (answers: ReviewAnswer[], name: string): ReviewAnswer[] => answers.map((answer) => {
+export const unlinkNodeInAnswers = (answers: ReviewAnswer[], name: string, aliases?: readonly string[]): ReviewAnswer[] => answers.map((answer) => {
   const text = answer.answer || '';
-  const next = unlinkNodeInText(text, name);
+  const next = unlinkNodeInText(text, name, aliases);
   return next === text ? answer : { ...answer, answer: next };
 });
 

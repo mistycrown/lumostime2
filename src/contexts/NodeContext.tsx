@@ -1,5 +1,6 @@
 /**
  * @file NodeContext.tsx
+ * @updated 2026-10-11: Restores removed alias references to plain text across logs and every review kind, saving logs with metadata atomically.
  * @updated 2026-10-11: Associates all potential log/review matches in one update per collection, preserving unrelated and existing links.
  * @updated 2026-10-11: Exposes validated manual node creation with immediate category assignment and existing metadata persistence.
  * @updated 2026-10-11: Deletes nodes across logs/reviews/history and edits/removes categories while retaining member nodes.
@@ -17,7 +18,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useData } from './DataContext';
 import { useOptionalReview } from './ReviewContext';
 import type { NoteNode, NodeCategory, ReviewAnswer } from '../types';
-import { buildNodeIndex, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers } from '../utils/nodeUtils';
+import { buildNodeIndex, createNode, createNodeCategory, deleteNode, deleteNodeCategory, discoverNodes, getNodeCandidates, linkNodeInText, mergeNodes, moveNodeToCategory, reorderNodeItems, renameNode, renameNodeCategory, renameNodeInAnswers, unlinkNodeInAnswers, unlinkNodeInText } from '../utils/nodeUtils';
 
 interface NodeContextValue {
   nodes: NoteNode[];
@@ -114,9 +115,33 @@ export const NodeProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setHistory((previous) => previous.filter((nodeId) => nodeId !== id));
   };
   const updateNode = (id: string, patch: Pick<NoteNode, 'aliases' | 'description'>) => {
-    setNodes((previous) => previous.map((node) => node.id === id ? {
-      ...node, ...patch, aliases: [...new Set(patch.aliases.map((alias) => alias.trim()).filter((alias) => alias && alias !== node.name))], updatedAt: Date.now()
-    } : node));
+    const source = nodes.find((node) => node.id === id);
+    if (!source) return;
+    const aliases = [...new Set(patch.aliases.map((alias) => alias.trim()).filter((alias) => alias && alias !== source.name))];
+    updateNodeRecords((previousNodes, previousLogs) => {
+      const current = previousNodes.find((node) => node.id === id);
+      if (!current) return { nodes: previousNodes, logs: previousLogs };
+      const removedAliases = current.aliases.filter((alias) => !aliases.includes(alias));
+      return {
+        nodes: previousNodes.map((node) => node.id === id ? { ...node, ...patch, aliases, updatedAt: Date.now() } : node),
+        logs: removedAliases.length ? previousLogs.map((log) => {
+          const note = unlinkNodeInText(log.note || '', current.name, removedAliases);
+          return note === (log.note || '') ? log : { ...log, note };
+        }) : previousLogs
+      };
+    });
+    const removedAliases = source.aliases.filter((alias) => !aliases.includes(alias));
+    if (!removedAliases.length) return;
+    const unlinkReviews = <T extends { answers: ReviewAnswer[]; updatedAt: number }>(previous: T[]): T[] => {
+      const next = previous.map((review) => {
+        const answers = unlinkNodeInAnswers(review.answers || [], source.name, removedAliases);
+        return answers.every((answer, index) => answer === review.answers?.[index]) ? review : { ...review, answers, updatedAt: Date.now() };
+      });
+      return next.every((review, index) => review === previous[index]) ? previous : next;
+    };
+    setDailyReviews((previous) => unlinkReviews(previous));
+    setWeeklyReviews((previous) => unlinkReviews(previous));
+    setMonthlyReviews((previous) => unlinkReviews(previous));
   };
   const moveNode = (id: string, categoryId: string, targetId?: string, after = false) => {
     setNodes((previous) => moveNodeToCategory(previous, nodeCategories, id, categoryId, targetId, after));

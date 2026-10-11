@@ -1,5 +1,6 @@
 /**
  * @file nodeUtils.test.ts
+ * @updated 2026-10-11: Covers selective alias unlinking, exact labels/targets, all bracket forms and unchanged review answers.
  * @updated 2026-10-11: Covers manual node creation, name validation, global duplicate checks and category assignment.
  * @updated 2026-10-11: Verifies deletion preserves record text/alias labels, prevents rediscovery and retains category members.
  * @updated 2026-10-07: Covers daily, weekly and monthly review indexing plus cross-kind rename/merge transforms.
@@ -46,6 +47,27 @@ describe('manual node creation', () => {
     for (const name of [' ', '[[节点]]', '［［节点］］', '别名丨节点', '别名|节点', '两个\n节点', '两个\r节点']) {
       expect(() => createNode([], [], name)).toThrow('有效名称');
     }
+  });
+});
+
+describe('removed node alias references', () => {
+  it('restores only matching alias links to ordinary text in every bracket form', () => {
+    const text = '[[老师丨小林]] ［［ 老师 丨 小林 ］］ [［老师丨小林]］ [[林林丨小林]] [[老师同学丨小林]] [[小林]] [[老师丨杭州]] [[老师]] 老师 [[[老师丨小林]]] [[老师|小林]]';
+    expect(unlinkNodeInText(text, '小林', ['老师'])).toBe('老师 老师 老师 [[林林丨小林]] [[老师同学丨小林]] [[小林]] [[老师丨杭州]] [[老师]] 老师 [[[老师丨小林]]] [[老师|小林]]');
+    expect(unlinkNodeInText('[[C++丨小林]] [[C++项目丨小林]]', '小林', ['C++'])).toBe('C++ [[C++项目丨小林]]');
+    expect(unlinkNodeInText(text, '小林', [])).toBe(text);
+  });
+
+  it('unlinks multiple removed aliases and retains unrelated review answers', () => {
+    const answers: ReviewAnswer[] = [
+      { questionId: 'q', question: 'Q', answer: '[[老师丨小林]] ［［林林丨小林］］ [[小林]] [[同学丨小林]]' },
+      { questionId: 'other', question: 'Q', answer: '[[老师丨杭州]] 老师' }
+    ];
+    const result = unlinkNodeInAnswers(answers, '小林', ['老师', '林林']);
+    expect(result[0]).toEqual({ ...answers[0], answer: '老师 林林 [[小林]] [[同学丨小林]]' });
+    expect(result[1]).toBe(answers[1]);
+    expect(unlinkNodeInAnswers(result, '小林', ['老师', '林林'])[0]).toBe(result[0]);
+    expect(answers[0].answer).toContain('[[老师丨小林]]');
   });
 });
 

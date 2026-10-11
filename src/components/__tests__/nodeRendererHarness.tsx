@@ -1,5 +1,6 @@
 /**
  * @file nodeRendererHarness.tsx
+ * @updated 2026-10-11: Deletes linked aliases through the detail editor, checks every review kind and confirms plain text survives reload.
  * @updated 2026-10-11: Verifies bulk associations across logs and all review kinds, latest edits, existing-link protection and persistence.
  * @updated 2026-10-11: Checks inline categorized/uncategorized creation, validation, cancellation, search reset and reload persistence.
  * @updated 2026-10-11: Covers linked-review ten-card batches, collapse/reopen, period resets, preserved data and mobile/desktop layouts.
@@ -590,6 +591,45 @@ async function run() {
   const savedBulkReviews = await dataRepository.loadReviewEntriesSnapshot();
   check(savedBulkReviews.dailyReviews.find((review) => review.id === 'bulk-daily')?.answers[0].answer === '回顾[[批量测试]]' && savedBulkReviews.weeklyReviews.find((review) => review.id === 'bulk-weekly')?.answers[0].answer === '回顾[[批量别名丨批量测试]]' && savedBulkReviews.monthlyReviews.find((review) => review.id === 'bulk-monthly')?.answers[0].answer === '回顾[[批量测试]]', 'Bulk linked reviews did not persist');
   passed.push('all-associations button, every log/review kind, alias labels, latest text, untouched existing links, updated counts, no candidates, repeated action and persistence');
+  nodes.closeNode(); await delay();
+  const aliasNode = { id: 'alias-removal', name: '张老师', aliases: ['老师', '林林', '同学'], description: '原简介', createdAt: 1, updatedAt: 1 };
+  const retainedAliasLog = fixture('alias-retained', '[[同学丨张老师]] [[张老师]] [[老师丨新主节点]] [[老师]] 老师', 2);
+  data.setNodes((previous) => [...previous, aliasNode]);
+  data.setLogs((previous) => [...previous, fixture('alias-history', '历史 [[老师丨张老师]] ［［老师丨张老师］］ [[林林丨张老师]]', -10), retainedAliasLog]);
+  const aliasAnswer = { questionId: 'alias', question: '人物', answer: '［［ 老师 丨 张老师 ］］ [[林林丨张老师]] [[张老师]] [[同学丨张老师]] [[老师丨新主节点]]' };
+  const unrelatedAliasAnswer = { questionId: 'other', question: '其他', answer: '普通 老师 [[新主节点]]' };
+  reviews.setDailyReviews((previous) => [...previous, { id: 'alias-daily', date: '2026-10-02', createdAt: 1, updatedAt: 1, answers: [aliasAnswer, unrelatedAliasAnswer] }]);
+  reviews.setWeeklyReviews((previous) => [...previous, { id: 'alias-weekly', weekStartDate: '2026-10-01', weekEndDate: '2026-10-07', createdAt: 1, updatedAt: 1, answers: [aliasAnswer, unrelatedAliasAnswer] }]);
+  reviews.setMonthlyReviews((previous) => [...previous, { id: 'alias-monthly', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', createdAt: 1, updatedAt: 1, answers: [aliasAnswer, unrelatedAliasAnswer] }]); await delay();
+  nodes.openNode(aliasNode.name); await until(() => button('细节'), 'alias removal detail'); await click('细节');
+  await labelledClick('编辑节点简介'); await input('节点简介', '保留正在编辑的简介');
+  data.setLogs((previous) => previous.map((log) => log.id === 'alias-history' ? { ...log, note: `${log.note}，刚修改` } : log));
+  await labelledClick('删除别名：老师');
+  check(data.logs.find((log) => log.id === 'alias-history')?.note === '历史 老师 老师 [[林林丨张老师]]，刚修改', 'Alias deletion did not restore latest historical log text');
+  check(data.logs.find((log) => log.id === retainedAliasLog.id) === retainedAliasLog, 'Alias deletion changed canonical/retained/other-node links');
+  check(nodes.nodes.find((node) => node.id === aliasNode.id)?.description === '保留正在编辑的简介', 'Alias deletion lost buffered biography');
+  for (const entries of [reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews]) {
+    const review = entries.find((entry) => entry.id.startsWith('alias-'))!;
+    check(review.answers[0].answer === '老师 [[林林丨张老师]] [[张老师]] [[同学丨张老师]] [[老师丨新主节点]]', 'Alias deletion missed review kind or changed unrelated links');
+    check(review.answers[1] === unrelatedAliasAnswer && review.updatedAt > 1, 'Alias deletion rewrote unrelated answer or missed updated timestamp');
+  }
+  await labelledClick('删除别名：林林'); await labelledClick('保存节点简介');
+  check(nodes.index.get(aliasNode.id)?.logs.length === 1, 'Removed aliases remained in backlinks');
+  check(data.logs.find((log) => log.id === 'alias-history')?.note === '历史 老师 老师 林林，刚修改', 'Second alias deletion lost plain text');
+  await click('关联'); assertFits(); await capture('node-alias-removal-mobile');
+  await delay(350);
+  const aliasSnapshot = await dataRepository.loadDataContextSnapshot();
+  check(aliasSnapshot.nodes.find((node) => node.id === aliasNode.id)?.aliases.join() === '同学' && aliasSnapshot.logs.find((log) => log.id === 'alias-history')?.note === '历史 老师 老师 林林，刚修改', 'Alias removal did not persist metadata and log text');
+  const beforeAliasRemount = data;
+  deletionRoot.unmount(); await delay();
+  const aliasRoot = createRoot(document.getElementById('root')!); aliasRoot.render(<Providers />);
+  await until(() => data !== beforeAliasRemount && data.isReady && reviews.isReady && nodes.nodes.some((node) => node.id === aliasNode.id), 'alias removal remount');
+  check(nodes.nodes.find((node) => node.id === aliasNode.id)?.aliases.join() === '同学' && nodes.index.get(aliasNode.id)?.logs.length === 1, 'Reload restored removed aliases/backlinks');
+  check(data.logs.find((log) => log.id === 'alias-history')?.note === '历史 老师 老师 林林，刚修改', 'Reload restored alias link syntax');
+  for (const entries of [reviews.dailyReviews, reviews.weeklyReviews, reviews.monthlyReviews]) {
+    check(entries.find((entry) => entry.id.startsWith('alias-'))?.answers[0].answer === '老师 林林 [[张老师]] [[同学丨张老师]] [[老师丨新主节点]]', 'Reload lost unlinked alias review text');
+  }
+  passed.push('detail alias deletion restores ordinary text across historical logs/all reviews, preserves latest edits/biography/other links, refreshes backlinks and survives reload');
   window.__nodeRendererResult = { passed };
 }
 run().catch((error) => { window.__nodeRendererResult = { passed, error: String(error?.stack || error) }; });
