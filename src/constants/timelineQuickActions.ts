@@ -3,6 +3,7 @@
  * @input Stored timeline quick-action preference payloads
  * @output Shared quick-action definitions and normalization helpers for timeline header buttons
  * @description Centralizes the configurable quick actions shown at the top of the timeline view.
+ * @updated 2026-10-11: Added the configurable Settings home shortcut.
  * @updated 2026-05-12: Added the Collection shortcut key so timeline quick actions can deep-link into the settings collection subpage.
  * @updated 2026-08-09: Added the daily-check overview shortcut key.
  * @updated 2026-08-26: Added the review-overview shortcut key without changing the default pinned actions.
@@ -22,6 +23,7 @@ export type TimelineQuickActionKey =
   | 'collections'
   | 'principle'
   | 'nodes'
+  | 'settings'
   | 'sync';
 
 export interface TimelineQuickActionOption {
@@ -80,6 +82,11 @@ export const TIMELINE_QUICK_ACTION_OPTIONS: TimelineQuickActionOption[] = [
     key: 'nodes',
     label: '节点',
     description: '打开设置中的节点目录。'
+  },
+  {
+    key: 'settings',
+    label: '设置',
+    description: '打开设置主页。'
   },
   {
     key: 'sync',

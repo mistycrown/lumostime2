@@ -1,5 +1,6 @@
 /**
  * @file TimelineView.tsx
+ * @updated 2026-10-11: Adds Settings home to configurable header shortcuts and the More menu.
  * @updated 2026-10-06: Adds post-save node suggestions beside rendered notes.
  * @input Logs, Categories, Todos, Scopes, Reviews (Daily/Weekly/Monthly)
  * @output Log CRUD, Date Navigation, Gesture/Calendar Animated Day Navigation, Search Trigger, Filter Trigger, Review Navigation
@@ -43,7 +44,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AppView, Log, Activity, TodoItem, Category, TodoCategory, Scope, DailyReview, ReviewTemplate, WeeklyReview, MonthlyReview, AutoLinkRule, Goal, CheckItem, CheckTemplate } from '../types';
 import { CATEGORIES } from '../constants';
 import * as LucideIcons from 'lucide-react';
-import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose, Network } from 'lucide-react';
+import { Plus, MoreHorizontal, BarChart2, BookOpen, FlaskConical, RefreshCw, Sparkles, Zap, Heart, Share, Timer, Clock, Search, Filter, Image as ImageIcon, Star, Scale, ChevronLeft, ChevronRight, ListFilter, ListTodo, X, Paintbrush, PanelRightClose, Network, Settings } from 'lucide-react';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { NodeSuggestions } from '../components/NodeSuggestions';
 import { ParsedTimeEntry } from '../services/aiService';
@@ -581,6 +582,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ timelineLayoutMode, 
                 setSettingsSubmenu('nodes');
                 setSettingsSubmenuBackCloses(true);
             }
+        },
+        settings: {
+            label: '设置',
+            title: '设置',
+            icon: <Settings size={20} />,
+            onClick: () => setIsSettingsOpen(true)
         },
         sync: {
             label: '同步',

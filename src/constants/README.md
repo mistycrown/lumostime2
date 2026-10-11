@@ -1,5 +1,7 @@
 # Constants Directory
 
+Update 2026-10-11: `timelineQuickActions.ts` includes the optional `settings` shortcut for the Timeline More menu and configurable pinned header buttons.
+
 Update 2026-10-09: `SETTINGS_KEYS.PERSONAL_DICTIONARY` names the persisted personal-word preference.
 
 Update 2026-10-05: `storageKeys.ts` adds the anonymous diagnostics user ID key.

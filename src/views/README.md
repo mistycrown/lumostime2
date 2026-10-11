@@ -4,6 +4,8 @@ Update 2026-10-11: Daily, weekly and monthly review guide answers receive full l
 
 Update 2026-10-11: `StatsView.tsx` keeps daily-check scrolling within its selected range, skips unrelated log statistics and hidden activity matrices, and reuses six recent check ranges until reviews or templates change. Other views track gestures with refs and ignore vertical/canceled swipes.
 
+Update 2026-10-11: `TimelineView.tsx` opens Settings home from the More menu or a user-pinned Settings header shortcut, using the shared navigation reset behavior.
+
 Update 2026-10-10: The personal dictionary entry uses `BookA`, distinct from the principle library's `BookOpen` icon.
 
 Update 2026-10-09: `SettingsView.tsx` adds the lazy personal dictionary subpage under Content, using the shared settings back navigation.
