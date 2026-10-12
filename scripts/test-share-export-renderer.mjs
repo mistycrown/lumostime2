@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Checks graph-paper typography, pure-text isolation and visible grid lines in the exported PNG.
  * @updated 2026-10-12: Verifies single-photo book-page availability, title/node text and circular photo exports.
  * @updated 2026-10-12: Checks that film-story uses an untinted blurred photo without shadows or darkened export corners.
  * @updated 2026-10-12: Verifies independent text/photo entrances, paper/film layouts and every mode's actual export.
@@ -63,6 +64,22 @@ async function run() {
   check(button('纯文字').getAttribute('aria-selected') === 'true' && button('图文').disabled, 'Empty record does not enter text mode');
   check(button('经典') && !button('摄影日记'), 'Text mode contains photo templates');
   check(!button('圆影书页'), 'Single-photo template appears without photos');
+  check(button('方格手帐'), 'Text mode lacks the graph-paper journal');
+  button('方格手帐').click(); await wait();
+  const journal = document.querySelector('p.font-serif').parentElement;
+  check(!document.querySelector('img') && journal.querySelectorAll('span.underline').length === 2, 'Graph journal lost pure text or node labels');
+  check(journal.querySelector('h2').textContent === '周末散步', 'Graph journal lost its record title');
+  await capture('grid-journal-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Journal export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Journal export failed');
+  const journalExport = new Image(); journalExport.src = downloaded; await journalExport.decode();
+  const journalCanvas = document.createElement('canvas'); journalCanvas.width = journalExport.naturalWidth; journalCanvas.height = journalExport.naturalHeight;
+  const journalContext = journalCanvas.getContext('2d'); journalContext.drawImage(journalExport, 0, 0);
+  const gridPixels = journalContext.getImageData(128, 440, 128, 1).data;
+  const intensities = Array.from({ length: 128 }, (_, index) => gridPixels[index * 4]);
+  check(Math.max(...intensities) - Math.min(...intensities) > 8, 'Graph paper grid disappeared from the PNG');
+  window.__gridJournalExport = downloaded;
+  passed.push('Graph-paper journal keeps its title/node text, hides photos and exports the paper grid');
   button('变迁').click(); await wait();
   const themeButtons = [...document.querySelector('section').querySelectorAll('button')];
   const filmColors = new Set();
@@ -86,6 +103,7 @@ async function run() {
 
   await mount(photos.slice(0,1), 'single'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears with one photo');
   check(button('图文').getAttribute('aria-selected') === 'true' && button('摄影日记') && !button('经典'), 'Photo record does not enter photography mode');
+  check(!button('方格手帐'), 'Graph-paper journal appears in photo mode');
   const diaryImage = document.querySelector('img[alt="照片 1"]');
   const diaryCard = diaryImage.parentElement.parentElement;
   check(diaryImage.getBoundingClientRect().left > diaryCard.getBoundingClientRect().left, 'Photography diary lacks paper margins');
@@ -250,7 +268,7 @@ async function run() {
   check(stripPhotos.length === 3 && stripCard.textContent.includes('LUMOS · 400'), 'Film frames or markings missing');
   check(stripCard.querySelectorAll('figure').length === 3 && stripCard.querySelector('p').getBoundingClientRect().top > stripPhotos.at(-1).getBoundingClientRect().bottom, 'Film story geometry is incorrect');
   await capture('film-strip-desktop');
-  for (const [mode, layouts] of [['纯文字', ['经典', '古韵', '现代', '分割', '变迁', '玻璃']], ['图文', ['摄影日记', '变迁', '无缝长图', '边框长图', '胶片长图', '胶片长图']]]) {
+  for (const [mode, layouts] of [['纯文字', ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '方格手帐']], ['图文', ['摄影日记', '变迁', '无缝长图', '边框长图', '胶片长图', '胶片长图']]]) {
     button(mode).click(); await wait();
     for (const layout of layouts) {
       button(layout).click(); await wait(); toast = null; downloaded = null;
@@ -262,7 +280,7 @@ async function run() {
       if(mode === '图文' && layout === '胶片长图') window.__filmStripExport = downloaded;
     }
   }
-  passed.push('All six text and five photo layouts export, including repeated PNG/JPEG/WebP exports');
+  passed.push('All seven text and multi-photo layouts export, including repeated PNG/JPEG/WebP exports');
   button('纯文字').click(); await wait(); button('经典').click(); await wait(); check(!document.querySelector('img'), 'Cannot switch back to classic');
   button('图文').click(); await wait();
   button('无缝长图').click(); await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 3, 'Cannot return to long-image mode');
@@ -369,7 +387,7 @@ app.whenReady().then(async () => {
   if(exported) await fs.writeFile(path.join(__dirname, 'long-image-export.png'), Buffer.from(exported.split(',')[1], 'base64'));
   const framedExport = await window.webContents.executeJavaScript('window.__framedLongImageExport');
   if(framedExport) await fs.writeFile(path.join(__dirname, 'framed-long-image-export.png'), Buffer.from(framedExport.split(',')[1], 'base64'));
-  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export'], ['__diaryExport', 'photo-diary-export'], ['__filmStripExport', 'film-strip-export'], ['__circleNoteExport', 'circle-note-export']]) {
+  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export'], ['__diaryExport', 'photo-diary-export'], ['__filmStripExport', 'film-strip-export'], ['__circleNoteExport', 'circle-note-export'], ['__gridJournalExport', 'grid-journal-export']]) {
     const exported = await window.webContents.executeJavaScript('window.' + key);
     if(exported) await fs.writeFile(path.join(__dirname, name + '.png'), Buffer.from(exported.split(',')[1], 'base64'));
   }

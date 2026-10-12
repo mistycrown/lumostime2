@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Registers a text-only graph-paper journal template.
  * @updated 2026-10-12: Registers the single-photo circular portrait and centered book-page layout.
  * @updated 2026-10-12: Separates existing text templates from the editorial photography collection.
  * @updated 2026-10-12: Renames seamless stacking and describes the photo-backed and photo-first framed layouts.
@@ -106,6 +107,11 @@ export const TEXT_SHARE_TEMPLATES: ShareTemplate[] = [
     id: 'glass-morphism',
     name: '玻璃',
     description: '毛玻璃质感',
+  },
+  {
+    id: 'grid-journal',
+    name: '方格手帐',
+    description: '淡方格纸与日记式文字排版',
   }
 ];
 

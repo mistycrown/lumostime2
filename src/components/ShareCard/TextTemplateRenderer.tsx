@@ -1,8 +1,9 @@
 /**
  * @file TextTemplateRenderer.tsx
  * @input Text-only share content, theme and selected text layout
- * @output Existing magazine, poetry, note, split, deepened-card and glass typography
+ * @output Magazine, poetry, note, split, deepened-card, glass and graph-paper journal typography
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Adds theme-tinted graph paper with a notebook margin, record title and diary typography.
  * @updated 2026-10-12: Extracts text layouts and removes all photo-grid rendering.
  */
 import React from 'react';
@@ -38,6 +39,33 @@ export const TextTemplateRenderer: React.FC<ShareTemplateRendererProps> = ({ con
   const primaryStyle = { color: theme.primaryColor };
   const bgStyle = { backgroundColor: theme.primaryColor };
   const cardColor = deepenThemeColor(theme.primaryColor);
+
+  if (templateId === 'grid-journal') {
+    return (
+      <div className="w-full relative flex flex-col min-h-[528px] px-8 py-6" style={{
+        color: theme.primaryColor,
+        backgroundColor: theme.backgroundColor,
+        backgroundImage: `linear-gradient(to right, ${theme.primaryColor}14 1px, transparent 1px), linear-gradient(to bottom, ${theme.primaryColor}14 1px, transparent 1px)`,
+        backgroundSize: '24px 24px',
+        backgroundPosition: '-1px -1px'
+      }}>
+        <div aria-hidden="true" className="absolute top-6 bottom-6 left-5 w-px pointer-events-none" style={{ backgroundColor: theme.primaryColor + '30' }} />
+        <div className="flex justify-between gap-4 text-[10px] font-mono leading-6 opacity-50">
+          <span className="shrink-0">{content.date}</span>
+          {content.activity && <span className="break-words text-right">#{content.activity}</span>}
+        </div>
+        {content.title && (
+          <h2 className="mt-6 font-serif text-lg font-medium leading-6 tracking-wide">
+            <ShareCardText text={content.title} />
+          </h2>
+        )}
+        <p className="mt-6 font-serif text-sm leading-6 whitespace-pre-wrap break-words opacity-90">
+          <ShareCardText text={content.body} />
+        </p>
+        <div className="mt-auto pt-12 text-right text-[9px] font-mono leading-6 tracking-widest opacity-40">LumosTime</div>
+      </div>
+    );
+  }
 
   // --- Template: Vertical Poetry (New Chinese Style) - Pure Text ---
   if (templateId === 'vertical-poetry') {
