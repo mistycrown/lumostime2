@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Exports a disposable snapshot with embedded preview pixels and rejects unloaded images explicitly.
  * @updated 2026-10-12: Arranges layout buttons in four columns with the long-image option on the second row.
  * @updated 2026-10-12: Preserves local Blob image URLs during export instead of appending invalid cache-busting queries.
  * @updated 2026-10-12: Offers a full-width long-image layout when multiple photos are available.
@@ -18,6 +19,7 @@ import { ShareCardContent } from '../components/ShareCard/types';
 import { TemplateRenderer } from '../components/ShareCard/TemplateRenderer';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { imageService } from '../services/imageService';
+import { createShareCardExportSnapshot } from '../utils/shareCardExport';
 
 interface ShareViewProps {
   log: Log;
@@ -116,26 +118,6 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
     
     setIsExporting(true);
     try {
-      // 等待所有图片加载完成
-      const images = previewRef.current.querySelectorAll('img');
-      const imagePromises = Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise<void>((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => {
-            console.warn('Image failed to load:', img.src);
-            resolve(); // 即使失败也继续
-          };
-          // 超时保护
-          setTimeout(() => resolve(), 3000);
-        });
-      });
-      
-      await Promise.all(imagePromises);
-      
-      // 额外延迟确保渲染完成
-      await new Promise<void>((resolve) => setTimeout(resolve, 200));
-
       const options = { 
         // Stored photos already have unique Blob URLs; appending a query makes them unreadable.
         cacheBust: false,
@@ -144,17 +126,22 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : activeTheme.backgroundColor
       };
 
+      const snapshot = await createShareCardExportSnapshot(previewRef.current, options.pixelRatio);
       let dataUrl: string;
       try {
-        dataUrl = await toPng(previewRef.current, options);
-      } catch (firstErr) {
-        console.warn("First export attempt failed, retrying with skipFonts...", firstErr);
         try {
-          dataUrl = await toPng(previewRef.current, { ...options, skipFonts: true });
-        } catch (secondErr) {
-          console.error("Second export attempt also failed:", secondErr);
-          throw new Error('图片导出失败，请重试');
+          dataUrl = await toPng(snapshot.node, options);
+        } catch (firstErr) {
+          console.warn('First export attempt failed, retrying with skipFonts...', firstErr);
+          try {
+            dataUrl = await toPng(snapshot.node, { ...options, skipFonts: true });
+          } catch (secondErr) {
+            console.error('Second export attempt also failed:', secondErr);
+            throw new Error('图片导出失败，请重试');
+          }
         }
+      } finally {
+        snapshot.dispose();
       }
       
       const isNative = Capacitor.isNativePlatform();
@@ -203,10 +190,11 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       
     } catch (err) {
       console.error("Could not download image", err);
+      const message = err instanceof Error ? err.message : '保存图片失败';
       if (onToast) {
-        onToast('error', '保存图片失败');
+        onToast('error', message);
       } else {
-        alert("保存图片失败。请稍后重试。");
+        alert(message);
       }
     } finally {
       setIsExporting(false);

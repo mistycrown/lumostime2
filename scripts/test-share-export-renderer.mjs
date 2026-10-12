@@ -4,6 +4,8 @@
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
  * @updated 2026-10-12: Reproduces broken Blob cache-busting and checks every share layout's real save action.
+ * @updated 2026-10-12: Checks recovery when the image exporter has cached a previous resource failure.
+ * @updated 2026-10-12: Covers revoked Blob URLs, missing MIME types, intact preview pixels and invalid-image rejection.
  */
 import { createRequire } from 'node:module';
 import { access, copyFile, mkdtemp, readdir, writeFile } from 'node:fs/promises';
@@ -20,6 +22,7 @@ await build({
   stdin: { resolveDir: root, loader: 'tsx', contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { toPng } from 'html-to-image';
 import { ShareView } from './src/views/ShareView';
 import { TemplateRenderer } from './src/components/ShareCard/TemplateRenderer';
 import { SHARE_THEMES } from './src/components/ShareCard/constants';
@@ -34,11 +37,11 @@ const passed = [];
 let toast;
 let downloaded;
 HTMLAnchorElement.prototype.click = function() { downloaded = this.href; };
-const mount = async (images, key) => {
+const mount = async (images, key, decodeImages = true) => {
   root.render(<ShareView key={key} log={{ ...log, images }} onBack={() => {}} onToast={(type, message) => { toast = { type, message }; }}/>);
   await wait();
   await until(() => document.querySelector('button[title="保存"]') && !document.querySelector('button[title="保存"]').disabled, 'Share preview never loaded');
-  await Promise.all([...document.images].map(image => image.decode()));
+  if (decodeImages) await Promise.all([...document.images].map(image => image.decode()));
 };
 const capture = async name => { window.__longImageCapture = name; await until(() => !window.__longImageCapture, 'Screenshot timeout'); };
 async function run() {
@@ -71,6 +74,11 @@ async function run() {
   check(!host.textContent.includes('周末散步'), 'Share title removal regressed');
   check(button('长图').classList.contains('bg-stone-100'), 'Long-image mode does not show selection');
   await capture('long-image-mobile');
+  // A previous failed export stays in the library's resource cache even after cacheBust is disabled.
+  let cachedFailure;
+  try { await toPng(host, { cacheBust: true, skipFonts: true }); } catch(error) { cachedFailure = error; }
+  check(cachedFailure, 'Failed-resource cache scenario was not reproduced');
+  await wait();
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Long-image download failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Long-image download failed');
   const exported = new Image(); exported.src = downloaded; await exported.decode();
@@ -84,6 +92,9 @@ async function run() {
     check(expectedColors[index].every((value, channel) => Math.abs(pixel[channel] - value) < 5), 'Saved PNG lost photo ' + index);
   });
   window.__longImageExport = downloaded;
+  check(images.every((image, index) => image.src === photos[index]), 'Export mutated preview image URLs');
+  check(!document.querySelector('[aria-hidden="true"] img'), 'Export snapshot leaked into the document');
+  passed.push('Recovers cached image failures without refetching or losing photo pixels');
   passed.push('Real ShareView enables long-image mode only with multiple available photos');
   passed.push('Original ratios, full card width, seamless record-order stacking and node text preserved');
   passed.push('Real save action exports the complete long PNG at 2x resolution');
@@ -103,11 +114,51 @@ async function run() {
     const blob = await (await fetch(url)).blob();
     return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); });
   }));
+  await mount(photos, 'revoked'); button('长图').click(); await wait();
+  await Promise.all([...document.images].map(image => image.decode()));
+  photos.forEach(url => URL.revokeObjectURL(url));
+  toast = null; downloaded = null;
+  const originalFetch = window.fetch;
+  window.fetch = (url, ...args) => String(url).startsWith('blob:') ? Promise.reject(new Error('Blob resources no longer readable')) : originalFetch(url, ...args);
+  try {
+    document.querySelector('button[title="保存"]').click();
+    await until(() => { if(toast?.type === 'error') throw new Error('Revoked Blob export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Revoked Blob export failed');
+    const image = new Image(); image.src = downloaded; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+    const previewImages = [...document.querySelectorAll('img[alt^="照片"]')];
+    const top = previewImages[0].parentElement.parentElement.getBoundingClientRect().top;
+    previewImages.forEach((image, index) => {
+      const rect = image.getBoundingClientRect();
+      const pixel = context.getImageData(10, Math.round((rect.top - top + rect.height / 2) * 2), 1, 1).data;
+      check(expectedColors[index].every((value, channel) => Math.abs(pixel[channel] - value) < 5), 'Revoked Blob lost photo pixels');
+    });
+  } finally { window.fetch = originalFetch; }
+  passed.push('Already-loaded photos still export after Blob revocation and blocked refetches');
+
+  const untypedUrls = await Promise.all(dataUrls.map(async (url, index) => {
+    const response = await fetch(url);
+    return URL.createObjectURL(new Blob([await response.arrayBuffer()], { type: index === 1 ? 'application/octet-stream' : '' }));
+  }));
+  await mount(untypedUrls, 'untyped'); button('长图').click(); await wait(); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Untyped Blob export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Untyped Blob export failed');
+  passed.push('Missing and generic Blob MIME types do not break image embedding');
+
   await mount(dataUrls, 'inline'); button('长图').click(); await wait(); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Data URL export failed'); return downloaded && toast?.type === 'success'; }, 'Data URL export failed');
   passed.push('Native-style inline raster images also export without cache-busting');
-  root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => photos[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="long-image"/></article>);
+  await mount([...dataUrls, 'data:image/png;base64,aW52YWxpZA=='], 'broken', false);
+  await until(() => [...document.images].every(image => image.complete), 'Broken image did not finish loading');
+  button('长图').click(); await wait(); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => toast?.type === 'error', 'Broken image silently exported');
+  check(toast.message.includes('第 4 张图片') && !downloaded, 'Broken image was omitted without a useful error');
+  check(!document.querySelector('[aria-hidden="true"] img'), 'Failed export leaked its snapshot');
+  check(!document.querySelector('button[title="保存"]').disabled, 'Failed export left saving disabled');
+  passed.push('Invalid images fail explicitly and restore the save button without leaking snapshots');
+  root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="long-image"/></article>);
   await wait(); check(document.querySelectorAll('img').length === 12, 'Long-image mode silently truncates photos');
   passed.push('Switching layouts works, and records with more than nine photos keep every image');
   window.__longImageResult = { passed };
