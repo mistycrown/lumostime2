@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Offers both seamless and framed long-image layouts in the second selector row.
  * @updated 2026-10-12: Exports a disposable snapshot with embedded preview pixels and rejects unloaded images explicitly.
  * @updated 2026-10-12: Arranges layout buttons in four columns with the long-image option on the second row.
  * @updated 2026-10-12: Preserves local Blob image URLs during export instead of appending invalid cache-busting queries.
@@ -70,7 +71,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   }, [log.images]);
 
   useEffect(() => {
-    if (!isLoadingImages && imageUrls.length < 2 && activeTemplateId === 'long-image') {
+    if (!isLoadingImages && imageUrls.length < 2 && ['long-image', 'framed-long-image'].includes(activeTemplateId)) {
       setActiveTemplateId(SHARE_TEMPLATES[0].id);
     }
   }, [imageUrls.length, isLoadingImages, activeTemplateId]);
@@ -297,7 +298,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 { id: 'modern-split', label: '分割' },
                 { id: 'film-story', label: '变迁' },
                 { id: 'glass-morphism', label: '玻璃' },
-                ...(imageUrls.length > 1 ? [{ id: 'long-image', label: '长图' }] : [])
+                ...(imageUrls.length > 1 ? [
+                  { id: 'long-image', label: '长图' },
+                  { id: 'framed-long-image', label: '边框长图' }
+                ] : [])
               ].map(template => (
                 <button
                   key={template.id}

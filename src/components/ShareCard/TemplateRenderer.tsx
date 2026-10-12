@@ -3,6 +3,7 @@
  * @input Share card content, theme and selected layout
  * @output Image-exportable card with node-aware body text in every template
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Adds theme-tinted photo frames with top-aligned notes in a second long-image layout.
  * @updated 2026-10-12: Adds edge-to-edge photo stacking with original aspect ratios and simple text typography.
  * @updated 2026-10-11: Renders node labels and aliases, preserving drop caps and visible vertical text lengths.
  */
@@ -46,6 +47,32 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
   const bgStyle = { backgroundColor: theme.primaryColor };
 
   const hasImages = content.images.length > 0;
+
+  if (templateId === 'framed-long-image') {
+    return (
+      <div className="w-full" style={{ backgroundColor: theme.backgroundColor, ...primaryStyle }}>
+        <div className="px-6 pt-6 pb-5">
+          <div className="flex items-baseline justify-between gap-4 text-[11px]">
+            {content.activity && <span className="min-w-0 break-words opacity-70">#{content.activity}</span>}
+            <span className="font-serif opacity-60 shrink-0 ml-auto">{content.date}</span>
+          </div>
+          <p className="mt-4 font-serif text-sm leading-loose whitespace-pre-wrap break-words">
+            <ShareCardText text={content.body} />
+          </p>
+        </div>
+        <div className="px-3 space-y-2">
+          {content.images.map((image, index) => (
+            <div key={index} className="border-4" style={{ borderColor: theme.primaryColor + '35' }}>
+              <img src={image} alt={`照片 ${index + 1}`} className="block w-full h-auto" />
+            </div>
+          ))}
+        </div>
+        <div className="px-6 pt-4 pb-5 text-right text-[9px] tracking-widest opacity-40">
+          LumosTime
+        </div>
+      </div>
+    );
+  }
 
   // Full-width photo story: keep every image in record order without cropping or count limits.
   if (templateId === 'long-image') {

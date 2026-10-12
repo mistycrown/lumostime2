@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Verifies framed photo geometry, original aspect ratios, top-aligned node text and complete image exports.
  * @updated 2026-10-12: Reproduces broken Blob cache-busting and checks every share layout's real save action.
  * @updated 2026-10-12: Checks recovery when the image exporter has cached a previous resource failure.
  * @updated 2026-10-12: Covers revoked Blob URLs, missing MIME types, intact preview pixels and invalid-image rejection.
@@ -54,10 +55,10 @@ async function run() {
   }));
   await document.fonts.load('16px VerifiedChinese', '分享卡片长图杭州朋友');
   check(document.fonts.check('16px VerifiedChinese', '分享卡片长图杭州朋友'), 'Chinese font unavailable');
-  await mount([], 'empty'); check(!button('长图'), 'Long-image mode appears without photos');
-  await mount(photos.slice(0,1), 'single'); check(!button('长图'), 'Long-image mode appears with one photo');
-  await mount([photos[0], 'missing'], 'missing'); check(!button('长图'), 'Unavailable image incorrectly enables long-image mode');
-  await mount(photos, 'multiple'); check(button('长图'), 'Multi-image record lacks long-image mode');
+  await mount([], 'empty'); check(!button('长图') && !button('边框长图'), 'Long-image mode appears without photos');
+  await mount(photos.slice(0,1), 'single'); check(!button('长图') && !button('边框长图'), 'Long-image mode appears with one photo');
+  await mount([photos[0], 'missing'], 'missing'); check(!button('长图') && !button('边框长图'), 'Unavailable image incorrectly enables long-image mode');
+  await mount(photos, 'multiple'); check(button('长图') && button('边框长图'), 'Multi-image record lacks long-image modes');
   button('长图').click(); await wait();
   const images = [...document.querySelectorAll('img[alt^="照片"]')];
   check(images.length === 3 && images.every((image, index) => image.src === photos[index]), 'Long-image mode lost/reordered photos');
@@ -98,18 +99,51 @@ async function run() {
   passed.push('Real ShareView enables long-image mode only with multiple available photos');
   passed.push('Original ratios, full card width, seamless record-order stacking and node text preserved');
   passed.push('Real save action exports the complete long PNG at 2x resolution');
+  button('边框长图').click(); await wait();
+  const framedImages = [...document.querySelectorAll('img[alt^="照片"]')];
+  await Promise.all(framedImages.map(image => image.decode()));
+  const framedCard = framedImages[0].parentElement.parentElement.parentElement;
+  check(framedImages.length === 3 && framedImages.every((image, index) => image.src === photos[index]), 'Framed layout lost photo order');
+  framedImages.forEach(image => {
+    const rect = image.getBoundingClientRect();
+    // Chromium rounds borders to physical pixels on scaled Windows displays.
+    const borderWidth = parseFloat(getComputedStyle(image.parentElement).borderLeftWidth);
+    check(Math.abs(borderWidth - 4) <= 1 / window.devicePixelRatio, 'Photo frame missing: ' + borderWidth);
+    check(rect.left > framedCard.getBoundingClientRect().left && rect.right < framedCard.getBoundingClientRect().right, 'Framed photo lacks outer margins');
+    check(Math.abs(rect.height / rect.width - image.naturalHeight / image.naturalWidth) < 0.01, 'Framed photo aspect ratio changed');
+  });
+  check(framedCard.querySelector('p').getBoundingClientRect().bottom < framedImages[0].getBoundingClientRect().top, 'Framed notes are not above the photos');
+  check(framedCard.querySelectorAll('span.underline').length === 2, 'Framed layout lost node labels');
+  check(button('长图').getBoundingClientRect().top === button('边框长图').getBoundingClientRect().top, 'Long-image options are not in the same selector row');
+  await capture('framed-long-image-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Framed export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Framed export failed');
+  const framedExport = new Image(); framedExport.src = downloaded; await framedExport.decode();
+  check(framedExport.naturalHeight > 2 * framedCard.clientHeight - 2, 'Framed long-image export is clipped');
+  const framedCanvas = document.createElement('canvas'); framedCanvas.width = framedExport.naturalWidth; framedCanvas.height = framedExport.naturalHeight;
+  const framedContext = framedCanvas.getContext('2d'); framedContext.drawImage(framedExport, 0, 0);
+  framedImages.forEach((image, index) => {
+    const rect = image.getBoundingClientRect(); const card = framedCard.getBoundingClientRect();
+    const pixel = framedContext.getImageData(Math.round((rect.left - card.left + 5) * 2), Math.round((rect.top - card.top + rect.height / 2) * 2), 1, 1).data;
+    check(expectedColors[index].every((value, channel) => Math.abs(pixel[channel] - value) < 5), 'Framed export lost photo pixels');
+  });
+  window.__framedLongImageExport = downloaded;
+  passed.push('Framed photos preserve order/ratios, top-aligned node text and all exported pixels');
+  button('长图').click(); await wait();
   await capture('long-image-desktop');
-  for (const layout of ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '长图', '长图']) {
+  button('边框长图').click(); await wait(); await capture('framed-long-image-desktop');
+  for (const layout of ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '长图', '边框长图', '边框长图']) {
     button(layout).click(); await wait(); toast = null; downloaded = null;
     document.querySelector('button[title="保存"]').click();
     await until(() => { if(toast?.type === 'error') throw new Error(layout + ': ' + toast.message); return downloaded && toast?.type === 'success'; }, layout + ': save failed');
     const image = new Image(); image.src = downloaded; await image.decode();
     check(image.naturalWidth > 0 && image.naturalHeight > 0, layout + ': invalid export');
   }
-  passed.push('All seven layouts save PNG/JPEG/WebP Blob images, including repeated exports');
+  passed.push('All eight layouts save PNG/JPEG/WebP Blob images, including repeated exports');
   button('经典').click(); await wait(); check(!document.querySelector('img[alt^="照片"]'), 'Cannot switch back to classic');
   button('长图').click(); await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 3, 'Cannot return to long-image mode');
-  await mount([], 'multiple'); check(!button('长图') && !document.querySelector('img'), 'Removing photos keeps the long-image mode or stale photos');
+  button('边框长图').click(); await wait();
+  await mount([], 'multiple'); check(!button('长图') && !button('边框长图') && !document.querySelector('img'), 'Removing photos keeps the long-image mode or stale photos');
   const dataUrls = await Promise.all(photos.map(async url => {
     const blob = await (await fetch(url)).blob();
     return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); });
@@ -160,6 +194,8 @@ async function run() {
   passed.push('Invalid images fail explicitly and restore the save button without leaking snapshots');
   root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="long-image"/></article>);
   await wait(); check(document.querySelectorAll('img').length === 12, 'Long-image mode silently truncates photos');
+  root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="framed-long-image"/></article>);
+  await wait(); check(document.querySelectorAll('img').length === 12, 'Framed mode silently truncates photos');
   passed.push('Switching layouts works, and records with more than nine photos keep every image');
   window.__longImageResult = { passed };
 }
@@ -202,6 +238,8 @@ app.whenReady().then(async () => {
   }
   const exported = await window.webContents.executeJavaScript('window.__longImageExport');
   if(exported) await fs.writeFile(path.join(__dirname, 'long-image-export.png'), Buffer.from(exported.split(',')[1], 'base64'));
+  const framedExport = await window.webContents.executeJavaScript('window.__framedLongImageExport');
+  if(framedExport) await fs.writeFile(path.join(__dirname, 'framed-long-image-export.png'), Buffer.from(framedExport.split(',')[1], 'base64'));
   console.log(JSON.stringify({ ...result, directory: __dirname }, null, 2));
   app.exit(result && !result.error ? 0 : 1);
 }).catch(error => { console.error(error); app.exit(1); });

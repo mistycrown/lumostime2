@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Adds a framed long-photo layout alongside seamless stacking.
  * @updated 2026-10-12: Registers the full-width stacked photo template for multi-image records.
  */
 
@@ -107,5 +108,10 @@ export const SHARE_TEMPLATES: ShareTemplate[] = [
     id: 'long-image',
     name: '长图',
     description: '照片原比例纵向拼接',
+  },
+  {
+    id: 'framed-long-image',
+    name: '边框长图',
+    description: '细边框照片与顶部文字排版',
   }
 ];
