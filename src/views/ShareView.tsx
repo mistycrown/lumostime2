@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Offers a full-width long-image layout when multiple photos are available.
  * @updated 2026-07-21: Raised the share overlay above record-detail modals so it remains the topmost visible view.
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -36,8 +37,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
 
   // Load image URLs
   useEffect(() => {
+    let cancelled = false;
     const loadImages = async () => {
       if (!log.images || log.images.length === 0) {
+        setImageUrls([]);
         setIsLoadingImages(false);
         return;
       }
@@ -52,12 +55,21 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         }
       }
       
-      setImageUrls(urls);
-      setIsLoadingImages(false);
+      if (!cancelled) {
+        setImageUrls(urls);
+        setIsLoadingImages(false);
+      }
     };
 
     loadImages();
+    return () => { cancelled = true; };
   }, [log.images]);
+
+  useEffect(() => {
+    if (!isLoadingImages && imageUrls.length < 2 && activeTemplateId === 'long-image') {
+      setActiveTemplateId(SHARE_TEMPLATES[0].id);
+    }
+  }, [imageUrls.length, isLoadingImages, activeTemplateId]);
 
   // Convert Log to ShareCardContent
   const getShareContent = (): ShareCardContent => {
@@ -293,12 +305,13 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 { id: 'minimal-note', label: '现代' },
                 { id: 'modern-split', label: '分割' },
                 { id: 'film-story', label: '变迁' },
-                { id: 'glass-morphism', label: '玻璃' }
+                { id: 'glass-morphism', label: '玻璃' },
+                ...(imageUrls.length > 1 ? [{ id: 'long-image', label: '长图' }] : [])
               ].map(template => (
                 <button
                   key={template.id}
                   onClick={() => setActiveTemplateId(template.id)}
-                  className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
+                  className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${template.id === 'long-image' ? 'col-span-3' : ''} ${
                     activeTemplateId === template.id 
                       ? 'bg-stone-100 border-stone-400 text-stone-900' 
                       : 'border-stone-300 text-stone-600 hover:border-stone-400'

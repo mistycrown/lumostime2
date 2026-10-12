@@ -3,6 +3,7 @@
  * @input Share card content, theme and selected layout
  * @output Image-exportable card with node-aware body text in every template
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Adds edge-to-edge photo stacking with original aspect ratios and simple text typography.
  * @updated 2026-10-11: Renders node labels and aliases, preserving drop caps and visible vertical text lengths.
  */
 import React from 'react';
@@ -45,6 +46,31 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
   const bgStyle = { backgroundColor: theme.primaryColor };
 
   const hasImages = content.images.length > 0;
+
+  // Full-width photo story: keep every image in record order without cropping or count limits.
+  if (templateId === 'long-image') {
+    return (
+      <div className="w-full" style={{ backgroundColor: theme.backgroundColor, ...primaryStyle }}>
+        <div className="flex items-baseline justify-between gap-4 px-6 py-5 text-[11px]">
+          <span className="font-serif opacity-60 shrink-0">{content.date}</span>
+          {content.activity && <span className="min-w-0 break-words text-right opacity-70">#{content.activity}</span>}
+        </div>
+        <div>
+          {content.images.map((image, index) => (
+            <img key={index} src={image} alt={`照片 ${index + 1}`} className="block w-full h-auto" />
+          ))}
+        </div>
+        <div className="px-6 pt-6 pb-5">
+          <p className="font-serif text-base leading-loose whitespace-pre-wrap break-words">
+            <ShareCardText text={content.body} />
+          </p>
+          <div className="mt-6 border-t pt-4 text-[9px] tracking-widest opacity-40" style={borderStyle}>
+            LumosTime
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Helper to render images based on count (Default Grid Logic)
   const renderImagesDefault = (className: string) => {

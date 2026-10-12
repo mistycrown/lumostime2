@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Registers the full-width stacked photo template for multi-image records.
  */
 
 import { ShareTheme, ShareTemplate } from './types';
@@ -101,5 +102,10 @@ export const SHARE_TEMPLATES: ShareTemplate[] = [
     id: 'glass-morphism',
     name: '磨砂玻璃',
     description: '毛玻璃质感',
+  },
+  {
+    id: 'long-image',
+    name: '长图',
+    description: '照片原比例纵向拼接',
   }
 ];
