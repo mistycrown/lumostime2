@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Arranges layout buttons in four columns with the long-image option on the second row.
  * @updated 2026-10-12: Preserves local Blob image URLs during export instead of appending invalid cache-busting queries.
  * @updated 2026-10-12: Offers a full-width long-image layout when multiple photos are available.
  * @updated 2026-07-21: Raised the share overlay above record-detail modals so it remains the topmost visible view.
@@ -300,7 +301,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
               <Layout size={14} /> 布局模版
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {[
                 { id: 'magazine-classic', label: '经典' },
                 { id: 'vertical-poetry', label: '古韵' },
@@ -313,7 +314,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 <button
                   key={template.id}
                   onClick={() => setActiveTemplateId(template.id)}
-                  className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${template.id === 'long-image' ? 'col-span-3' : ''} ${
+                  className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
                     activeTemplateId === template.id 
                       ? 'bg-stone-100 border-stone-400 text-stone-900' 
                       : 'border-stone-300 text-stone-600 hover:border-stone-400'
