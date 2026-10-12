@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Adds unlocked share-only builtin/uploaded font capsules and embeds selected fonts in exports.
  * @updated 2026-10-12: Offers the circular book-page template only for one usable photo and passes through record titles.
  * @updated 2026-10-12: Adds independent text/photo entrances, template selections and photo-first defaults.
  * @updated 2026-10-12: Labels seamless photo stacking as 无缝长图.
@@ -12,8 +13,8 @@
  * @updated 2026-07-21: Raised the share overlay above record-detail modals so it remains the topmost visible view.
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronLeft, Download, Palette, Layout } from 'lucide-react';
-import { toPng } from 'html-to-image';
+import { ChevronLeft, Download, Palette, Layout, Type } from 'lucide-react';
+import { getFontEmbedCSS, toPng } from 'html-to-image';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Log, Scope } from '../types';
@@ -24,6 +25,9 @@ import { TemplateRenderer } from '../components/ShareCard/TemplateRenderer';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { imageService } from '../services/imageService';
 import { createShareCardExportSnapshot } from '../utils/shareCardExport';
+import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
+import { fontService, type FontOption } from '../services/fontService';
+import '../components/ShareCard/shareCard.css';
 
 interface ShareViewProps {
   log: Log;
@@ -41,6 +45,10 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   const [isExporting, setIsExporting] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const sponsorshipUnlocked = useSponsorshipUnlocked();
+  const [fonts, setFonts] = useState<FontOption[]>([]);
+  const [activeFontId, setActiveFontId] = useState('default');
+  const [isLoadingFont, setIsLoadingFont] = useState(false);
   
   const previewRef = useRef<HTMLDivElement>(null);
   const activeTheme = SHARE_THEMES.find(t => t.id === activeThemeId) || SHARE_THEMES[0];
@@ -48,6 +56,40 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   const activeTemplateId = layoutMode === 'text' ? textTemplateId : photoTemplateId;
   const availableTemplates = templates.filter(template => imageUrls.length >= (template.minImages || 0)
     && imageUrls.length <= (template.maxImages ?? Infinity));
+  const activeFont = sponsorshipUnlocked && activeFontId !== 'default'
+    ? fonts.find(font => font.id === activeFontId) : undefined;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!sponsorshipUnlocked) {
+      setFonts([]);
+      setActiveFontId('default');
+      return;
+    }
+    fontService.refreshCustomFonts().then(options => {
+      if (!cancelled) setFonts(options);
+    });
+    return () => { cancelled = true; };
+  }, [sponsorshipUnlocked]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeFont) {
+      setIsLoadingFont(false);
+      return;
+    }
+    setIsLoadingFont(true);
+    Promise.all([400, 700].map(weight => document.fonts.load(`${weight} 16px ${activeFont.fontFamily}`)))
+      .catch(error => {
+        if (!cancelled) {
+          console.warn('Share font failed to load:', error);
+          setActiveFontId('default');
+          onToast?.('error', '字体加载失败，请重新选择');
+        }
+      })
+      .finally(() => { if (!cancelled) setIsLoadingFont(false); });
+    return () => { cancelled = true; };
+  }, [activeFont]);
 
   // Load image URLs
   useEffect(() => {
@@ -128,7 +170,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   const content = getShareContent();
 
   const downloadImage = async () => {
-    if (previewRef.current === null || isExporting) return;
+    if (previewRef.current === null || isExporting || isLoadingFont) return;
     
     setIsExporting(true);
     try {
@@ -143,12 +185,23 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       const snapshot = await createShareCardExportSnapshot(previewRef.current, options.pixelRatio);
       let dataUrl: string;
       try {
+        const exportFont = activeFont || fontService.getCurrentFontOption();
+        const customFontCSS = await fontService.getFontEmbedCSS(exportFont.id);
+        if (exportFont.source === 'uploaded' && !customFontCSS) {
+          throw new Error('无法读取导入字体，请重新选择字体');
+        }
+        const embeddedFontCSS = await getFontEmbedCSS(snapshot.node).catch(error => {
+          console.warn('Share font CSS could not be collected:', error);
+          return '';
+        });
+        const fontEmbedCSS = [embeddedFontCSS, customFontCSS].filter(Boolean).join('\n');
+        const exportOptions = { ...options, fontEmbedCSS: fontEmbedCSS || undefined };
         try {
-          dataUrl = await toPng(snapshot.node, options);
+          dataUrl = await toPng(snapshot.node, exportOptions);
         } catch (firstErr) {
           console.warn('First export attempt failed, retrying with skipFonts...', firstErr);
           try {
-            dataUrl = await toPng(snapshot.node, { ...options, skipFonts: true });
+            dataUrl = await toPng(snapshot.node, { ...exportOptions, skipFonts: true });
           } catch (secondErr) {
             console.error('Second export attempt also failed:', secondErr);
             throw new Error('图片导出失败，请重试');
@@ -228,7 +281,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         <span className="text-stone-800 font-bold text-lg flex-1 text-center">分享卡片</span>
         <button
           onClick={downloadImage}
-          disabled={isExporting || isLoadingImages}
+          disabled={isExporting || isLoadingImages || isLoadingFont}
           className="text-stone-400 hover:text-stone-600 p-1 disabled:opacity-50 relative"
           title={isExporting ? '生成中...' : '保存'}
         >
@@ -266,11 +319,12 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
             <div className="w-full shadow-2xl">
               <div 
                 ref={previewRef}
-                className="w-full"
+                className={`w-full${activeFont ? ' share-card-selected-font' : ''}`}
                 style={{ 
                   backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : activeTheme.backgroundColor,
-                  fontFamily: activeTheme.fontFamily === 'font-serif' ? '"Noto Serif SC", "Playfair Display", serif' : '"Inter", "Noto Sans SC", sans-serif'
-                }}
+                  fontFamily: activeTheme.fontFamily === 'font-serif' ? '"Noto Serif SC", "Playfair Display", serif' : '"Inter", "Noto Sans SC", sans-serif',
+                  '--share-card-font-family': activeFont?.fontFamily
+                } as React.CSSProperties}
               >
                 <TemplateRenderer 
                   mode={layoutMode}
@@ -285,7 +339,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       </div>
 
       {/* Controls Area - 底部选项区（固定） */}
-      <div className="flex-shrink-0 bg-white px-4 py-6 space-y-6 border-t border-stone-100">
+      <div className="flex-shrink-0 bg-white px-4 py-4 space-y-4 border-t border-stone-100">
           {/* Theme Selector */}
           <section>
             <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
@@ -337,6 +391,29 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
               ))}
             </div>
           </section>
+          {sponsorshipUnlocked && (
+            <section aria-label="分享字体">
+              <div className="flex items-center gap-2 text-xs font-bold text-stone-700 mb-3 uppercase tracking-wider">
+                <Type size={14} /> 字体
+              </div>
+              <div className="share-card-font-options flex gap-2 overflow-x-auto pb-1 touch-pan-x">
+                {fonts.map(font => {
+                  const characters = Array.from(font.displayName);
+                  const label = characters.length > 4 ? `${characters.slice(0, 4).join('')}…` : font.displayName;
+                  return (
+                    <button key={font.id} title={font.displayName} aria-label={font.displayName}
+                      aria-pressed={activeFontId === font.id} disabled={isExporting}
+                      onClick={() => setActiveFontId(font.id)}
+                      style={{ fontFamily: font.fontFamily }}
+                      className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-full text-xs border transition-colors ${activeFontId === font.id
+                        ? 'bg-stone-100 border-stone-400 text-stone-900' : 'border-stone-300 text-stone-600 hover:border-stone-400'}`}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
     </div>
   );

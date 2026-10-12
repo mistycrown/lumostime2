@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Isolates sponsorship verification for existing locked-share export regressions.
  * @updated 2026-10-12: Verifies the editorial text film-story title, metadata hierarchy and complete node text.
  * @updated 2026-10-12: Checks graph-paper typography, pure-text isolation and visible grid lines in the exported PNG.
  * @updated 2026-10-12: Verifies single-photo book-page availability, title/node text and circular photo exports.
@@ -15,7 +16,7 @@
  * @updated 2026-10-12: Covers revoked Blob URLs, missing MIME types, intact preview pixels and invalid-image rejection.
  */
 import { createRequire } from 'node:module';
-import { access, copyFile, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -357,15 +358,17 @@ run().catch(error => { window.__longImageResult = { passed, error: error.stack |
   bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
   define: { 'process.env.NODE_ENV': '"development"' },
   plugins: [{ name: 'isolated-share-adapters', setup(builder) {
-    builder.onResolve({ filter: /\/(CategoryScopeContext|imageService)$/ }, args => ({ path: args.path, namespace: 'share-smoke' }));
+    builder.onResolve({ filter: /\/(CategoryScopeContext|imageService|redemptionService)$/ }, args => ({ path: args.path, namespace: 'share-smoke' }));
     builder.onLoad({ filter: /.*/, namespace: 'share-smoke' }, args => ({ contents: args.path.endsWith('CategoryScopeContext')
       ? "export const useCategoryScope = () => ({ categories: [{ id: 'reading', activities: [{ id: 'books', name: '阅读' }] }] });"
-      : "export const imageService = { getImageUrl: async reference => reference === 'missing' ? null : reference };", loader: 'js' }));
+      : args.path.endsWith('redemptionService')
+        ? "export const SPONSORSHIP_STATUS_UPDATED_EVENT = 'share-smoke-unlocked'; export class RedemptionService { async isVerified() { return { isVerified: false }; } }"
+        : "export const imageService = { getImageUrl: async reference => reference === 'missing' ? null : reference };", loader: 'js' }));
   } }]
 });
-const css = (await readdir(path.join(root, 'dist/assets'))).find(file => file.endsWith('.css'));
-if (!css) throw new Error('Run npm run build before renderer verification');
-await copyFile(path.join(root, 'dist/assets', css), path.join(directory, 'test.css'));
+const css = (await readdir(path.join(root, 'dist/assets'))).filter(file => file.endsWith('.css'));
+if (!css.length) throw new Error('Run npm run build before renderer verification');
+await writeFile(path.join(directory, 'test.css'), (await Promise.all(css.map(file => readFile(path.join(root, 'dist/assets', file), 'utf8')))).join('\n'), 'utf8');
 await writeFile(path.join(directory, 'index.html'), `<!doctype html><html><meta charset="utf-8"><link rel="stylesheet" href="test.css"><style>@font-face{font-family:VerifiedChinese;src:local('Microsoft YaHei')}body,*{font-family:VerifiedChinese!important}</style><body><div id="root"></div><script src="test.js"></script></body></html>`, 'utf8');
 await writeFile(path.join(directory, 'main.cjs'), `
 const { app, BrowserWindow } = require('electron');

@@ -1,0 +1,18 @@
+/**
+ * @file shareCard.css
+ * @input ShareView's locally selected font family
+ * @output Font override scoped to the share preview and its export snapshot
+ * @updated 2026-10-12: Keeps selected fonts consistent across template typography and node labels.
+ */
+div.share-card-selected-font,
+div.share-card-selected-font * {
+  font-family: var(--share-card-font-family) !important;
+}
+
+.share-card-font-options {
+  scrollbar-width: none;
+}
+
+.share-card-font-options::-webkit-scrollbar {
+  display: none;
+}

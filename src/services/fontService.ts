@@ -1,6 +1,7 @@
 /**
  * @file fontService.ts
  * @description 字体管理服务 - 管理内置字体与本地上传字体的切换、持久化与恢复
+ * @updated 2026-10-12: Exports a font by ID without changing the application's selected font.
  * @updated 2026-09-30: Retries custom font registration with a data URL when Android WebView rejects an ArrayBuffer source.
  * @updated 2026-09-30: Accepts archive Blobs with an explicit filename so Android imports do not depend on synthetic File metadata.
  */
@@ -356,13 +357,18 @@ class FontService {
   }
 
   async getCurrentFontEmbedCSS(): Promise<string> {
-    const currentFontOption = this.getCurrentFontOption();
-    if (currentFontOption.source !== 'uploaded') {
+    return this.getFontEmbedCSS(this.currentFont);
+  }
+
+  /** 获取指定字体的导出样式，不改变应用字体设置。 */
+  async getFontEmbedCSS(fontId: string): Promise<string> {
+    const fontOption = this.getAllFonts().find((font) => font.id === fontId);
+    if (fontOption?.source !== 'uploaded') {
       return '';
     }
 
     try {
-      const record = await customFontStorageService.getFont(currentFontOption.id);
+      const record = await customFontStorageService.getFont(fontId);
       if (!record) {
         return '';
       }

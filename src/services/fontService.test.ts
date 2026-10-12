@@ -4,19 +4,22 @@
  * @output Regression coverage for custom font registration fallbacks
  * @pos Test (Font Service)
  * @description Verifies custom font registration prefers ArrayBuffer sources and recovers with a data URL source.
+ * @updated 2026-10-12: Checks share-specific font embedding without changing the global font, including missing files.
  * @updated 2026-09-30: Added Android WebView-compatible FontFace registration coverage.
  * @updated 2026-09-30: Covers explicit Blob filenames so mobile theme imports do not depend on File.name.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { StoredCustomFontRecord } from './customFontStorageService';
 
-const { listFonts, saveFont } = vi.hoisted(() => ({
-  listFonts: vi.fn(async () => []),
-  saveFont: vi.fn(async () => undefined)
+const { listFonts, saveFont, getFont } = vi.hoisted(() => ({
+  listFonts: vi.fn(async (): Promise<StoredCustomFontRecord[]> => []),
+  saveFont: vi.fn(async (_record: StoredCustomFontRecord) => undefined),
+  getFont: vi.fn()
 }));
 
 vi.mock('./customFontStorageService', () => ({
-  customFontStorageService: { listFonts, saveFont, getFont: vi.fn(), deleteFont: vi.fn() }
+  customFontStorageService: { listFonts, saveFont, getFont, deleteFont: vi.fn() }
 }));
 
 const createLocalStorage = () => {
@@ -51,6 +54,7 @@ describe('fontService custom font registration', () => {
     listFonts.mockResolvedValue([]);
     saveFont.mockReset();
     saveFont.mockResolvedValue(undefined);
+    getFont.mockReset();
   });
 
   afterEach(() => {
@@ -150,5 +154,45 @@ describe('fontService custom font registration', () => {
 
     expect(result).toMatchObject({ success: false });
     expect(saveFont).not.toHaveBeenCalled();
+  });
+
+  it('embeds a share-selected upload while preserving the global default font', async () => {
+    vi.stubGlobal('FontFace', vi.fn(function () {
+      return { load: vi.fn(async () => undefined) };
+    }));
+    vi.stubGlobal('document', { fonts: { add: vi.fn() } });
+    installFileReader();
+    const { fontService } = await import('./fontService');
+    const result = await fontService.addCustomFont(new File(['font'], 'share.ttf'));
+    const record = saveFont.mock.calls[0][0];
+    listFonts.mockResolvedValue([record]);
+    await fontService.refreshCustomFonts();
+    getFont.mockResolvedValue(record);
+
+    const css = await fontService.getFontEmbedCSS(result.fontId!);
+
+    expect(css).toContain(`font-family: '${record.familyName}'`);
+    expect(css).toContain("url('data:font/ttf;base64,Zm9udA==') format('truetype')");
+    expect(css).toContain('font-weight: 400');
+    expect(css).toContain('font-weight: 700');
+    expect(fontService.getCurrentFont()).toBe('default');
+    expect(localStorage.getItem('lumostime_font_family')).toBeNull();
+    expect(await fontService.getCurrentFontEmbedCSS()).toBe('');
+  });
+
+  it('returns no embedding for builtins, unknown IDs or removed uploads', async () => {
+    vi.stubGlobal('FontFace', vi.fn(function () {
+      return { load: vi.fn(async () => undefined) };
+    }));
+    vi.stubGlobal('document', { fonts: { add: vi.fn() } });
+    const { fontService } = await import('./fontService');
+    expect(await fontService.getFontEmbedCSS('lxgw-wenkai')).toBe('');
+    expect(await fontService.getFontEmbedCSS('missing')).toBe('');
+    expect(getFont).not.toHaveBeenCalled();
+    const result = await fontService.addCustomFont(new File(['font'], 'removed.ttf'));
+    listFonts.mockResolvedValue([saveFont.mock.calls[0][0]]);
+    await fontService.refreshCustomFonts();
+    getFont.mockResolvedValue(null);
+    expect(await fontService.getFontEmbedCSS(result.fontId!)).toBe('');
   });
 });
