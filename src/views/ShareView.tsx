@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Preserves local Blob image URLs during export instead of appending invalid cache-busting queries.
  * @updated 2026-10-12: Offers a full-width long-image layout when multiple photos are available.
  * @updated 2026-07-21: Raised the share overlay above record-detail modals so it remains the topmost visible view.
  */
@@ -135,7 +136,8 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
       await new Promise<void>((resolve) => setTimeout(resolve, 200));
 
       const options = { 
-        cacheBust: true, 
+        // Stored photos already have unique Blob URLs; appending a query makes them unreadable.
+        cacheBust: false,
         pixelRatio: 2,
         useCORS: true,
         backgroundColor: activeTemplateId === 'glass-morphism' ? 'transparent' : activeTheme.backgroundColor
