@@ -3,6 +3,7 @@
  * @input Ordered photos, node-aware notes and selected theme/photo layout
  * @output Photography diary, blurred card, seamless story, paper frames or film strip
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Uses only an overscanned blurred photo behind film-story, without tint overlays or card shadows.
  * @updated 2026-10-12: Adds photo-first editorial layouts with original ratios and no image-count limit.
  */
 import React from 'react';
@@ -46,14 +47,11 @@ export const PhotoTemplateRenderer: React.FC<ShareTemplateRendererProps> = ({ co
     return (
       <div className="w-full relative overflow-hidden px-6 py-10" style={{ backgroundColor: cardColor }}>
         {content.images[0] && (
-          <>
-            <img src={content.images[0]} alt="" aria-hidden="true" className="absolute object-cover pointer-events-none"
-              style={{ top: -24, left: -24, width: 'calc(100% + 48px)', height: 'calc(100% + 48px)', filter: 'blur(18px)' }} />
-            <div className="absolute inset-0 bg-black/20" />
-          </>
+          <img src={content.images[0]} alt="" aria-hidden="true" className="absolute object-cover pointer-events-none"
+            style={{ top: -54, left: -54, width: 'calc(100% + 108px)', maxWidth: 'none', height: 'calc(100% + 108px)', filter: 'blur(18px)' }} />
         )}
         <div className="relative flex flex-col p-4 rounded-sm min-h-[480px]"
-          style={{ backgroundColor: cardColor, color: '#F5F5F0', boxShadow: '0 16px 48px rgba(0, 0, 0, 0.28)' }}>
+          style={{ backgroundColor: cardColor, color: '#F5F5F0' }}>
           <div className="space-y-3 mb-4">{photos}</div>
           <PhotoNote body={content.body} />
           <div className="mt-auto pt-12"><PhotoMetadata content={content} /></div>

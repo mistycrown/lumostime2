@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Checks that film-story uses an untinted blurred photo without shadows or darkened export corners.
  * @updated 2026-10-12: Verifies independent text/photo entrances, paper/film layouts and every mode's actual export.
  * @updated 2026-10-12: Checks deepened palette colors, film-story blur/no-image exports and photo-first framed layout.
  * @updated 2026-10-12: Verifies framed photo geometry, original aspect ratios, top-aligned node text and complete image exports.
@@ -107,6 +108,11 @@ async function run() {
   const filmPhoto = document.querySelector('img[alt="照片 1"]');
   const filmCard = filmPhoto.parentElement.parentElement;
   const filmBounds = filmCard.parentElement.getBoundingClientRect();
+  check(getComputedStyle(filmCard).boxShadow === 'none', 'Film card casts a gradient-like shadow over its photo background');
+  check(!filmCard.parentElement.querySelector('div.absolute'), 'Film background still has a tint overlay');
+  const backgroundBounds = filmBackground.getBoundingClientRect();
+  check(backgroundBounds.top <= filmBounds.top - 53 && backgroundBounds.bottom >= filmBounds.bottom + 53
+    && backgroundBounds.left <= filmBounds.left - 53 && backgroundBounds.right >= filmBounds.right + 53, 'Blur edges do not extend beyond all four sides of the background crop');
   check(filmCard.getBoundingClientRect().left > filmBounds.left, 'Photo film card lacks background gutters');
   check(Math.abs(filmPhoto.height / filmPhoto.width - filmPhoto.naturalHeight / filmPhoto.naturalWidth) < 0.01, 'Film photo is cropped');
   await capture('film-story-photo-mobile'); toast = null; downloaded = null;
@@ -118,7 +124,10 @@ async function run() {
   const filmRect = filmPhoto.getBoundingClientRect();
   const filmPixel = filmContext.getImageData(Math.round((filmRect.left - filmBounds.left + 5) * 2), Math.round((filmRect.top - filmBounds.top + filmRect.height / 2) * 2), 1, 1).data;
   check([174,197,178].every((value, channel) => Math.abs(filmPixel[channel] - value) < 5), 'Film export lost the sharp foreground photo');
-  check(filmContext.getImageData(8, 8, 1, 1).data[0] > 70, 'Film export lost its photo background');
+  for (const [x, y] of [[8, 8], [filmCanvas.width - 9, 8], [8, filmCanvas.height - 9], [filmCanvas.width - 9, filmCanvas.height - 9]]) {
+    const pixel = filmContext.getImageData(x, y, 1, 1).data;
+    check([174,197,178].every((value, channel) => Math.abs(pixel[channel] - value) < 8), 'Film export darkens a blurred photo corner');
+  }
   window.__filmPhotoExport = downloaded;
   passed.push('Film card deepens all nine themes, omits the background without photos and exports blur with sharp foreground pixels');
   await mount([photos[0]], 'photos-only', true, '');
