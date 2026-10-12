@@ -3,6 +3,7 @@
  * @input Text-only share content, theme and selected text layout
  * @output Magazine, poetry, note, split, deepened-card, glass and graph-paper journal typography
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Refines text-only film-story into an editorial page with balanced whitespace and distinct title/date typography.
  * @updated 2026-10-12: Adds theme-tinted graph paper with a notebook margin, record title and diary typography.
  * @updated 2026-10-12: Extracts text layouts and removes all photo-grid rendering.
  */
@@ -204,17 +205,27 @@ export const TextTemplateRenderer: React.FC<ShareTemplateRendererProps> = ({ con
     );
   }
 
-  // Text-only deepened-theme card.
+  // A quiet editorial page with deepened theme ink and balanced vertical whitespace.
   if (templateId === 'film-story') {
     return (
-      <div className="w-full flex flex-col p-4 min-h-[400px]" style={{ backgroundColor: cardColor, color: '#F5F5F0' }}>
-        <p className="font-serif text-base leading-loose whitespace-pre-wrap break-words">
-          <ShareCardText text={content.body} />
-        </p>
-        <div className="mt-auto pt-12 flex flex-col items-end gap-2 text-[11px] opacity-50">
-          <span className="font-mono tracking-widest">{content.date}</span>
-          {content.activity && <span className="break-words text-right">#{content.activity}</span>}
-          <span className="mt-2 text-[9px] tracking-widest">LumosTime</span>
+      <div data-share-template="text-film-story" className="w-full flex flex-col px-8 py-8 min-h-[420px]"
+        style={{ backgroundColor: cardColor, color: '#F2EEE5' }}>
+        <div className="border-b pb-4 text-[10px] font-mono tracking-widest" style={{ borderColor: '#F2EEE520' }}>
+          <span className="opacity-50">{content.date}</span>
+        </div>
+        <div className="flex-1 flex flex-col justify-center py-10">
+          {content.title && (
+            <h2 className="mb-5 font-serif text-[22px] font-normal leading-relaxed tracking-wide break-words">
+              <ShareCardText text={content.title} />
+            </h2>
+          )}
+          <p className="font-serif text-sm leading-[2.1] tracking-[0.04em] whitespace-pre-wrap break-words opacity-80">
+            <ShareCardText text={content.body} />
+          </p>
+        </div>
+        <div className="flex items-end justify-between gap-4 border-t pt-4" style={{ borderColor: '#F2EEE520' }}>
+          {content.activity && <span className="text-[10px] leading-relaxed break-words opacity-50">#{content.activity}</span>}
+          <span className="ml-auto shrink-0 text-[8px] font-mono tracking-[0.2em] opacity-35">LumosTime</span>
         </div>
       </div>
     );

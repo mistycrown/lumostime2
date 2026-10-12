@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Describes the refined text-only film-story as an editorial page.
  * @updated 2026-10-12: Registers a text-only graph-paper journal template.
  * @updated 2026-10-12: Registers the single-photo circular portrait and centered book-page layout.
  * @updated 2026-10-12: Separates existing text templates from the editorial photography collection.
@@ -101,7 +102,7 @@ export const TEXT_SHARE_TEMPLATES: ShareTemplate[] = [
   {
     id: 'film-story',
     name: '变迁',
-    description: '深色文字卡片',
+    description: '深色书页与轻文字排版',
   },
   {
     id: 'glass-morphism',

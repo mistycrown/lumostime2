@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Verifies the editorial text film-story title, metadata hierarchy and complete node text.
  * @updated 2026-10-12: Checks graph-paper typography, pure-text isolation and visible grid lines in the exported PNG.
  * @updated 2026-10-12: Verifies single-photo book-page availability, title/node text and circular photo exports.
  * @updated 2026-10-12: Checks that film-story uses an untinted blurred photo without shadows or darkened export corners.
@@ -85,7 +86,7 @@ async function run() {
   const filmColors = new Set();
   for (const [index, themeButton] of themeButtons.entries()) {
     themeButton.click(); await wait();
-    const card = document.querySelector('p.font-serif').parentElement;
+    const card = document.querySelector('[data-share-template="text-film-story"]');
     const color = getComputedStyle(card).backgroundColor;
     const channels = color.match(/\\d+/g).slice(0, 3).map(Number);
     const base = [1, 3, 5].map(offset => parseInt(SHARE_THEMES[index].primaryColor.slice(offset, offset + 2), 16));
@@ -96,6 +97,11 @@ async function run() {
     filmColors.add(color);
   }
   check(filmColors.size === 9, 'Selected palette colors do not affect the film card');
+  themeButtons[0].click(); await wait();
+  const textFilm = document.querySelector('[data-share-template="text-film-story"]');
+  check(textFilm.querySelector('h2').textContent === '周末散步' && textFilm.querySelector('p').textContent.includes('和朋友在杭州散步。'), 'Editorial film card lost its title or body');
+  check(textFilm.querySelectorAll('span.underline').length === 2, 'Editorial film card lost node styling');
+  check(textFilm.firstElementChild.getBoundingClientRect().bottom < textFilm.querySelector('h2').getBoundingClientRect().top, 'Date and title hierarchy collapsed');
   await capture('film-story-no-image-mobile'); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('No-image film export failed'); return downloaded && toast?.type === 'success'; }, 'No-image film export failed');
