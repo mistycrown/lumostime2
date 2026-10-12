@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Checks deepened palette colors, film-story blur/no-image exports and photo-first framed layout.
  * @updated 2026-10-12: Verifies framed photo geometry, original aspect ratios, top-aligned node text and complete image exports.
  * @updated 2026-10-12: Reproduces broken Blob cache-busting and checks every share layout's real save action.
  * @updated 2026-10-12: Checks recovery when the image exporter has cached a previous resource failure.
@@ -55,11 +56,53 @@ async function run() {
   }));
   await document.fonts.load('16px VerifiedChinese', '分享卡片长图杭州朋友');
   check(document.fonts.check('16px VerifiedChinese', '分享卡片长图杭州朋友'), 'Chinese font unavailable');
-  await mount([], 'empty'); check(!button('长图') && !button('边框长图'), 'Long-image mode appears without photos');
-  await mount(photos.slice(0,1), 'single'); check(!button('长图') && !button('边框长图'), 'Long-image mode appears with one photo');
-  await mount([photos[0], 'missing'], 'missing'); check(!button('长图') && !button('边框长图'), 'Unavailable image incorrectly enables long-image mode');
-  await mount(photos, 'multiple'); check(button('长图') && button('边框长图'), 'Multi-image record lacks long-image modes');
-  button('长图').click(); await wait();
+  await mount([], 'empty'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears without photos');
+  button('变迁').click(); await wait();
+  const themeButtons = [...document.querySelector('section').querySelectorAll('button')];
+  const filmColors = new Set();
+  for (const [index, themeButton] of themeButtons.entries()) {
+    themeButton.click(); await wait();
+    const card = document.querySelector('p.font-serif').parentElement;
+    const color = getComputedStyle(card).backgroundColor;
+    const channels = color.match(/\\d+/g).slice(0, 3).map(Number);
+    const base = [1, 3, 5].map(offset => parseInt(SHARE_THEMES[index].primaryColor.slice(offset, offset + 2), 16));
+    check(channels.every((value, channel) => value <= base[channel]) && channels.some((value, channel) => value < base[channel]), 'Film card does not deepen the selected theme');
+    check(channels.reduce((a, b) => a + b) > base.reduce((a, b) => a + b) * 0.65, 'Film card loses the base color');
+    check(!document.querySelector('img'), 'No-image film card has a photo background');
+    check(card.getBoundingClientRect().width === card.parentElement.getBoundingClientRect().width, 'No-image film card still has background gutters');
+    filmColors.add(color);
+  }
+  check(filmColors.size === 9, 'Selected palette colors do not affect the film card');
+  await capture('film-story-no-image-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('No-image film export failed'); return downloaded && toast?.type === 'success'; }, 'No-image film export failed');
+  window.__filmTextExport = downloaded;
+
+  await mount(photos.slice(0,1), 'single'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears with one photo');
+  button('变迁').click(); await wait();
+  await Promise.all([...document.images].map(image => image.decode()));
+  const filmBackground = document.querySelector('img[aria-hidden="true"]');
+  check(filmBackground?.src === photos[0] && getComputedStyle(filmBackground).filter.includes('blur'), 'Film background is not the blurred first photo');
+  const filmPhoto = document.querySelector('img[alt="照片 1"]');
+  const filmCard = filmPhoto.parentElement.parentElement;
+  const filmBounds = filmCard.parentElement.getBoundingClientRect();
+  check(filmCard.getBoundingClientRect().left > filmBounds.left, 'Photo film card lacks background gutters');
+  check(Math.abs(filmPhoto.height / filmPhoto.width - filmPhoto.naturalHeight / filmPhoto.naturalWidth) < 0.01, 'Film photo is cropped');
+  await capture('film-story-photo-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Photo film export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Photo film export failed');
+  const filmExport = new Image(); filmExport.src = downloaded; await filmExport.decode();
+  const filmCanvas = document.createElement('canvas'); filmCanvas.width = filmExport.naturalWidth; filmCanvas.height = filmExport.naturalHeight;
+  const filmContext = filmCanvas.getContext('2d'); filmContext.drawImage(filmExport, 0, 0);
+  const filmRect = filmPhoto.getBoundingClientRect();
+  const filmPixel = filmContext.getImageData(Math.round((filmRect.left - filmBounds.left + 5) * 2), Math.round((filmRect.top - filmBounds.top + filmRect.height / 2) * 2), 1, 1).data;
+  check([174,197,178].every((value, channel) => Math.abs(filmPixel[channel] - value) < 5), 'Film export lost the sharp foreground photo');
+  check(filmContext.getImageData(8, 8, 1, 1).data[0] > 70, 'Film export lost its photo background');
+  window.__filmPhotoExport = downloaded;
+  passed.push('Film card deepens all nine themes, omits the background without photos and exports blur with sharp foreground pixels');
+  await mount([photos[0], 'missing'], 'missing'); check(!button('无缝长图') && !button('边框长图'), 'Unavailable image incorrectly enables long-image mode');
+  await mount(photos, 'multiple'); check(button('无缝长图') && button('边框长图'), 'Multi-image record lacks long-image modes');
+  button('无缝长图').click(); await wait();
   const images = [...document.querySelectorAll('img[alt^="照片"]')];
   check(images.length === 3 && images.every((image, index) => image.src === photos[index]), 'Long-image mode lost/reordered photos');
   const host = images[0].parentElement.parentElement;
@@ -73,13 +116,14 @@ async function run() {
   check(host.textContent.includes('和朋友在杭州散步。') && !host.textContent.includes('[['), 'Node labels do not render');
   check(host.querySelectorAll('span.underline').length === 2, 'Node underline styling lost');
   check(!host.textContent.includes('周末散步'), 'Share title removal regressed');
-  check(button('长图').classList.contains('bg-stone-100'), 'Long-image mode does not show selection');
+  check(button('无缝长图').classList.contains('bg-stone-100'), 'Long-image mode does not show selection');
   await capture('long-image-mobile');
   // A previous failed export stays in the library's resource cache even after cacheBust is disabled.
   let cachedFailure;
   try { await toPng(host, { cacheBust: true, skipFonts: true }); } catch(error) { cachedFailure = error; }
   check(cachedFailure, 'Failed-resource cache scenario was not reproduced');
   await wait();
+  toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Long-image download failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Long-image download failed');
   const exported = new Image(); exported.src = downloaded; await exported.decode();
@@ -112,9 +156,10 @@ async function run() {
     check(rect.left > framedCard.getBoundingClientRect().left && rect.right < framedCard.getBoundingClientRect().right, 'Framed photo lacks outer margins');
     check(Math.abs(rect.height / rect.width - image.naturalHeight / image.naturalWidth) < 0.01, 'Framed photo aspect ratio changed');
   });
-  check(framedCard.querySelector('p').getBoundingClientRect().bottom < framedImages[0].getBoundingClientRect().top, 'Framed notes are not above the photos');
+  check(framedCard.querySelector('p').getBoundingClientRect().top > framedImages.at(-1).getBoundingClientRect().bottom, 'Framed notes are not below the photos');
+  check(framedImages[0].getBoundingClientRect().top - framedCard.getBoundingClientRect().top < 24, 'Framed photos still have a leading header band');
   check(framedCard.querySelectorAll('span.underline').length === 2, 'Framed layout lost node labels');
-  check(button('长图').getBoundingClientRect().top === button('边框长图').getBoundingClientRect().top, 'Long-image options are not in the same selector row');
+  check(button('无缝长图').getBoundingClientRect().top === button('边框长图').getBoundingClientRect().top, 'Long-image options are not in the same selector row');
   await capture('framed-long-image-mobile'); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Framed export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Framed export failed');
@@ -128,11 +173,11 @@ async function run() {
     check(expectedColors[index].every((value, channel) => Math.abs(pixel[channel] - value) < 5), 'Framed export lost photo pixels');
   });
   window.__framedLongImageExport = downloaded;
-  passed.push('Framed photos preserve order/ratios, top-aligned node text and all exported pixels');
-  button('长图').click(); await wait();
+  passed.push('Framed photos preserve order/ratios, bottom-aligned node text and all exported pixels without a header band');
+  button('无缝长图').click(); await wait();
   await capture('long-image-desktop');
   button('边框长图').click(); await wait(); await capture('framed-long-image-desktop');
-  for (const layout of ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '长图', '边框长图', '边框长图']) {
+  for (const layout of ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '无缝长图', '边框长图', '边框长图']) {
     button(layout).click(); await wait(); toast = null; downloaded = null;
     document.querySelector('button[title="保存"]').click();
     await until(() => { if(toast?.type === 'error') throw new Error(layout + ': ' + toast.message); return downloaded && toast?.type === 'success'; }, layout + ': save failed');
@@ -141,14 +186,14 @@ async function run() {
   }
   passed.push('All eight layouts save PNG/JPEG/WebP Blob images, including repeated exports');
   button('经典').click(); await wait(); check(!document.querySelector('img[alt^="照片"]'), 'Cannot switch back to classic');
-  button('长图').click(); await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 3, 'Cannot return to long-image mode');
+  button('无缝长图').click(); await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 3, 'Cannot return to long-image mode');
   button('边框长图').click(); await wait();
-  await mount([], 'multiple'); check(!button('长图') && !button('边框长图') && !document.querySelector('img'), 'Removing photos keeps the long-image mode or stale photos');
+  await mount([], 'multiple'); check(!button('无缝长图') && !button('边框长图') && !document.querySelector('img'), 'Removing photos keeps the long-image mode or stale photos');
   const dataUrls = await Promise.all(photos.map(async url => {
     const blob = await (await fetch(url)).blob();
     return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); });
   }));
-  await mount(photos, 'revoked'); button('长图').click(); await wait();
+  await mount(photos, 'revoked'); button('无缝长图').click(); await wait();
   await Promise.all([...document.images].map(image => image.decode()));
   photos.forEach(url => URL.revokeObjectURL(url));
   toast = null; downloaded = null;
@@ -174,18 +219,18 @@ async function run() {
     const response = await fetch(url);
     return URL.createObjectURL(new Blob([await response.arrayBuffer()], { type: index === 1 ? 'application/octet-stream' : '' }));
   }));
-  await mount(untypedUrls, 'untyped'); button('长图').click(); await wait(); toast = null; downloaded = null;
+  await mount(untypedUrls, 'untyped'); button('无缝长图').click(); await wait(); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Untyped Blob export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Untyped Blob export failed');
   passed.push('Missing and generic Blob MIME types do not break image embedding');
 
-  await mount(dataUrls, 'inline'); button('长图').click(); await wait(); toast = null; downloaded = null;
+  await mount(dataUrls, 'inline'); button('无缝长图').click(); await wait(); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => { if(toast?.type === 'error') throw new Error('Data URL export failed'); return downloaded && toast?.type === 'success'; }, 'Data URL export failed');
   passed.push('Native-style inline raster images also export without cache-busting');
   await mount([...dataUrls, 'data:image/png;base64,aW52YWxpZA=='], 'broken', false);
   await until(() => [...document.images].every(image => image.complete), 'Broken image did not finish loading');
-  button('长图').click(); await wait(); toast = null; downloaded = null;
+  button('无缝长图').click(); await wait(); toast = null; downloaded = null;
   document.querySelector('button[title="保存"]').click();
   await until(() => toast?.type === 'error', 'Broken image silently exported');
   check(toast.message.includes('第 4 张图片') && !downloaded, 'Broken image was omitted without a useful error');
@@ -240,6 +285,10 @@ app.whenReady().then(async () => {
   if(exported) await fs.writeFile(path.join(__dirname, 'long-image-export.png'), Buffer.from(exported.split(',')[1], 'base64'));
   const framedExport = await window.webContents.executeJavaScript('window.__framedLongImageExport');
   if(framedExport) await fs.writeFile(path.join(__dirname, 'framed-long-image-export.png'), Buffer.from(framedExport.split(',')[1], 'base64'));
+  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export']]) {
+    const exported = await window.webContents.executeJavaScript('window.' + key);
+    if(exported) await fs.writeFile(path.join(__dirname, name + '.png'), Buffer.from(exported.split(',')[1], 'base64'));
+  }
   console.log(JSON.stringify({ ...result, directory: __dirname }, null, 2));
   app.exit(result && !result.error ? 0 : 1);
 }).catch(error => { console.error(error); app.exit(1); });

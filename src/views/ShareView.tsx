@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Labels seamless photo stacking as 无缝长图.
  * @updated 2026-10-12: Offers both seamless and framed long-image layouts in the second selector row.
  * @updated 2026-10-12: Exports a disposable snapshot with embedded preview pixels and rejects unloaded images explicitly.
  * @updated 2026-10-12: Arranges layout buttons in four columns with the long-image option on the second row.
@@ -299,7 +300,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 { id: 'film-story', label: '变迁' },
                 { id: 'glass-morphism', label: '玻璃' },
                 ...(imageUrls.length > 1 ? [
-                  { id: 'long-image', label: '长图' },
+                  { id: 'long-image', label: '无缝长图' },
                   { id: 'framed-long-image', label: '边框长图' }
                 ] : [])
               ].map(template => (

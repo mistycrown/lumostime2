@@ -3,6 +3,7 @@
  * @input Share card content, theme and selected layout
  * @output Image-exportable card with node-aware body text in every template
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Reworks film-story into a deepened-theme card over a blurred photo, and moves framed-story notes below the photos.
  * @updated 2026-10-12: Adds theme-tinted photo frames with top-aligned notes in a second long-image layout.
  * @updated 2026-10-12: Adds edge-to-edge photo stacking with original aspect ratios and simple text typography.
  * @updated 2026-10-11: Renders node labels and aliases, preserving drop caps and visible vertical text lengths.
@@ -17,6 +18,10 @@ interface TemplateRendererProps {
   theme: ShareTheme;
   templateId: string;
 }
+
+const deepenThemeColor = (color: string): string => '#' + [1, 3, 5]
+  .map((offset) => Math.round(parseInt(color.slice(offset, offset + 2), 16) * 0.82).toString(16).padStart(2, '0'))
+  .join('');
 
 // Improved TagPill component to prevent layout shifts during export
 const TagPill: React.FC<{ text: string; icon: React.ReactNode; color: string; bg?: string; borderColor?: string }> = ({ text, icon, color, bg, borderColor }) => (
@@ -45,30 +50,29 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
   const primaryStyle = { color: theme.primaryColor };
   const borderStyle = { borderColor: theme.primaryColor };
   const bgStyle = { backgroundColor: theme.primaryColor };
+  const cardColor = deepenThemeColor(theme.primaryColor);
 
   const hasImages = content.images.length > 0;
 
   if (templateId === 'framed-long-image') {
     return (
-      <div className="w-full" style={{ backgroundColor: theme.backgroundColor, ...primaryStyle }}>
-        <div className="px-6 pt-6 pb-5">
-          <div className="flex items-baseline justify-between gap-4 text-[11px]">
-            {content.activity && <span className="min-w-0 break-words opacity-70">#{content.activity}</span>}
-            <span className="font-serif opacity-60 shrink-0 ml-auto">{content.date}</span>
-          </div>
-          <p className="mt-4 font-serif text-sm leading-loose whitespace-pre-wrap break-words">
-            <ShareCardText text={content.body} />
-          </p>
-        </div>
-        <div className="px-3 space-y-2">
+      <div className="w-full" style={{ backgroundColor: cardColor, color: '#F5F5F0' }}>
+        <div className="p-3 space-y-3">
           {content.images.map((image, index) => (
-            <div key={index} className="border-4" style={{ borderColor: theme.primaryColor + '35' }}>
+            <div key={index} className="border-4" style={{ borderColor: theme.primaryColor }}>
               <img src={image} alt={`照片 ${index + 1}`} className="block w-full h-auto" />
             </div>
           ))}
         </div>
-        <div className="px-6 pt-4 pb-5 text-right text-[9px] tracking-widest opacity-40">
-          LumosTime
+        <div className="px-6 pt-3 pb-6">
+          <p className="font-serif text-base leading-loose whitespace-pre-wrap break-words">
+            <ShareCardText text={content.body} />
+          </p>
+          <div className="mt-8 flex flex-col items-end gap-2 text-[11px] opacity-50">
+            <span className="font-mono tracking-widest">{content.date}</span>
+            {content.activity && <span className="break-words text-right">#{content.activity}</span>}
+            <span className="mt-2 text-[9px] tracking-widest">LumosTime</span>
+          </div>
         </div>
       </div>
     );
@@ -389,50 +393,46 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
     );
   }
 
-    // --- Template: Film Story ---
-    if (templateId === 'film-story') {
-      return (
-        <div className="w-full p-8 md:p-10 flex flex-col relative">
-          {/* Top Bar with Activity Tag */}
-          <div className="flex justify-between items-start mb-6 flex-shrink-0">
-            <div className="text-xs opacity-50 font-mono tracking-wider" style={primaryStyle}>
-              {content.date}
-            </div>
-            {content.activity && (
-              <div className="text-xs opacity-60 font-medium" style={primaryStyle}>
-                #{content.activity}
-              </div>
-            )}
-          </div>
-
-          {/* Image Area - only show if images exist */}
+  // --- Template: Film Story ---
+  if (templateId === 'film-story') {
+    return (
+      <div className={`w-full relative overflow-hidden ${hasImages ? 'px-6 py-10' : ''}`} style={{ backgroundColor: cardColor }}>
+        {hasImages && (
+          <>
+            <img
+              src={content.images[0]}
+              alt=""
+              aria-hidden="true"
+              className="absolute object-cover pointer-events-none"
+              style={{ top: -24, left: -24, width: 'calc(100% + 48px)', height: 'calc(100% + 48px)', filter: 'blur(18px)' }}
+            />
+            <div className="absolute inset-0 bg-black/20" />
+          </>
+        )}
+        <div
+          className="relative flex flex-col rounded-sm p-4"
+          style={{ backgroundColor: cardColor, color: '#F5F5F0', minHeight: hasImages ? 480 : 400,
+            boxShadow: hasImages ? '0 16px 48px rgba(0, 0, 0, 0.28)' : undefined }}
+        >
           {hasImages && (
-            <div className="mb-6 rounded-lg overflow-hidden shadow-lg flex-shrink-0 max-h-[400px]">
-              {renderImagesDefault('h-full w-full object-cover')}
+            <div className="mb-4 flex-shrink-0">
+              {content.images.length === 1
+                ? <img src={content.images[0]} alt="照片 1" className="block w-full h-auto" />
+                : renderImagesDefault('')}
             </div>
           )}
-
-          {/* Body Text */}
-          <div className="mb-6">
-            <p className="text-base leading-relaxed font-serif text-justify" style={{
-              ...primaryStyle,
-              whiteSpace: 'pre-wrap'
-            }}>
-              <ShareCardText text={content.body} />
-            </p>
-          </div>
-
-          {/* Bottom decoration */}
-          <div className="flex items-center justify-center gap-3 opacity-60 flex-shrink-0 mt-4">
-            <div className="h-px flex-1" style={bgStyle}></div>
-            <div className="text-[9px] font-sans tracking-wider" style={primaryStyle}>
-              LumosTime
-            </div>
-            <div className="h-px flex-1" style={bgStyle}></div>
+          <p className="font-serif text-base leading-loose whitespace-pre-wrap break-words">
+            <ShareCardText text={content.body} />
+          </p>
+          <div className="mt-auto pt-12 flex flex-col items-end gap-2 text-[11px] opacity-50">
+            <span className="font-mono tracking-widest">{content.date}</span>
+            {content.activity && <span className="break-words text-right">#{content.activity}</span>}
+            <span className="mt-2 text-[9px] tracking-widest">LumosTime</span>
           </div>
         </div>
-      );
-    }
+      </div>
+    );
+  }
 
   // --- Template: Magazine Classic ---
   if (templateId === 'magazine-classic') {
