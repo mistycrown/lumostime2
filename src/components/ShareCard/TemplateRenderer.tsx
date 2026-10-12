@@ -1,6 +1,14 @@
+/**
+ * @file TemplateRenderer.tsx
+ * @input Share card content, theme and selected layout
+ * @output Image-exportable card with node-aware body text in every template
+ * @pos Component (ShareCard)
+ * @updated 2026-10-11: Renders node labels and aliases, preserving drop caps and visible vertical text lengths.
+ */
 import React from 'react';
 import { ShareCardContent, ShareTheme } from './types';
 import { Hash, Calendar, Quote, Feather } from 'lucide-react';
+import { getShareCardPlainText, ShareCardText } from './ShareCardText';
 
 interface TemplateRendererProps {
   content: ShareCardContent;
@@ -190,7 +198,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
   if (templateId === 'vertical-poetry') {
     // 按段落分割文本（保留换行符）
     const paragraphs = content.body.split('\n').filter(p => p.trim().length > 0);
-    const totalChars = content.body.replace(/\n/g, '').length; // 不计算换行符
+    const totalChars = getShareCardPlainText(content.body).replace(/\n/g, '').length; // 不计算换行符和节点语法
     const maxColumns = 8; // 最多8列
     
     // 根据字数决定列数
@@ -223,7 +231,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
     
     for (let i = 0; i < paragraphs.length; i++) {
       const para = paragraphs[i];
-      const paraLength = para.length;
+      const paraLength = getShareCardPlainText(para).length;
       
       // 如果当前列为空，直接添加段落
       if (currentColumnLength === 0) {
@@ -276,7 +284,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                 whiteSpace: 'pre-wrap'
               }}
             >
-              {columnText}
+              <ShareCardText text={columnText} />
             </div>
           ))}
         </div>
@@ -311,7 +319,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
              ...primaryStyle,
              whiteSpace: 'pre-wrap'
            }}>
-               {content.body}
+               <ShareCardText text={content.body} />
            </p>
         </div>
 
@@ -357,7 +365,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
               ...primaryStyle,
               whiteSpace: 'pre-wrap'
             }}>
-              {content.body}
+              <ShareCardText text={content.body} />
             </p>
           </div>
 
@@ -393,14 +401,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
 
         <div className="font-serif max-w-none text-justify leading-loose opacity-90" style={{ color: theme.primaryColor }}>
           {/* Drop cap for the first letter - reduced size to fit exactly 2 lines */}
-          <span className="float-left text-[2.8em] leading-[0.85] pr-2 pt-1 font-serif font-bold opacity-100" style={primaryStyle}>
-            {content.body.charAt(0)}
-          </span>
-          <div className="text-sm md:text-base" style={{ 
-            whiteSpace: 'pre-wrap'
-          }}>
-            {content.body.slice(1)}
-          </div>
+          <ShareCardText text={content.body} dropCap />
         </div>
         
         <div className="mt-8 pt-6 flex flex-col items-center justify-center gap-3 opacity-80 flex-shrink-0">
@@ -529,7 +530,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                       ...primaryStyle,
                       whiteSpace: 'pre-wrap'
                     }}>
-                        {content.body}
+                        <ShareCardText text={content.body} />
                     </p>
                     {content.activity && (
                       <div className="flex justify-between items-center pt-4 border-t border-dashed flex-shrink-0" style={{ borderColor: theme.primaryColor + '20' }}>
@@ -664,7 +665,7 @@ export const TemplateRenderer: React.FC<TemplateRendererProps> = ({ content, the
                 whiteSpace: 'pre-wrap'
               }}
             >
-              {content.body}
+              <ShareCardText text={content.body} />
             </p>
 
             {/* Footer */}
