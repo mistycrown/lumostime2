@@ -4,6 +4,7 @@
  * @output A full-day scrollable schedule canvas with actionable idle-time gaps, plan drops, quick-color record creation, editable time bounds, and touch pinch zoom
  * @pos Component
  * @description Positions real records and virtual planning blocks on a 00:00-24:00 time grid for the Chronicle split layout.
+ * @updated 2026-10-12: Opens actual-record editors on completed clicks instead of pointer-up, avoiding delayed touch-click backdrop closes and global editor click suppression.
  * @updated 2026-08-13: Hides notes while a time block is being edited so long text cannot extend beyond its bounds.
  * @updated 2026-08-06: Lets larger blocks show full multiline notes while keeping shorter blocks on a single truncated line.
  * @updated 2026-07-31: Prevents locked recurring auto-Plan blocks from entering long-press time editing or drag/resize adjustment.
@@ -50,7 +51,6 @@ const BLOCK_GESTURE_THRESHOLD = 6;
 const LONG_PRESS_EDIT_DELAY = 500;
 const PINCH_BLOCK_TAP_SUPPRESSION_MS = 300;
 const BLOCK_CLICK_FALLBACK_SUPPRESSION_MS = 160;
-const RECORD_DETAIL_BACKDROP_CLICK_SUPPRESSION_MS = 320;
 export const PLAN_ACTION_INTERACTION_GUARD_MS = 280;
 
 export const isPlanActionInteractionGuardActive = (
@@ -319,7 +319,6 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
   const pinchRef = useRef<{ distance: number; hourHeight: number } | null>(null);
   const pinchBlockTapSuppressionUntilRef = useRef<number>(0);
   const blockClickFallbackSuppressionUntilRef = useRef<number>(0);
-  const recordDetailBackdropClickSuppressionUntilRef = useRef<number>(0);
   const initializedDateRef = useRef<string>('');
   const longPressRef = useRef<{ logId: string; pointerId: number; startX: number; startY: number; timerId: number | null; active: boolean; mode: BlockPressMode } | null>(null);
   const resizeRef = useRef<{ log: Log; edge: 'start' | 'end' } | null>(null);
@@ -507,10 +506,7 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
 
     const handleDocumentClickCapture = (event: MouseEvent) => {
       const now = Date.now();
-      if (
-        now < pinchBlockTapSuppressionUntilRef.current
-        || now < recordDetailBackdropClickSuppressionUntilRef.current
-      ) {
+      if (now < pinchBlockTapSuppressionUntilRef.current) {
         event.preventDefault();
         event.stopPropagation();
         return;
@@ -792,7 +788,6 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
 
   const scheduleRecordDetailOpen = (log: Log) => {
     if (recordDetailOpenTimerRef.current !== null) clearTimeout(recordDetailOpenTimerRef.current);
-    recordDetailBackdropClickSuppressionUntilRef.current = Date.now() + RECORD_DETAIL_BACKDROP_CLICK_SUPPRESSION_MS;
     recordDetailOpenTimerRef.current = scheduleTimelineRecordDetailOpen(() => {
       recordDetailOpenTimerRef.current = null;
       onEditLog(log);
@@ -818,13 +813,11 @@ export const TimelineScheduleCanvas = React.forwardRef<TimelineScheduleCanvasHan
     const wasLongPress = press?.logId === log.id && press.pointerId === event.pointerId && press.mode === 'detail' && press.active;
     clearLongPress();
     if (editingLogIdRef.current) return;
-    if (!wasLongPress) {
+    // Actual records open from onClick after the browser finishes its pointer/touch sequence.
+    // Opening here can retarget a delayed compatibility click onto the new modal backdrop.
+    if (!wasLongPress && log.isPlanned) {
       blockClickFallbackSuppressionUntilRef.current = Date.now() + BLOCK_CLICK_FALLBACK_SUPPRESSION_MS;
-      if (log.isPlanned) {
-        openPlanActions(log.id);
-      } else {
-        scheduleRecordDetailOpen(log);
-      }
+      openPlanActions(log.id);
     }
   };
 
