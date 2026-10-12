@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Verifies independent text/photo entrances, paper/film layouts and every mode's actual export.
  * @updated 2026-10-12: Checks deepened palette colors, film-story blur/no-image exports and photo-first framed layout.
  * @updated 2026-10-12: Verifies framed photo geometry, original aspect ratios, top-aligned node text and complete image exports.
  * @updated 2026-10-12: Reproduces broken Blob cache-busting and checks every share layout's real save action.
@@ -39,8 +40,8 @@ const passed = [];
 let toast;
 let downloaded;
 HTMLAnchorElement.prototype.click = function() { downloaded = this.href; };
-const mount = async (images, key, decodeImages = true) => {
-  root.render(<ShareView key={key} log={{ ...log, images }} onBack={() => {}} onToast={(type, message) => { toast = { type, message }; }}/>);
+const mount = async (images, key, decodeImages = true, note = log.note) => {
+  root.render(<ShareView key={key} log={{ ...log, images, note }} onBack={() => {}} onToast={(type, message) => { toast = { type, message }; }}/>);
   await wait();
   await until(() => document.querySelector('button[title="保存"]') && !document.querySelector('button[title="保存"]').disabled, 'Share preview never loaded');
   if (decodeImages) await Promise.all([...document.images].map(image => image.decode()));
@@ -57,6 +58,8 @@ async function run() {
   await document.fonts.load('16px VerifiedChinese', '分享卡片长图杭州朋友');
   check(document.fonts.check('16px VerifiedChinese', '分享卡片长图杭州朋友'), 'Chinese font unavailable');
   await mount([], 'empty'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears without photos');
+  check(button('纯文字').getAttribute('aria-selected') === 'true' && button('图文').disabled, 'Empty record does not enter text mode');
+  check(button('经典') && !button('摄影日记'), 'Text mode contains photo templates');
   button('变迁').click(); await wait();
   const themeButtons = [...document.querySelector('section').querySelectorAll('button')];
   const filmColors = new Set();
@@ -79,6 +82,24 @@ async function run() {
   window.__filmTextExport = downloaded;
 
   await mount(photos.slice(0,1), 'single'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears with one photo');
+  check(button('图文').getAttribute('aria-selected') === 'true' && button('摄影日记') && !button('经典'), 'Photo record does not enter photography mode');
+  const diaryImage = document.querySelector('img[alt="照片 1"]');
+  const diaryCard = diaryImage.parentElement.parentElement;
+  check(diaryImage.getBoundingClientRect().left > diaryCard.getBoundingClientRect().left, 'Photography diary lacks paper margins');
+  check(diaryCard.querySelector('p').getBoundingClientRect().top > diaryImage.getBoundingClientRect().bottom, 'Diary caption precedes the photo');
+  await capture('photo-diary-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Diary export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Diary export failed');
+  window.__diaryExport = downloaded;
+  button('纯文字').click(); await wait();
+  check(!document.querySelector('img') && button('经典') && !button('摄影日记'), 'Text entrance retains photos or photo templates');
+  button('古韵').click(); await wait();
+  button('图文').click(); await wait();
+  check(button('摄影日记').getAttribute('aria-pressed') === 'true', 'Photo template choice was not preserved');
+  button('纯文字').click(); await wait();
+  check(button('古韵').getAttribute('aria-pressed') === 'true', 'Text template choice was not preserved');
+  button('图文').click(); await wait();
+  passed.push('Text and photo entrances isolate their templates/photos and preserve independent selections');
   button('变迁').click(); await wait();
   await Promise.all([...document.images].map(image => image.decode()));
   const filmBackground = document.querySelector('img[aria-hidden="true"]');
@@ -100,6 +121,11 @@ async function run() {
   check(filmContext.getImageData(8, 8, 1, 1).data[0] > 70, 'Film export lost its photo background');
   window.__filmPhotoExport = downloaded;
   passed.push('Film card deepens all nine themes, omits the background without photos and exports blur with sharp foreground pixels');
+  await mount([photos[0]], 'photos-only', true, '');
+  check(!document.querySelector('p') && !document.body.textContent.includes('这是一段美好的时光记录'), 'Photo-only records have an invented caption');
+  button('纯文字').click(); await wait();
+  check(document.body.textContent.includes('这是一段美好的时光记录'), 'Text fallback was removed');
+  passed.push('Photo-only records keep their captions empty while text mode retains its existing fallback');
   await mount([photos[0], 'missing'], 'missing'); check(!button('无缝长图') && !button('边框长图'), 'Unavailable image incorrectly enables long-image mode');
   await mount(photos, 'multiple'); check(button('无缝长图') && button('边框长图'), 'Multi-image record lacks long-image modes');
   button('无缝长图').click(); await wait();
@@ -150,14 +176,14 @@ async function run() {
   check(framedImages.length === 3 && framedImages.every((image, index) => image.src === photos[index]), 'Framed layout lost photo order');
   framedImages.forEach(image => {
     const rect = image.getBoundingClientRect();
-    // Chromium rounds borders to physical pixels on scaled Windows displays.
-    const borderWidth = parseFloat(getComputedStyle(image.parentElement).borderLeftWidth);
-    check(Math.abs(borderWidth - 4) <= 1 / window.devicePixelRatio, 'Photo frame missing: ' + borderWidth);
+    const paperPadding = parseFloat(getComputedStyle(image.parentElement).paddingLeft);
+    check(paperPadding >= 12 && image.parentElement.querySelector('figcaption'), 'Paper frame or caption missing');
+    check(getComputedStyle(image.parentElement).backgroundColor !== getComputedStyle(framedCard).backgroundColor, 'Paper frames blend into the surround');
     check(rect.left > framedCard.getBoundingClientRect().left && rect.right < framedCard.getBoundingClientRect().right, 'Framed photo lacks outer margins');
     check(Math.abs(rect.height / rect.width - image.naturalHeight / image.naturalWidth) < 0.01, 'Framed photo aspect ratio changed');
   });
   check(framedCard.querySelector('p').getBoundingClientRect().top > framedImages.at(-1).getBoundingClientRect().bottom, 'Framed notes are not below the photos');
-  check(framedImages[0].getBoundingClientRect().top - framedCard.getBoundingClientRect().top < 24, 'Framed photos still have a leading header band');
+  check(framedImages[0].getBoundingClientRect().top - framedCard.getBoundingClientRect().top <= 24, 'Framed photos still have a leading header band');
   check(framedCard.querySelectorAll('span.underline').length === 2, 'Framed layout lost node labels');
   check(button('无缝长图').getBoundingClientRect().top === button('边框长图').getBoundingClientRect().top, 'Long-image options are not in the same selector row');
   await capture('framed-long-image-mobile'); toast = null; downloaded = null;
@@ -177,18 +203,31 @@ async function run() {
   button('无缝长图').click(); await wait();
   await capture('long-image-desktop');
   button('边框长图').click(); await wait(); await capture('framed-long-image-desktop');
-  for (const layout of ['经典', '古韵', '现代', '分割', '变迁', '玻璃', '无缝长图', '边框长图', '边框长图']) {
-    button(layout).click(); await wait(); toast = null; downloaded = null;
-    document.querySelector('button[title="保存"]').click();
-    await until(() => { if(toast?.type === 'error') throw new Error(layout + ': ' + toast.message); return downloaded && toast?.type === 'success'; }, layout + ': save failed');
-    const image = new Image(); image.src = downloaded; await image.decode();
-    check(image.naturalWidth > 0 && image.naturalHeight > 0, layout + ': invalid export');
+  button('胶片长图').click(); await wait();
+  const stripPhotos = [...document.querySelectorAll('img[alt^="照片"]')];
+  const stripCard = stripPhotos[0].parentElement.parentElement;
+  check(stripPhotos.length === 3 && stripCard.textContent.includes('LUMOS · 400'), 'Film frames or markings missing');
+  check(stripCard.querySelectorAll('figure').length === 3 && stripCard.querySelector('p').getBoundingClientRect().top > stripPhotos.at(-1).getBoundingClientRect().bottom, 'Film story geometry is incorrect');
+  await capture('film-strip-desktop');
+  for (const [mode, layouts] of [['纯文字', ['经典', '古韵', '现代', '分割', '变迁', '玻璃']], ['图文', ['摄影日记', '变迁', '无缝长图', '边框长图', '胶片长图', '胶片长图']]]) {
+    button(mode).click(); await wait();
+    for (const layout of layouts) {
+      button(layout).click(); await wait(); toast = null; downloaded = null;
+      if(mode === '纯文字') check(!document.querySelector('img'), 'Text mode contains photographs');
+      document.querySelector('button[title="保存"]').click();
+      await until(() => { if(toast?.type === 'error') throw new Error(layout + ': ' + toast.message); return downloaded && toast?.type === 'success'; }, layout + ': save failed');
+      const image = new Image(); image.src = downloaded; await image.decode();
+      check(image.naturalWidth > 0 && image.naturalHeight > 0, layout + ': invalid export');
+      if(mode === '图文' && layout === '胶片长图') window.__filmStripExport = downloaded;
+    }
   }
-  passed.push('All eight layouts save PNG/JPEG/WebP Blob images, including repeated exports');
-  button('经典').click(); await wait(); check(!document.querySelector('img[alt^="照片"]'), 'Cannot switch back to classic');
+  passed.push('All six text and five photo layouts export, including repeated PNG/JPEG/WebP exports');
+  button('纯文字').click(); await wait(); button('经典').click(); await wait(); check(!document.querySelector('img'), 'Cannot switch back to classic');
+  button('图文').click(); await wait();
   button('无缝长图').click(); await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 3, 'Cannot return to long-image mode');
   button('边框长图').click(); await wait();
   await mount([], 'multiple'); check(!button('无缝长图') && !button('边框长图') && !document.querySelector('img'), 'Removing photos keeps the long-image mode or stale photos');
+  check(button('图文').disabled && button('纯文字').getAttribute('aria-selected') === 'true', 'Removing photos keeps the photo entrance active');
   const dataUrls = await Promise.all(photos.map(async url => {
     const blob = await (await fetch(url)).blob();
     return new Promise(resolve => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.readAsDataURL(blob); });
@@ -237,10 +276,14 @@ async function run() {
   check(!document.querySelector('[aria-hidden="true"] img'), 'Failed export leaked its snapshot');
   check(!document.querySelector('button[title="保存"]').disabled, 'Failed export left saving disabled');
   passed.push('Invalid images fail explicitly and restore the save button without leaking snapshots');
-  root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="long-image"/></article>);
+  root.render(<article style={{ width: 358 }}><TemplateRenderer mode="photo" content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="long-image"/></article>);
   await wait(); check(document.querySelectorAll('img').length === 12, 'Long-image mode silently truncates photos');
-  root.render(<article style={{ width: 358 }}><TemplateRenderer content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="framed-long-image"/></article>);
+  root.render(<article style={{ width: 358 }}><TemplateRenderer mode="photo" content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId="framed-long-image"/></article>);
   await wait(); check(document.querySelectorAll('img').length === 12, 'Framed mode silently truncates photos');
+  for (const templateId of ['photo-diary', 'film-story', 'film-strip']) {
+    root.render(<article style={{ width: 358 }}><TemplateRenderer mode="photo" content={{ body: '十二张照片全部保留。', images: Array.from({length:12}, (_, index) => dataUrls[index % 3]), date: '2026年10月12日', activity: '', domain: '' }} theme={SHARE_THEMES[0]} templateId={templateId}/></article>);
+    await wait(); check(document.querySelectorAll('img[alt^="照片"]').length === 12, templateId + ' silently truncates photos');
+  }
   passed.push('Switching layouts works, and records with more than nine photos keep every image');
   window.__longImageResult = { passed };
 }
@@ -285,7 +328,7 @@ app.whenReady().then(async () => {
   if(exported) await fs.writeFile(path.join(__dirname, 'long-image-export.png'), Buffer.from(exported.split(',')[1], 'base64'));
   const framedExport = await window.webContents.executeJavaScript('window.__framedLongImageExport');
   if(framedExport) await fs.writeFile(path.join(__dirname, 'framed-long-image-export.png'), Buffer.from(framedExport.split(',')[1], 'base64'));
-  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export']]) {
+  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export'], ['__diaryExport', 'photo-diary-export'], ['__filmStripExport', 'film-strip-export']]) {
     const exported = await window.webContents.executeJavaScript('window.' + key);
     if(exported) await fs.writeFile(path.join(__dirname, name + '.png'), Buffer.from(exported.split(',')[1], 'base64'));
   }

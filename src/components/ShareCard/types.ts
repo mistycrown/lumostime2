@@ -1,6 +1,7 @@
 /**
  * @file types.ts
  * @description Type definitions for ShareCard component
+ * @updated 2026-10-12: Defines separate text/photo layout modes and shared renderer props.
  */
 
 export interface ShareCardContent {
@@ -23,4 +24,13 @@ export interface ShareTemplate {
   id: string;
   name: string;
   description: string;
+  minImages?: number;
+}
+
+export type ShareLayoutMode = 'text' | 'photo';
+
+export interface ShareTemplateRendererProps {
+  content: ShareCardContent;
+  theme: ShareTheme;
+  templateId: string;
 }

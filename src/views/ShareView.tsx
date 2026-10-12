@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Adds independent text/photo entrances, template selections and photo-first defaults.
  * @updated 2026-10-12: Labels seamless photo stacking as 无缝长图.
  * @updated 2026-10-12: Offers both seamless and framed long-image layouts in the second selector row.
  * @updated 2026-10-12: Exports a disposable snapshot with embedded preview pixels and rejects unloaded images explicitly.
@@ -16,8 +17,8 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Log, Scope } from '../types';
 import type { ToastType } from '../components/Toast';
-import { SHARE_THEMES, SHARE_TEMPLATES } from '../components/ShareCard/constants';
-import { ShareCardContent } from '../components/ShareCard/types';
+import { SHARE_THEMES, TEXT_SHARE_TEMPLATES, PHOTO_SHARE_TEMPLATES } from '../components/ShareCard/constants';
+import { ShareCardContent, ShareLayoutMode } from '../components/ShareCard/types';
 import { TemplateRenderer } from '../components/ShareCard/TemplateRenderer';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
 import { imageService } from '../services/imageService';
@@ -33,13 +34,18 @@ interface ShareViewProps {
 export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) => {
   const { categories } = useCategoryScope();
   const [activeThemeId, setActiveThemeId] = useState<string>(SHARE_THEMES[0].id);
-  const [activeTemplateId, setActiveTemplateId] = useState<string>(SHARE_TEMPLATES[0].id);
+  const [layoutMode, setLayoutMode] = useState<ShareLayoutMode>(log.images?.length ? 'photo' : 'text');
+  const [textTemplateId, setTextTemplateId] = useState(TEXT_SHARE_TEMPLATES[0].id);
+  const [photoTemplateId, setPhotoTemplateId] = useState(PHOTO_SHARE_TEMPLATES[0].id);
   const [isExporting, setIsExporting] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   
   const previewRef = useRef<HTMLDivElement>(null);
   const activeTheme = SHARE_THEMES.find(t => t.id === activeThemeId) || SHARE_THEMES[0];
+  const templates = layoutMode === 'text' ? TEXT_SHARE_TEMPLATES : PHOTO_SHARE_TEMPLATES;
+  const activeTemplateId = layoutMode === 'text' ? textTemplateId : photoTemplateId;
+  const availableTemplates = templates.filter(template => imageUrls.length >= (template.minImages || 0));
 
   // Load image URLs
   useEffect(() => {
@@ -72,10 +78,11 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   }, [log.images]);
 
   useEffect(() => {
-    if (!isLoadingImages && imageUrls.length < 2 && ['long-image', 'framed-long-image'].includes(activeTemplateId)) {
-      setActiveTemplateId(SHARE_TEMPLATES[0].id);
-    }
-  }, [imageUrls.length, isLoadingImages, activeTemplateId]);
+    if (isLoadingImages) return;
+    if (imageUrls.length === 0) setLayoutMode('text');
+    const selected = PHOTO_SHARE_TEMPLATES.find(template => template.id === photoTemplateId);
+    if (imageUrls.length < (selected?.minImages || 0)) setPhotoTemplateId(PHOTO_SHARE_TEMPLATES[0].id);
+  }, [imageUrls.length, isLoadingImages, photoTemplateId]);
 
   // Convert Log to ShareCardContent
   const getShareContent = (): ShareCardContent => {
@@ -100,13 +107,13 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
     bodyText = bodyText.replace(/#[^#]+#/, '').trim();
     
     // If no body text, use a default message
-    if (!bodyText) {
+    if (!bodyText && layoutMode === 'text') {
       bodyText = '这是一段美好的时光记录。';
     }
     
     return {
       body: bodyText,
-      images: imageUrls, // Use loaded image URLs instead of filenames
+      images: layoutMode === 'photo' ? imageUrls : [],
       date: dateStr,
       activity: activityText,
       domain: '' // Remove domain to keep UI clean
@@ -228,6 +235,18 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
         </button>
       </div>
 
+      <div role="tablist" aria-label="分享排版" className="flex-shrink-0 flex justify-center gap-10 px-4 bg-[#fdfbf7] border-b border-stone-100">
+        {([{ id: 'text', label: '纯文字' }, { id: 'photo', label: '图文' }] as const).map(mode => (
+          <button key={mode.id} role="tab" aria-selected={layoutMode === mode.id}
+            disabled={isExporting || isLoadingImages || (mode.id === 'photo' && imageUrls.length === 0)}
+            onClick={() => setLayoutMode(mode.id)}
+            className={`px-5 py-3 text-sm border-b-2 transition-colors disabled:opacity-30 ${layoutMode === mode.id
+              ? 'border-stone-700 text-stone-900' : 'border-transparent text-stone-400 hover:text-stone-700'}`}>
+            {mode.label}
+          </button>
+        ))}
+      </div>
+
       {/* Preview Area - 预览区域（可滚动） */}
       <div 
         className="flex-1 overflow-y-auto py-8 px-4"
@@ -249,6 +268,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
                 }}
               >
                 <TemplateRenderer 
+                  mode={layoutMode}
                   content={content} 
                   theme={activeTheme} 
                   templateId={activeTemplateId} 
@@ -270,6 +290,9 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
               {SHARE_THEMES.map(theme => (
                 <button
                   key={theme.id}
+                  title={theme.name}
+                  aria-label={theme.name}
+                  disabled={isExporting}
                   onClick={() => setActiveThemeId(theme.id)}
                   className={`flex-1 flex items-center justify-center transition-all ${
                     activeThemeId === theme.id ? 'scale-110' : 'opacity-60 hover:opacity-100'
@@ -292,28 +315,19 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
               <Layout size={14} /> 布局模版
             </div>
             <div className="grid grid-cols-4 gap-2">
-              {[
-                { id: 'magazine-classic', label: '经典' },
-                { id: 'vertical-poetry', label: '古韵' },
-                { id: 'minimal-note', label: '现代' },
-                { id: 'modern-split', label: '分割' },
-                { id: 'film-story', label: '变迁' },
-                { id: 'glass-morphism', label: '玻璃' },
-                ...(imageUrls.length > 1 ? [
-                  { id: 'long-image', label: '无缝长图' },
-                  { id: 'framed-long-image', label: '边框长图' }
-                ] : [])
-              ].map(template => (
+              {availableTemplates.map(template => (
                 <button
                   key={template.id}
-                  onClick={() => setActiveTemplateId(template.id)}
+                  disabled={isExporting}
+                  aria-pressed={activeTemplateId === template.id}
+                  onClick={() => layoutMode === 'text' ? setTextTemplateId(template.id) : setPhotoTemplateId(template.id)}
                   className={`px-2 py-1.5 rounded-full text-[10px] font-medium border transition-all ${
                     activeTemplateId === template.id 
                       ? 'bg-stone-100 border-stone-400 text-stone-900' 
                       : 'border-stone-300 text-stone-600 hover:border-stone-400'
                   }`}
                 >
-                  {template.label}
+                  {template.name}
                 </button>
               ))}
             </div>

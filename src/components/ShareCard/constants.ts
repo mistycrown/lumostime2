@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Separates existing text templates from the editorial photography collection.
  * @updated 2026-10-12: Renames seamless stacking and describes the photo-backed and photo-first framed layouts.
  * @updated 2026-10-12: Adds a framed long-photo layout alongside seamless stacking.
  * @updated 2026-10-12: Registers the full-width stacked photo template for multi-image records.
@@ -74,21 +75,44 @@ export const SHARE_THEMES: ShareTheme[] = [
   },
 ];
 
-export const SHARE_TEMPLATES: ShareTemplate[] = [
+export const TEXT_SHARE_TEMPLATES: ShareTemplate[] = [
   {
     id: 'magazine-classic',
-    name: '经典杂志',
+    name: '经典',
     description: '优雅的居中排版',
   },
   {
     id: 'vertical-poetry',
-    name: '竖排古韵',
+    name: '古韵',
     description: '传统竖排文字',
   },
   {
+    id: 'minimal-note',
+    name: '现代',
+    description: '极简风格',
+  },
+  {
     id: 'modern-split',
-    name: '现代分割',
-    description: '左文右图',
+    name: '分割',
+    description: '分割线与正文排版',
+  },
+  {
+    id: 'film-story',
+    name: '变迁',
+    description: '深色文字卡片',
+  },
+  {
+    id: 'glass-morphism',
+    name: '玻璃',
+    description: '毛玻璃质感',
+  }
+];
+
+export const PHOTO_SHARE_TEMPLATES: ShareTemplate[] = [
+  {
+    id: 'photo-diary',
+    name: '摄影日记',
+    description: '相纸留白与照片下方的日记',
   },
   {
     id: 'film-story',
@@ -96,23 +120,21 @@ export const SHARE_TEMPLATES: ShareTemplate[] = [
     description: '虚化照片背景与深色卡片',
   },
   {
-    id: 'minimal-note',
-    name: '留白便签',
-    description: '极简风格',
-  },
-  {
-    id: 'glass-morphism',
-    name: '磨砂玻璃',
-    description: '毛玻璃质感',
-  },
-  {
     id: 'long-image',
     name: '无缝长图',
     description: '照片原比例纵向拼接',
+    minImages: 2,
   },
   {
     id: 'framed-long-image',
     name: '边框长图',
-    description: '深色边框照片与底部文字排版',
+    description: '拍立得相纸边框与底部文字排版',
+    minImages: 2,
+  },
+  {
+    id: 'film-strip',
+    name: '胶片长图',
+    description: '暗色底片与细小帧号',
+    minImages: 2,
   }
 ];
