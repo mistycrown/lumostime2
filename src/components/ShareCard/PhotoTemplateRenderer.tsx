@@ -3,6 +3,7 @@
  * @input Ordered photos, node-aware notes and selected theme/photo layout
  * @output Photography diary, blurred card, seamless story, paper frames or film strip
  * @pos Component (ShareCard)
+ * @updated 2026-10-12: Adds a single-photo paper layout with a circular portrait, title and centered narrow-column text.
  * @updated 2026-10-12: Uses only an overscanned blurred photo behind film-story, without tint overlays or card shadows.
  * @updated 2026-10-12: Adds photo-first editorial layouts with original ratios and no image-count limit.
  */
@@ -30,6 +31,31 @@ export const PhotoTemplateRenderer: React.FC<ShareTemplateRendererProps> = ({ co
   const photos = content.images.map((image, index) => (
     <img key={index} src={image} alt={`照片 ${index + 1}`} className="block w-full h-auto" />
   ));
+
+  if (templateId === 'circle-note') {
+    return (
+      <div className="w-full p-3" style={{ backgroundColor: theme.primaryColor + '18', color: theme.primaryColor }}>
+        <div className="flex flex-col min-h-[600px] px-8 pt-10 pb-8" style={{ backgroundColor: theme.backgroundColor }}>
+          <div className="mx-auto w-[44%] max-w-[160px] aspect-square overflow-hidden rounded-full shrink-0">
+            <img src={content.images[0]} alt="照片 1" className="block w-full h-full object-cover" />
+          </div>
+          {(content.title || content.activity) && (
+            <h2 className="mt-6 text-center font-serif text-sm font-medium leading-loose tracking-widest">
+              <ShareCardText text={content.title || content.activity} />
+            </h2>
+          )}
+          {content.body && (
+            <p className="mt-5 font-serif text-[13px] leading-[1.9] tracking-[0.04em] text-center whitespace-pre-wrap break-words opacity-80">
+              <ShareCardText text={content.body} />
+            </p>
+          )}
+          <div className="mt-auto pt-10 flex justify-center flex-wrap gap-3 text-[9px] font-mono tracking-widest opacity-40">
+            <span>{content.date}</span><span>LumosTime</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (templateId === 'photo-diary') {
     return (

@@ -1,6 +1,7 @@
 /**
  * @file constants.ts
  * @description Constants for ShareCard themes and templates
+ * @updated 2026-10-12: Registers the single-photo circular portrait and centered book-page layout.
  * @updated 2026-10-12: Separates existing text templates from the editorial photography collection.
  * @updated 2026-10-12: Renames seamless stacking and describes the photo-backed and photo-first framed layouts.
  * @updated 2026-10-12: Adds a framed long-photo layout alongside seamless stacking.
@@ -118,6 +119,13 @@ export const PHOTO_SHARE_TEMPLATES: ShareTemplate[] = [
     id: 'film-story',
     name: '变迁',
     description: '虚化照片背景与深色卡片',
+  },
+  {
+    id: 'circle-note',
+    name: '圆影书页',
+    description: '圆形照片与居中的书页文字',
+    minImages: 1,
+    maxImages: 1,
   },
   {
     id: 'long-image',

@@ -1,6 +1,7 @@
 /**
  * @file ShareView.tsx
  * @description Share card generation view for exporting time records as beautiful images
+ * @updated 2026-10-12: Offers the circular book-page template only for one usable photo and passes through record titles.
  * @updated 2026-10-12: Adds independent text/photo entrances, template selections and photo-first defaults.
  * @updated 2026-10-12: Labels seamless photo stacking as 无缝长图.
  * @updated 2026-10-12: Offers both seamless and framed long-image layouts in the second selector row.
@@ -45,7 +46,8 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
   const activeTheme = SHARE_THEMES.find(t => t.id === activeThemeId) || SHARE_THEMES[0];
   const templates = layoutMode === 'text' ? TEXT_SHARE_TEMPLATES : PHOTO_SHARE_TEMPLATES;
   const activeTemplateId = layoutMode === 'text' ? textTemplateId : photoTemplateId;
-  const availableTemplates = templates.filter(template => imageUrls.length >= (template.minImages || 0));
+  const availableTemplates = templates.filter(template => imageUrls.length >= (template.minImages || 0)
+    && imageUrls.length <= (template.maxImages ?? Infinity));
 
   // Load image URLs
   useEffect(() => {
@@ -81,7 +83,9 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
     if (isLoadingImages) return;
     if (imageUrls.length === 0) setLayoutMode('text');
     const selected = PHOTO_SHARE_TEMPLATES.find(template => template.id === photoTemplateId);
-    if (imageUrls.length < (selected?.minImages || 0)) setPhotoTemplateId(PHOTO_SHARE_TEMPLATES[0].id);
+    if (imageUrls.length < (selected?.minImages || 0) || imageUrls.length > (selected?.maxImages ?? Infinity)) {
+      setPhotoTemplateId(PHOTO_SHARE_TEMPLATES[0].id);
+    }
   }, [imageUrls.length, isLoadingImages, photoTemplateId]);
 
   // Convert Log to ShareCardContent
@@ -112,6 +116,7 @@ export const ShareView: React.FC<ShareViewProps> = ({ log, onBack, onToast }) =>
     }
     
     return {
+      title: log.title?.trim() || log.note?.match(/#([^#]+)#/)?.[1].trim() || '',
       body: bodyText,
       images: layoutMode === 'photo' ? imageUrls : [],
       date: dateStr,

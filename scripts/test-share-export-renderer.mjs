@@ -3,6 +3,7 @@
  * @input Actual ShareView, production CSS, synthetic PNG/JPEG/WebP Blob images and isolated storage adapters
  * @output Renderer assertions and Chinese-font-verified preview/export PNGs in a disposable directory
  * @pos Test Runner
+ * @updated 2026-10-12: Verifies single-photo book-page availability, title/node text and circular photo exports.
  * @updated 2026-10-12: Checks that film-story uses an untinted blurred photo without shadows or darkened export corners.
  * @updated 2026-10-12: Verifies independent text/photo entrances, paper/film layouts and every mode's actual export.
  * @updated 2026-10-12: Checks deepened palette colors, film-story blur/no-image exports and photo-first framed layout.
@@ -61,6 +62,7 @@ async function run() {
   await mount([], 'empty'); check(!button('无缝长图') && !button('边框长图'), 'Long-image mode appears without photos');
   check(button('纯文字').getAttribute('aria-selected') === 'true' && button('图文').disabled, 'Empty record does not enter text mode');
   check(button('经典') && !button('摄影日记'), 'Text mode contains photo templates');
+  check(!button('圆影书页'), 'Single-photo template appears without photos');
   button('变迁').click(); await wait();
   const themeButtons = [...document.querySelector('section').querySelectorAll('button')];
   const filmColors = new Set();
@@ -101,6 +103,35 @@ async function run() {
   check(button('古韵').getAttribute('aria-pressed') === 'true', 'Text template choice was not preserved');
   button('图文').click(); await wait();
   passed.push('Text and photo entrances isolate their templates/photos and preserve independent selections');
+  check(button('圆影书页'), 'Single photo does not offer the circular book page');
+  const bookNote = '#思考与心智模型#和[[朋友丨小林]]在［［杭州］］散步。\\n停下来，看见光落在树叶上的样子。\\n\\n把生活里的片刻写下来，也把那些细小的感受留下来。\\n一张照片，一页文字，慢慢读，也慢慢想。';
+  await mount(photos.slice(0,1), 'single', true, bookNote);
+  button('圆影书页').click(); await wait();
+  const circleImage = document.querySelector('img[alt="照片 1"]');
+  const circleFrame = circleImage.parentElement;
+  const bookPage = circleFrame.parentElement;
+  const bookCard = bookPage.parentElement;
+  const circleBounds = circleImage.getBoundingClientRect();
+  check(Math.abs(circleBounds.width - circleBounds.height) < 1 && parseFloat(getComputedStyle(circleFrame).borderRadius) >= circleBounds.width / 2, 'Photo is not circular: ' + JSON.stringify(circleBounds));
+  check(getComputedStyle(circleImage).objectFit === 'cover', 'Circular photo is stretched');
+  check(bookPage.querySelector('h2').textContent === '思考与心智模型', 'Record title is missing');
+  check(getComputedStyle(bookPage.querySelector('p')).textAlign === 'center' && bookPage.querySelectorAll('span.underline').length === 2, 'Book-page typography or node text is missing');
+  await capture('circle-note-mobile'); toast = null; downloaded = null;
+  document.querySelector('button[title="保存"]').click();
+  await until(() => { if(toast?.type === 'error') throw new Error('Book page export failed: ' + toast.message); return downloaded && toast?.type === 'success'; }, 'Book page export failed');
+  const circleExport = new Image(); circleExport.src = downloaded; await circleExport.decode();
+  const circleCanvas = document.createElement('canvas'); circleCanvas.width = circleExport.naturalWidth; circleCanvas.height = circleExport.naturalHeight;
+  const circleContext = circleCanvas.getContext('2d'); circleContext.drawImage(circleExport, 0, 0);
+  const bookBounds = bookCard.getBoundingClientRect();
+  const circlePixel = circleContext.getImageData(Math.round((circleBounds.left - bookBounds.left + circleBounds.width / 2) * 2), Math.round((circleBounds.top - bookBounds.top + circleBounds.height / 2) * 2), 1, 1).data;
+  check([245,234,216].every((value, channel) => Math.abs(circlePixel[channel] - value) < 5), 'Circular export lost the photo');
+  const maskedPixel = circleContext.getImageData(Math.round((circleBounds.left - bookBounds.left + 1) * 2), Math.round((circleBounds.top - bookBounds.top + 1) * 2), 1, 1).data;
+  check([245,245,240].every((value, channel) => Math.abs(maskedPixel[channel] - value) < 5), 'Circular clipping was lost in the PNG');
+  window.__circleNoteExport = downloaded;
+  await mount(photos, 'single');
+  check(!button('圆影书页') && button('摄影日记').getAttribute('aria-pressed') === 'true', 'Adding photos keeps a single-image layout selected');
+  await mount(photos.slice(0,1), 'single');
+  passed.push('Single-photo book page renders its title/node text, exports a circular crop and falls back when more photos are added');
   button('变迁').click(); await wait();
   await Promise.all([...document.images].map(image => image.decode()));
   const filmBackground = document.querySelector('img[aria-hidden="true"]');
@@ -137,6 +168,7 @@ async function run() {
   passed.push('Photo-only records keep their captions empty while text mode retains its existing fallback');
   await mount([photos[0], 'missing'], 'missing'); check(!button('无缝长图') && !button('边框长图'), 'Unavailable image incorrectly enables long-image mode');
   await mount(photos, 'multiple'); check(button('无缝长图') && button('边框长图'), 'Multi-image record lacks long-image modes');
+  check(!button('圆影书页'), 'Single-photo book page appears in multi-image mode');
   button('无缝长图').click(); await wait();
   const images = [...document.querySelectorAll('img[alt^="照片"]')];
   check(images.length === 3 && images.every((image, index) => image.src === photos[index]), 'Long-image mode lost/reordered photos');
@@ -337,7 +369,7 @@ app.whenReady().then(async () => {
   if(exported) await fs.writeFile(path.join(__dirname, 'long-image-export.png'), Buffer.from(exported.split(',')[1], 'base64'));
   const framedExport = await window.webContents.executeJavaScript('window.__framedLongImageExport');
   if(framedExport) await fs.writeFile(path.join(__dirname, 'framed-long-image-export.png'), Buffer.from(framedExport.split(',')[1], 'base64'));
-  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export'], ['__diaryExport', 'photo-diary-export'], ['__filmStripExport', 'film-strip-export']]) {
+  for (const [key, name] of [['__filmTextExport', 'film-story-no-image-export'], ['__filmPhotoExport', 'film-story-photo-export'], ['__diaryExport', 'photo-diary-export'], ['__filmStripExport', 'film-strip-export'], ['__circleNoteExport', 'circle-note-export']]) {
     const exported = await window.webContents.executeJavaScript('window.' + key);
     if(exported) await fs.writeFile(path.join(__dirname, name + '.png'), Buffer.from(exported.split(',')[1], 'base64'));
   }
