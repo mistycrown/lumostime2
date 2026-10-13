@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-13: Uses native widget restore with legacy migration and live preference mirroring.
  * @updated 2026-10-07: Includes node categories in exports and data reset flows.
  * @updated 2026-10-06: Mounts node navigation and includes metadata in backup and reset flows.
  * @updated 2026-10-03: Runs Feishu synchronization in the main app and marks dataset resets as replacements.
@@ -121,7 +122,7 @@ import { assistantBackupService } from './services/assistantBackupService';
 import { appearanceBackupService } from './services/appearanceBackupService';
 import { preferencesBackupService } from './services/preferencesBackupService';
 import { customColorGroupService } from './services/customColorGroupService';
-import { getDesktopWidgetType, loadEnabledDesktopWidgetTypes } from './services/desktopWidgetService';
+import { DESKTOP_WIDGET_PREFERENCES_CHANGED_EVENT, getDesktopWidgetType, loadEnabledDesktopWidgetTypes, saveEnabledDesktopWidgetTypes, type DesktopWidgetStartupType } from './services/desktopWidgetService';
 import { ShortcutWidgetAction } from './services/widgetShortcutService';
 import { loadWidgetTemplatesFromStorage } from './services/widgetService';
 import { splitLogByDays } from './utils/logUtils';
@@ -916,33 +917,22 @@ const AppContent: React.FC = () => {
   ]);
 
   useEffect(() => {
-    if (!window.desktopWidget || hasRestoredDesktopWidgetsRef.current || desktopWindowType !== null) {
+    if (!window.desktopWidget || desktopWindowType !== null) {
       return;
     }
 
-    hasRestoredDesktopWidgetsRef.current = true;
-
-    loadEnabledDesktopWidgetTypes(localStorage).forEach((widgetType) => {
-      if (widgetType === 'today') {
-        window.desktopWidget?.open();
-        return;
-      }
-      if (widgetType === 'month') {
-        window.desktopWidget?.openMonth();
-        return;
-      }
-      if (widgetType === 'quick') {
-        window.desktopWidget?.openQuick?.();
-        return;
-      }
-      if (widgetType === 'timer') {
-        window.desktopWidget?.openTimer?.();
-        return;
-      }
-      if (widgetType === 'ai') {
-        window.desktopWidget?.openAI?.();
-      }
-    });
+    const mirrorPreferences = (types: DesktopWidgetStartupType[]) => {
+      saveEnabledDesktopWidgetTypes(types, localStorage);
+      window.dispatchEvent(new Event(DESKTOP_WIDGET_PREFERENCES_CHANGED_EVENT));
+    };
+    const unsubscribe = window.desktopWidget.onStartupTypesChanged(mirrorPreferences);
+    if (!hasRestoredDesktopWidgetsRef.current) {
+      hasRestoredDesktopWidgetsRef.current = true;
+      window.desktopWidget.restore(loadEnabledDesktopWidgetTypes(localStorage))
+        .then(mirrorPreferences)
+        .catch((error) => console.error('[DesktopWidget] Failed to restore native widgets', error));
+    }
+    return unsubscribe;
   }, [desktopWindowType]);
 
   useEffect(() => {

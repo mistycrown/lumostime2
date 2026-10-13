@@ -4,6 +4,7 @@
  * @output Window Management
  * @pos Electron Main
  * @description Entry point for the Electron application. Handles main-window and desktop-widget creation, lifecycle events, and inter-process communication (IPC).
+ * @updated 2026-10-13: Restores native widget selections/layouts and reads effective Windows autostart approval.
  * @updated 2026-10-02: Added cookie-protected unified Feishu OAuth service requests for the main renderer.
  * @updated 2026-06-14: Changed Windows login-item startup to open the main renderer instead of stopping in tray-only mode, so data hydration and desktop widgets initialize immediately.
  * @updated 2026-05-19: Added blur event handler to AI widget window so it auto-docks to edge when the window loses focus.
@@ -31,6 +32,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFeishuConnection } from './feishuConnection';
 import { createPersonalFeishuExecutor } from './feishuPersonalConnection';
+import { DesktopWidgetStateStore, type DesktopWidgetStartupType, type PersistedWidgetWindowState } from './desktopWidgetState';
+import { buildLoginItemSettings, isLoginItemEnabled } from './loginItemSettings';
+import { restoreWidgetBounds } from './widgetWindowBounds';
 
 // Personal Feishu connections execute in the main process with encrypted local persistence.
 
@@ -49,15 +53,6 @@ type DesktopTodoQuickEditorPayload = {
 };
 
 type DesktopAIWidgetHiddenEdge = 'left' | 'right';
-
-type PersistedWidgetWindowState = {
-  bounds?: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-};
 
 type PersistedAIWidgetWindowState = PersistedWidgetWindowState & {
   hiddenToEdge?: boolean;
@@ -114,11 +109,6 @@ const TODO_QUICK_EDITOR_HEIGHT = 300;
 const TODO_QUICK_EDITOR_OFFSET_PX = 12;
 const TODO_QUICK_EDITOR_BLUR_GUARD_MS = 250;
 const TODO_QUICK_EDITOR_HIDE_DELAY_MS = 120;
-const WIDGET_STATE_FILENAME = 'desktop-widget-state.json';
-const MONTH_WIDGET_STATE_FILENAME = 'desktop-month-widget-state.json';
-const QUICK_WIDGET_STATE_FILENAME = 'desktop-quick-widget-state.json';
-const TIMER_WIDGET_STATE_FILENAME = 'desktop-timer-widget-state.json';
-const AI_WIDGET_STATE_FILENAME = 'desktop-ai-widget-state.json';
 const DEV_USER_DATA_DIRECTORY_NAME = 'LumosTime Dev';
 const LOGIN_ITEM_STARTUP_ARG = '--startup';
 const DEV_SERVER_LOAD_RETRY_DELAY_MS = 350;
@@ -176,11 +166,9 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html');
 
 const getIconPath = () => path.join(process.env.VITE_PUBLIC || '', 'icon.ico');
 
-const getWidgetStatePath = () => path.join(app.getPath('userData'), WIDGET_STATE_FILENAME);
-const getMonthWidgetStatePath = () => path.join(app.getPath('userData'), MONTH_WIDGET_STATE_FILENAME);
-const getQuickWidgetStatePath = () => path.join(app.getPath('userData'), QUICK_WIDGET_STATE_FILENAME);
-const getTimerWidgetStatePath = () => path.join(app.getPath('userData'), TIMER_WIDGET_STATE_FILENAME);
-const getAIWidgetStatePath = () => path.join(app.getPath('userData'), AI_WIDGET_STATE_FILENAME);
+const widgetStateStore = new DesktopWidgetStateStore(app.getPath('userData'));
+const pendingWidgetOpens = new Map<DesktopWidgetStartupType, Promise<BrowserWindow>>();
+const cancelledWidgetOpens = new Set<DesktopWidgetStartupType>();
 const didLaunchFromLoginItem = process.argv.includes(LOGIN_ITEM_STARTUP_ARG);
 
 const buildRendererUrl = (windowType?: string): string => {
@@ -330,7 +318,7 @@ const getLoginItemArgs = () => {
   if (process.defaultApp) {
     const entryPoint = process.argv[1];
     if (entryPoint) {
-      return [path.resolve(entryPoint), LOGIN_ITEM_STARTUP_ARG];
+      return [`"${path.resolve(entryPoint)}"`, LOGIN_ITEM_STARTUP_ARG];
     }
   }
 
@@ -348,7 +336,7 @@ const isOpenAtLoginEnabled = () => {
   }
 
   try {
-    return app.getLoginItemSettings(getLoginItemQuery()).openAtLogin;
+    return isLoginItemEnabled(app.getLoginItemSettings(getLoginItemQuery()), app.getName());
   } catch (error) {
     console.error('[Electron] Failed to read login item settings', error);
     return false;
@@ -370,17 +358,14 @@ const buildTrayMenu = () => {
       label: '开机自启动',
       type: 'checkbox',
       checked: isOpenAtLoginEnabled(),
+      enabled: app.isPackaged && !IS_DEV,
       click: (menuItem) => {
         if (process.platform !== 'win32') {
           return;
         }
 
         try {
-          app.setLoginItemSettings({
-            openAtLogin: menuItem.checked,
-            path: process.execPath,
-            args: getLoginItemArgs()
-          });
+          app.setLoginItemSettings(buildLoginItemSettings(menuItem.checked, getLoginItemQuery(), app.getName()));
         } catch (error) {
           console.error('[Electron] Failed to update login item settings', error);
         }
@@ -507,15 +492,7 @@ const clampMonthWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) =
 };
 
 const readMonthWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
-  try {
-    const raw = await fs.readFile(getMonthWidgetStatePath(), 'utf-8');
-    return JSON.parse(raw) as PersistedWidgetWindowState;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error('[Electron] Failed to read desktop month widget state', error);
-    }
-    return {};
-  }
+  return widgetStateStore.read('month');
 };
 
 const saveMonthWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
@@ -525,26 +502,14 @@ const saveMonthWidgetWindowState = async (targetWindow: BrowserWindow | null) =>
 
   try {
     const bounds = clampMonthWidgetBounds(targetWindow.getBounds());
-    await fs.writeFile(
-      getMonthWidgetStatePath(),
-      JSON.stringify({ bounds }, null, 2),
-      'utf-8'
-    );
+    widgetStateStore.update('month', { bounds });
   } catch (error) {
     console.error('[Electron] Failed to save desktop month widget state', error);
   }
 };
 
 const readWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
-  try {
-    const raw = await fs.readFile(getWidgetStatePath(), 'utf-8');
-    return JSON.parse(raw) as PersistedWidgetWindowState;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error('[Electron] Failed to read desktop widget state', error);
-    }
-    return {};
-  }
+  return widgetStateStore.read('today');
 };
 
 const saveWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
@@ -554,26 +519,14 @@ const saveWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
 
   try {
     const bounds = clampWidgetBounds(targetWindow.getBounds());
-    await fs.writeFile(
-      getWidgetStatePath(),
-      JSON.stringify({ bounds }, null, 2),
-      'utf-8'
-    );
+    widgetStateStore.update('today', { bounds });
   } catch (error) {
     console.error('[Electron] Failed to save desktop widget state', error);
   }
 };
 
 const readQuickWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
-  try {
-    const raw = await fs.readFile(getQuickWidgetStatePath(), 'utf-8');
-    return JSON.parse(raw) as PersistedWidgetWindowState;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error('[Electron] Failed to read desktop quick widget state', error);
-    }
-    return {};
-  }
+  return widgetStateStore.read('quick');
 };
 
 const saveQuickWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
@@ -583,11 +536,7 @@ const saveQuickWidgetWindowState = async (targetWindow: BrowserWindow | null) =>
 
   try {
     const bounds = clampWidgetBounds(targetWindow.getBounds());
-    await fs.writeFile(
-      getQuickWidgetStatePath(),
-      JSON.stringify({ bounds }, null, 2),
-      'utf-8'
-    );
+    widgetStateStore.update('quick', { bounds });
   } catch (error) {
     console.error('[Electron] Failed to save desktop quick widget state', error);
   }
@@ -628,15 +577,7 @@ const clampTimerWidgetBounds = (bounds?: PersistedWidgetWindowState['bounds']) =
 };
 
 const readTimerWidgetWindowState = async (): Promise<PersistedWidgetWindowState> => {
-  try {
-    const raw = await fs.readFile(getTimerWidgetStatePath(), 'utf-8');
-    return JSON.parse(raw) as PersistedWidgetWindowState;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error('[Electron] Failed to read desktop timer widget state', error);
-    }
-    return {};
-  }
+  return widgetStateStore.read('timer');
 };
 
 const saveTimerWidgetWindowState = async (targetWindow: BrowserWindow | null) => {
@@ -646,11 +587,7 @@ const saveTimerWidgetWindowState = async (targetWindow: BrowserWindow | null) =>
 
   try {
     const bounds = clampTimerWidgetBounds(targetWindow.getBounds());
-    await fs.writeFile(
-      getTimerWidgetStatePath(),
-      JSON.stringify({ bounds }, null, 2),
-      'utf-8'
-    );
+    widgetStateStore.update('timer', { bounds });
   } catch (error) {
     console.error('[Electron] Failed to save desktop timer widget state', error);
   }
@@ -750,29 +687,17 @@ const isCursorInsideWindowBounds = (targetWindow: BrowserWindow | null): boolean
 };
 
 const readAIWidgetWindowState = async (): Promise<PersistedAIWidgetWindowState> => {
-  try {
-    const raw = await fs.readFile(getAIWidgetStatePath(), 'utf-8');
-    return JSON.parse(raw) as PersistedAIWidgetWindowState;
-  } catch (error: any) {
-    if (error?.code !== 'ENOENT') {
-      console.error('[Electron] Failed to read desktop AI widget state', error);
-    }
-    return {};
-  }
+  return widgetStateStore.read('ai');
 };
 
 const saveAIWidgetWindowState = async () => {
   try {
     const bounds = clampAIWidgetBounds(aiWidgetExpandedBounds || aiWidgetWindow?.getBounds());
-    await fs.writeFile(
-      getAIWidgetStatePath(),
-      JSON.stringify({
-        bounds,
-        hiddenToEdge: isAIWidgetHiddenToEdge,
-        hiddenEdge: aiWidgetHiddenEdge
-      }, null, 2),
-      'utf-8'
-    );
+    widgetStateStore.update('ai', {
+      bounds,
+      hiddenToEdge: isAIWidgetHiddenToEdge,
+      hiddenEdge: aiWidgetHiddenEdge
+    });
   } catch (error) {
     console.error('[Electron] Failed to save desktop AI widget state', error);
   }
@@ -988,6 +913,88 @@ const focusMainWindow = async () => {
   return targetWindow;
 };
 
+const publishDesktopWidgetPreferences = () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('desktop-widget:startup-types-changed', widgetStateStore.getEnabledTypes());
+  }
+};
+
+const rememberDesktopWidget = (type: DesktopWidgetStartupType, targetWindow: BrowserWindow) => {
+  const setEnabled = (enabled: boolean) => {
+    try {
+      widgetStateStore.update(type, { enabled });
+      publishDesktopWidgetPreferences();
+    } catch (error) {
+      logAsyncTaskError(`save ${type} widget startup preference`, error);
+    }
+  };
+  setEnabled(true);
+  targetWindow.on('close', () => {
+    if (!isQuitting) {
+      setEnabled(false);
+    }
+  });
+};
+
+const getDesktopWidgetWindow = (type: DesktopWidgetStartupType) => ({
+  today: widgetWindow,
+  month: monthWidgetWindow,
+  quick: quickWidgetWindow,
+  timer: timerWidgetWindow,
+  ai: aiWidgetWindow
+})[type];
+
+const openDesktopWidget = (type: DesktopWidgetStartupType): Promise<BrowserWindow> => {
+  const pending = pendingWidgetOpens.get(type);
+  if (pending) {
+    return pending;
+  }
+  const createWindow = {
+    today: createWidgetWindow,
+    month: createMonthWidgetWindow,
+    quick: createQuickWidgetWindow,
+    timer: createTimerWidgetWindow,
+    ai: createAIWidgetWindow
+  }[type];
+  const opening = createWindow().then((targetWindow) => {
+    if (cancelledWidgetOpens.has(type) && targetWindow && !targetWindow.isDestroyed()) {
+      targetWindow.close();
+    }
+    return targetWindow;
+  }).finally(() => {
+    pendingWidgetOpens.delete(type);
+    cancelledWidgetOpens.delete(type);
+  });
+  pendingWidgetOpens.set(type, opening);
+  return opening;
+};
+
+const closeDesktopWidget = (type: DesktopWidgetStartupType) => {
+  if (pendingWidgetOpens.has(type)) {
+    cancelledWidgetOpens.add(type);
+  }
+  try {
+    widgetStateStore.update(type, { enabled: false });
+    publishDesktopWidgetPreferences();
+  } catch (error) {
+    logAsyncTaskError(`disable ${type} widget startup preference`, error);
+  }
+  getDesktopWidgetWindow(type)?.close();
+};
+
+const restoreDesktopWidgets = async (legacyTypes?: unknown) => {
+  widgetStateStore.migrateLegacyPreferences(legacyTypes);
+  await Promise.all(widgetStateStore.getEnabledTypes().map((type) => {
+    const existingWindow = getDesktopWidgetWindow(type);
+    // Restoring a second time must not focus existing windows or expand a docked AI window.
+    if (existingWindow && !existingWindow.isDestroyed()) {
+      return Promise.resolve(existingWindow);
+    }
+    return openDesktopWidget(type);
+  }));
+  return widgetStateStore.getEnabledTypes();
+};
+
 async function createWidgetWindow() {
   if (widgetWindow && !widgetWindow.isDestroyed()) {
     focusWindow(widgetWindow);
@@ -1019,10 +1026,11 @@ async function createWidgetWindow() {
     }
   });
 
+  restoreWidgetBounds(widgetWindow, widgetBounds);
   widgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(widgetWindow);
   attachWidgetShowFallback(widgetWindow, 'today');
-  await loadWindowUrl(widgetWindow, buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE), 'today widget');
+  rememberDesktopWidget('today', widgetWindow);
 
   widgetWindow.on('move', () => {
     runInBackground('save today widget state after move', saveWidgetWindowState(widgetWindow));
@@ -1036,6 +1044,9 @@ async function createWidgetWindow() {
   widgetWindow.on('closed', () => {
     widgetWindow = null;
   });
+
+  await saveWidgetWindowState(widgetWindow);
+  await loadWindowUrl(widgetWindow, buildRendererUrl(DESKTOP_WIDGET_QUERY_VALUE), 'today widget');
 
   return widgetWindow;
 }
@@ -1071,10 +1082,11 @@ async function createMonthWidgetWindow() {
     }
   });
 
+  restoreWidgetBounds(monthWidgetWindow, widgetBounds);
   monthWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(monthWidgetWindow);
   attachWidgetShowFallback(monthWidgetWindow, 'month');
-  await loadWindowUrl(monthWidgetWindow, buildRendererUrl(DESKTOP_MONTH_WIDGET_QUERY_VALUE), 'month widget');
+  rememberDesktopWidget('month', monthWidgetWindow);
 
   monthWidgetWindow.on('move', () => {
     runInBackground('save month widget state after move', saveMonthWidgetWindowState(monthWidgetWindow));
@@ -1088,6 +1100,9 @@ async function createMonthWidgetWindow() {
   monthWidgetWindow.on('closed', () => {
     monthWidgetWindow = null;
   });
+
+  await saveMonthWidgetWindowState(monthWidgetWindow);
+  await loadWindowUrl(monthWidgetWindow, buildRendererUrl(DESKTOP_MONTH_WIDGET_QUERY_VALUE), 'month widget');
 
   return monthWidgetWindow;
 }
@@ -1123,10 +1138,11 @@ async function createQuickWidgetWindow() {
     }
   });
 
+  restoreWidgetBounds(quickWidgetWindow, widgetBounds);
   quickWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(quickWidgetWindow);
   attachWidgetShowFallback(quickWidgetWindow, 'quick');
-  await loadWindowUrl(quickWidgetWindow, buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE), 'quick widget');
+  rememberDesktopWidget('quick', quickWidgetWindow);
 
   quickWidgetWindow.on('move', () => {
     runInBackground('save quick widget state after move', saveQuickWidgetWindowState(quickWidgetWindow));
@@ -1140,6 +1156,9 @@ async function createQuickWidgetWindow() {
   quickWidgetWindow.on('closed', () => {
     quickWidgetWindow = null;
   });
+
+  await saveQuickWidgetWindowState(quickWidgetWindow);
+  await loadWindowUrl(quickWidgetWindow, buildRendererUrl(DESKTOP_QUICK_WIDGET_QUERY_VALUE), 'quick widget');
 
   return quickWidgetWindow;
 }
@@ -1176,10 +1195,11 @@ async function createTimerWidgetWindow() {
     }
   });
 
+  restoreWidgetBounds(timerWidgetWindow, widgetBounds);
   timerWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(timerWidgetWindow);
   attachWidgetShowFallback(timerWidgetWindow, 'timer');
-  await loadWindowUrl(timerWidgetWindow, buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE), 'timer widget');
+  rememberDesktopWidget('timer', timerWidgetWindow);
 
   timerWidgetWindow.on('move', () => {
     runInBackground('save timer widget state after move', saveTimerWidgetWindowState(timerWidgetWindow));
@@ -1190,6 +1210,9 @@ async function createTimerWidgetWindow() {
   timerWidgetWindow.on('closed', () => {
     timerWidgetWindow = null;
   });
+
+  await saveTimerWidgetWindowState(timerWidgetWindow);
+  await loadWindowUrl(timerWidgetWindow, buildRendererUrl(DESKTOP_TIMER_WIDGET_QUERY_VALUE), 'timer widget');
 
   return timerWidgetWindow;
 }
@@ -1238,14 +1261,15 @@ async function createAIWidgetWindow() {
     }
   });
 
+  restoreWidgetBounds(aiWidgetWindow, widgetBounds);
   aiWidgetWindow.setMenuBarVisibility(false);
   configureExternalLinks(aiWidgetWindow);
   attachWidgetShowFallback(aiWidgetWindow, 'ai');
+  rememberDesktopWidget('ai', aiWidgetWindow);
   aiWidgetWindow.webContents.once('did-finish-load', () => {
     isAIWidgetReady = true;
     publishAIWidgetWindowState();
   });
-  await loadWindowUrl(aiWidgetWindow, buildRendererUrl(DESKTOP_AI_WIDGET_QUERY_VALUE), 'ai widget');
 
   aiWidgetWindow.on('move', () => {
     if (isAIWidgetHiddenToEdge) {
@@ -1289,6 +1313,9 @@ async function createAIWidgetWindow() {
     isAIWidgetPointerInside = false;
     isAIWidgetResizing = false;
   });
+
+  await saveAIWidgetWindowState();
+  await loadWindowUrl(aiWidgetWindow, buildRendererUrl(DESKTOP_AI_WIDGET_QUERY_VALUE), 'ai widget');
 
   return aiWidgetWindow;
 }
@@ -1469,6 +1496,14 @@ app.whenReady().then(() => {
   }
 
   runInBackground('create main window on app ready', createMainWindow());
+  runInBackground('restore native desktop widget windows on app ready', restoreDesktopWidgets());
+});
+
+app.on('browser-window-created', (_event, targetWindow) => {
+  // Windows shutdown does not emit before-quit; preserve pinned windows on logout too.
+  targetWindow.on('query-session-end', () => {
+    isQuitting = true;
+  });
 });
 
 app.on('before-quit', () => {
@@ -1520,46 +1555,53 @@ ipcMain.handle('open-win', async (_, arg) => {
 });
 
 ipcMain.on('desktop-widget:open', () => {
-  runInBackground('open today widget window', createWidgetWindow());
+  runInBackground('open today widget window', openDesktopWidget('today'));
 });
 
 ipcMain.on('desktop-widget:close', () => {
-  widgetWindow?.close();
+  closeDesktopWidget('today');
   closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-month', () => {
-  runInBackground('open month widget window', createMonthWidgetWindow());
+  runInBackground('open month widget window', openDesktopWidget('month'));
 });
 
 ipcMain.on('desktop-widget:close-month', () => {
-  monthWidgetWindow?.close();
+  closeDesktopWidget('month');
   closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-quick', () => {
-  runInBackground('open quick widget window', createQuickWidgetWindow());
+  runInBackground('open quick widget window', openDesktopWidget('quick'));
 });
 
 ipcMain.on('desktop-widget:close-quick', () => {
-  quickWidgetWindow?.close();
+  closeDesktopWidget('quick');
   closeTodoQuickEditorWindow();
 });
 
 ipcMain.on('desktop-widget:open-timer', () => {
-  runInBackground('open timer widget window', createTimerWidgetWindow());
+  runInBackground('open timer widget window', openDesktopWidget('timer'));
 });
 
 ipcMain.on('desktop-widget:close-timer', () => {
-  timerWidgetWindow?.close();
+  closeDesktopWidget('timer');
 });
 
 ipcMain.on('desktop-widget:open-ai', () => {
-  runInBackground('open ai widget window', createAIWidgetWindow());
+  runInBackground('open ai widget window', openDesktopWidget('ai'));
 });
 
 ipcMain.on('desktop-widget:close-ai', () => {
-  aiWidgetWindow?.close();
+  closeDesktopWidget('ai');
+});
+
+ipcMain.handle('desktop-widget:restore', (event, legacyTypes: unknown) => {
+  if (event.sender !== mainWindow?.webContents) {
+    return widgetStateStore.getEnabledTypes();
+  }
+  return restoreDesktopWidgets(legacyTypes);
 });
 
 ipcMain.on('desktop-widget:hide-ai-to-edge', () => {

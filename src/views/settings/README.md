@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-13: `DesktopWidgetSettingsView` refreshes its toggles when native widget restore or close broadcasts updated preferences.
+
 Update 2026-10-11: `NodeManageView` adds “新增节点” below each category, including empty categories and 未分类. Names edit inline, save into that category, and reject invalid/duplicate names. Cancel, Escape and hardware back dismiss the draft; successful creation clears search so the new capsule is visible.
 
 Update 2026-10-11: `NodeManageView` adds category title edit/delete buttons; selected-node controls retain only classification and ordering. Category names edit inline; destructive actions require confirmation. `NodesSettingsView` resets a removed category filter to all categories. Node deletion is available in the details 细节 tab, discarding pending biography/AI edits before removal.

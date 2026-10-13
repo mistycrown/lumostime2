@@ -4,6 +4,7 @@
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
  * @description Verifies the desktop today-widget snapshot keeps pinned and today-visible todos together while still surfacing overdue items outside the shared today bucket.
+ * @updated 2026-10-13: Checks native startup preference mirroring clears stale renderer toggles.
  * @updated 2026-05-18: Added startup-toggle coverage for the desktop AI widget route so launch-time restore parsing now includes the Electron AI chat window.
  * @updated 2026-05-18: Added regression coverage for subtask parent metadata in today-widget snapshot items so compact Electron views can rebuild one-level hierarchy locally.
  * @updated 2026-05-17: 扩展了单元测试，补全了计时器小组件（timer widget）的快照构建 buildDesktopTimerWidgetSnapshot 和 loadEnabledDesktopWidgetTypes 在启用 timer 时的测试覆盖。
@@ -15,10 +16,22 @@ import type { Category, TodoItem, ActiveSession } from '../types';
 import {
   buildDesktopTodayWidgetSnapshot,
   loadEnabledDesktopWidgetTypes,
+  saveEnabledDesktopWidgetTypes,
   buildDesktopTimerWidgetSnapshot
 } from './desktopWidgetService';
 
 const REFERENCE_DATE = new Date('2026-05-17T09:00:00');
+
+it('mirrors native enabled types and clears stale renderer startup selections', () => {
+  const values = new Map<string, string>();
+  const storageLike = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value); }
+  };
+  saveEnabledDesktopWidgetTypes(['today', 'month', 'quick', 'timer', 'ai'], storageLike);
+  saveEnabledDesktopWidgetTypes(['quick', 'ai'], storageLike);
+  expect(loadEnabledDesktopWidgetTypes(storageLike)).toEqual(['quick', 'ai']);
+});
 
 const categories: Category[] = [
   {

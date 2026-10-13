@@ -4,6 +4,7 @@
  * @output PC端小组件设置页面，含今日小组件、月历小组件、小事小组件与计时器小组件开关
  * @pos View (Settings Subpage)
  * @description 桌面小组件的PC端控制台，在此管理和触发小组件的呼起、配置保存与环境提示。
+ * @updated 2026-10-13: Refreshes toggles when a native widget closes or restores.
  * @updated 2026-05-18: Added a desktop AI widget startup toggle wired to the Electron quick-chat window so users can keep an always-on-top AI companion beside the existing desktop widgets.
  * @updated 2026-05-17: 扩展了小组件控制中心，新增“桌面计时器小组件”开关选项与触发器支持，实现独立的 IPC 呼起与收起桌面计时器小组件（timer widget）。
  * @updated 2026-05-17: 改为复用共享的桌面小组件启动偏好键名，确保设置页与应用启动恢复逻辑读写同一份状态。
@@ -14,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, LayoutGrid, Monitor, Calendar, ListTodo, Timer, MessageSquare } from 'lucide-react';
 import {
   DESKTOP_WIDGET_AI_STORAGE_KEY,
+  DESKTOP_WIDGET_PREFERENCES_CHANGED_EVENT,
   DESKTOP_WIDGET_MONTH_STORAGE_KEY,
   DESKTOP_WIDGET_QUICK_STORAGE_KEY,
   DESKTOP_WIDGET_TODAY_STORAGE_KEY,
@@ -68,6 +70,18 @@ export const DesktopWidgetSettingsView: React.FC<DesktopWidgetSettingsViewProps>
       setAIEnabled(false);
     }
   }, [isElectron]);
+
+  useEffect(() => {
+    const refreshPreferences = () => {
+      setTodayEnabled(localStorage.getItem(DESKTOP_WIDGET_TODAY_STORAGE_KEY) === 'true');
+      setMonthEnabled(localStorage.getItem(DESKTOP_WIDGET_MONTH_STORAGE_KEY) === 'true');
+      setQuickEnabled(localStorage.getItem(DESKTOP_WIDGET_QUICK_STORAGE_KEY) === 'true');
+      setTimerEnabled(localStorage.getItem(DESKTOP_WIDGET_TIMER_STORAGE_KEY) === 'true');
+      setAIEnabled(localStorage.getItem(DESKTOP_WIDGET_AI_STORAGE_KEY) === 'true');
+    };
+    window.addEventListener(DESKTOP_WIDGET_PREFERENCES_CHANGED_EVENT, refreshPreferences);
+    return () => window.removeEventListener(DESKTOP_WIDGET_PREFERENCES_CHANGED_EVENT, refreshPreferences);
+  }, []);
 
   const handleToggleTodayWidget = () => {
     if (!isElectron) {

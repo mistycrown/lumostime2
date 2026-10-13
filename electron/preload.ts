@@ -4,6 +4,7 @@
  * @output IPC Bridge
  * @pos Electron Preload
  * @description Exposes safe IPC methods to the renderer process via `contextBridge`, enabling communication between the web app and the main process.
+ * @updated 2026-10-13: Exposes native widget restoration and startup preference subscriptions.
  * @updated 2026-10-02: Exposes action-only Feishu service requests without renderer access to session cookies.
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openTimer() 和 closeTimer() 以支持桌面计时器小组件（timer widget）的启用与停用。
  * @updated 2026-05-17: 扩展了桌面小组件的 IPC 桥接，暴露了 openQuick() 和 closeQuick() 方法以支持小事清单小组件的打开与关闭。并在 DesktopWidgetMainAction 中新增了 add_quick_todo 动作支持。
@@ -60,6 +61,14 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
 })
 
 contextBridge.exposeInMainWorld('desktopWidget', {
+    restore(legacyTypes: string[]) {
+        return ipcRenderer.invoke('desktop-widget:restore', legacyTypes)
+    },
+    onStartupTypesChanged(listener: (types: string[]) => void) {
+        const wrappedListener = (_event: Electron.IpcRendererEvent, types: string[]) => listener(types)
+        ipcRenderer.on('desktop-widget:startup-types-changed', wrappedListener)
+        return () => ipcRenderer.off('desktop-widget:startup-types-changed', wrappedListener)
+    },
     open() {
         ipcRenderer.send('desktop-widget:open')
     },

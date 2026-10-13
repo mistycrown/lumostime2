@@ -35,6 +35,10 @@ interface Window {
     invoke: (...args: any[]) => Promise<any>;
   };
   desktopWidget?: {
+    restore: (legacyTypes: import('./services/desktopWidgetService').DesktopWidgetStartupType[]) => Promise<import('./services/desktopWidgetService').DesktopWidgetStartupType[]>;
+    onStartupTypesChanged: (
+      listener: (types: import('./services/desktopWidgetService').DesktopWidgetStartupType[]) => void
+    ) => (() => void);
     open: () => void;
     close: () => void;
     openMonth: () => void;
