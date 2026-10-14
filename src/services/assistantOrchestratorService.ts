@@ -1,5 +1,6 @@
 /**
  * @file assistantOrchestratorService.ts
+ * @updated 2026-10-14: Preserves completion timestamps, repairs retained native message times, and orders delayed background replies chronologically.
  * @updated 2026-10-11: Waits for chat storage readiness and persists native reply deduplication independently of the capped debug history.
  * @input Assistant system triggers, local todo/log/session summaries, AI service access, and assistant memory
  * @output Background assistant turn decisions plus applied reminder or memory side effects
@@ -61,7 +62,7 @@ import { assistantPromptService } from './assistantPromptService';
 import { assistantReminderQueueService } from './assistantReminderQueueService';
 import { assistantTurnService } from './assistantTurnService';
 import { dreamService } from './dreamService';
-import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime } from '../utils/assistantTime';
+import { formatAssistantDateTimeForDisplay, normalizeAssistantDateTime, parseAssistantDateTime } from '../utils/assistantTime';
 import { resolveAssistantBackgroundSession } from '../utils/assistantBackgroundSessionUtils';
 import { buildAssistantDisplayParts } from '../utils/assistantMessageParts';
 import { buildNativeDiagnosticDebugExchange } from '../utils/assistantNativeDebug';
@@ -623,6 +624,7 @@ const persistAssistantMessage = (
   message: string,
   targetSessionId?: string,
   options?: {
+    createdAt?: string;
     reasoning?: AssistantReasoningSummary;
     displayParts?: string[];
     backgroundDebugHistoryId?: string;
@@ -648,7 +650,8 @@ const persistAssistantMessage = (
     sessions,
     resolvedTargetSessionId
   } = resolved;
-  const now = Date.now();
+  const completedAt = parseAssistantDateTime(options?.createdAt);
+  const now = Number.isFinite(completedAt) ? completedAt : Date.now();
   const nextMessage: PersistedAIChatMessage = {
     id: crypto.randomUUID(),
     role: 'assistant',
@@ -666,11 +669,11 @@ const persistAssistantMessage = (
     session.id === resolvedTargetSessionId
       ? {
         ...session,
-        updatedAt: now,
+        updatedAt: Math.max(session.updatedAt, now),
         messages: [
           ...session.messages,
           nextMessage
-        ]
+        ].sort((left, right) => left.createdAt - right.createdAt)
       }
       : session
   ));
@@ -782,6 +785,7 @@ export const assistantOrchestratorService = {
     didHydrateHistory: boolean;
     didUpdateMemory: boolean;
     didUpdateReminders: boolean;
+    didUpdateMessageTimes: boolean;
   } {
     if (!aiChatStorageService.isReady()) {
       return {
@@ -789,11 +793,45 @@ export const assistantOrchestratorService = {
         surfacedMessageLocations: [],
         didHydrateHistory: false,
         didUpdateMemory: false,
-        didUpdateReminders: false
+        didUpdateReminders: false,
+        didUpdateMessageTimes: false
       };
     }
 
     const storedTriggerIds = safeParseJson<unknown>(localStorage.getItem(NATIVE_HANDLED_TRIGGER_IDS_KEY), []);
+    const nativeCompletionTimes = new Map(diagnostics
+      .filter((entry) => entry.type === 'native_request_completed' && entry.triggerId)
+      .map((entry) => [
+        buildNativeHydratedHistoryId(entry.triggerId!.trim()),
+        parseAssistantDateTime(normalizeAssistantDateTime(entry.context?.completedAt) || entry.createdAt)
+      ]));
+    let didUpdateMessageTimes = false;
+    const repairedSessions = loadPersistedSessions().map((session) => {
+      let didUpdateSession = false;
+      const messages = session.messages.map((message) => {
+        const completedAt = message.backgroundDebugHistoryId
+          ? nativeCompletionTimes.get(message.backgroundDebugHistoryId)
+          : undefined;
+        if (message.role !== 'assistant' || completedAt === undefined || !Number.isFinite(completedAt) || completedAt === message.createdAt) {
+          return message;
+        }
+        didUpdateSession = true;
+        return { ...message, createdAt: completedAt };
+      });
+      if (!didUpdateSession) {
+        return session;
+      }
+      didUpdateMessageTimes = true;
+      return {
+        ...session,
+        updatedAt: Math.max(session.updatedAt, ...messages.map((message) => message.createdAt)),
+        messages: messages.sort((left, right) => left.createdAt - right.createdAt)
+      };
+    });
+    if (didUpdateMessageTimes) {
+      aiChatStorageService.setSessions(repairedSessions);
+      notifyAIBackupDataChanged();
+    }
     const knownTriggerIds = new Set(
       [
         ...(Array.isArray(storedTriggerIds) ? storedTriggerIds.filter((id): id is string => typeof id === 'string') : []),
@@ -937,6 +975,7 @@ export const assistantOrchestratorService = {
         }
 
         const persistedLocation = persistAssistantMessage(assistantReply, options?.targetSessionId, {
+          createdAt: normalizeAssistantDateTime(completedAt) || entry.createdAt,
           backgroundDebugHistoryId: baseHistoryEntry.id,
           ...(memoryUpdates.length > 0 ? { memoryUpdates } : {}),
           ...(reminderUpdates.length > 0 ? { reminderUpdates } : {})
@@ -997,7 +1036,8 @@ export const assistantOrchestratorService = {
       surfacedMessageLocations,
       didHydrateHistory,
       didUpdateMemory,
-      didUpdateReminders
+      didUpdateReminders,
+      didUpdateMessageTimes
     };
   },
 
@@ -1158,6 +1198,7 @@ export const assistantOrchestratorService = {
     if (hasVisibleReply && replyContent) {
       surfacedMessage = replyContent;
       surfacedMessageLocation = persistAssistantMessage(surfacedMessage, request.targetSessionId, {
+        createdAt: debug.completedAt,
         ...(output.reasoning ? { reasoning: output.reasoning } : {}),
         ...(messageParts?.length ? { displayParts: messageParts } : {}),
         backgroundDebugHistoryId: backgroundCallId,

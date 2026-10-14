@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatModal.tsx
+ * @updated 2026-10-14: Reloads repaired native background message timestamps without raising another unread alert.
  * @updated 2026-10-11: Defers native reply hydration until chat storage loads and resolves toast names from the persisted message destination.
  * @updated 2026-10-09: Forwards the shortcut settings opener to the AI homepage.
  * @updated 2026-10-09: Shares overlay visibility across home and conversation composers.
@@ -1013,8 +1014,10 @@ export const AIBackfillChatModal: React.FC<AIBackfillChatModalProps> = ({
       if (hydrationResult.didHydrateHistory) {
         refreshAssistantBackgroundCallHistory();
       }
-      if (hydrationResult.surfacedMessages.length > 0) {
+      if (hydrationResult.surfacedMessages.length > 0 || hydrationResult.didUpdateMessageTimes) {
         reloadPersistedChatSessions();
+      }
+      if (hydrationResult.surfacedMessages.length > 0) {
         if (!isOpenRef.current) {
           const latestLocation = hydrationResult.surfacedMessageLocations[hydrationResult.surfacedMessageLocations.length - 1];
           onUnreadAssistantMessage?.(

@@ -1,5 +1,6 @@
 /**
  * @file assistantOrchestratorService.test.ts
+ * @updated 2026-10-14: Covers native completion times, timezone equivalence, fallback timestamps, and delayed hydration order.
  * @updated 2026-10-11: Covers startup readiness, persistent native deduplication after history pruning, and migration from existing messages.
  * @input Mocked assistant turns, native diagnostics, memory, reminders, and persisted chats
  * @output Regression coverage for background assistant orchestration and native result hydration
@@ -721,6 +722,71 @@ describe('assistantOrchestratorService', () => {
     expect(persisted).toHaveLength(1);
     expect(location?.sessionId).toBe(persisted[0].id);
     expect(persisted[0].messages[0]).toMatchObject({ role: 'user', content: 'Completed a log' });
+  });
+
+  it('repairs an existing 09:00 bubble from its 11:00 native completion without replaying it', () => {
+    const earlyTime = Date.parse('2026-10-14T09:15:00+08:00');
+    const completedAt = '2026-10-14T11:00:05+08:00';
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'repair-session', title: 'Chat', createdAt: 1, updatedAt: earlyTime,
+      personaId: 'builtin-default', contextCacheEnabled: true,
+      messages: [
+        { id: 'old-reminder', role: 'assistant', content: 'Reminder', createdAt: earlyTime, backgroundDebugHistoryId: 'native:repair-trigger' },
+        { id: 'ordinary-user', role: 'user', content: 'Hello', createdAt: Date.parse('2026-10-14T10:00:00+08:00') }
+      ]
+    }]));
+    const entries: AssistantNativeDiagnosticEntry[] = [{
+      id: 'repair-result', type: 'native_request_completed', level: 'success',
+      createdAt: completedAt, message: 'Completed', triggerId: 'repair-trigger', triggerType: 'reminder_due',
+      context: { completedAt, assistantReply: 'Reminder' }
+    }];
+
+    const result = assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { showSystemNotification: true });
+    expect(result).toMatchObject({ didUpdateMessageTimes: true, surfacedMessages: [], didUpdateMemory: false });
+    const [session] = aiChatStorageService.getSessions() as any[];
+    expect(session.messages.map((message: any) => message.id)).toEqual(['ordinary-user', 'old-reminder']);
+    expect(session.messages[1].createdAt).toBe(Date.parse(completedAt));
+    expect(session.updatedAt).toBe(Date.parse(completedAt));
+    expect(AssistantAgent.showAssistantNotification).not.toHaveBeenCalled();
+    expect(assistantMemoryService.appendDecisionSummary).not.toHaveBeenCalled();
+    expect(assistantOrchestratorService.hydrateNativeCompletedReplies(entries).didUpdateMessageTimes).toBe(false);
+  });
+
+  it.each([
+    '2026-10-14T11:00:05+08:00',
+    '2026-10-14T03:00:05.000Z'
+  ])('keeps native completion time %s when reopening after a later conversation turn', (completedAt) => {
+    const laterTime = Date.parse('2026-10-14T12:30:00+08:00');
+    localStorage.setItem('lumostime_ai_chat_sessions_v1', JSON.stringify([{
+      id: 'time-session', title: 'Chat', createdAt: 1, updatedAt: laterTime,
+      personaId: 'builtin-default', contextCacheEnabled: true,
+      messages: [{ id: 'later-message', role: 'user', content: 'Hello', createdAt: laterTime }]
+    }]));
+    const entries: AssistantNativeDiagnosticEntry[] = [{
+      id: 'time-result', type: 'native_request_completed', level: 'success',
+      createdAt: '2026-10-14T11:00:06+08:00', message: 'Completed',
+      triggerId: 'time-trigger', triggerType: 'reminder_due',
+      context: { requestedAt: '2026-10-14T11:00:00+08:00', completedAt, assistantReply: 'Reminder' }
+    }];
+
+    assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { targetSessionId: 'time-session' });
+    assistantOrchestratorService.hydrateNativeCompletedReplies(entries, { targetSessionId: 'time-session' });
+    const [session] = aiChatStorageService.getSessions() as any[];
+    expect(session.messages).toHaveLength(2);
+    expect(session.messages[0]).toMatchObject({ content: 'Reminder', createdAt: Date.parse('2026-10-14T03:00:05Z') });
+    expect(session.messages[1].id).toBe('later-message');
+    expect(session.updatedAt).toBe(laterTime);
+  });
+
+  it.each([undefined, 'invalid'])('falls back to diagnostic time when native completion time is %s', (completedAt) => {
+    const createdAt = '2026-10-15T00:00:05+08:00';
+    assistantOrchestratorService.hydrateNativeCompletedReplies([{
+      id: 'fallback-result', type: 'native_request_completed', level: 'success',
+      createdAt, message: 'Completed', triggerId: 'fallback-trigger', triggerType: 'reminder_due',
+      context: { ...(completedAt ? { completedAt } : {}), assistantReply: 'Reminder' }
+    }]);
+    const [session] = aiChatStorageService.getSessions() as any[];
+    expect(session.messages[0].createdAt).toBe(Date.parse(createdAt));
   });
 
   it('hydrates native completed replies into persisted chat sessions only once', () => {

@@ -1,5 +1,6 @@
 /**
  * @file assistant-background-reminder.test.ts
+ * @updated 2026-10-14: Ensures native requests refresh cached time anchors and localize reminder metadata before inference.
  * @input Android assistant service, alarm, notification, and pending-trigger source files
  * @output Regression coverage for native check-in/reminder scheduling and execution contracts
  * @pos Test (Android Assistant Background Scheduling)
@@ -75,6 +76,14 @@ describe('Android assistant background reminder source contract', () => {
     expect(dispatchMethod).toContain('AssistantNativeBackgroundExecutor.executeAsync');
     expect(completedBlock).toContain('AssistantNativeReminderStore.markDispatched');
     expect(failedBlock).not.toContain('AssistantNativeReminderStore.markDispatched');
+  });
+
+  it('refreshes prompt time for each native execution and localizes reminder metadata', () => {
+    expect(nativeExecutorSource).toContain('AssistantNativePromptBuilder.buildSystemPrompt(snapshot.systemPrompt, requestedAt)');
+    expect(nativeExecutorSource).toContain('AssistantNativePromptBuilder.buildUserPrompt(triggerPayload, snapshot.conversationJson)');
+    expect(nativeExecutorSource).toContain('buildRequestEnvelope(config, systemPrompt, userPrompt)');
+    expect(nativeExecutorSource).not.toContain('buildRequestEnvelope(config, snapshot.systemPrompt, userPrompt)');
+    expect(serviceSource).toContain('metadata.put("scheduledDueAt", AssistantTimeParser.formatLocalDateTime(');
   });
 
   it('keeps a persistent Web fallback when native AI execution is unavailable', () => {

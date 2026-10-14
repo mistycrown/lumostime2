@@ -1,5 +1,6 @@
 /**
  * @file AssistantAgentService.java
+ * @updated 2026-10-14: Presents scheduled reminder times in the device's local timezone to match dispatch timestamps.
  * @input Foreground-service control intents and assistant schedule config
  * @output Alarm-backed Android assistant scheduling, shared runtime notification state, and bridge-triggered assistant events
  * @pos Native Service
@@ -508,7 +509,7 @@ public class AssistantAgentService extends Service {
         com.getcapacitor.JSObject metadata = new com.getcapacitor.JSObject();
         metadata.put("reminderId", reminderId);
         metadata.put("reminderType", safeTrim(reminder.optString("type", "")));
-        metadata.put("scheduledDueAt", safeTrim(reminder.optString("dueAt", "")));
+        metadata.put("scheduledDueAt", AssistantTimeParser.formatLocalDateTime(safeTrim(reminder.optString("dueAt", ""))));
         metadata.put("actualDispatchAt", attemptedAt);
         metadata.put("dispatchAttemptCount", reminder.optInt("dispatchAttemptCount", 0));
         long dueAtMs = AssistantTimeParser.parseIsoDateTime(reminder.optString("dueAt", ""));

@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatHelpers.test.ts
+ * @updated 2026-10-14: Verifies chat timestamps use local clock fields for equivalent UTC and offset instants.
  * @input Persona prompt fixtures with labeled custom prompt blocks
  * @output Regression coverage for persona prompt assembly
  * @pos Component Support Tests (AI Integration)
@@ -10,7 +11,19 @@
  * @updated 2026-09-23: Aligns debug-exchange fixtures with the normalized response contract.
  */
 import { describe, expect, it } from 'vitest';
-import { buildDebugBlocks, buildPersonaPrompt, getErrorDebugSections } from './AIBackfillChatHelpers';
+import { buildDebugBlocks, buildPersonaPrompt, formatConversationTime, getErrorDebugSections } from './AIBackfillChatHelpers';
+
+describe('formatConversationTime', () => {
+  it('renders a local 11:00 reminder identically after UTC persistence', () => {
+    const localTime = new Date(2026, 9, 14, 11, 0);
+    expect(formatConversationTime(Date.parse(localTime.toISOString()))).toBe('10月14日 11:00');
+  });
+
+  it('renders UTC and explicit offset timestamps as the same local clock time', () => {
+    expect(formatConversationTime(Date.parse('2026-10-14T03:00:00Z')))
+      .toBe(formatConversationTime(Date.parse('2026-10-14T11:00:00+08:00')));
+  });
+});
 
 describe('buildPersonaPrompt', () => {
   it('appends labeled custom prompt blocks after the base persona prompt', () => {

@@ -1,5 +1,6 @@
 /**
  * @file AssistantNativeBackgroundExecutor.java
+ * @updated 2026-10-14: Refreshes cached prompt clock/calendar anchors at execution time and normalizes trigger datetimes to the device timezone.
  * @input Native AI config, persisted background prompt snapshot, and a trigger payload
  * @output Immediate Android-side background AI request execution plus diagnostic events
  * @pos Native Helper
@@ -155,8 +156,9 @@ public final class AssistantNativeBackgroundExecutor {
             AssistantNativeBackgroundSnapshotStore.NativeBackgroundSnapshot snapshot =
                 AssistantNativeBackgroundSnapshotStore.load(context);
 
-            String userPrompt = buildUserPrompt(triggerPayload, snapshot.conversationJson);
-            request = buildRequestEnvelope(config, snapshot.systemPrompt, userPrompt);
+            String systemPrompt = AssistantNativePromptBuilder.buildSystemPrompt(snapshot.systemPrompt, requestedAt);
+            String userPrompt = AssistantNativePromptBuilder.buildUserPrompt(triggerPayload, snapshot.conversationJson);
+            request = buildRequestEnvelope(config, systemPrompt, userPrompt);
             NativeRequestExecutionResult requestResult = requestJsonObject(request);
             JSONObject normalized = normalizeResponse(requestResult.parsedOutput);
             String completedAt = isoNow();
@@ -495,19 +497,6 @@ public final class AssistantNativeBackgroundExecutor {
         } catch (JSONException error) {
             return new JSONObject();
         }
-    }
-
-    private static String buildUserPrompt(JSONObject trigger, String conversationJson) {
-        String normalizedConversation = safeTrim(conversationJson);
-        if (normalizedConversation.isEmpty()) {
-            normalizedConversation = "{\"recentTurns\":[]}";
-        }
-
-        return "=== Trigger ===\n"
-            + stringifyJson(trigger)
-            + "\n\n=== Conversation Context ===\n"
-            + normalizedConversation
-            + "\n\nReturn one JSON object only.";
     }
 
     public static JSONObject buildTriggerPayload(String triggerId, String triggerType, String triggerText, String triggerSource) {
