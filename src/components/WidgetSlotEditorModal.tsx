@@ -4,6 +4,7 @@
  * @output Slot editor modal for timer, daily-check, and shortcut widget slots
  * @pos Component
  * @description Unified widget slot editor that lets each slot choose its own type, icon mode, source binding, and background color.
+ * @updated 2026-10-14: Applies preferred timer scope rules and offers clickable scope suggestions when automatic association is disabled.
  * @updated 2026-05-06: Timer slots now inherit the selected todo's linked tag and default scopes inside the editor, and their shared todo picker now uses the same hierarchical parent/subtask view as Add Log.
  * @updated 2026-05-03: Rewrote the file in UTF-8, cleaned all mojibake copy, and let daily UI icon mode follow the currently selected daily item.
  * @updated 2026-05-03: Added an explicit "follow default UI icon" action inside the UI icon picker so daily widget bindings expose the fallback entry more clearly.
@@ -18,6 +19,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { COLOR_OPTIONS } from '../constants';
 import { useCustomColors } from '../hooks/useCustomColors';
+import { useSuggestions } from '../hooks/useSuggestions';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
 import { uiIconService } from '../services/uiIconService';
 import { DEFAULT_DAILY_WIDGET_COLOR } from '../services/widgetService';
@@ -29,7 +31,8 @@ import {
   getShortcutWidgetActionEmoji,
   getShortcutWidgetActionLabel
 } from '../services/widgetShortcutService';
-import { Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../types';
+import { AutoLinkRule, Category, CheckTemplate, Scope, TodoCategory, TodoItem } from '../types';
+import { getWidgetTimerScopeRules, mergeWidgetTimerScopeIds } from '../utils/widgetScopeUtils';
 import { getColorHexForCharts, getWidgetSlotFillColor } from '../utils/colorAdapterUtils';
 import { getEligibleNfcDailyCheckItems } from '../utils/dailyCheckUtils';
 import { normalizeHexColor } from '../utils/colorUtils';
@@ -68,12 +71,15 @@ interface WidgetSlotEditorModalProps {
   todos: TodoItem[];
   todoCategories: TodoCategory[];
   scopes: Scope[];
+  autoLinkRules?: AutoLinkRule[];
+  autoApplyAutoLinkRules?: boolean;
   canUseUiIcon: boolean;
   onClose: () => void;
   onSave: (draft: WidgetSlotEditorDraft) => void;
 }
 
 const EMOJI_INPUT_MAX_LENGTH = 8;
+const EMPTY_AUTO_LINK_RULES: AutoLinkRule[] = [];
 
 const COLOR_SWATCH_GRID_STYLE: React.CSSProperties = {
   gridTemplateColumns: 'repeat(auto-fit, minmax(2.75rem, 1fr))'
@@ -207,18 +213,42 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
   todos,
   todoCategories,
   scopes,
+  autoLinkRules = EMPTY_AUTO_LINK_RULES,
+  autoApplyAutoLinkRules = true,
   canUseUiIcon,
   onClose,
   onSave
 }) => {
+  const timerScopeRules = useMemo(
+    () => getWidgetTimerScopeRules(autoApplyAutoLinkRules, autoLinkRules, scopes),
+    [autoApplyAutoLinkRules, autoLinkRules, scopes]
+  );
+  const applyTimerScopes = (value: WidgetSlotEditorDraft | null) => value?.slotType === 'timer'
+    ? { ...value, scopeIds: mergeWidgetTimerScopeIds(value.scopeIds, value.activityId, timerScopeRules) }
+    : value;
   const [localDraft, setLocalDraft] = useState<WidgetSlotEditorDraft | null>(
-    applyIconSupportRules(draft, canUseUiIcon)
+    applyTimerScopes(applyIconSupportRules(draft, canUseUiIcon))
   );
   const customColors = useCustomColors();
 
   useEffect(() => {
-    setLocalDraft(applyIconSupportRules(draft, canUseUiIcon));
+    setLocalDraft(applyTimerScopes(applyIconSupportRules(draft, canUseUiIcon)));
   }, [canUseUiIcon, draft]);
+
+  useEffect(() => {
+    setLocalDraft((previousDraft) => applyTimerScopes(previousDraft));
+  }, [timerScopeRules]);
+
+  const suggestions = useSuggestions(
+    localDraft?.linkedTodoId || undefined,
+    '',
+    localDraft?.activityId || '',
+    localDraft?.scopeIds || undefined,
+    categories,
+    todos,
+    scopes,
+    autoLinkRules
+  );
 
   const selectedCategoryId = localDraft?.categoryId || categories[0]?.id || '';
   const selectedCategory = useMemo(
@@ -269,7 +299,10 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
       if (!previousDraft) {
         return previousDraft;
       }
-      return updater(previousDraft);
+      const nextDraft = updater(previousDraft);
+      return nextDraft.activityId !== previousDraft.activityId || nextDraft.linkedTodoId !== previousDraft.linkedTodoId
+        ? applyTimerScopes(nextDraft)
+        : nextDraft;
     });
   };
 
@@ -698,6 +731,25 @@ export const WidgetSlotEditorModal: React.FC<WidgetSlotEditorModalProps> = ({
                 selectedScopeIds={localDraft.scopeIds || undefined}
                 onSelect={(scopeIds) => setDraftField('scopeIds', scopeIds || null)}
               />
+
+              {!autoApplyAutoLinkRules && suggestions.scopes.length > 0 && (
+                <div>
+                  <h3 className="mb-3 px-1 text-xs font-bold text-stone-400">建议关联</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.scopes.map((scope) => (
+                      <button
+                        key={scope.id}
+                        type="button"
+                        onClick={() => setDraftField('scopeIds', [...new Set([...(localDraft.scopeIds || []), scope.id])])}
+                        className="flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-xs text-stone-600 transition-colors hover:bg-stone-100"
+                      >
+                        <IconRenderer icon={scope.icon} size={14} />
+                        <span>{scope.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {canUseUiIcon && renderIconModeSection()}
 

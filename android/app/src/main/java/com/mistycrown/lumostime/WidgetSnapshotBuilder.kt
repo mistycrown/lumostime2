@@ -1,5 +1,6 @@
 package com.mistycrown.lumostime
 
+import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -7,6 +8,7 @@ import java.util.Locale
 /**
  * Builds the lightweight widget UI snapshot from template bindings, runtime state,
  * and the daily widget's mirrored review progress.
+ * Updated 2026-10-14: Matches active sessions using the preferred timer scope rules.
  * Updated 2026-08-11: Selects daily progress by both item ID and date because the payload includes a full week.
  */
 object WidgetSnapshotBuilder {
@@ -144,7 +146,7 @@ object WidgetSnapshotBuilder {
                 )
             } else {
                 val matchesRuntime = runtimeStates.any { runtimeState ->
-                    matchesRuntime(template, slot, runtimeState)
+                    matchesRuntime(context, template, slot, runtimeState)
                 }
                 WidgetSnapshotSlot(
                     slotIndex = slot.slotIndex,
@@ -193,6 +195,7 @@ object WidgetSnapshotBuilder {
     }
 
     private fun matchesRuntime(
+        context: Context,
         template: WidgetTemplate?,
         slot: WidgetSlotConfig,
         runtimeState: WidgetRuntimeState?
@@ -211,7 +214,7 @@ object WidgetSnapshotBuilder {
             runtimeState.activityId == slot.activityId &&
                 runtimeState.categoryId == slot.categoryId &&
                 runtimeState.linkedTodoId == slot.linkedTodoId &&
-                runtimeState.scopeIds.toSet() == slot.scopeIds.toSet()
+                runtimeState.scopeIds.toSet() == WidgetStores.resolveTimerScopeIds(context, slot.activityId, slot.scopeIds).toSet()
         }
     }
 

@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-14: `useWidgetBridgeSync` mirrors current timer scope rules through `syncTimerScopeRules` independently of template saves. Android stores these rules separately and resolves them when a timer slot is tapped, so existing templates follow preference and rule changes.
+
 Update 2026-10-11: `useNoteFocus.ts` keeps record-note shortcuts aligned while the keyboard settles, including delayed viewport panning and native container scrolling. Position correction uses instant scrolling, expires after 1.5 seconds, and stops on manual navigation, typing, blur or unmount.
 
 Update 2026-10-10: `useTextDictionary.ts` merges manual words with live node names and aliases for completion/cloud consumers. `usePersonalDictionary.ts` remains the manual-only list for the editor; node changes refresh derived candidates without copying them to preference storage.

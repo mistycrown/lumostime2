@@ -12,6 +12,7 @@ import java.util.UUID
 
 /**
  * Native widget action controller for timer, daily, and shortcut widgets.
+ * Updated 2026-10-14: Merges current preferred scope rules into timer-slot runtime without replacing configured scopes.
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
  * Updated 2026-05-03: Reused the shared tap-animation state for scene widget items so scene timers and checklist cards get the same springy tap feedback as the timer widget family.
  * Updated 2026-05-03: Consolidated daily-slot and scene-checklist completion handling into one shared helper to keep widget-side checklist rules in sync.
@@ -130,6 +131,7 @@ object WidgetTimerController {
     ): Boolean {
         val normalizedWidgetType = WidgetTypes.normalize(slot.slotType)
         val slotIndex = slot.slotIndex
+        val scopeIds = WidgetStores.resolveTimerScopeIds(context, slot.activityId, slot.scopeIds)
 
         if (!slot.isConfigured()) {
             return false
@@ -144,7 +146,7 @@ object WidgetTimerController {
                 runtime.activityId == slot.activityId &&
                     runtime.categoryId == slot.categoryId &&
                     runtime.linkedTodoId == slot.linkedTodoId &&
-                    runtime.scopeIds.toSet() == slot.scopeIds.toSet()
+                    runtime.scopeIds.toSet() == scopeIds.toSet()
             }
         }
         val isSameSlotActive = currentRuntime?.let { runtime ->
@@ -154,7 +156,7 @@ object WidgetTimerController {
                 runtime.activityId == slot.activityId &&
                     runtime.categoryId == slot.categoryId &&
                     runtime.linkedTodoId == slot.linkedTodoId &&
-                    runtime.scopeIds.toSet() == slot.scopeIds.toSet()
+                    runtime.scopeIds.toSet() == scopeIds.toSet()
             }
         } ?: false
 
@@ -186,7 +188,7 @@ object WidgetTimerController {
             startedAt = now,
             source = "widget",
             linkedTodoId = slot.linkedTodoId,
-            scopeIds = slot.scopeIds,
+            scopeIds = scopeIds,
             slotIndex = slotIndex,
             templateId = template.id,
             appWidgetId = appWidgetId

@@ -4,6 +4,7 @@
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
  * @description Imports completed timer widget actions into logs, mirrors timer runtime state, syncs daily widget progress to native, and replays queued daily taps back into review state.
+ * @updated 2026-10-14: Mirrors current scope rules and auto-link preferences for native timer starts, including existing templates.
  * @updated 2026-07-22: Replays TODAY + PIN checkbox changes from Android widgets into persisted todo completion state.
  * @updated 2026-05-18: Catches both synchronous and async native bridge failures during widget payload sync so newly extended todo recurrence payloads cannot white-screen the app.
  * @updated 2026-05-14: Stops native app-sourced runtime echoes from restoring a just-stopped in-app session back into React state during NFC flows.
@@ -26,6 +27,8 @@
 import { App as CapacitorApp } from '@capacitor/app';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCategoryScope } from '../contexts/CategoryScopeContext';
+import { useSettings } from '../contexts/SettingsContext';
+import { getWidgetTimerScopeRules } from '../utils/widgetScopeUtils';
 import { useData } from '../contexts/DataContext';
 import { useReview } from '../contexts/ReviewContext';
 import type { TodoItem } from '../types';
@@ -72,6 +75,7 @@ const fireAndForgetWidgetBridgeCall = (
 
 export const useWidgetBridgeSync = () => {
   const { categories, scopes } = useCategoryScope();
+  const { autoLinkRules, autoApplyAutoLinkRules } = useSettings();
   const { logs, todos, setLogs, setTodos } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
@@ -508,6 +512,18 @@ export const useWidgetBridgeSync = () => {
       () => WidgetBridge.saveTemplates({ templates })
     );
   }, [hasHydratedNativeState, widgetTemplateRevision]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported()) {
+      return;
+    }
+
+    const rules = getWidgetTimerScopeRules(autoApplyAutoLinkRules, autoLinkRules, scopes);
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync timer scope rules to native widget',
+      () => WidgetBridge.syncTimerScopeRules({ rules })
+    );
+  }, [autoApplyAutoLinkRules, autoLinkRules, scopes]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {

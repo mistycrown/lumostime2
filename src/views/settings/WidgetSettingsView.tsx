@@ -4,6 +4,7 @@
  * @output A template-based widget configuration page with per-slot mixed-type editing
  * @pos View
  * @description Lets the user create, rename, resize, edit, and manage Android widget templates while configuring each slot as a timer, daily check, or shortcut.
+ * @updated 2026-10-14: Passes scope auto-link preferences into timer slot configuration.
  * @updated 2026-04-18: Removed template-level widget categories and switched to slot-type-first editing.
  * @updated 2026-04-25: Added supporter-gated widget UI icon editing and native asset-backed icon slot persistence.
  * @updated 2026-04-26: Updated 4x1 widget previews to render five evenly spaced slots.
@@ -31,6 +32,7 @@ import {
   WidgetTrackingCalendarEditorModal
 } from '../../components/WidgetTrackingCalendarEditorModal';
 import WidgetBridge from '../../plugins/WidgetBridgePlugin';
+import { useSettings } from '../../contexts/SettingsContext';
 import { RedemptionService } from '../../services/redemptionService';
 import {
   getUIIconAssetPathWithFallback,
@@ -257,6 +259,7 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
   todoCategories,
   scopes
 }) => {
+  const { autoLinkRules, autoApplyAutoLinkRules } = useSettings();
   const redemptionService = useMemo(() => new RedemptionService(), []);
   const [templates, setTemplates] = useState<WidgetTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1060,6 +1063,8 @@ export const WidgetSettingsView: React.FC<WidgetSettingsViewProps> = ({
       </div>
 
       <WidgetSlotEditorModal
+        autoLinkRules={autoLinkRules}
+        autoApplyAutoLinkRules={autoApplyAutoLinkRules}
         isOpen={Boolean(editingTemplateDraft && currentEditingSlot)}
         draft={currentEditingSlot ? toSlotEditorDraft(currentEditingSlot, canUseWidgetUiIcon) : null}
         categories={categories}

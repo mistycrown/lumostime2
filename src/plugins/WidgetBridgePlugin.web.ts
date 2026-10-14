@@ -4,6 +4,7 @@
  * @output No-op widget bridge implementation for browser environments
  * @pos Plugin
  * @description Prevents widget bridge calls from failing when the app runs outside native Android.
+ * @updated 2026-10-14: Adds the timer scope-rule synchronization fallback.
  * @updated 2026-04-25: Added no-op DAILY_RUNTIME payload sync for the native 4x4 heatmap widget.
  * @updated 2026-04-26: Added no-op TODAY + PIN widget payload sync for the dedicated scrollable todo widget.
  * @updated 2026-05-01: Added no-op tracking-calendar payload sync for the dedicated 2x2 tracking calendar widget.
@@ -34,6 +35,8 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   }
 
   async saveTemplates(): Promise<void> {}
+
+  async syncTimerScopeRules(): Promise<void> {}
 
   async getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }> {
     return { bindings: [] };

@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-14: `WidgetSlotEditorModal` applies preferred activity-to-scope rules to timer drafts and offers clickable scope suggestions when automatic association is disabled. Verify configuration, saved scopes and preference changes with `node scripts/test-widget-scope-renderer.mjs`.
+
 Update 2026-10-11: `AddLogModal` uses `useNoteFocus` for instant note jumps and short-lived correction after keyboard viewport movement, resizing and native container scrolling; manual navigation or typing cancels correction. The note renderer harness covers first-tap positioning and cancellation in the actual modal.
 
 Update 2026-10-11: `DetailTimelineCard` uses Lucide `Orbit` in place of the bracket glyph in node history metadata.

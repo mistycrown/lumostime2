@@ -4,6 +4,7 @@
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
  * @description Exposes the Android widget template, instance binding state, and runtime bridge to the React application.
+ * @updated 2026-10-14: Mirrors preferred activity-to-scope rules for native widget timer starts.
  * @updated 2026-05-21: Expanded TODAY + PIN mirrored todo contracts with `maybeDates` plus recurrence `skipDates` so native rebuilds can match the app's current-day schedule visibility.
  * @updated 2026-08-10: Added recurring state to TODAY + PIN item contracts for non-completable native rows.
  * @updated 2026-05-13: Expanded mirrored todo recurrence contracts with optional month-end fallback metadata for monthly schedules.
@@ -367,6 +368,7 @@ export interface WidgetBridgeScenePayload {
 export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
+  syncTimerScopeRules(options: { rules: Record<string, string[]> }): Promise<void>;
   getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }>;
   getPendingActions(): Promise<{ actions: WidgetBridgePendingAction[] }>;
   clearPendingActions(options: { ids: string[] }): Promise<void>;

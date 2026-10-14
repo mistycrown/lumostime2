@@ -4,6 +4,7 @@
  * @output Regression coverage for widget timer-slot todo selection inheritance
  * @pos Test
  * @description Verifies timer widget slots inherit linked tag metadata and default scopes from the selected todo while keeping sensible fallbacks for partially linked todos or cleared selections.
+ * @updated 2026-10-14: Isolates browser settings dependencies for pure todo-inheritance tests.
  * @updated 2026-05-06: Added a source-level guard that keeps widget timer slots on the shared hierarchical todo picker configuration.
  * @updated 2026-05-06: Added regression coverage for todo-driven widget slot tag and scope auto-apply behavior.
  */
@@ -12,6 +13,8 @@ import widgetSlotEditorModalSource from './WidgetSlotEditorModal.tsx?raw';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { TodoItem } from '../types';
 import type { WidgetSlotEditorDraft } from './WidgetSlotEditorModal';
+
+vi.mock('../contexts/SettingsContext', () => ({ useSettings: () => ({ emojiStyle: 'native' }) }));
 
 let applyLinkedTodoToTimerWidgetDraft: typeof import('./WidgetSlotEditorModal')['applyLinkedTodoToTimerWidgetDraft'];
 

@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-14: `widgetScopeUtils.ts` builds native timer scope rules from the auto-link preference and active scopes, then merges matching rules with explicit widget selections without duplicates.
+
 Update 2026-10-11: `nodeUtils.createNode` creates empty metadata for manually added nodes, trims names, enforces link syntax and global name uniqueness, and validates the destination category. It uses the same node fields as automatic discovery.
 
 Update 2026-10-11: `syncUtils.ts` propagates WebDAV HTTP 429/503 when reading cloud image manifests or inventories, stopping uploads before more image requests are sent to unavailable storage.

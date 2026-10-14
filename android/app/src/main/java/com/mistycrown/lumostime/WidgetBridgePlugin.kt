@@ -11,6 +11,7 @@ import org.json.JSONObject
 
 /**
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
+ * Updated 2026-10-14: Synchronizes timer scope rules separately from configured template scopes.
  * Updated 2026-07-22: Exposes queued TODAY + PIN checkbox changes so the app can persist widget-side todo completion updates.
  * Updated 2026-08-10: Parses recurring item state for non-completable TODAY + PIN rows.
  * Updated 2026-05-21: Expanded TODAY + PIN sync parsing to accept mirrored todo `maybeDates` and recurrence `skipDates`, matching app-side today visibility during native rebuilds.
@@ -92,6 +93,13 @@ class WidgetBridgePlugin : Plugin() {
         WidgetStores.saveTemplates(context, templates)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshTrackingCalendarWidgets(context)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun syncTimerScopeRules(call: PluginCall) {
+        WidgetStores.saveTimerScopeRules(context, call.getObject("rules") ?: JSObject())
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
         call.resolve()
     }
 

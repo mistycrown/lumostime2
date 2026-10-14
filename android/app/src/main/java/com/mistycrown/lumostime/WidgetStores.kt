@@ -8,6 +8,7 @@ import org.json.JSONObject
 /**
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
+ * Updated 2026-10-14: Persists preferred timer scope rules and resolves them at widget tap time.
  * Updated 2026-07-22: Persists queued TODAY + PIN checkbox changes until the app writes them back to todo storage.
  * Updated 2026-08-10: Persists the recurring flag on TODAY + PIN items across native cache reloads.
  * Updated 2026-05-21: Expanded TODAY + PIN payload storage to persist mirrored todo `maybeDates` and recurrence `skipDates`, keeping native rebuild visibility aligned with the app's today schedule.
@@ -23,6 +24,7 @@ import org.json.JSONObject
 object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
     private const val KEY_TEMPLATES = "templates_v1"
+    private const val KEY_TIMER_SCOPE_RULES = "timer_scope_rules_v1"
     private const val KEY_INSTANCE_BINDINGS = "instance_bindings_v1"
     private const val KEY_RUNTIME = "runtime_v1"
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
@@ -51,6 +53,18 @@ object WidgetStores {
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    fun saveTimerScopeRules(context: Context, rules: JSONObject) {
+        prefs(context).edit().putString(KEY_TIMER_SCOPE_RULES, rules.toString()).apply()
+    }
+
+    fun resolveTimerScopeIds(context: Context, activityId: String?, scopeIds: List<String>): List<String> {
+        val ruleScopeIds = runCatching {
+            val rules = JSONObject(prefs(context).getString(KEY_TIMER_SCOPE_RULES, null) ?: "{}")
+            rules.optJSONArray(activityId.orEmpty()).toStringList()
+        }.getOrDefault(emptyList())
+        return (scopeIds + ruleScopeIds).distinct()
+    }
 
     private fun parseNullableString(value: String?): String? {
         val trimmed = value?.trim() ?: return null
