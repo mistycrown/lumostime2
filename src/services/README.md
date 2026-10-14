@@ -207,3 +207,5 @@ Update 2026-03-12: timeline styling for normal timeline records is managed by `t
 2026-10-03：`feishuAutoSyncStore.ts` 原子保存 Log 与按账号隔离的自动同步队列；`feishuAutoSyncService.ts` 从落盘数据构建最终内容，按版本确认结果、核查删除及未知创建、处理分类保护和退避重试。`feishuSyncLock.ts` 协调手动/自动操作及多窗口写入。队列不进入云同步或导出；使用说明见 `docs/feishu-auto-sync.md`。
 
 Update 2026-10-13: `desktopWidgetService.ts` mirrors Electron's authoritative enabled widget types into localStorage. Native restore migrates old preferences once and broadcasts changes so settings reflect widget close actions.
+
+- Update 2026-10-14: `todoScheduleColorService.ts` adds the shared Plan color with backward-compatible defaults.

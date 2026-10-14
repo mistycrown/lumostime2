@@ -3,6 +3,7 @@
  * @input Schedule-type color setting payloads
  * @output Shared persisted schedule-type color settings plus resolved colors
  * @pos Service
+ * @updated 2026-10-14: Adds a persisted Plan color alongside existing schedule types with defaults for older settings.
  * @description Persists the shared default/custom color mapping used when Todo schedule views color entries by Arrange / Due / Repeat / Maybe / Done / Trace type.
  * @updated 2026-05-14: Added a dedicated `Maybe` schedule color so week and month schedule views can theme tentative future dates alongside the existing five schedule badges.
  * @updated 2026-05-11: Added shared default/custom schedule-type colors so week and month schedule views can reuse one editable six-color palette.
@@ -15,7 +16,7 @@ import { normalizeHexColor } from '../utils/colorUtils';
 
 export const TODO_SCHEDULE_TYPE_COLOR_SETTINGS_UPDATED_EVENT = 'lumostime:todo-schedule-type-colors-updated';
 
-export type TodoScheduleTypeColorKey = 'scheduled' | 'deadline' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
+export type TodoScheduleTypeColorKey = 'scheduled' | 'deadline' | 'recurring' | 'maybe' | 'planned' | 'completed' | 'inProgress';
 export type TodoScheduleTypeColorMode = 'default' | 'custom';
 
 export interface TodoScheduleTypeColorSettings {
@@ -30,6 +31,7 @@ export const TODO_SCHEDULE_TYPE_COLOR_ITEMS: Array<{ key: TodoScheduleTypeColorK
   { key: 'deadline', label: '截止' },
   { key: 'recurring', label: '重复' },
   { key: 'maybe', label: 'Maybe' },
+  { key: 'planned', label: 'Plan' },
   { key: 'completed', label: '完成' },
   { key: 'inProgress', label: '追踪' }
 ];
@@ -39,6 +41,7 @@ export const DEFAULT_TODO_SCHEDULE_TYPE_COLORS: Record<TodoScheduleTypeColorKey,
   deadline: '#C86A4C',
   recurring: '#768252',
   maybe: '#A58863',
+  planned: '#8377A1',
   completed: '#A4A09A',
   inProgress: '#60758B'
 };

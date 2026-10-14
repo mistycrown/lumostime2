@@ -7,6 +7,7 @@
  * @input Todos, Categories, Scopes
  * @output Todo Status Updates, Edit Triggers, Focus Timer Start
  * @pos View (Main Tab)
+ * @updated 2026-10-14: Displays Plan badges for planned blocks in list and week schedules, keeping Plan distinct from Trace.
  * @description The main To-Do list interface. Displays tasks grouped by category, supports swipe actions, and now includes reserved `小事` / `未来` buckets plus a week planning view with schedule and history badges.
  * @updated 2026-09-20: Prefills the quick-add-todo command when opening AI from the todo header.
  * @updated 2026-08-26: Hides archived todo categories from the main list and scheduling presentation.
@@ -40,6 +41,7 @@ import {
   TodoScheduleRange,
   WeekTodoEntry,
   buildWeekTodoBuckets,
+  buildTodoPlannedLookup,
   formatWeekTodoLineTitle,
   formatDateKey,
   getStartOfWeek,
@@ -699,7 +701,8 @@ const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
   deadline: 'Due',
   scheduled: 'Arrange',
   recurring: 'Repeat',
-  maybe: 'Maybe'
+  maybe: 'Maybe',
+  planned: 'Plan'
 };
 
 const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
@@ -707,14 +710,16 @@ const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
   Maybe: 'May',
   Repeat: 'Rep',
   Pin: 'Pin',
-  Due: 'Due'
+  Due: 'Due',
+  Plan: 'Plan'
 };
 
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = {
   deadline: 0,
   scheduled: 1,
   recurring: 2,
-  maybe: 3
+  maybe: 3,
+  planned: 4
 };
 
 interface TodoListEntry {
@@ -901,8 +906,8 @@ const formatScheduleSectionLabel = (dateKey: string, todayDateKey: string, tomor
   return `${weekdayLabel} · ${date.getMonth() + 1}.${date.getDate()}`;
 };
 
-type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type WeekQuickActionBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
+type WeekBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'planned' | 'completed' | 'inProgress';
+type WeekQuickActionBadgeKey = WeekBadgeKey;
 
 interface WeekBadgeDescriptor {
   key: WeekBadgeKey;
@@ -916,7 +921,7 @@ const getWeekBadgeDisplayLabel = (badge: WeekBadgeDescriptor, badgeCount: number
     return badge.label;
   }
 
-  if (badge.key === 'deadline' || badge.key === 'completed') {
+  if (badge.key === 'deadline' || badge.key === 'completed' || badge.key === 'planned') {
     return badge.label;
   }
 
@@ -933,7 +938,7 @@ const WeekTodoLineItem: React.FC<{
   onBadgeClick: (entry: WeekTodoEntry, badgeKey: WeekQuickActionBadgeKey) => void;
 }> = ({ entry, isDragging, isScheduleLocked, onDragStart, onDragEnd, onTouchDragStart, onBadgeClick }) => {
   const { todo, badges, parentTitle } = entry;
-  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && (badges.completed || badges.inProgress);
+  const isHistoricalOnly = !badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && !badges.planned && (badges.completed || badges.inProgress);
   const iconClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
   const titleClassName = isHistoricalOnly ? 'text-stone-400' : 'text-stone-700';
   const parentTitleClassName = isHistoricalOnly ? 'text-stone-300' : 'text-stone-400';
@@ -970,6 +975,7 @@ const WeekTodoLineItem: React.FC<{
     badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97', overdue: isScheduledOverdue } : null,
     badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
     badges.maybe ? { key: 'maybe', label: 'Maybe', color: '#a58863' } : null,
+    badges.planned ? { key: 'planned', label: 'Plan', color: '#8377a1' } : null,
     badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
     badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
   ].filter(Boolean) as WeekBadgeDescriptor[];
@@ -1010,7 +1016,7 @@ const WeekTodoLineItem: React.FC<{
       </div>
       <div className={`shrink-0 flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
         {orderedBadges.map((badge) => (
-          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+          badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'planned' || badge.key === 'completed' || badge.key === 'inProgress' ? (
             <span
               key={badge.key}
               data-week-badge-trigger="true"
@@ -1298,6 +1304,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   const tomorrowDate = new Date(todayDate);
   tomorrowDate.setDate(todayDate.getDate() + 1);
   const tomorrowDateKey = formatDateKey(tomorrowDate);
+  const plannedLookup = useMemo(() => buildTodoPlannedLookup(logs), [logs]);
 
   // 濠碘€冲€归悘澶娾柦閳╁啯绠掗柛鎺戞鐞氼偊鏁嶇仦鐐枖缂佲偓閾忓厜鏁勯柣妯垮煐閳ь兛娴囬埀顒€濂旂粭澶愬及椤栨氨鈹涙繝?
   if (projectTodoCategories.length === 0) {
@@ -1321,7 +1328,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     const buildEntries = (range: TodoScheduleRange): TodoListEntry[] => (
       filterVisibleTodos(displayTodos, showCompletedTodos)
         .map((todo) => {
-          const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate);
+          const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate, plannedLookup);
 
           return decorateTodoListEntryWithHierarchy(
             buildTodoListEntry(todo, scheduleMatches, {
@@ -1339,7 +1346,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       tomorrow: buildEntries('tomorrow'),
       thisWeek: buildEntries('thisWeek')
     };
-  }, [displayTodos, showCompletedTodos, todayDateKey, tomorrowDateKey]);
+  }, [displayTodos, showCompletedTodos, todayDateKey, tomorrowDateKey, plannedLookup]);
 
   const pinnedTodayEntries = useMemo<TodoListEntry[]>(() => {
     const referenceDate = parseDateKey(todayDateKey) || new Date();
@@ -1347,9 +1354,9 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
     return filterVisibleTodos(displayTodos, showCompletedTodos)
       .filter((todo) => todo.pin)
-      .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
+      .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate) || plannedLookup.get(todo.id)?.has(todayDateKey))
       .map((todo) => {
-        const todayMatches = getTodoScheduleMatches(todo, 'today', referenceDate);
+        const todayMatches = getTodoScheduleMatches(todo, 'today', referenceDate, plannedLookup);
         const overdueMatches = buildOverdueScheduleMatches(todo, todayDateKey);
         const combinedMatches = todayMatches.length > 0 ? todayMatches : overdueMatches;
 
@@ -1361,7 +1368,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         );
       })
       .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true, orderLookup }));
-  }, [displayTodos, showCompletedTodos, todayDateKey]);
+  }, [displayTodos, showCompletedTodos, todayDateKey, plannedLookup]);
 
   const nonPinnedTodayEntries = useMemo<TodoListEntry[]>(
     () => scheduleEntriesByFilter.today.filter((entry) => !entry.todo.pin),
@@ -1724,6 +1731,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           recurring: false,
           maybe: false,
           completed: false,
+          planned: false,
           inProgress: false
         }
       };
@@ -1738,6 +1746,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           recurring: false,
           maybe: false,
           completed: false,
+          planned: false,
           inProgress: false
         }
       };
@@ -1752,6 +1761,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           recurring: false,
           maybe: true,
           completed: false,
+          planned: false,
           inProgress: false
         }
       };

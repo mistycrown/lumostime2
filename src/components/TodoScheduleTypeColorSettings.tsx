@@ -3,6 +3,7 @@
  * @input Shared schedule-type color settings plus change handler
  * @output Default/custom selector with per-type color picker rows
  * @pos Component (Settings)
+ * @updated 2026-10-14: Includes Plan in the shared schedule-type color editor.
  * @description Reuses the built-in palette and persisted custom color group so Todo schedule views can customize Arrange / Due / Repeat / Done / Trace colors from one shared UI block.
  * @updated 2026-05-11: Added the shared schedule-type color settings block used by the Todo month and bento display popups.
  *

@@ -3,6 +3,7 @@
  * @input Todo items, logs, a reference date, and an optional todo-open callback
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
+ * @updated 2026-10-14: Displays Plan badges in month day details while keeping planned entries out of Trace strips.
  * @description Renders the editorial monthly schedule view adapted from the minimalist demo, using shared todo schedule utilities so each day shows the same real Arrange / Due / Repeat / Maybe / Done / Trace data as the week planner.
  *
  * @updated 2026-06-16: Locked the month-cell date-number header row to a fixed height so ordinary entries and cross-day Trace overlays share the same vertical baseline instead of drifting a few pixels apart.
@@ -217,6 +218,7 @@ const MONTH_VIEW_ENTRY_TAGS: Array<{
     { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
     { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: true },
     { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
+    { key: 'planned', label: 'Plan', color: '#8377a1', clickable: true },
     { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
     { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
   ];
@@ -229,7 +231,7 @@ const getMonthEntryTagLabel = (
     return tag.label;
   }
 
-  if (tag.key === 'deadline' || tag.key === 'completed') {
+  if (tag.key === 'deadline' || tag.key === 'completed' || tag.key === 'planned') {
     return tag.label;
   }
 
@@ -587,6 +589,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           recurring: false,
           maybe: false,
           completed: false,
+          planned: false,
           inProgress: false
         },
         primaryKind: 'deadline'
@@ -602,6 +605,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           recurring: false,
           maybe: false,
           completed: false,
+          planned: false,
           inProgress: false
         },
         primaryKind: 'scheduled'
@@ -617,6 +621,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
           recurring: false,
           maybe: true,
           completed: false,
+          planned: false,
           inProgress: false
         },
         primaryKind: 'maybe'

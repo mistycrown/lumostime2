@@ -3,6 +3,7 @@
  * @input Todo items with optional schedule fields, reference dates
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
+ * @updated 2026-10-14: Separates Plan blocks from actual Trace logs across schedule lists, week buckets, and month entries.
  * @description Shared helpers for deriving scheduled, deadline, recurring, maybe, completed, and in-progress todo visibility without creating standalone occurrence records.
  * @updated 2026-06-06: Exposes one shared primary schedule-kind priority so month ordering and bento-week marker colors stay aligned when a single todo matches multiple day badges.
  * @updated 2026-05-18: Canonicalizes persisted recurrence rules on save/load so invalid monthly-day payloads and stale skip-date shapes cannot fan out into render-time crashes after detail-page auto-save.
@@ -20,6 +21,7 @@ export interface TodoDateBadges {
   deadline: boolean;
   recurring: boolean;
   maybe: boolean;
+  planned: boolean;
   completed: boolean;
   inProgress: boolean;
 }
@@ -36,9 +38,9 @@ export interface WeekDayBucket {
   items: WeekTodoEntry[];
 }
 
-export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe';
+export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'planned';
 export type TodoScheduleRange = 'today' | 'tomorrow' | 'thisWeek';
-export type TodoScheduleEntryKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
+export type TodoScheduleEntryKind = TodoScheduleMatchKind | 'completed' | 'inProgress';
 
 export interface TodoScheduleMatch {
   dateKey: string;
@@ -77,7 +79,8 @@ const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
   deadline: 0,
   scheduled: 1,
   recurring: 2,
-  maybe: 3
+  maybe: 3,
+  planned: 4
 };
 const TODO_SCHEDULE_ENTRY_PRIORITY: Record<TodoScheduleEntryKind, number> = {
   completed: 0,
@@ -85,7 +88,8 @@ const TODO_SCHEDULE_ENTRY_PRIORITY: Record<TodoScheduleEntryKind, number> = {
   scheduled: 2,
   recurring: 3,
   maybe: 4,
-  inProgress: 5
+  planned: 5,
+  inProgress: 6
 };
 
 const normalizeDate = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -546,11 +550,11 @@ export const getNextRecurrenceOccurrenceDateKey = (
   return null;
 };
 
-const buildInProgressLookup = (logs: Log[]): Map<string, Set<string>> => {
+const buildTodoLogDateLookup = (logs: Log[], isPlanned: boolean): Map<string, Set<string>> => {
   const lookup = new Map<string, Set<string>>();
 
   logs.forEach((log) => {
-    if (!log.linkedTodoId) return;
+    if (!log.linkedTodoId || Boolean(log.isPlanned) !== isPlanned) return;
     const dateKey = formatDateKey(new Date(log.startTime));
     const current = lookup.get(log.linkedTodoId) || new Set<string>();
     current.add(dateKey);
@@ -560,6 +564,9 @@ const buildInProgressLookup = (logs: Log[]): Map<string, Set<string>> => {
   return lookup;
 };
 
+export const buildTodoPlannedLookup = (logs: Log[]): Map<string, Set<string>> =>
+  buildTodoLogDateLookup(logs, true);
+
 const normalizeTodoDateBadges = (badges: TodoDateBadges): TodoDateBadges => {
   const normalized = { ...badges };
 
@@ -567,7 +574,7 @@ const normalizeTodoDateBadges = (badges: TodoDateBadges): TodoDateBadges => {
     normalized.scheduled = false;
   }
 
-  if (normalized.completed) {
+  if (normalized.completed || normalized.planned) {
     normalized.inProgress = false;
   }
 
@@ -577,12 +584,14 @@ const normalizeTodoDateBadges = (badges: TodoDateBadges): TodoDateBadges => {
 export const getTodoDateBadges = (
   todo: TodoItem,
   targetDateKey: string,
-  inProgressLookup?: Map<string, Set<string>>
+  inProgressLookup?: Map<string, Set<string>>,
+  plannedLookup?: Map<string, Set<string>>
 ): TodoDateBadges => normalizeTodoDateBadges({
   scheduled: todo.scheduledDate === targetDateKey,
   deadline: todo.deadlineDate === targetDateKey,
   recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey),
   maybe: hasMaybeDate(todo, targetDateKey),
+  planned: plannedLookup?.get(todo.id)?.has(targetDateKey) || false,
   completed: todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false,
   inProgress: inProgressLookup?.get(todo.id)?.has(targetDateKey) || false
 });
@@ -590,12 +599,13 @@ export const getTodoDateBadges = (
 export const getTodoScheduleMatches = (
   todo: TodoItem,
   range: TodoScheduleRange,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  plannedLookup?: Map<string, Set<string>>
 ): TodoScheduleMatch[] => {
   const dateKeys = getTodoScheduleRangeDateKeys(range, referenceDate);
 
   return dateKeys.flatMap((dateKey) => {
-    const badges = getTodoDateBadges(todo, dateKey);
+    const badges = getTodoDateBadges(todo, dateKey, undefined, plannedLookup);
     const matches: TodoScheduleMatch[] = [];
 
     if (badges.deadline) {
@@ -614,6 +624,10 @@ export const getTodoScheduleMatches = (
       matches.push({ dateKey, kind: 'maybe' });
     }
 
+    if (badges.planned) {
+      matches.push({ dateKey, kind: 'planned' });
+    }
+
     return matches;
   }).sort((left, right) => {
     if (left.dateKey !== right.dateKey) {
@@ -630,6 +644,7 @@ export const getPrimaryTodoScheduleEntryKind = (badges: TodoDateBadges): TodoSch
   if (badges.scheduled) return 'scheduled';
   if (badges.recurring) return 'recurring';
   if (badges.maybe) return 'maybe';
+  if (badges.planned) return 'planned';
   return 'inProgress';
 };
 
@@ -796,12 +811,13 @@ const assignTodoWeekTraceSegmentLanes = (
 const buildTodoDateEntriesWithLookup = (
   todos: TodoItem[],
   targetDateKey: string,
-  inProgressLookup?: Map<string, Set<string>>
+  inProgressLookup?: Map<string, Set<string>>,
+  plannedLookup?: Map<string, Set<string>>
 ): TodoDateEntry[] => todos
   .map((todo) => {
-    const badges = getTodoDateBadges(todo, targetDateKey, inProgressLookup);
+    const badges = getTodoDateBadges(todo, targetDateKey, inProgressLookup, plannedLookup);
 
-    if (!badges.scheduled && !badges.deadline && !badges.recurring && !badges.maybe && !badges.completed && !badges.inProgress) {
+    if (!Object.values(badges).some(Boolean)) {
       return null;
     }
 
@@ -824,8 +840,9 @@ export const buildTodoDateEntries = (
   logs: Log[],
   targetDateKey: string
 ): TodoDateEntry[] => {
-  const inProgressLookup = buildInProgressLookup(logs);
-  return buildTodoDateEntriesWithLookup(todos, targetDateKey, inProgressLookup);
+  const inProgressLookup = buildTodoLogDateLookup(logs, false);
+  const plannedLookup = buildTodoPlannedLookup(logs);
+  return buildTodoDateEntriesWithLookup(todos, targetDateKey, inProgressLookup, plannedLookup);
 };
 
 export const buildTodoDateEntryMap = (
@@ -833,11 +850,12 @@ export const buildTodoDateEntryMap = (
   logs: Log[],
   targetDateKeys: string[]
 ): Record<string, TodoDateEntry[]> => {
-  const inProgressLookup = buildInProgressLookup(logs);
+  const inProgressLookup = buildTodoLogDateLookup(logs, false);
+  const plannedLookup = buildTodoPlannedLookup(logs);
   const uniqueDateKeys = Array.from(new Set(targetDateKeys));
 
   return uniqueDateKeys.reduce<Record<string, TodoDateEntry[]>>((accumulator, dateKey) => {
-    accumulator[dateKey] = buildTodoDateEntriesWithLookup(todos, dateKey, inProgressLookup);
+    accumulator[dateKey] = buildTodoDateEntriesWithLookup(todos, dateKey, inProgressLookup, plannedLookup);
     return accumulator;
   }, {});
 };

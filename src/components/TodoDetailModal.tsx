@@ -3,6 +3,7 @@
  * @input props: TodoItem, logs, categories
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
+ * @updated 2026-10-14: Documents Plan as the seventh automatically derived schedule type.
  * @description Displays detailed information for a specific Todo item, including its progress, planning fields, associated history logs, and focus stats.
  * @updated 2026-08-02: Reused the adaptive association option grid for the todo category picker without changing its original text size.
  * @updated 2026-08-09: Planned timeline blocks are excluded from todo detail statistics while remaining visible in history.
@@ -1492,7 +1493,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                       title="时间安排说明"
                       iconSize={13}
                       className="text-stone-400 hover:text-stone-600"
-                      message={'一个任务可以拥有六种排期类型：\n\nArrange：我安排这天完成\nDue：这天之前要完成\nMaybe：这几天可能做，但还没定\nRepeat：循环任务\nTrace：这天推进过\nComplete：这天正式完成\n\n前四种可以手动指定，后两种由系统自动在排期日历中生成。\n\n安排日期和截止日期可以各指定一个。可能日期可以指定未来的多个，但是当此日期过去之后，可能日期会自动更新删除。循环日期可以设定循环规则，在循环结束前，不需要点击完成。设定跳过日期可以跳过此周期循环。'}
+                      message={'一个任务可以拥有七种排期类型：\n\nArrange：我安排这天完成\nDue：这天之前要完成\nMaybe：这几天可能做，但还没定\nRepeat：循环任务\nPlan：这天有计划块\nTrace：这天推进过\nComplete：这天正式完成\n\n前四种可以手动指定，后三种由系统自动在排期日历中生成。\n\n安排日期和截止日期可以各指定一个。可能日期可以指定未来的多个，但是当此日期过去之后，可能日期会自动更新删除。循环日期可以设定循环规则，在循环结束前，不需要点击完成。设定跳过日期可以跳过此周期循环。'}
                     />
                   </div>
                 </div>

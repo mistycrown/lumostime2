@@ -3,6 +3,7 @@
  * @input Todo schedule helpers with fixed reference dates
  * @output Regression coverage for virtual-category date matching, shared day entries, and week-view badge normalization
  * @pos Test (todo planning utilities)
+ * @updated 2026-10-14: Covers planned-only dates, Plan versus Trace normalization, week buckets, and month Trace lanes.
  * @description Verifies today/tomorrow/this-week filtering and shared per-day entry building against Arrange, Due, recurrence, and Maybe rules without creating occurrence records.
  * @updated 2026-06-06: Added regression coverage that locks the shared primary-kind priority used by both month view ordering and bento-week marker color selection when one todo matches multiple schedule badges on the same day.
  * @updated 2026-05-18: Added recurrence normalization coverage so invalid monthly payloads, stale skip dates, and stray month-end fallback flags are canonicalized before runtime consumers read hydrated todo data.
@@ -17,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Log, TodoItem } from '../types';
 import {
   buildWeekTodoBuckets,
+  buildTodoPlannedLookup,
   buildTodoDateEntryMap,
   buildTodoDateEntries,
   buildTodoMonthWeekLayout,
@@ -67,6 +69,52 @@ afterEach(() => {
 });
 
 describe('todoScheduleUtils virtual category helpers', () => {
+  test('shows each planned day as Plan and keeps actual-only days as Trace', () => {
+    const todo = buildTodo({ id: 'planned-task' });
+    const dateKeys = ['2026-04-20', '2026-04-21', '2026-04-22'];
+    const logs = [
+      buildLog({ id: 'plan-20', linkedTodoId: todo.id, isPlanned: true }),
+      buildLog({ id: 'duplicate-plan', linkedTodoId: todo.id, isPlanned: true }),
+      buildLog({ id: 'plan-21', linkedTodoId: todo.id, isPlanned: true, planSource: 'recurrence-auto', startTime: new Date('2026-04-21T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'actual-22', linkedTodoId: todo.id, startTime: new Date('2026-04-22T09:00:00+08:00').getTime() }),
+      buildLog({ id: 'unlinked-plan', isPlanned: true })
+    ];
+    const entriesByDate = buildTodoDateEntryMap([todo], logs, dateKeys);
+
+    expect(dateKeys.map((dateKey) => entriesByDate[dateKey].map((entry) => entry.primaryKind))).toEqual([
+      ['planned'], ['planned'], ['inProgress']
+    ]);
+    expect(entriesByDate[dateKeys[0]][0].badges).toMatchObject({ planned: true, inProgress: false });
+    expect(getTodoScheduleMatches(todo, 'thisWeek', REFERENCE_DATE, buildTodoPlannedLookup(logs))).toEqual([
+      { dateKey: '2026-04-20', kind: 'planned' },
+      { dateKey: '2026-04-21', kind: 'planned' }
+    ]);
+    expect(buildWeekTodoBuckets([todo], logs, REFERENCE_DATE)[0].items[0].badges.planned).toBe(true);
+    const layout = buildTodoMonthWeekLayout(dateKeys, entriesByDate, 6);
+    expect(layout.traceSegments.map((segment) => segment.dateKeys)).toEqual([['2026-04-22']]);
+  });
+
+  test('prefers Plan over Trace on the same day without losing manual or completion badges', () => {
+    const todo = buildTodo({ id: 'mixed-task' });
+    const logs = [
+      buildLog({ id: 'plan', linkedTodoId: todo.id, isPlanned: true }),
+      buildLog({ id: 'actual', linkedTodoId: todo.id, isPlanned: false })
+    ];
+    expect(buildTodoDateEntries([todo], logs, '2026-04-20')[0]).toMatchObject({
+      primaryKind: 'planned', badges: { planned: true, inProgress: false }
+    });
+    expect(buildTodoDateEntries([{ ...todo, deadlineDate: '2026-04-20' }], logs, '2026-04-20')[0]).toMatchObject({
+      primaryKind: 'deadline', badges: { deadline: true, planned: true, inProgress: false }
+    });
+    expect(buildTodoDateEntries([{ ...todo, isCompleted: true, completedAt: REFERENCE_DATE.toISOString() }], logs, '2026-04-20')[0]).toMatchObject({
+      primaryKind: 'completed', badges: { completed: true, planned: true, inProgress: false }
+    });
+    expect(buildTodoDateEntries([todo], logs.filter((log) => !log.isPlanned), '2026-04-20')[0]).toMatchObject({
+      primaryKind: 'inProgress', badges: { planned: false, inProgress: true }
+    });
+    expect(buildTodoDateEntries([todo], [], '2026-04-20')).toEqual([]);
+  });
+
   test('builds Monday-based date keys for today, tomorrow, and this week', () => {
     expect(getTodoScheduleRangeDateKeys('today', REFERENCE_DATE)).toEqual(['2026-04-20']);
     expect(getTodoScheduleRangeDateKeys('tomorrow', REFERENCE_DATE)).toEqual(['2026-04-21']);

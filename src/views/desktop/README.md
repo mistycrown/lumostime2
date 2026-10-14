@@ -84,3 +84,5 @@
 - `BroadcastChannel('lumostime-data-sync')`: propagates todo changes across windows.
 - `window.focus`: refreshes widget data when the widget regains focus.
 - Periodic refresh: provides a safety-net reload in case a sync event is missed.
+
+- Update 2026-10-14: `DesktopMonthCalendar.tsx` renders Plan entries using the shared schedule palette instead of Trace strips.

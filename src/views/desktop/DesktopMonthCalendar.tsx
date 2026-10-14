@@ -3,6 +3,7 @@
  * @input Todo items, logs, current week-page start date, and desktop widget drag callbacks
  * @output Week-paged calendar grid for the Electron desktop month widget
  * @pos View helper (Desktop widget)
+ * @updated 2026-10-14: Supports shared Plan entry colors and initializes the Plan field in drag previews.
  * @description Renders a desktop scheduling calendar that pages by 2/3/4 whole weeks, keeps the app's month-view spacing feel, and supports drag-to-schedule inside the desktop widget.
  * @updated 2026-05-18: 支持在月视图小组件中如果是 recurring（循环）类型的任务，在靠右渲染 Repeat2 图标，模仿截止 (due) 条目的 Flag 样式，保持 UI 一致。
  * @updated 2026-05-17: Added a caller-controlled entry background opacity so the desktop month widget display settings can tune task strip fill strength independently from window opacity.
@@ -217,6 +218,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
         recurring: false,
         maybe: externalDraggingType === 'maybe',
         completed: false,
+        planned: false,
         inProgress: false
       },
       primaryKind: externalDraggingType === 'deadline'

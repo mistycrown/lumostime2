@@ -154,3 +154,5 @@ Update 2026-08-09: `detailTimelineGrouping.ts` centralizes detail timeline date 
 - Update 2026-10-02: `tagStickerUtils.ts` resolves active groups associated with a tag and valid keyword sticker assignments, providing color fallback after sticker removal or group reassignment. `tagStickerUtils.test.ts` covers tag isolation, legacy mood groups, asset protection, and attribute option renaming.
 
 2026-10-03：`feishuAutoSyncState.ts` 提供账号隔离的基线、最终意图合并、明确删除、整批替换保护和按版本确认的纯状态转换；上传内容指纹让图片等非日历字段的修改无需写入飞书。
+
+- Update 2026-10-14: `todoScheduleUtils.ts` separates planned blocks from actual logs, derives Plan dates for list/week/month schedules, and tests Plan precedence and Trace lanes.

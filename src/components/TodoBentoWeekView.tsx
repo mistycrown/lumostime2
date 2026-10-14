@@ -3,6 +3,7 @@
  * @input Todo items, logs, one parent-owned week start, and schedule interaction callbacks
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
+ * @updated 2026-10-14: Displays full Plan badges and shared Plan marker colors in bento week entries.
  * @description Renders one selected week at a time in the bento layout so the mini calendar, header range, and visible day cells always describe the same week.
  * @updated 2026-07-21: Applied the shared calendar number typography to the two-column week view.
  * @updated 2026-09-12: Added explicit min-size constraints to the bento schedule shell so Android WebView flex scrolling does not clip day-cell content at viewport edges.
@@ -98,8 +99,8 @@ const TODO_BENTO_MARKER_COLOR_OPTIONS = [
   { key: 'schedule', label: '按排期类型' },
   { key: 'category', label: '按任务分类' }
 ] as const;
-type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
-type BentoQuickActionBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'completed' | 'inProgress';
+type BentoBadgeKey = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'planned' | 'completed' | 'inProgress';
+type BentoQuickActionBadgeKey = BentoBadgeKey;
 type TodoBentoDisplayMode = typeof TODO_BENTO_DISPLAY_MODE_OPTIONS[number]['key'];
 type TodoBentoMarkerColorMode = typeof TODO_BENTO_MARKER_COLOR_OPTIONS[number]['key'];
 
@@ -131,6 +132,7 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
         recurring: false,
         maybe: false,
         completed: false,
+        planned: false,
         inProgress: false
       },
       primaryKind: 'deadline'
@@ -146,6 +148,7 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
         recurring: false,
         maybe: false,
         completed: false,
+        planned: false,
         inProgress: false
       },
       primaryKind: 'scheduled'
@@ -161,6 +164,7 @@ const createDraggableEntry = (entry: WeekTodoEntry): BentoDraggableEntry | null 
         recurring: false,
         maybe: true,
         completed: false,
+        planned: false,
         inProgress: false
       },
       primaryKind: 'maybe'
@@ -175,7 +179,7 @@ const getBentoBadgeDisplayLabel = (badge: BentoBadgeDescriptor, badgeCount: numb
     return badge.label;
   }
 
-  if (badge.key === 'deadline' || badge.key === 'completed') {
+  if (badge.key === 'deadline' || badge.key === 'completed' || badge.key === 'planned') {
     return badge.label;
   }
 
@@ -912,6 +916,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                               entry.badges.scheduled ? { key: 'scheduled', label: 'Arrange', color: '#7c8b97', overdue: isScheduledOverdue } : null,
                               entry.badges.recurring ? { key: 'recurring', label: 'Repeat', color: '#8b8f79' } : null,
                               entry.badges.maybe ? { key: 'maybe', label: 'Maybe', color: '#a58863' } : null,
+                              entry.badges.planned ? { key: 'planned', label: 'Plan', color: '#8377a1' } : null,
                               entry.badges.completed ? { key: 'completed', label: 'Done', color: '#7f8c84' } : null,
                               entry.badges.inProgress ? { key: 'inProgress', label: 'Trace', color: '#8b8096' } : null
                             ].filter(Boolean) as BentoBadgeDescriptor[];
@@ -945,7 +950,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
                                 </div>
                                 <div className={`shrink-0 self-center flex items-center justify-end gap-1 whitespace-nowrap text-[9px] uppercase leading-none ${hasMultipleBadges ? 'tracking-[0.08em]' : 'tracking-[0.16em]'}`}>
                                   {orderedBadges.map((badge) => (
-                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'completed' || badge.key === 'inProgress' ? (
+                                    badge.key === 'scheduled' || badge.key === 'deadline' || badge.key === 'recurring' || badge.key === 'maybe' || badge.key === 'planned' || badge.key === 'completed' || badge.key === 'inProgress' ? (
                                       <button
                                         key={badge.key}
                                         type="button"

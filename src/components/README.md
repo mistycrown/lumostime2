@@ -462,3 +462,5 @@ Components for theme and appearance customization.
 - `DetailTimelineCard.test.ts`: Added regression coverage for cross-month, planned-only, same-day planned, and all-record timeline grouping.
 - `FeishuAutoSyncPanel.tsx`: Displays the local account-bound auto-sync switch, pending/blocked status, last success and retry action. The root hook owns scheduling.
 - Update 2026-10-02: `TagStickerGroupSection.tsx` manages tag sticker previews capped at 96px, create/ZIP import actions, and a shared contextual usage hint. `StickerSetEditModal.tsx` reuses `TagAssociation.tsx` to associate groups with tags; `KeywordColorSequenceModal.tsx` enables linked tag stickers; `DetailTimelineCard.tsx` centers the first available daily sticker with a small bottom-right gray date overlay, gray keyword calendar dates, heatmap-style empty cells, and color fallback. `TagStickerCalendar.test.tsx` covers calendar and settings rendering.
+
+- Update 2026-10-14: Week and month schedules display a full `Plan` label, the shared color editor includes Plan, and the task detail hint describes all seven types.

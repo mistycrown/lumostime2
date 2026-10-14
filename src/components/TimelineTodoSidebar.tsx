@@ -3,6 +3,7 @@
  * @input Date-specific scheduled todos, logs, resolved daily checks, review entries, and selection callbacks
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
+ * @updated 2026-10-14: Includes the shared Plan badge field in synthetic sidebar entries.
  * @description Renders date-specific todos and daily checks without duplicating Todo view mutation controls.
  * @updated 2026-09-27: Lowers the split sidebar surface opacity so the active timeline background remains visibly shared.
  * @updated 2026-08-02: Replaces recurring todo completion toggles in the Chronicle sidebar with a read-only repeat marker.
@@ -89,7 +90,7 @@ export interface TimelineSidebarTodoTreeGroup {
 
 const createCategoryTodoEntry = (todo: TodoItem): SidebarTodoEntry => ({
   todo,
-  badges: { scheduled: false, deadline: false, recurring: false, maybe: false, completed: todo.isCompleted, inProgress: false },
+  badges: { scheduled: false, deadline: false, recurring: false, maybe: false, planned: false, completed: todo.isCompleted, inProgress: false },
   primaryKind: todo.isCompleted ? 'completed' : 'scheduled'
 });
 
@@ -101,7 +102,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
     .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
     .map((todo): SidebarTodoEntry => ({
       todo,
-      badges: { scheduled: false, deadline: false, recurring: false, maybe: false, completed: false, inProgress: false },
+      badges: { scheduled: false, deadline: false, recurring: false, maybe: false, planned: false, completed: false, inProgress: false },
       primaryKind: 'scheduled',
       isPinnedOnly: true
     }));
