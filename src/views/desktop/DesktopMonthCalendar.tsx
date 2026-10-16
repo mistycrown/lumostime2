@@ -1,5 +1,6 @@
 /**
  * @file DesktopMonthCalendar.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Todo items, logs, current week-page start date, and desktop widget drag callbacks
  * @output Week-paged calendar grid for the Electron desktop month widget
  * @pos View helper (Desktop widget)
@@ -66,7 +67,7 @@ interface DesktopMonthCalendarProps {
   pageStartDate: Date;
   weeksPerPage: 2 | 3 | 4;
   onMoveScheduleEntry?: (entry: TodoDateEntry, targetDateKey: string) => void;
-  onOpenTodo?: (todo: TodoItem, anchor: { x: number; y: number }) => void;
+  onOpenTodo?: (todo: TodoItem, anchor: { x: number; y: number }, occurrenceDateKey?: string) => void;
   isScheduleLocked?: boolean;
   externalDraggingTodoId?: string | null;
   externalDraggingType?: 'scheduled' | 'deadline' | 'maybe' | null;
@@ -532,7 +533,7 @@ export const DesktopMonthCalendar: React.FC<DesktopMonthCalendarProps> = ({
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     void resolveDesktopTodoQuickEditorScreenAnchor(event).then((anchor) => {
-                                      onOpenTodo(entry.todo, anchor);
+                                      onOpenTodo(entry.todo, anchor, entry.dateKey);
                                     });
                                   }}
                                   className="flex w-full items-center justify-between gap-0.5 text-left"

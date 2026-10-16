@@ -10,6 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  * Updated 2026-10-14: Synchronizes timer scope rules separately from configured template scopes.
  * Updated 2026-07-22: Exposes queued TODAY + PIN checkbox changes so the app can persist widget-side todo completion updates.
@@ -570,6 +571,7 @@ class WidgetBridgePlugin : Plugin() {
             put("isCompleted", action.isCompleted)
             put("createdAt", action.createdAt)
             put("actionType", action.actionType)
+            put("occurrenceDateKey", action.occurrenceDateKey)
             put("title", action.title)
         }
     }
@@ -836,11 +838,20 @@ class WidgetBridgePlugin : Plugin() {
                     deadlineDate = parseNullableString(item.optString("deadlineDate")),
                     maybeDates = item.optJSONArray("maybeDates").toStringList(),
                     recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule(),
-                    completedAt = parseNullableString(item.optString("completedAt"))
+                    completedAt = parseNullableString(item.optString("completedAt")),
+                    occurrenceCompletions = item.optJSONObject("occurrenceCompletions").toOccurrenceCompletions()
                 )
             )
         }
         return values
+    }
+
+    private fun JSONObject?.toOccurrenceCompletions(): Map<String, String> {
+        if (this == null) return emptyMap()
+        return keys().asSequence().mapNotNull { dateKey ->
+            val completedAt = optJSONObject(dateKey)?.optString("completedAt")
+            if (completedAt.isNullOrBlank()) null else dateKey to completedAt
+        }.toMap()
     }
 
     private fun JSONObject.toTodoPinSourceRecurrenceRule(): WidgetTodoPinSourceRecurrenceRule? {

@@ -1,5 +1,6 @@
 /**
  * @file DesktopTodoQuickEditorWindowView.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Electron quick-editor payloads plus live todo data snapshots
  * @output Transparent always-on-top desktop quick editor that can exceed the source widget bounds
  * @pos View (Desktop widget)
@@ -19,6 +20,9 @@ import {
 import type { DesktopTodoQuickEditorWindowPayload } from '../../services/desktopWidgetService';
 import type { TodoItem } from '../../types';
 import { buildDesktopTodoQuickEditorModel } from '../../utils/desktopTodoQuickEditorUtils';
+import { canCompleteTodoOccurrence, getTodoForOccurrence, setTodoCompletion } from '../../utils/todoOccurrenceUtils';
+import { getTodayDateKey } from '../../utils/todoScheduleUtils';
+import { TodoDatePickerModal } from '../../components/TodoDatePickerModal';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 
@@ -27,6 +31,8 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [isCompletionPickerOpen, setIsCompletionPickerOpen] = useState(false);
+  const occurrenceDateKey = payload?.occurrenceDateKey || getTodayDateKey();
 
   const refreshTodos = useCallback(async () => {
     try {
@@ -86,9 +92,19 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
   }, [refreshTodos]);
 
   const selectedTodoModel = useMemo(
-    () => (selectedTodoId ? buildDesktopTodoQuickEditorModel(todos, selectedTodoId) : null),
-    [selectedTodoId, todos]
+    () => {
+      const model = selectedTodoId ? buildDesktopTodoQuickEditorModel(todos, selectedTodoId) : null;
+      return model ? { ...model, todo: getTodoForOccurrence(model.todo, occurrenceDateKey) } : null;
+    },
+    [selectedTodoId, todos, occurrenceDateKey]
   );
+
+  useEffect(() => {
+    const todo = todos.find((item) => item.id === selectedTodoId);
+    if (payload && todo) {
+      setIsCompletionPickerOpen(Boolean(todo.recurrenceRule && !todo.isCompleted && !canCompleteTodoOccurrence(todo, occurrenceDateKey)));
+    }
+  }, [payload, selectedTodoId, Boolean(selectedTodoModel), occurrenceDateKey]);
 
   useEffect(() => {
     if (payload) {
@@ -142,6 +158,7 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
           anchor={{ x: 0, y: 0 }}
           isDark={isDark}
           model={selectedTodoModel}
+          occurrenceDateKey={occurrenceDateKey}
           inline
           onClose={() => window.desktopWidget?.closeTodoQuickEditor?.()}
           onOpenDetail={handleOpenTodoDetail}
@@ -155,17 +172,32 @@ export const DesktopTodoQuickEditorWindowView: React.FC = () => {
             { note },
             'Failed to save todo note from desktop quick editor'
           )}
-          onToggleComplete={(todoId, isCompleted) => saveTodoPatch(
-            todoId,
-            {
-              isCompleted,
-              completedAt: isCompleted ? new Date().toISOString() : undefined
-            },
-            'Failed to toggle todo completion state from desktop quick editor'
-          )}
+          onToggleComplete={(todoId, isCompleted) => {
+            const todo = todos.find((item) => item.id === todoId);
+            if (!todo) return;
+            if (todo.recurrenceRule && !todo.isCompleted && !canCompleteTodoOccurrence(todo, occurrenceDateKey)) {
+              setIsCompletionPickerOpen(true);
+              return;
+            }
+            return saveTodoPatch(todoId, setTodoCompletion(todo, isCompleted, todo.isCompleted ? undefined : occurrenceDateKey), 'Failed to complete todo occurrence');
+          }}
           onSelectTodo={(todoId) => setSelectedTodoId(todoId)}
         />
       )}
+      <TodoDatePickerModal
+        isOpen={isCompletionPickerOpen}
+        title="选择完成日期"
+        isDateSelectable={(dateKey) => {
+          const todo = todos.find((item) => item.id === selectedTodoId);
+          return Boolean(todo && canCompleteTodoOccurrence(todo, dateKey));
+        }}
+        onSelect={(dateKey) => {
+          const todo = todos.find((item) => item.id === selectedTodoId);
+          if (todo) void saveTodoPatch(todo.id, setTodoCompletion(todo, !todo.occurrenceCompletions?.[dateKey], dateKey), 'Failed to complete todo occurrence');
+          setIsCompletionPickerOpen(false);
+        }}
+        onClose={() => setIsCompletionPickerOpen(false)}
+      />
     </div>
   );
 };

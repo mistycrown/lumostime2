@@ -1,5 +1,6 @@
 /**
  * @file TodoDetailModal.tsx
+ * @updated 2026-10-16: Preserves occurrence history on autosave and labels series completion explicitly.
  * @input props: TodoItem, logs, categories
  * @output Modal Interaction (Edit Todo, View History)
  * @pos Component (Modal)
@@ -763,6 +764,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     parentTodoId: isQuickReminder ? undefined : parentTodoId,
     childOrder: isQuickReminder ? undefined : childOrder,
     title: title.trim(),
+    occurrenceCompletions: persistedTodo ? persistedTodo.occurrenceCompletions : initialTodo?.occurrenceCompletions,
     isCompleted,
     completedAt: isCompleted
       ? (completedAt || (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString()))
@@ -1181,7 +1183,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
                 >
                   {isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                  {isCompleted ? '已完成' : '标记完成'}
+                  {recurrenceRule ? (isCompleted ? '恢复循环' : '结束循环') : (isCompleted ? '已完成' : '标记完成')}
                 </button>
               </div>
               {isSubtask ? (

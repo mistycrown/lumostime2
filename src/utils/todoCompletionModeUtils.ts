@@ -1,5 +1,6 @@
 /**
  * @file todoCompletionModeUtils.ts
+ * @updated 2026-10-16: Passes the recorded occurrence date into optional completion.
  * @input Linked todo state, one-shot completion toggle state, and submit callbacks
  * @output Shared helpers for gating and sequencing optional todo completion after log/session submission
  * @pos Utility
@@ -13,7 +14,8 @@ type TodoCompletionCandidate = Pick<TodoItem, 'id' | 'isCompleted'> | undefined;
 interface RunWithOptionalTodoCompletionParams {
   runPrimaryAction: () => void;
   linkedTodoId?: string;
-  completeLinkedTodo?: (todoId: string) => boolean;
+  completeLinkedTodo?: (todoId: string, occurrenceDateKey?: string) => boolean;
+  occurrenceDateKey?: string;
 }
 
 interface RunWithOptionalTodoCompletionResult {
@@ -35,7 +37,8 @@ export const getCompletionModeTodoId = (
 export const runPrimaryActionWithOptionalTodoCompletion = ({
   runPrimaryAction,
   linkedTodoId,
-  completeLinkedTodo
+  completeLinkedTodo,
+  occurrenceDateKey
 }: RunWithOptionalTodoCompletionParams): RunWithOptionalTodoCompletionResult => {
   runPrimaryAction();
 
@@ -49,7 +52,9 @@ export const runPrimaryActionWithOptionalTodoCompletion = ({
   try {
     return {
       attemptedTodoCompletion: true,
-      todoCompletionSucceeded: completeLinkedTodo(linkedTodoId)
+      todoCompletionSucceeded: occurrenceDateKey
+        ? completeLinkedTodo(linkedTodoId, occurrenceDateKey)
+        : completeLinkedTodo(linkedTodoId)
     };
   } catch {
     return {

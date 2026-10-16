@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-16: Android and Electron today-widget snapshots expose per-date completion while mirrored source tasks retain series state and completion history. Completed recurring occurrences sort after pending tasks and appear pending again on the next scheduled date.
+
 Update 2026-10-11: Audited all 17 theme image save call sites and the direct original-only TimePal writer. Real ZIP import verifies one stored file per theme image. The mood-calendar integration test now checks the unified sync event list without relying on its historical variable name.
 
 Update 2026-10-11: The settings cleanup checker lists obsolete theme thumbnails even when their originals remain referenced. Cleanup removes those thumbnails individually on every platform, preserves referenced counterpart files, and reports original-only theme assets without missing-thumbnail warnings.

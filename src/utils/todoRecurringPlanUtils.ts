@@ -1,5 +1,6 @@
 /**
  * @file todoRecurringPlanUtils.ts
+ * @updated 2026-10-16: Excludes completed occurrences from automatic Plan replenishment.
  * @input Todo items, timeline logs, and local reference dates
  * @output Normalized recurring Plan configs, occurrence windows, generated Plan logs, and deletion-lock checks
  * @pos Utility (Todo planning)
@@ -232,7 +233,7 @@ export const getRecurringPlanOccurrenceDateKeys = (
 
   for (let index = 0; index < maxIterations && dateKeys.length < config.horizonCount; index += 1) {
     const dateKey = formatDateKey(cursor);
-    if (matchesRecurrenceRule(recurrenceRule, dateKey)) {
+    if (matchesRecurrenceRule(recurrenceRule, dateKey) && !todo.occurrenceCompletions?.[dateKey]) {
       dateKeys.push(dateKey);
     }
 
@@ -303,6 +304,7 @@ export const buildRecurringPlanTodoSignature = (todos: TodoItem[]): string => JS
     .map((todo) => ({
       id: todo.id,
       isCompleted: todo.isCompleted,
+      occurrenceCompletions: todo.occurrenceCompletions || null,
       kind: todo.kind || 'project',
       parentTodoId: todo.parentTodoId || '',
       recurrenceRule: todo.recurrenceRule || null,

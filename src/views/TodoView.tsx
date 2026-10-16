@@ -1,5 +1,6 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-16: Groups completed recurring occurrences by day and retains dates in quick actions.
  * @updated 2026-10-11: Wires arrange/due date selection into the shared quick-actions sheet.
  * @updated 2026-10-04: Wires searchable main-task association into shared todo quick actions.
  * @updated 2026-07-21: Kept week-view date columns transparent in dark mode.
@@ -65,6 +66,7 @@ import {
   useCalendarNumberStyle
 } from '../services/calendarNumberStyleService';
 import { useTodoQuickActions } from '../hooks/useTodoQuickActions';
+import { canCompleteTodoOccurrence, getTodoForOccurrence } from '../utils/todoOccurrenceUtils';
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { formatTodoCompactScheduleSummary, formatTodoCompletionDate, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
@@ -91,7 +93,7 @@ interface TodoViewProps {
   categories: TodoCategory[];
   activityCategories: Category[];
   scopes: Scope[];
-  onToggleTodo: (id: string) => void;
+  onToggleTodo: (id: string, occurrenceDateKey?: string) => void;
   onEditTodo: (todo: TodoItem) => void;
   onAddTodo: (categoryId: string, draft?: Partial<TodoItem>) => void;
   onStartFocus: (todo: TodoItem) => void;
@@ -111,9 +113,10 @@ const SwipeableTodoItem: React.FC<{
   categories: TodoCategory[];
   activityCategories: Category[];
   scopes: Scope[];
-  onToggle: (id: string) => void;
+  onToggle: (id: string, occurrenceDateKey?: string) => void;
   onOpenDetail: (todo: TodoItem) => void;
-  onOpenQuickActions: (todo: TodoItem) => void;
+  onOpenQuickActions: (todo: TodoItem, occurrenceDateKey?: string | null) => void;
+  occurrenceDateKey?: string | null;
   onStartFocus: (todo: TodoItem) => void;
   onDuplicate: (todo: TodoItem) => void;
   viewMode: 'loose' | 'compact';
@@ -136,6 +139,7 @@ const SwipeableTodoItem: React.FC<{
   onToggle,
   onOpenDetail,
   onOpenQuickActions,
+  occurrenceDateKey: requestedOccurrenceDateKey,
   onStartFocus,
   onDuplicate,
   viewMode,
@@ -152,9 +156,12 @@ const SwipeableTodoItem: React.FC<{
   backgroundIndex = 0
 }) => {
   const cardBackground = useCardBackground(backgroundIndex, viewMode === 'loose');
+  const occurrenceDateKey = requestedOccurrenceDateKey === null ? null : requestedOccurrenceDateKey
+    || (canCompleteTodoOccurrence(todo, getTodayDateKey()) ? getTodayDateKey() : undefined);
   const cardBackgroundAccentStyle = getTodoCardBackgroundAccentStyle(cardBackground.active);
   const [translateX, setTranslateX] = useState(0);
   const isQuickReminder = isQuickTodo(todo);
+  const isTodayOccurrenceCompleted = !todo.isCompleted && Boolean(todo.recurrenceRule && todo.occurrenceCompletions?.[getTodayDateKey()]);
   const canQuickToggle = true;
   const quickToggleDirection: 'left' = 'left';
   const shouldShowCompactScheduleLabels = viewMode !== 'compact' || compactDisplaySettings.showScheduleType;
@@ -295,13 +302,18 @@ const SwipeableTodoItem: React.FC<{
     let handledGesture = releaseAction !== 'none';
 
     if (releaseAction === 'openQuickActions') {
-      onOpenQuickActions(todo);
+      onOpenQuickActions(todo, occurrenceDateKey);
     } else if (releaseAction === 'duplicate') {
       onDuplicate(todo);
     } else if (releaseAction === 'openDetail') {
       onOpenDetail(todo);
     } else if (releaseAction === 'toggleComplete') {
-      onToggle(todo.id);
+      if (todo.recurrenceRule && !todo.isCompleted
+        && (!occurrenceDateKey || !canCompleteTodoOccurrence(todo, occurrenceDateKey))) {
+        onOpenQuickActions(todo, occurrenceDateKey);
+      } else {
+        onToggle(todo.id, occurrenceDateKey || undefined);
+      }
     }
 
     shouldSuppressClickRef.current = handledGesture;
@@ -367,7 +379,7 @@ const SwipeableTodoItem: React.FC<{
       return;
     }
 
-    onOpenQuickActions(todo);
+    onOpenQuickActions(todo, occurrenceDateKey);
   };
 
   const isDuplicateSwipeState = translateX > duplicateSwipeDistance;
@@ -410,6 +422,7 @@ const SwipeableTodoItem: React.FC<{
     </>
   ) : null;
   const hasMetaBadges = Boolean(
+    isTodayOccurrenceCompleted ||
     hierarchyBadges ||
     visibleScheduleMatchLabels.length > 0 ||
     hiddenScheduleMatchCount > 0 ||
@@ -435,7 +448,7 @@ const SwipeableTodoItem: React.FC<{
         style={{ opacity: quickToggleDirection === 'left' && translateX < 0 ? 1 : 0 }}
       >
         <span className="flex items-center gap-2">
-          {todo.isCompleted ? 'UNDO' : 'COMPLETE'} <CheckCircle2 size={20} />
+          {todo.isCompleted || (occurrenceDateKey && todo.occurrenceCompletions?.[occurrenceDateKey]) ? 'UNDO' : 'COMPLETE'} <CheckCircle2 size={20} />
         </span>
       </div>
 
@@ -528,6 +541,7 @@ const SwipeableTodoItem: React.FC<{
           {hasMetaBadges && (
           <div className={`flex items-center gap-x-1.5 gap-y-1 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
             {viewMode === 'loose' && hierarchyBadges}
+            {isTodayOccurrenceCompleted && <span className="text-[11px] text-stone-400">今日已完成</span>}
             {visibleScheduleMatchLabels.map((label) => (
               scheduleLabelStyle === 'schedule' ? (
                 <span
@@ -698,6 +712,7 @@ const VIRTUAL_SCHEDULE_FILTERS: Array<{ id: TodoScheduleRange; label: string }> 
 const PIN_SCHEDULE_MATCH_LABEL = 'Pin';
 
 const TODO_SCHEDULE_MATCH_LABELS: Record<TodoScheduleMatch['kind'], string> = {
+  completed: 'Done',
   deadline: 'Due',
   scheduled: 'Arrange',
   recurring: 'Repeat',
@@ -715,6 +730,7 @@ const COMPACT_SCHEDULE_LABELS: Record<string, string> = {
 };
 
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = {
+  completed: -1,
   deadline: 0,
   scheduled: 1,
   recurring: 2,
@@ -724,6 +740,7 @@ const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatch['kind'], number> = 
 
 interface TodoListEntry {
   todo: TodoItem;
+  occurrenceDateKey?: string | null;
   scheduleMatchLabels: string[];
   scheduleMatches: TodoScheduleMatch[];
   hierarchyDepth?: 0 | 1;
@@ -1134,6 +1151,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
   } | null>(null);
   const {
     quickActionTodo,
+    quickActionOccurrenceDateKey,
     quickActionOpenedAt,
     openQuickActions,
     closeQuickActions,
@@ -1329,15 +1347,19 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       filterVisibleTodos(displayTodos, showCompletedTodos)
         .map((todo) => {
           const scheduleMatches = getTodoScheduleMatches(todo, range, referenceDate, plannedLookup);
+          const dates = Array.from(new Set(scheduleMatches.map((match) => match.dateKey)));
+          const occurrenceDateKey = todo.recurrenceRule ? (dates.length === 1 ? dates[0] : null) : undefined;
+          const displayTodo = occurrenceDateKey ? getTodoForOccurrence(todo, occurrenceDateKey) : todo;
 
           return decorateTodoListEntryWithHierarchy(
-            buildTodoListEntry(todo, scheduleMatches, {
+            { ...buildTodoListEntry(displayTodo, scheduleMatches, {
               includePinLabel: range === 'today'
-            }),
+            }), occurrenceDateKey },
             todos
           );
         })
         .filter((entry) => entry.scheduleMatches.length > 0)
+        .filter((entry) => showCompletedTodos || !entry.todo.isCompleted)
         .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: range === 'today', orderLookup }))
     );
 
@@ -1361,12 +1383,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         const combinedMatches = todayMatches.length > 0 ? todayMatches : overdueMatches;
 
         return decorateTodoListEntryWithHierarchy(
-          buildTodoListEntry(todo, combinedMatches, {
+          { ...buildTodoListEntry(getTodoForOccurrence(todo, todayDateKey), combinedMatches, {
             includePinLabel: true
-          }),
+          }), occurrenceDateKey: todo.recurrenceRule ? todayDateKey : undefined },
           todos
         );
       })
+      .filter((entry) => showCompletedTodos || !entry.todo.isCompleted)
       .sort((left, right) => sortTodoListEntries(left, right, { pinFirst: true, orderLookup }));
   }, [displayTodos, showCompletedTodos, todayDateKey, plannedLookup]);
 
@@ -1541,7 +1564,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         sections.push({
           dateKey: '__pin__',
           label: 'Pin',
-          entries: pinnedTodayEntries
+          entries: pinnedTodayEntries.filter((entry) => !entry.todo.isCompleted)
         });
       }
 
@@ -1549,7 +1572,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         sections.push({
           dateKey: todayDateKey,
           label: formatScheduleSectionLabel(todayDateKey, todayDateKey, tomorrowDateKey),
-          entries: nonPinnedTodayEntries
+          entries: nonPinnedTodayEntries.filter((entry) => !entry.todo.isCompleted)
         });
       }
 
@@ -1559,6 +1582,11 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           label: '过期未完成',
           entries: overdueTodayEntries
         });
+      }
+
+      const completedEntries = [...pinnedTodayEntries, ...nonPinnedTodayEntries].filter((entry) => entry.todo.isCompleted);
+      if (completedEntries.length > 0) {
+        sections.push({ dateKey: '__completed__', label: '已完成', entries: completedEntries });
       }
 
       return sections;
@@ -2149,7 +2177,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const handleWeekBadgeClick = (entry: WeekTodoEntry, _badgeKey: WeekQuickActionBadgeKey) => {
     if (touchDragActivatedRef.current) return;
-    openQuickActions(entry.todo);
+    openQuickActions(entry.todo, entry.dateKey);
   };
 
   const assignModalDateLabel = useMemo(() => {
@@ -2254,6 +2282,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     <TodoQuickActionsModal
       isOpen={quickActionTodo !== null}
       todo={quickActionTodo}
+      occurrenceDateKey={quickActionOccurrenceDateKey}
       todos={todos}
       todoCategories={standardTodoCategories}
       onMoveDate={handleQuickActionMove}
@@ -2930,11 +2959,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                     <React.Fragment key={entry.todo.id}>
                       <SwipeableTodoItem
                         todo={entry.todo}
+                        occurrenceDateKey={entry.occurrenceDateKey}
                         categories={categories}
                         activityCategories={activityCategories}
                         scopes={scopes}
                         onToggle={onToggleTodo}
-                        onOpenDetail={onEditTodo}
+                        onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                         onOpenQuickActions={openQuickActions}
                         onStartFocus={onStartFocus}
                         onDuplicate={handleOpenDuplicateModal}
@@ -2966,11 +2996,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                             <SwipeableTodoItem
                               key={childEntry.todo.id}
                               todo={childEntry.todo}
+                              occurrenceDateKey={childEntry.occurrenceDateKey}
                               categories={categories}
                               activityCategories={activityCategories}
                               scopes={scopes}
                               onToggle={onToggleTodo}
-                              onOpenDetail={onEditTodo}
+                              onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                               onOpenQuickActions={openQuickActions}
                               onStartFocus={onStartFocus}
                               onDuplicate={handleOpenDuplicateModal}
@@ -3000,11 +3031,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   <React.Fragment key={entry.todo.id}>
                     <SwipeableTodoItem
                       todo={entry.todo}
+                      occurrenceDateKey={entry.occurrenceDateKey}
                       categories={categories}
                       activityCategories={activityCategories}
                       scopes={scopes}
                       onToggle={onToggleTodo}
-                      onOpenDetail={onEditTodo}
+                      onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                       onOpenQuickActions={openQuickActions}
                       onStartFocus={onStartFocus}
                       onDuplicate={handleOpenDuplicateModal}
@@ -3036,11 +3068,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                           <SwipeableTodoItem
                             key={childEntry.todo.id}
                             todo={childEntry.todo}
+                            occurrenceDateKey={childEntry.occurrenceDateKey}
                             categories={categories}
                             activityCategories={activityCategories}
                             scopes={scopes}
                             onToggle={onToggleTodo}
-                            onOpenDetail={onEditTodo}
+                            onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                             onOpenQuickActions={openQuickActions}
                             onStartFocus={onStartFocus}
                             onDuplicate={handleOpenDuplicateModal}
@@ -3064,11 +3097,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   <SwipeableTodoItem
                     key={entry.todo.id}
                     todo={entry.todo}
+                    occurrenceDateKey={entry.occurrenceDateKey}
                     categories={categories}
                     activityCategories={activityCategories}
                     scopes={scopes}
                     onToggle={onToggleTodo}
-                    onOpenDetail={onEditTodo}
+                    onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                     onOpenQuickActions={openQuickActions}
                     onStartFocus={onStartFocus}
                     onDuplicate={handleOpenDuplicateModal}
@@ -3087,11 +3121,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                   <section key={group.parentEntry.todo.id} className={viewMode === 'compact' ? 'mb-0' : 'mb-3'}>
                     <SwipeableTodoItem
                       todo={group.parentEntry.todo}
+                      occurrenceDateKey={group.parentEntry.occurrenceDateKey}
                       categories={categories}
                       activityCategories={activityCategories}
                       scopes={scopes}
                       onToggle={onToggleTodo}
-                      onOpenDetail={onEditTodo}
+                      onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                       onOpenQuickActions={openQuickActions}
                       onStartFocus={onStartFocus}
                       onDuplicate={handleOpenDuplicateModal}
@@ -3120,11 +3155,12 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
                           <SwipeableTodoItem
                             key={entry.todo.id}
                             todo={entry.todo}
+                            occurrenceDateKey={entry.occurrenceDateKey}
                             categories={categories}
                             activityCategories={activityCategories}
                             scopes={scopes}
                             onToggle={onToggleTodo}
-                            onOpenDetail={onEditTodo}
+                            onOpenDetail={(todo) => onEditTodo(todos.find((item) => item.id === todo.id) || todo)}
                             onOpenQuickActions={openQuickActions}
                             onStartFocus={onStartFocus}
                             onDuplicate={handleOpenDuplicateModal}

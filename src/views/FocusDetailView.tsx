@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Save focus-note drafts on blur/exit/background and discard after completion or cancellation.
  * @file FocusDetailView.tsx
+ * @updated 2026-10-16: Completes the recurring occurrence on the session start date.
  * @updated 2026-10-09: Adds inline historical note completion while preserving buffered focus-note commits.
  * @input Active Session Data, Todos, Categories, Scopes
  * @output Session Updates (Note, Association), Completion Event
@@ -16,6 +17,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { formatDateKey } from '../utils/todoScheduleUtils';
 import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ActiveSession, TodoItem, Category, Activity, TodoCategory, Scope, AutoLinkRule, Log } from '../types';
@@ -55,7 +57,7 @@ interface FocusDetailViewProps {
     onClose: () => void;
     onCancel?: (sessionId: string) => void;
     onComplete: (session: ActiveSession) => void;
-    onCompleteLinkedTodo?: (todoId: string) => boolean;
+    onCompleteLinkedTodo?: (todoId: string, occurrenceDateKey?: string) => boolean;
     onUpdate: (session: ActiveSession) => void;
     onUpdateActivity?: (activity: Activity) => void;
     logs?: Log[];
@@ -415,7 +417,8 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
         const submitResult = runPrimaryActionWithOptionalTodoCompletion({
             runPrimaryAction: () => onComplete(finalSession),
             linkedTodoId: linkedTodoIdToComplete,
-            completeLinkedTodo: onCompleteLinkedTodo
+            completeLinkedTodo: onCompleteLinkedTodo,
+            occurrenceDateKey: linkedTodo?.recurrenceRule ? formatDateKey(new Date(session.startTime)) : undefined
         });
 
         if (submitResult.attemptedTodoCompletion && !submitResult.todoCompletionSucceeded) {

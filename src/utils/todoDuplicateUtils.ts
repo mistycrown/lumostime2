@@ -1,5 +1,6 @@
 /**
  * @file todoDuplicateUtils.ts
+ * @updated 2026-10-16: Normalizes occurrence history and clears it when duplicating tasks.
  * @input Todo items plus duplicate cleanup options
  * @output Pure helpers for todo duplication and schedule-field normalization
  * @pos Utility
@@ -12,6 +13,7 @@
 import { TodoDuplicateOptions, TodoItem } from '../types';
 import { normalizeMaybeDates } from './todoScheduleUtils';
 import { normalizeTodoRecurringPlanConfig } from './todoRecurringPlanUtils';
+import { normalizeOccurrenceCompletions } from './todoOccurrenceUtils';
 
 export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
   const skipDates = todo.recurrenceRule?.skipDates?.length
@@ -24,6 +26,7 @@ export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
 
   return {
     ...todo,
+    occurrenceCompletions: normalizeOccurrenceCompletions(todo.occurrenceCompletions),
     maybeDates: normalizeMaybeDates(todo.maybeDates),
     recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
       ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
@@ -53,6 +56,7 @@ export const buildDuplicatedTodo = (
     isCompleted: false,
     pin: false,
     completedAt: undefined,
+    occurrenceCompletions: undefined,
     completedUnits: 0,
     coverImage: undefined,
     note: undefined,

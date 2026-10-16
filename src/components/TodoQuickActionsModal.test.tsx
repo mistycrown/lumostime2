@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.test.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-11: Supplies the shared single-date selection callback.
  * @input TodoQuickActionsModal props
  * @output Regression coverage for quick category move visibility and Maybe-date summary rendering in the shared todo quick-actions sheet
@@ -62,6 +63,28 @@ const baseProps = {
 };
 
 describe('TodoQuickActionsModal category move', () => {
+  test('offers single completion with an explicit occurrence date', () => {
+    const todo = {
+      id: 'repeat', title: 'Read', categoryId: 'cat-a', isCompleted: false,
+      recurrenceRule: { frequency: 'daily', startDate: '2026-10-01' }
+    } as any;
+    const html = renderToStaticMarkup(<TodoQuickActionsModal {...baseProps} todo={todo} occurrenceDateKey="2026-10-16" />);
+    expect(html).toContain('完成本次');
+    expect(html).toContain('10/16');
+    expect(html).not.toContain('撤销本次完成');
+  });
+
+  test('offers occurrence undo while keeping the series open', () => {
+    const todo = {
+      id: 'repeat', title: 'Read', categoryId: 'cat-a', isCompleted: false,
+      recurrenceRule: { frequency: 'daily', startDate: '2026-10-01' },
+      occurrenceCompletions: { '2026-10-16': { completedAt: '2026-10-17T05:30:00Z' } }
+    } as any;
+    const html = renderToStaticMarkup(<TodoQuickActionsModal {...baseProps} todo={todo} occurrenceDateKey="2026-10-16" />);
+    expect(html).toContain('撤销本次完成');
+    expect(html).not.toContain('title="完成本次"');
+    expect(html).not.toContain('恢复循环');
+  });
   test('renders main-task association beside duplicate for eligible tasks', () => {
     const todo = { id: 'leaf', title: 'Leaf', categoryId: 'cat-a', isCompleted: false } as any;
     const html = renderToStaticMarkup(

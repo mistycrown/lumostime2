@@ -1,5 +1,7 @@
 # Electron Layer
 
+Update 2026-10-16: Todo completion actions and quick-editor payloads accept an optional occurrence date, preserving the selected widget date across IPC and midnight boundaries.
+
 The `electron/` directory contains the main process and preload scripts for running LumosTime as a desktop application.
 
 ## Architecture

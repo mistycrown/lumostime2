@@ -1,5 +1,6 @@
 /**
  * @file TodoDetailModal.test.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input TodoDetailModal component props
  * @output Regression coverage for parent-task detail rendering from subtask navigation
  * @pos Test
@@ -12,6 +13,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test, vi } from 'vitest';
+vi.mock('../services/appearanceBackupService', () => ({ APPEARANCE_RESTORED_EVENT: 'test-appearance-restored' }));
 import { replaceCompletedAtDate, resolvePersistedTodoForDetail, TodoDetailModal } from './TodoDetailModal';
 
 let detailTimelineCardProps: any = null;

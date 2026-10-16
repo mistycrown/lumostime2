@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-16: Todo manager and quick-action completion preserve the recurring series and accept occurrence dates. Android widget reconciliation replays completion actions per date with the original action time. `vitest.todo.config.ts` covers the shared completion, schedule, modal and widget paths.
+
 Update 2026-10-16: `useReviewManager.ts` inserts missing weekly/monthly records when an editor commits on return, matching daily review behavior. The buffered editor renderer regression covers missing-record save/reopen, repeat updates, local period dates and template snapshots.
 
 Update 2026-10-16: `useBufferedRecord.ts` accepts an optional save delay; daily reviews commit after 500 ms without edits and cancel pending timers on commit, discard or exit. Other buffered editors retain their existing save timing.

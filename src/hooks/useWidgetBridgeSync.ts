@@ -1,5 +1,6 @@
 /**
  * @file useWidgetBridgeSync.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Widget native bridge state, categories, active sessions, logs, daily reviews, and daily templates
  * @output Runtime reconciliation between the Android widget layer and the React app
  * @pos Hook
@@ -59,6 +60,7 @@ import {
 import { buildSceneWidgetPayloadFromStorage } from '../services/widgetSceneService';
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 import { syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
+import { applyTodoCompletionActions } from '../utils/todoOccurrenceUtils';
 
 const fireAndForgetWidgetBridgeCall = (
   label: string,
@@ -312,7 +314,6 @@ export const useWidgetBridgeSync = () => {
         }
 
         if (todoPinActions.length > 0) {
-          const completedAt = new Date().toISOString();
           setTodos((prevTodos) => {
             const createdTodos: TodoItem[] = todoPinActions
               .filter((action) => action.actionType === 'create' && action.title?.trim())
@@ -328,19 +329,7 @@ export const useWidgetBridgeSync = () => {
               }));
             const currentTodos = [...prevTodos, ...createdTodos];
 
-            return syncSubtaskProgressToParentTodos(currentTodos.map((todo) => {
-              const action = todoPinActions.find(
-                (item) => item.actionType !== 'create' && item.todoId === todo.id
-              );
-              if (!action || todo.isCompleted === action.isCompleted) {
-                return todo;
-              }
-              return {
-                ...todo,
-                isCompleted: action.isCompleted,
-                completedAt: action.isCompleted ? todo.completedAt || completedAt : undefined
-              };
-            }));
+            return syncSubtaskProgressToParentTodos(currentTodos.map((todo) => applyTodoCompletionActions(todo, todoPinActions)));
           });
           await WidgetBridge.clearPendingTodoPinActions({ ids: todoPinActions.map((action) => action.id) });
         }

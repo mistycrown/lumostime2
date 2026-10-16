@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-16: Keeps fallback weekly/monthly draft identities stable across unrelated route renders.
  * @updated 2026-10-11: Wires arrange/due date selection for route-level todo quick actions.
  * @updated 2026-08-28: Refreshes daily-check auto states whenever logs or filter context changes.
@@ -18,6 +19,7 @@
  * @updated 2026-08-26: Applies scope and todo deletion reference decisions together with batch changes.
  * @updated 2026-09-08: Preserves the daily-check overview scroll position across detail navigation.
  */
+import { toggleTodoCompletion } from '../utils/todoOccurrenceUtils';
 import React from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { AppView, Category, DailyReview, WeeklyReview, MonthlyReview, Log, TodoItem, TodoCategory, TodoDuplicateOptions, ActiveRoutineRun, Routine } from '../types';
@@ -428,6 +430,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
 
     const {
         quickActionTodo,
+        quickActionOccurrenceDateKey,
         quickActionOpenedAt,
         openQuickActions,
         closeQuickActions,
@@ -447,6 +450,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         handleQuickActionUpdateTitle,
         handleQuickActionUpdateNote
     } = useTodoQuickActions({
+        todos,
         onSaveTodo: handleSaveTodo,
         onEditTodo: openEditTodoModal,
         onDeleteTodo: handleDeleteTodo
@@ -479,11 +483,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
     };
 
     const handleToggleTimelineTodoCompletion = (todo: TodoItem) => {
-        handleSaveTodo({
-            ...todo,
-            isCompleted: !todo.isCompleted,
-            completedAt: todo.isCompleted ? undefined : Date.now()
-        });
+        const liveTodo = todos.find((item) => item.id === todo.id) || todo;
+        handleSaveTodo(toggleTodoCompletion(liveTodo, liveTodo.recurrenceRule ? getLocalDateStr(currentDate) : undefined));
     };
 
     const handleDeleteTimelinePlannedLog = (log: Log) => {
@@ -905,7 +906,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     activeSessions={activeSessions}
                     onNavigateToTodo={(todo) => {
                         // Reuse the Todo page quick-actions sheet from the Chronicle sidebar.
-                        openQuickActions(todo);
+                        openQuickActions(todo, getLocalDateStr(currentDate));
                     }}
                     onToggleTodoCompletion={handleToggleTimelineTodoCompletion}
                     onNavigateToGoal={(goal) => {
@@ -939,6 +940,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 <TodoQuickActionsModal
                     isOpen={quickActionTodo !== null}
                     todo={quickActionTodo}
+                    occurrenceDateKey={quickActionOccurrenceDateKey}
                     todoCategories={getRealTodoCategories(todoCategories)}
                     onMoveDate={handleQuickActionMove}
                     onSelectDate={handleQuickActionSelectDate}

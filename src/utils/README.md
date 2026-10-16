@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-16: `todoOccurrenceUtils.ts` owns sparse dated completion normalization, display projections, idempotent completion/undo and chronological native action replay. Schedule badges retain historical occurrence dates; recurring Plan replenishment skips completed dates; duplication clears completion history. Display projections must never be saved as whole-task completion.
+
 Update 2026-10-16: `referenceDeleteTargets.ts` builds eligible todo migration targets in hierarchy order, retains unavailable parents as nonselectable context, and filters target groups by child or parent names. Reference migration and hierarchy regressions are included in `vitest.todo.config.ts`.
 
 Update 2026-10-14: `widgetScopeUtils.ts` builds native timer scope rules from the auto-link preference and active scopes, then merges matching rules with explicit widget selections without duplicates.

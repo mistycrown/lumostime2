@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-16: `DataContext` validates sparse occurrence completion maps during initial hydration and desktop snapshot refresh, retaining valid dates even after recurrence rule edits.
+
 Update 2026-10-11: `NodeContext.associateAll` batches potential associations across logs and daily/weekly/monthly review answers, rechecking the latest text, preserving alias labels and leaving unrelated/already-linked records unchanged.
 
 Update 2026-10-11: `NodeContext.addNode` creates a validated node directly in a selected category (or 未分类), retaining metadata without requiring a linked record. The existing DataContext persistence, export and sync paths store these nodes.

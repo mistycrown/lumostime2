@@ -1,5 +1,6 @@
 /**
  * @file AddLogModal.tsx
+ * @updated 2026-10-16: Completes the recurring occurrence on the log start date.
  * @updated 2026-10-11: Settles note positioning after delayed keyboard panning/native scroll and stops correction on manual navigation.
  * @updated 2026-10-10: Aligns note shortcuts near the visible scroll area's top and corrects their position after keyboard viewport changes.
  * @updated 2026-10-09: Adds single inline history-based note completion with Tab and touch acceptance.
@@ -27,6 +28,7 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
+import { formatDateKey } from '../utils/todoScheduleUtils';
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Category, Log, TodoItem, TodoCategory, Scope, AutoLinkRule, Comment } from '../types';
 import { X, Trash2, TrendingUp, Plus, Minus, Lightbulb, Check, CheckCircle2, Clock, Camera, Image as ImageIcon, Maximize2, Minimize2, Share2, Scissors } from 'lucide-react';
@@ -77,7 +79,7 @@ interface AddLogModalProps {
   onSave: (log: Log) => void;
   onSplit?: (id: string, splitTime: number) => boolean;
   onMerge?: (sourceLogId: string, targetLogId: string) => boolean;
-  onCompleteLinkedTodo?: (todoId: string) => boolean;
+  onCompleteLinkedTodo?: (todoId: string, occurrenceDateKey?: string) => boolean;
 
   onDelete?: (id: string) => void;
   onImageRemove?: (logId: string, filename: string) => void;
@@ -546,7 +548,8 @@ export const AddLogModal: React.FC<AddLogModalProps> = ({ initialLog, initialSta
     const submitResult = runPrimaryActionWithOptionalTodoCompletion({
       runPrimaryAction: () => onSave(newLog),
       linkedTodoId: linkedTodoIdToComplete,
-      completeLinkedTodo: onCompleteLinkedTodo
+      completeLinkedTodo: onCompleteLinkedTodo,
+      occurrenceDateKey: linkedTodo?.recurrenceRule ? formatDateKey(new Date(newLog.startTime)) : undefined
     });
 
     if (submitResult.attemptedTodoCompletion && !submitResult.todoCompletionSucceeded) {

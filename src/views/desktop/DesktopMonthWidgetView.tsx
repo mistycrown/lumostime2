@@ -1,5 +1,6 @@
 /**
  * @file DesktopMonthWidgetView.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Desktop widget IPC bridge plus persisted todo snapshot data
  * @output Unified desktop month widget view with one shared title bar, week-paged calendar, and collapsible planning sidebar
  * @pos View (Desktop widget)
@@ -286,9 +287,10 @@ export const DesktopMonthWidgetView: React.FC = () => {
     }));
   };
 
-  const handleOpenTodoQuickEditor = (todo: TodoItem, anchor: { x: number; y: number }) => {
+  const handleOpenTodoQuickEditor = (todo: TodoItem, anchor: { x: number; y: number }, occurrenceDateKey?: string) => {
     window.desktopWidget?.openTodoQuickEditor?.({
       todoId: todo.id,
+      occurrenceDateKey,
       theme,
       x: anchor.x,
       y: anchor.y

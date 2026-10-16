@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.tsx
+ * @updated 2026-10-16: Offers dated single completion, undo and a date picker for undated recurring actions.
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
  * @pos Component
@@ -49,6 +50,7 @@ import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { TodoParentPickerModal } from './TodoParentPickerModal';
 import { canTodoLinkToParent } from '../utils/todoParentLinkUtils';
+import { canCompleteTodoOccurrence } from '../utils/todoOccurrenceUtils';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
 
@@ -62,7 +64,8 @@ interface TodoQuickActionsModalProps {
   onSelectDate: (type: 'scheduled' | 'deadline', dateKey: string) => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
-  onComplete: () => void;
+  onComplete: (dateKey?: string) => void;
+  occurrenceDateKey?: string;
   onUndoComplete: () => void;
   onTogglePin: () => void;
   onDuplicate?: () => void;
@@ -91,6 +94,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   onClearDate,
   onOpenDetail,
   onComplete,
+  occurrenceDateKey,
   onUndoComplete,
   onTogglePin,
   onDuplicate,
@@ -114,6 +118,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [datePickerType, setDatePickerType] = useState<'scheduled' | 'deadline' | null>(null);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
+  const [isCompletionPickerOpen, setIsCompletionPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [isEditingNote, setIsEditingNote] = useState(false);
@@ -131,6 +136,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
     setIsMaybePickerOpen(false);
     setDatePickerType(null);
     setIsSkipToPickerOpen(false);
+    setIsCompletionPickerOpen(false);
     setIsEditingTitle(false);
     setEditedTitle(todo?.title || '');
     setIsEditingNote(false);
@@ -161,6 +167,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
       if (isSkipToPickerOpen) {
         setIsSkipToPickerOpen(false);
+        return true;
+      }
+
+      if (isCompletionPickerOpen) {
+        setIsCompletionPickerOpen(false);
         return true;
       }
 
@@ -203,7 +214,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, datePickerType, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, datePickerType, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -387,6 +398,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
   const showDetailShortcut = !isQuickTodo(todo);
   const isRecurringTodo = Boolean(todo.recurrenceRule);
+  const isOccurrenceCompleted = Boolean(occurrenceDateKey && todo.occurrenceCompletions?.[occurrenceDateKey]);
   const canMoveCategory = !todo.parentTodoId && todoCategories.length > 1;
   const canLinkParent = Boolean(onLinkParent && canTodoLinkToParent(todo, todos));
   const canUpgradeToProject = Boolean(showUpgradeToProject && onUpgradeToProject && isQuickTodo(todo) && todoCategories.length > 0);
@@ -425,6 +437,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
   const quickActionDateRows = [
     { key: 'pin', label: 'Pin', value: todo.pin ? 'On' : null },
     { key: 'recurrence', label: '', value: recurrenceSummary },
+    { key: 'occurrence', label: '本次', value: isRecurringTodo ? formatQuickActionDate(occurrenceDateKey) : null },
     { key: 'scheduled', label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
     { key: 'deadline', label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
     { key: 'maybe', label: 'Maybe', value: maybeQuickActionValue },
@@ -470,6 +483,11 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
       return;
     }
 
+    if (isCompletionPickerOpen) {
+      setIsCompletionPickerOpen(false);
+      return;
+    }
+
     onClose();
   };
 
@@ -510,7 +528,7 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="relative border-b border-stone-200 px-5 py-4 pr-24">
+        <div className={`relative border-b border-stone-200 px-5 py-4 ${isRecurringTodo ? 'pr-36' : 'pr-24'}`}>
           <div className="text-[11px] uppercase tracking-[0.22em] text-stone-400">Quick Actions</div>
           <div
             className="-mx-1 mt-1 line-clamp-2 cursor-pointer rounded px-1 text-lg font-medium text-stone-800 transition-colors hover:bg-stone-100/60"
@@ -548,14 +566,18 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               <PanelRightOpen size={16} />
               </button>
             )}
-            {!todo.isCompleted && (
+            {!todo.isCompleted && !isOccurrenceCompleted && (
               <button
                 type="button"
-                onClick={withActionGuard(onComplete)}
-                className="rounded-full p-2 text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
-                title="标记完成"
+                onClick={withActionGuard(() => {
+                  if (isRecurringTodo && (!occurrenceDateKey || !canCompleteTodoOccurrence(todo, occurrenceDateKey))) setIsCompletionPickerOpen(true);
+                  else onComplete(occurrenceDateKey);
+                })}
+                className="inline-flex items-center whitespace-nowrap rounded-full p-2 text-stone-500 transition-colors hover:bg-white hover:text-stone-600"
+                title={isRecurringTodo ? '完成本次' : '标记完成'}
               >
                 <Check size={16} />
+                {isRecurringTodo && <span className="ml-1 text-xs">完成本次</span>}
               </button>
             )}
           </div>
@@ -789,14 +811,14 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
               </button>
             )}
 
-            {todo.isCompleted && (
+            {(todo.isCompleted || isOccurrenceCompleted) && (
               <button
                 type="button"
                 onClick={withActionGuard(onUndoComplete)}
                 className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
               >
                 <CheckCircle2 size={16} className="text-stone-400" />
-                <span>取消完成</span>
+                <span>{isRecurringTodo ? (todo.isCompleted ? '恢复循环' : '撤销本次完成') : '取消完成'}</span>
               </button>
             )}
 
@@ -856,6 +878,18 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
         onSelectMultiple={onEditMaybeDates}
         onClear={() => onEditMaybeDates([])}
         onClose={() => setIsMaybePickerOpen(false)}
+      />
+
+      <TodoDatePickerModal
+        isOpen={isCompletionPickerOpen}
+        title="选择完成日期"
+        value={occurrenceDateKey}
+        isDateSelectable={(dateKey) => canCompleteTodoOccurrence(todo, dateKey)}
+        onSelect={(dateKey) => {
+          onComplete(dateKey);
+          setIsCompletionPickerOpen(false);
+        }}
+        onClose={() => setIsCompletionPickerOpen(false)}
       />
 
       <TodoDatePickerModal

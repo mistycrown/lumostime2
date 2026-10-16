@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-16: Todo quick actions complete or undo a dated occurrence, with a date picker when the entry has no valid date. Week/month callbacks retain the selected date. Todo detail autosave preserves occurrence history and exposes series end/restore. `node scripts/test-todo-occurrence.mjs` checks actual interactions and Chinese-font mobile/desktop captures.
+
 Update 2026-10-16: `ReferenceDeleteModal` uses an in-dialog migration picker with fixed search, parent-child rows collapsed by default, contextual search results that automatically expand matching groups, and selected paths. `node scripts/test-reference-delete.mjs` verifies default collapse, explicit expansion, selection, back navigation, empty/stale targets and mobile/desktop layouts.
 
 Update 2026-10-16: `AppRoutes.tsx` assigns stable period-based identities to fallback weekly/monthly reviews so unrelated route renders keep the same editor draft until it is saved.

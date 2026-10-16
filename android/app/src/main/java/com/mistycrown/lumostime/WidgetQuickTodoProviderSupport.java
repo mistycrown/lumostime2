@@ -13,6 +13,7 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Rendering and actions for the dedicated quick-todo widget.
  * Updated 2026-08-12: Animates the manual refresh control while the widget redraws.
  * Updated 2026-10-06: Rebinds the list to each saved payload revision so home-screen additions render without opening the app.
@@ -72,13 +73,13 @@ public final class WidgetQuickTodoProviderSupport {
         sourceTodos.add(new WidgetTodoPinSourceTodo(
                 todoId, normalizedTitle, "quick", false, null, null, null,
                 java.util.Collections.<String>emptyList(), false, null, null,
-                java.util.Collections.<String>emptyList(), null, null
+                java.util.Collections.<String>emptyList(), null, null, java.util.Collections.<String, String>emptyMap()
         ));
         WidgetStores.INSTANCE.saveTodoPinPayload(context, new WidgetTodoPinPayload(
                 payload.getDate(), payload.getItems(), now, sourceTodos, payload.getSourceCategories()
         ));
         WidgetStores.INSTANCE.appendPendingTodoPinAction(context, new WidgetPendingTodoPinAction(
-                "quick-create-" + todoId, todoId, false, now, "create", normalizedTitle
+                "quick-create-" + todoId, todoId, false, now, "create", normalizedTitle, null
         ));
         WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgets(context);
     }

@@ -1,5 +1,7 @@
 # Desktop Widget Views
 
+Update 2026-10-16: Today and month widget actions carry occurrence dates into the main app or quick-editor window. The editor uses display-only completion projections and saves dated completion against the original task; invalid dates open the shared date picker.
+
 `src/views/desktop/` contains the Electron-only widget surfaces. They run in separate windows and sync with the main app through IPC, IndexedDB snapshots, and `BroadcastChannel`.
 
 ## Updates

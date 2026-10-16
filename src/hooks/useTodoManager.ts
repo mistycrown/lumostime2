@@ -1,5 +1,6 @@
 /**
  * @file useTodoManager.ts
+ * @updated 2026-10-16: Routes completion through dated occurrence helpers without ending recurring tasks.
  * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules)
  * @output Todo CRUD Operations with recurring auto-Plan cleanup (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
  * @pos Hook (Data Manager)
@@ -39,6 +40,8 @@ import {
 import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { pushTodoDetailHistory } from '../utils/todoDetailNavigation';
 import { isQuickTodo } from '../utils/todoKindUtils';
+import { canCompleteTodoOccurrence, setTodoCompletion, toggleTodoCompletion } from '../utils/todoOccurrenceUtils';
+import { getTodayDateKey } from '../utils/todoScheduleUtils';
 import { getRealTodoCategories } from '../utils/todoQuickCategoryUtils';
 import { buildDuplicatedTodo, normalizeTodoScheduleFields } from '../utils/todoDuplicateUtils';
 import { isTodoRecurringPlanEnabled, removeRecurringAutoPlanLogsFromDate } from '../utils/todoRecurringPlanUtils';
@@ -79,22 +82,17 @@ export const useTodoManager = () => {
     recurrenceRule: undefined
   });
 
-  const handleToggleTodo = (id: string) => {
+  const handleToggleTodo = (id: string, occurrenceDateKey?: string) => {
     setTodos((prev) => syncSubtaskProgressToParentTodos(prev.map((todo) => {
       if (todo.id !== id) {
         return todo;
       }
 
-      const isCompleted = !todo.isCompleted;
-      return {
-        ...todo,
-        isCompleted,
-        completedAt: isCompleted ? new Date().toISOString() : undefined
-      };
+      return toggleTodoCompletion(todo, occurrenceDateKey);
     })));
   };
 
-  const handleCompleteTodo = (id: string) => {
+  const handleCompleteTodo = (id: string, occurrenceDateKey?: string) => {
     const targetTodo = todos.find((todo) => todo.id === id);
     if (!targetTodo) {
       return false;
@@ -104,14 +102,13 @@ export const useTodoManager = () => {
       return true;
     }
 
-    const completedAt = new Date().toISOString();
+    if (targetTodo.recurrenceRule && !canCompleteTodoOccurrence(targetTodo, occurrenceDateKey || getTodayDateKey())) {
+      return false;
+    }
+
     setTodos((prev) => syncSubtaskProgressToParentTodos(prev.map((todo) => (
       todo.id === id
-        ? {
-            ...todo,
-            isCompleted: true,
-            completedAt: todo.completedAt || completedAt
-          }
+        ? setTodoCompletion(todo, true, occurrenceDateKey)
         : todo
     ))));
     return true;

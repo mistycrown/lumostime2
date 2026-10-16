@@ -1,5 +1,6 @@
 /**
  * @file TimelineTodoSidebar.test.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Todo drag movement vectors, scheduled entries, and one-level task hierarchy fixtures
  * @output Regression coverage for sidebar drag intent, marker visibility, and schedule-aware parent-child grouping
  * @pos Test
@@ -38,7 +39,7 @@ describe('shouldHideCheckMarkerContent', () => {
 });
 
 describe('isTimelineSidebarTodoCompletionLocked', () => {
-  test('locks recurring todos while leaving ordinary todos completable', () => {
+  test('allows dated recurring completion and locks dates outside the rule', () => {
     expect(isTimelineSidebarTodoCompletionLocked({
       id: 'repeat',
       categoryId: 'cat',
@@ -48,7 +49,12 @@ describe('isTimelineSidebarTodoCompletionLocked', () => {
         frequency: 'daily',
         startDate: '2026-08-02'
       }
-    })).toBe(true);
+    }, '2026-08-02')).toBe(false);
+
+    expect(isTimelineSidebarTodoCompletionLocked({
+      id: 'repeat', categoryId: 'cat', title: 'Repeat', isCompleted: false,
+      recurrenceRule: { frequency: 'daily', startDate: '2026-08-02' }
+    }, '2026-08-01')).toBe(true);
 
     expect(isTimelineSidebarTodoCompletionLocked({
       id: 'ordinary',
@@ -60,6 +66,17 @@ describe('isTimelineSidebarTodoCompletionLocked', () => {
 });
 
 describe('buildTimelineSidebarTodoEntries', () => {
+  test('a dated category shows occurrence completion without completing the series', () => {
+    const todo: TodoItem = {
+      id: 'repeat', categoryId: 'cat', title: 'Repeat', isCompleted: false,
+      recurrenceRule: { frequency: 'daily', startDate: '2026-10-01' },
+      occurrenceCompletions: { '2026-10-16': { completedAt: '2026-10-16T12:00:00Z' } }
+    };
+    const entry = buildTimelineSidebarCategoryTodoEntries([todo], 'cat', '2026-10-16')[0];
+    expect(entry.primaryKind).toBe('completed');
+    expect(entry.todo.isCompleted).toBe(false);
+    expect(isTimelineSidebarTodoCompletionLocked(entry.todo, entry.dateKey)).toBe(false);
+  });
   test('includes an unfinished pin-only todo once and puts it before dated entries', () => {
     const entries = buildTimelineSidebarTodoEntries([
       { id: 'today', categoryId: 'cat', title: 'Today task', isCompleted: false, scheduledDate: '2026-07-30' },

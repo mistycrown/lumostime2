@@ -1,5 +1,6 @@
 /**
  * @file TodoBentoWeekView.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Todo items, logs, one parent-owned week start, and schedule interaction callbacks
  * @output Single-week 2x4 bento schedule UI backed by real todo data
  * @pos Component (Todo scheduling)
@@ -68,7 +69,7 @@ interface TodoBentoWeekViewProps {
   onOpenWeekPicker: () => void;
   onWeekStartChange?: (weekStart: Date) => void;
   onMoveScheduleEntry?: (entry: Pick<TodoDateEntry, 'todo' | 'badges'>, targetDateKey: string) => void;
-  onOpenTodo?: (todo: TodoItem) => void;
+  onOpenTodo?: (todo: TodoItem, occurrenceDateKey?: string) => void;
   onOpenDay?: (dateKey: string) => void;
   isScheduleLocked?: boolean;
   onToggleScheduleLock?: () => void;
@@ -352,7 +353,7 @@ export const TodoBentoWeekView: React.FC<TodoBentoWeekViewProps> = ({
     badgeKey: BentoQuickActionBadgeKey
   ) => {
     if (badgeKey === 'deadline' || badgeKey === 'scheduled' || badgeKey === 'recurring' || badgeKey === 'maybe' || badgeKey === 'completed' || badgeKey === 'inProgress') {
-      onOpenTodo?.(entry.todo);
+      onOpenTodo?.(entry.todo, entry.dateKey);
     }
   };
 

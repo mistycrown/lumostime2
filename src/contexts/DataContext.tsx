@@ -1,5 +1,6 @@
 /**
  * @file DataContext.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-07: Applies node rename/merge and related log edits as one React state transition.
  * @updated 2026-10-07: Hydrates and atomically persists node category metadata.
  * @updated 2026-10-06: Discovers wiki-link nodes after log changes and persists metadata with core data.
@@ -19,6 +20,7 @@ import {
 import { DataCollection, DataCollectionEntry, Log, NoteNode, NodeCategory, TodoCategory, TodoItem } from '../types';
 import { discoverNodes } from '../utils/nodeUtils';
 import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
+import { normalizeOccurrenceCompletions } from '../utils/todoOccurrenceUtils';
 import { normalizeTodoRecurringPlanConfig } from '../utils/todoRecurringPlanUtils';
 import {
   getLocalDataTimestamp,
@@ -137,6 +139,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         hydratedSuccessfully = true;
         const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates({
           ...todo,
+          occurrenceCompletions: normalizeOccurrenceCompletions(todo.occurrenceCompletions),
           recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
             ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
             : undefined
@@ -231,6 +234,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const snapshot = await dataRepository.loadDataContextSnapshot();
           const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates({
             ...todo,
+            occurrenceCompletions: normalizeOccurrenceCompletions(todo.occurrenceCompletions),
             recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
               ? normalizeTodoRecurringPlanConfig(todo.recurringPlan)
               : undefined

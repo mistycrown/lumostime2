@@ -1,5 +1,6 @@
 /**
  * @file widgetService.test.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input TODAY + PIN and principle-card payload builders plus native provider source text
  * @output Regression coverage for pinned/recurring TODAY + PIN widget payload items, principle-card sync, and native refresh bindings
  * @pos Test (widget service)
@@ -281,6 +282,17 @@ describe('buildTodoPinWidgetPayload', () => {
       activityId: 'writing-activity',
       activityLabel: 'Writing'
     });
+  });
+
+  it('mirrors single completion while retaining the open recurring source and its history', () => {
+    const todo = buildTodo({
+      id: 'repeat-done', title: 'Repeat done',
+      recurrenceRule: { frequency: 'daily', startDate: '2026-04-01' },
+      occurrenceCompletions: { '2026-04-26': { completedAt: '2026-04-26T01:30:00Z' } }
+    });
+    const payload = buildTodoPinWidgetPayload({ todos: [todo], categories, date: REFERENCE_DATE });
+    expect(payload.items[0].isCompleted).toBe(true);
+    expect(payload.sourceTodos?.[0]).toMatchObject({ isCompleted: false, occurrenceCompletions: todo.occurrenceCompletions });
   });
 
   it('includes mirrored source snapshots so native refresh can rebuild today items', () => {

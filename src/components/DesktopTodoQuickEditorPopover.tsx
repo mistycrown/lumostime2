@@ -1,5 +1,6 @@
 /**
  * @file DesktopTodoQuickEditorPopover.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Shared desktop quick-editor model, anchor position, and save/open callbacks
  * @output Reusable inline todo quick editor for desktop widget surfaces
  * @pos Component (desktop widget quick editor)
@@ -27,6 +28,7 @@ interface DesktopTodoQuickEditorPopoverProps {
   onSaveNote: (todoId: string, note: string) => void | Promise<void>;
   onSelectTodo?: (todoId: string) => void;
   onToggleComplete?: (todoId: string, isCompleted: boolean) => void | Promise<void>;
+  occurrenceDateKey?: string;
 }
 
 const POPOVER_WIDTH_PX = 280;
@@ -43,9 +45,15 @@ export const DesktopTodoQuickEditorPopover: React.FC<DesktopTodoQuickEditorPopov
   onSaveTitle,
   onSaveNote,
   onSelectTodo,
-  onToggleComplete
+  onToggleComplete,
+  occurrenceDateKey
 }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const completionLabel = model.todo.recurrenceRule
+    ? (model.todo.isCompleted
+      ? (occurrenceDateKey && model.todo.occurrenceCompletions?.[occurrenceDateKey] ? '撤销本次完成' : '恢复循环')
+      : '完成本次')
+    : (model.todo.isCompleted ? '取消完成' : '标记为完成');
   const lastSubmittedTitleRef = useRef(model.todo.title);
   const lastSubmittedNoteRef = useRef(model.todo.note || '');
   const [draftTitle, setDraftTitle] = useState(model.todo.title);
@@ -201,8 +209,8 @@ export const DesktopTodoQuickEditorPopover: React.FC<DesktopTodoQuickEditorPopov
                   ? 'text-stone-400 hover:bg-stone-800'
                   : 'text-stone-500 hover:bg-stone-100'
               }`}
-              aria-label={model.todo.isCompleted ? '取消完成' : '标记为完成'}
-              title={model.todo.isCompleted ? '取消完成' : '标记为完成'}
+              aria-label={completionLabel}
+              title={completionLabel}
             >
               {model.todo.isCompleted ? (
                 <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />

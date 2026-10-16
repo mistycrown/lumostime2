@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Shared rendering and tap handling for the dedicated TODAY + PIN widgets.
  * Updated 2026-07-22: Appends a subtask's parent title when rebuilding TODAY + PIN widget rows from mirrored sources.
  * Updated 2026-08-10: Propagates recurrence state so recurring widget rows cannot be completed.
@@ -36,6 +37,7 @@ public final class WidgetTodoPinProviderSupport {
     public static final String ACTION_REFRESH_TODO_PIN =
             "com.mistycrown.lumostime.action.REFRESH_TODO_PIN";
     public static final String EXTRA_TODO_ID = "todo_pin_todo_id";
+    public static final String EXTRA_OCCURRENCE_DATE = "todo_pin_occurrence_date";
     public static final String EXTRA_TODO_PIN_ACTION = "todo_pin_action";
     public static final String TODO_PIN_ACTION_COMPLETE = "complete";
     private static final long TODO_PIN_REFRESH_ANIMATION_DURATION_MS = 420L;
@@ -85,8 +87,10 @@ public final class WidgetTodoPinProviderSupport {
             String todoId = intent.getStringExtra(EXTRA_TODO_ID);
             if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID && todoId != null && !todoId.trim().isEmpty()) {
                 if (TODO_PIN_ACTION_COMPLETE.equals(intent.getStringExtra(EXTRA_TODO_PIN_ACTION))) {
-                    if (toggleTodoCompletion(context, todoId)) {
+                    if (toggleTodoCompletion(context, todoId, intent.getStringExtra(EXTRA_OCCURRENCE_DATE))) {
                         WidgetRefreshCoordinator.INSTANCE.refreshTodoPinWidgets(context);
+                    } else {
+                        launchApp(context, appWidgetId);
                     }
                     return true;
                 }
@@ -311,8 +315,8 @@ public final class WidgetTodoPinProviderSupport {
         Collections.sort(visibleTodos, new Comparator<WidgetTodoPinSourceTodo>() {
             @Override
             public int compare(WidgetTodoPinSourceTodo left, WidgetTodoPinSourceTodo right) {
-                if (left.isCompleted() != right.isCompleted()) {
-                    return left.isCompleted() ? 1 : -1;
+                if (isCompletedOnDate(left, targetDate) != isCompletedOnDate(right, targetDate)) {
+                    return isCompletedOnDate(left, targetDate) ? 1 : -1;
                 }
                 if (left.getPin() != right.getPin()) {
                     return left.getPin() ? -1 : 1;
@@ -332,7 +336,7 @@ public final class WidgetTodoPinProviderSupport {
             items.add(new WidgetTodoPinItem(
                     todo.getId(),
                     formatTodoPinTitle(todo, todoById),
-                    todo.isCompleted(),
+                    isCompletedOnDate(todo, targetDate),
                     todo.getRecurrenceRule() != null,
                     todo.getPin() ? "PIN" : "TODAY",
                     linkedTarget.categoryId,
@@ -347,6 +351,14 @@ public final class WidgetTodoPinProviderSupport {
     }
 
     public static boolean toggleTodoCompletion(Context context, String todoId) {
+        return toggleTodoCompletion(context, todoId, null);
+    }
+
+    private static boolean isCompletedOnDate(WidgetTodoPinSourceTodo todo, String dateKey) {
+        return todo.isCompleted() || (todo.getRecurrenceRule() != null && todo.getOccurrenceCompletions().containsKey(dateKey));
+    }
+
+    public static boolean toggleTodoCompletion(Context context, String todoId, String occurrenceDateKey) {
         WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
         if (payload == null) return false;
 
@@ -358,17 +370,26 @@ public final class WidgetTodoPinProviderSupport {
             }
         }
         if (target == null) return false;
-        if (target.getRecurrenceRule() != null) return false;
-
-        boolean isCompleted = !target.isCompleted();
+        boolean isRecurring = target.getRecurrenceRule() != null;
+        String dateKey = occurrenceDateKey == null ? payload.getDate() : occurrenceDateKey;
+        if (isRecurring && (target.isCompleted() || parseDateKey(dateKey) == null
+                || !(target.getOccurrenceCompletions().containsKey(dateKey)
+                || matchesRecurrenceRule(target.getRecurrenceRule(), dateKey, false)
+                || target.getMaybeDates().contains(dateKey)))) return false;
+        boolean isCompleted = !isCompletedOnDate(target, dateKey);
+        Map<String, String> completions = new HashMap<>(target.getOccurrenceCompletions());
+        if (isRecurring) {
+            if (isCompleted) completions.put(dateKey, formatCompletionTimestamp());
+            else completions.remove(dateKey);
+        }
         List<WidgetTodoPinSourceTodo> updatedSourceTodos = new ArrayList<>();
         for (WidgetTodoPinSourceTodo todo : payload.getSourceTodos()) {
             updatedSourceTodos.add(todoId.equals(todo.getId())
                     ? new WidgetTodoPinSourceTodo(
-                            todo.getId(), todo.getTitle(), todo.getKind(), isCompleted, todo.getParentTodoId(),
+                            todo.getId(), todo.getTitle(), todo.getKind(), isRecurring ? todo.isCompleted() : isCompleted, todo.getParentTodoId(),
                             todo.getLinkedCategoryId(), todo.getLinkedActivityId(), todo.getDefaultScopeIds(),
                             todo.getPin(), todo.getScheduledDate(), todo.getDeadlineDate(), todo.getMaybeDates(),
-                            todo.getRecurrenceRule(), isCompleted ? formatCompletionTimestamp() : null)
+                            todo.getRecurrenceRule(), isRecurring ? todo.getCompletedAt() : (isCompleted ? formatCompletionTimestamp() : null), completions)
                     : todo);
         }
         WidgetTodoPinPayload updatedPayload = new WidgetTodoPinPayload(
@@ -382,7 +403,8 @@ public final class WidgetTodoPinProviderSupport {
                 isCompleted,
                 System.currentTimeMillis(),
                 "completion",
-                null
+                null,
+                isRecurring ? dateKey : null
         ));
         return true;
     }
@@ -404,6 +426,19 @@ public final class WidgetTodoPinProviderSupport {
             WidgetTodoPinSourceTodo todo,
             String targetDate
     ) {
+        if (todo.getOccurrenceCompletions().containsKey(targetDate)) return true;
+        if (todo.getRecurrenceRule() != null && todo.isCompleted()) {
+            if (todo.getCompletedAt() == null) return false;
+            try {
+                String timestamp = todo.getCompletedAt().replaceFirst("Z$", "+0000")
+                        .replaceFirst("([+-]\\d{2}):(\\d{2})$", "$1$2");
+                Date completedAt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ", Locale.US).parse(timestamp);
+                String completedDate = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(completedAt);
+                if (targetDate.compareTo(completedDate) > 0) return false;
+            } catch (java.text.ParseException exception) {
+                return false;
+            }
+        }
         boolean hasExplicitTodayMatch = TextUtils.equals(targetDate, todo.getScheduledDate())
                 || TextUtils.equals(targetDate, todo.getDeadlineDate())
                 || hasMaybeDate(todo, targetDate);

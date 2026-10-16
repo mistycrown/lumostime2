@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * RemoteViews collection service backing the scrollable TODAY + PIN widget list.
  * Updated 2026-08-10: Uses a repeat icon and omits completion intents for recurring rows.
  */
@@ -24,6 +25,7 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
         private final android.content.Context context;
         private final int appWidgetId;
         private List<WidgetTodoPinItem> items = new ArrayList<>();
+        private String occurrenceDateKey;
         private List<WidgetRuntimeState> runtimeStates = new ArrayList<>();
 
         private Factory(android.content.Context context, Intent intent) {
@@ -45,6 +47,7 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             WidgetTodoPinPayload payload = WidgetStores.INSTANCE.loadTodoPinPayload(context);
             if (payload != null && isPayloadForToday(payload)) {
                 items = payload.getItems();
+                occurrenceDateKey = payload.getDate();
             } else {
                 items = new ArrayList<>();
             }
@@ -77,9 +80,7 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             views.setTextViewText(R.id.widget_todo_pin_title, item.getTitle());
             views.setImageViewResource(
                     R.id.widget_todo_pin_checkbox,
-                    item.isRecurring()
-                            ? R.drawable.widget_todo_pin_repeat_icon
-                            : item.isCompleted()
+                    item.isCompleted()
                             ? R.drawable.widget_todo_pin_checkbox_checked
                             : R.drawable.widget_todo_pin_checkbox_unchecked
             );
@@ -105,12 +106,13 @@ public class WidgetTodoPinRemoteViewsService extends RemoteViewsService {
             fillInIntent.putExtra(WidgetTodoPinProviderSupport.EXTRA_TODO_ID, item.getTodoId());
             views.setOnClickFillInIntent(R.id.widget_todo_pin_row, fillInIntent);
             views.setOnClickFillInIntent(R.id.widget_todo_pin_action_button, fillInIntent);
-            if (!item.isRecurring()) {
+            {
                 Intent completionFillInIntent = new Intent(fillInIntent);
                 completionFillInIntent.putExtra(
                         WidgetTodoPinProviderSupport.EXTRA_TODO_PIN_ACTION,
                         WidgetTodoPinProviderSupport.TODO_PIN_ACTION_COMPLETE
                 );
+                completionFillInIntent.putExtra(WidgetTodoPinProviderSupport.EXTRA_OCCURRENCE_DATE, occurrenceDateKey);
                 views.setOnClickFillInIntent(R.id.widget_todo_pin_checkbox, completionFillInIntent);
             }
             return views;

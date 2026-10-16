@@ -1,5 +1,6 @@
 /**
  * @file TodoMonthView.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Todo items, logs, a reference date, and an optional todo-open callback
  * @output Reference-style rolling month schedule UI backed by real daily todo data
  * @pos Component (Todo scheduling)
@@ -83,7 +84,7 @@ interface TodoMonthViewProps {
   onOpenDatePicker?: () => void;
   useReducedEffects?: boolean;
   viewMenuNode: React.ReactNode;
-  onOpenTodo?: (todo: TodoItem) => void;
+  onOpenTodo?: (todo: TodoItem, occurrenceDateKey?: string) => void;
   isScheduleLocked?: boolean;
   onToggleScheduleLock?: () => void;
 
@@ -1728,7 +1729,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                     ) : (
                                       <button
                                         type="button"
-                                        onClick={() => onOpenTodo(entry.todo)}
+                                        onClick={() => onOpenTodo(entry.todo, entry.dateKey)}
                                         className={`min-w-0 flex flex-1 items-baseline gap-0 overflow-hidden font-medium uppercase tracking-[0.12em] text-left ${monthDetailTaskClassName} ${titleClassName} ${entry.primaryKind === 'completed' ? 'line-through opacity-70' : ''}`}
                                       >
                                         <span className={titleSegmentClassName}>{entry.todo.title}</span>
@@ -1745,7 +1746,7 @@ export const TodoMonthView: React.FC<TodoMonthViewProps> = ({
                                             type="button"
                                             draggable={false}
                                             onTouchStart={(event) => event.stopPropagation()}
-                                            onClick={() => onOpenTodo(entry.todo)}
+                                            onClick={() => onOpenTodo(entry.todo, entry.dateKey)}
                                             className="inline-flex items-center justify-end gap-1 whitespace-nowrap rounded-full px-1 py-0.5 text-right transition-colors hover:bg-stone-100/70"
                                             style={{ color: tag.color }}
                                           >

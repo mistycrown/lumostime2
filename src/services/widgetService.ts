@@ -1,5 +1,6 @@
 /**
  * @file widgetService.ts
+ * @updated 2026-10-16: Mirrors occurrence completion history into Android TODAY + PIN snapshots.
  * @input Category/activity data, daily template data, ActiveSession state, widget bridge payloads
  * @output Widget template persistence helpers and app/native conversion utilities
  * @pos Service
@@ -24,6 +25,7 @@
  * @updated 2026-09-02: Persisted stable UI icon IDs and regenerate theme-specific widget assets when the UI icon theme changes.
  * @updated 2026-09-11: Mirrors todo completion timestamps so quick-todo widgets can keep only the five most recently completed items.
  */
+import { getTodoForOccurrence } from '../utils/todoOccurrenceUtils';
 import { Capacitor } from '@capacitor/core';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 import type {
@@ -1497,7 +1499,8 @@ const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTo
           fallbackToMonthEnd: todo.recurrenceRule.fallbackToMonthEnd ?? null
         }
       : null,
-    completedAt: todo.completedAt ?? null
+    completedAt: todo.completedAt ?? null,
+    occurrenceCompletions: todo.occurrenceCompletions ?? null
   }));
 
 const buildTodoPinSourceCategories = (categories: Category[]): WidgetBridgeTodoPinSourceCategory[] =>
@@ -1591,7 +1594,7 @@ export const buildTodoPinWidgetPayload = ({
       return {
         todoId: todo.id,
         title: formatTodoPinTitle(todo, todos),
-        isCompleted: todo.isCompleted,
+        isCompleted: getTodoForOccurrence(todo, getLocalDateStr(date)).isCompleted,
         isRecurring: Boolean(todo.recurrenceRule),
         badgeLabel: todo.pin ? TODO_PIN_BADGE_PIN : TODO_PIN_BADGE_TODAY,
         categoryId: linkedTarget.categoryId,

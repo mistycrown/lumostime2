@@ -1,5 +1,6 @@
 /**
  * @file desktopWidgetService.test.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Shared today-task snapshot builder plus representative todo/category fixtures
  * @output Regression coverage for the Electron desktop widget today/pin/overdue grouping logic
  * @pos Test (desktop widget service)
@@ -59,6 +60,24 @@ const buildTodo = (overrides: Partial<TodoItem> & Pick<TodoItem, 'id' | 'title'>
 });
 
 describe('buildDesktopTodayWidgetSnapshot', () => {
+  it('requests date selection for pinned recurring tasks without an occurrence today', () => {
+    const recurring = buildTodo({ id: 'future-repeat', title: 'Future repeat', pin: true,
+      recurrenceRule: { frequency: 'daily', startDate: '2026-05-20' } });
+    const snapshot = buildDesktopTodayWidgetSnapshot({ todos: [recurring], categories, date: REFERENCE_DATE });
+    expect(snapshot.pinned[0].requiresOccurrenceDate).toBe(true);
+  });
+  it('completes only the selected day and returns to pending on the next day', () => {
+    const recurring = buildTodo({
+      id: 'repeat', title: 'Repeat',
+      recurrenceRule: { frequency: 'daily', startDate: '2026-05-01' },
+      occurrenceCompletions: { '2026-05-17': { completedAt: '2026-05-17T12:00:00Z' } }
+    });
+    const snapshot = buildDesktopTodayWidgetSnapshot({ todos: [recurring], categories, date: REFERENCE_DATE });
+    expect(snapshot.completed.map((item) => item.todoId)).toEqual(['repeat']);
+    const tomorrow = buildDesktopTodayWidgetSnapshot({ todos: [recurring], categories, date: new Date('2026-05-18T09:00:00') });
+    expect(tomorrow.completed).toHaveLength(0);
+    expect(tomorrow.today[0].isCompleted).toBe(false);
+  });
   it('keeps pinned and today-visible todos in their dedicated sections', () => {
     const todos: TodoItem[] = [
       buildTodo({

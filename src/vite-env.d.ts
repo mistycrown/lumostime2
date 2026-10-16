@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/** @updated 2026-10-16: Adds occurrence dates to desktop todo action contracts. */
 
 declare module '*?raw' {
   const content: string;
@@ -7,13 +8,14 @@ declare module '*?raw' {
 
 type DesktopWidgetBridgeAction =
   | { type: 'open_todo'; todoId: string }
-  | { type: 'toggle_todo'; todoId: string }
+  | { type: 'toggle_todo'; todoId: string; occurrenceDateKey?: string }
   | { type: 'start_focus'; todoId: string }
   | { type: 'add_quick_todo'; title: string }
   | { type: 'stop_active_session_and_save'; sessionId: string };
 
 type DesktopTodoQuickEditorBridgePayload = {
   todoId: string;
+  occurrenceDateKey?: string;
   theme: 'light' | 'dark';
   x: number;
   y: number;

@@ -1,5 +1,6 @@
 /**
  * @file todoScheduleUtils.ts
+ * @updated 2026-10-16: Displays occurrence completion on its scheduled date, including preserved history.
  * @input Todo items with optional schedule fields, reference dates
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
  * @pos Utility (Todo planning)
@@ -38,7 +39,7 @@ export interface WeekDayBucket {
   items: WeekTodoEntry[];
 }
 
-export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'planned';
+export type TodoScheduleMatchKind = 'deadline' | 'scheduled' | 'recurring' | 'maybe' | 'planned' | 'completed';
 export type TodoScheduleRange = 'today' | 'tomorrow' | 'thisWeek';
 export type TodoScheduleEntryKind = TodoScheduleMatchKind | 'completed' | 'inProgress';
 
@@ -76,6 +77,7 @@ export const TODO_ASSOCIATION_TODAY_CATEGORY_ID = '__todo_association_today__';
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const TODO_RECURRENCE_WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'] as const;
 const TODO_SCHEDULE_MATCH_PRIORITY: Record<TodoScheduleMatchKind, number> = {
+  completed: -1,
   deadline: 0,
   scheduled: 1,
   recurring: 2,
@@ -401,6 +403,9 @@ export const isTodoInAssociationTodayCategory = (
   referenceDate: Date = new Date()
 ): boolean => {
   const todayDateKey = formatDateKey(referenceDate);
+  if (todo.occurrenceCompletions?.[todayDateKey]) return true;
+  if (todo.recurrenceRule && todo.isCompleted
+    && (!todo.completedAt || formatDateKey(new Date(todo.completedAt)) < todayDateKey)) return false;
   const hasExplicitTodayMatch = todo.scheduledDate === todayDateKey
     || todo.deadlineDate === todayDateKey
     || hasMaybeDate(todo, todayDateKey, referenceDate);
@@ -420,11 +425,14 @@ export const getTodoAssociationTodayTodos = (
   referenceDate: Date = new Date(),
   options?: { includeCompleted?: boolean }
 ): TodoItem[] => todos
-  .filter((todo) => options?.includeCompleted || !todo.isCompleted)
+  .filter((todo) => options?.includeCompleted || (!todo.isCompleted && !todo.occurrenceCompletions?.[formatDateKey(referenceDate)]))
   .filter((todo) => isTodoInAssociationTodayCategory(todo, referenceDate))
   .sort((left, right) => {
-    if (left.isCompleted !== right.isCompleted) {
-      return Number(left.isCompleted) - Number(right.isCompleted);
+    const dateKey = formatDateKey(referenceDate);
+    const leftCompleted = left.isCompleted || Boolean(left.occurrenceCompletions?.[dateKey]);
+    const rightCompleted = right.isCompleted || Boolean(right.occurrenceCompletions?.[dateKey]);
+    if (leftCompleted !== rightCompleted) {
+      return Number(leftCompleted) - Number(rightCompleted);
     }
 
     if (Boolean(left.pin) !== Boolean(right.pin)) {
@@ -589,10 +597,12 @@ export const getTodoDateBadges = (
 ): TodoDateBadges => normalizeTodoDateBadges({
   scheduled: todo.scheduledDate === targetDateKey,
   deadline: todo.deadlineDate === targetDateKey,
-  recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey),
+  recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey) && (!todo.isCompleted
+    || Boolean(todo.completedAt && targetDateKey <= formatDateKey(new Date(todo.completedAt)))),
   maybe: hasMaybeDate(todo, targetDateKey),
   planned: plannedLookup?.get(todo.id)?.has(targetDateKey) || false,
-  completed: todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false,
+  completed: Boolean(todo.occurrenceCompletions?.[targetDateKey])
+    || (todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false),
   inProgress: inProgressLookup?.get(todo.id)?.has(targetDateKey) || false
 });
 
@@ -607,6 +617,10 @@ export const getTodoScheduleMatches = (
   return dateKeys.flatMap((dateKey) => {
     const badges = getTodoDateBadges(todo, dateKey, undefined, plannedLookup);
     const matches: TodoScheduleMatch[] = [];
+
+    if (todo.occurrenceCompletions?.[dateKey]) {
+      matches.push({ dateKey, kind: 'completed' });
+    }
 
     if (badges.deadline) {
       matches.push({ dateKey, kind: 'deadline' });

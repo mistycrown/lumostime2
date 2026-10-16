@@ -1,5 +1,6 @@
 /**
  * @file TodoView.recurrenceFallback.test.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input TodoView props with a monthly 31st recurrence plus month-end fallback
  * @output Regression coverage for hidden TodoView schedule render paths during detail-page recurrence edits
  * @pos Test
@@ -11,6 +12,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { TodoView } from './TodoView';
+vi.mock('../services/appearanceBackupService', () => ({ APPEARANCE_RESTORED_EVENT: 'test-appearance-restored' }));
 
 vi.mock('../contexts/PrivacyContext', () => ({
   usePrivacy: () => ({

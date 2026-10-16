@@ -1,5 +1,6 @@
 /**
  * @file TimelineTodoSidebar.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Date-specific scheduled todos, logs, resolved daily checks, review entries, and selection callbacks
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
  * @pos Component
@@ -21,6 +22,7 @@ import { getCheckItemCountState } from '../utils/dailyCheckUtils';
 import { TIMELINE_SIDEBAR_MAX_RATIO, TIMELINE_SIDEBAR_MIN_RATIO } from '../utils/timelineSidebarRatioUtils';
 import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
 import { buildTodoDateEntries, formatDateKey, TodoDateEntry } from '../utils/todoScheduleUtils';
+import { canCompleteTodoOccurrence } from '../utils/todoOccurrenceUtils';
 
 interface TimelineTodoSidebarProps {
   todos: TodoItem[];
@@ -49,7 +51,9 @@ export const shouldHideCheckMarkerContent = (isCount: boolean, isCompleted: bool
   !isCount && !isCompleted
 );
 
-export const isTimelineSidebarTodoCompletionLocked = (todo: TodoItem): boolean => Boolean(todo.recurrenceRule);
+export const isTimelineSidebarTodoCompletionLocked = (todo: TodoItem, dateKey = formatDateKey(new Date())): boolean => (
+  Boolean(todo.recurrenceRule && !canCompleteTodoOccurrence(todo, dateKey))
+);
 
 const TodoCompletionMarker: React.FC<{ completed: boolean; isLocked: boolean; onToggle: () => void }> = ({ completed, isLocked, onToggle }) => isLocked ? (
   <span
@@ -88,11 +92,15 @@ export interface TimelineSidebarTodoTreeGroup {
   childEntries: SidebarTodoEntry[];
 }
 
-const createCategoryTodoEntry = (todo: TodoItem): SidebarTodoEntry => ({
-  todo,
-  badges: { scheduled: false, deadline: false, recurring: false, maybe: false, planned: false, completed: todo.isCompleted, inProgress: false },
-  primaryKind: todo.isCompleted ? 'completed' : 'scheduled'
-});
+const createCategoryTodoEntry = (todo: TodoItem, dateKey?: string): SidebarTodoEntry => {
+  const isCompleted = todo.isCompleted || Boolean(dateKey && todo.occurrenceCompletions?.[dateKey]);
+  return {
+    todo,
+    dateKey,
+    badges: { scheduled: false, deadline: false, recurring: false, maybe: false, planned: false, completed: isCompleted, inProgress: false },
+    primaryKind: isCompleted ? 'completed' : 'scheduled'
+  };
+};
 
 export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], dateKey: string): SidebarTodoEntry[] => {
   const dateEntries = buildTodoDateEntries(todos, logs, dateKey)
@@ -102,6 +110,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
     .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
     .map((todo): SidebarTodoEntry => ({
       todo,
+      dateKey,
       badges: { scheduled: false, deadline: false, recurring: false, maybe: false, planned: false, completed: false, inProgress: false },
       primaryKind: 'scheduled',
       isPinnedOnly: true
@@ -111,10 +120,10 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
     .sort((left, right) => Number(Boolean(right.todo.pin)) - Number(Boolean(left.todo.pin)) || left.todo.title.localeCompare(right.todo.title, 'zh-CN'));
 };
 
-export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string): SidebarTodoEntry[] => (
+export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string, dateKey?: string): SidebarTodoEntry[] => (
   todos
     .filter((todo) => todo.categoryId === categoryId && !todo.isCompleted)
-    .map(createCategoryTodoEntry)
+    .map((todo) => createCategoryTodoEntry(todo, dateKey))
     .sort((left, right) => left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
 );
 
@@ -167,7 +176,7 @@ const TodoRow: React.FC<{
   onDrop: (clientX: number, clientY: number) => boolean;
 }> = ({ entry, onSelect, onToggleCompletion, onDragMove, onDragEnd, onDrop }) => {
   const isCompleted = entry.primaryKind === 'completed' || entry.todo.isCompleted;
-  const isCompletionLocked = isTimelineSidebarTodoCompletionLocked(entry.todo);
+  const isCompletionLocked = isTimelineSidebarTodoCompletionLocked(entry.todo, entry.dateKey);
   const [didCreatePlan, setDidCreatePlan] = useState(false);
   const feedbackTimerRef = useRef<number | null>(null);
 
@@ -273,7 +282,7 @@ const TodoGroups: React.FC<{
 }> = ({ todos, logs, checkItems, currentDate, selectedCategoryId, selectedListLabel, onSelectTodo, onToggleTodoCompletion, onCheckItemClick, onTodoDragMove, onTodoDragEnd, onTodoDrop }) => {
   const visibleTodos = useMemo(() => (
     selectedCategoryId
-      ? buildTimelineSidebarCategoryTodoEntries(todos, selectedCategoryId)
+      ? buildTimelineSidebarCategoryTodoEntries(todos, selectedCategoryId, formatDateKey(currentDate))
       : buildTimelineSidebarTodoEntries(todos, logs, formatDateKey(currentDate))
   ), [currentDate, logs, selectedCategoryId, todos]);
   const todoTreeGroups = useMemo(

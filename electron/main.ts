@@ -1,5 +1,6 @@
 /**
  * @file main.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input App Lifecycle
  * @output Window Management
  * @pos Electron Main
@@ -40,13 +41,14 @@ import { restoreWidgetBounds } from './widgetWindowBounds';
 
 type DesktopWidgetMainAction =
   | { type: 'open_todo'; todoId: string }
-  | { type: 'toggle_todo'; todoId: string }
+  | { type: 'toggle_todo'; todoId: string; occurrenceDateKey?: string }
   | { type: 'start_focus'; todoId: string }
   | { type: 'add_quick_todo'; title: string }
   | { type: 'stop_active_session_and_save'; sessionId: string };
 
 type DesktopTodoQuickEditorPayload = {
   todoId: string;
+  occurrenceDateKey?: string;
   theme: 'light' | 'dark';
   x: number;
   y: number;

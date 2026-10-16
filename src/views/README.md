@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-16: `TodoView` moves completed occurrences into today's completed section, keeps recurring series active and passes explicit dates through list/week/bento/month actions. Focus completion uses the session start date. Date-less weekly summaries require selecting an occurrence.
+
 Update 2026-10-16: `TodoBatchManageView` supplies hierarchical migration targets to the shared deletion picker and keys each pending deletion by todo identity so repeated task names cannot retain the previous decision.
 
 Update 2026-10-16: `SceneView.tsx` delegates weekly/monthly review creation to `useReviewManager`, keeping local period dates, template snapshots and record lookup consistent with the review routes.

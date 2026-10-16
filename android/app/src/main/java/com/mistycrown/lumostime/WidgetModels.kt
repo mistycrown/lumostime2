@@ -1,6 +1,7 @@
 package com.mistycrown.lumostime
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Lightweight native models used by the unified Android widget system.
  * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
  * Updated 2026-05-21: Expanded mirrored TODAY + PIN source models with todo `maybeDates` plus recurrence `skipDates` so native rebuilds can match app-side today visibility.
@@ -374,7 +375,8 @@ data class WidgetPendingTodoPinAction(
     val isCompleted: Boolean,
     val createdAt: Long,
     val actionType: String = "completion",
-    val title: String? = null
+    val title: String? = null,
+    val occurrenceDateKey: String? = null
 )
 
 data class WidgetTodoPinSourceRecurrenceRule(
@@ -402,7 +404,8 @@ data class WidgetTodoPinSourceTodo(
     val deadlineDate: String? = null,
     val maybeDates: List<String> = emptyList(),
     val recurrenceRule: WidgetTodoPinSourceRecurrenceRule? = null,
-    val completedAt: String? = null
+    val completedAt: String? = null,
+    val occurrenceCompletions: Map<String, String> = emptyMap()
 )
 
 data class WidgetTodoPinSourceActivity(

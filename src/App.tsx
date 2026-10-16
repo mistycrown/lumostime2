@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-16: Keeps the selected occurrence date when handling desktop widget completion actions.
  * @updated 2026-10-16: Supplies parent-child migration targets when deleting todos.
  * @updated 2026-10-13: Uses native widget restore with legacy migration and live preference mirroring.
  * @updated 2026-10-07: Includes node categories in exports and data reset flows.
@@ -890,7 +891,7 @@ const AppContent: React.FC = () => {
 
     if (action.type === 'toggle_todo') {
       if (todos.some((todo) => todo.id === action.todoId)) {
-        todoManager.handleToggleTodo(action.todoId);
+        todoManager.handleToggleTodo(action.todoId, action.occurrenceDateKey);
       }
       return;
     }

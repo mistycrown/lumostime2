@@ -1,5 +1,6 @@
 /**
  * @file useTodoQuickActions.ts
+ * @updated 2026-10-16: Carries occurrence dates into complete, undo and skip actions.
  * @input Todo save/edit callbacks from TodoView
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
  * @pos Hook
@@ -24,6 +25,7 @@ import { TodoItem } from '../types';
 import { formatDateKey, getNextRecurrenceOccurrenceDateKey, normalizeMaybeDates, normalizeSkipDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { buildTodoParentLink } from '../utils/todoParentLinkUtils';
+import { canCompleteTodoOccurrence, setTodoCompletion } from '../utils/todoOccurrenceUtils';
 
 export const QUICK_ACTION_INTERACTION_GUARD_MS = 280;
 
@@ -93,11 +95,16 @@ interface UseTodoQuickActionsOptions {
 
 export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTodo }: UseTodoQuickActionsOptions) => {
   const [quickActionTodo, setQuickActionTodo] = useState<TodoItem | null>(null);
+  const [quickActionDate, setQuickActionDate] = useState<string | null>();
+  const todayDateKey = formatDateKey(new Date());
+  const quickActionOccurrenceDateKey = quickActionDate === null ? undefined : quickActionDate
+    || (quickActionTodo && canCompleteTodoOccurrence(quickActionTodo, todayDateKey) ? todayDateKey : undefined);
   const quickActionOpenedAtRef = useRef(0);
 
-  const openQuickActions = (todo: TodoItem) => {
+  const openQuickActions = (todo: TodoItem, dateKey?: string | null) => {
     quickActionOpenedAtRef.current = Date.now();
-    setQuickActionTodo(todo);
+    setQuickActionTodo(todos.find((item) => item.id === todo.id) || todo);
+    setQuickActionDate(dateKey);
   };
 
   const closeQuickActions = (force = false) => {
@@ -148,23 +155,19 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     closeQuickActions(true);
   };
 
-  const handleQuickActionComplete = () => {
+  const handleQuickActionComplete = (dateKey?: string) => {
     if (!quickActionTodo) return;
-    onSaveTodo({
-      ...quickActionTodo,
-      isCompleted: true,
-      completedAt: new Date().toISOString()
-    });
+    const liveTodo = todos.find((item) => item.id === quickActionTodo.id) || quickActionTodo;
+    const occurrenceDate = dateKey || quickActionOccurrenceDateKey;
+    if (liveTodo.recurrenceRule && !occurrenceDate) return;
+    onSaveTodo(setTodoCompletion(liveTodo, true, occurrenceDate));
     closeQuickActions(true);
   };
 
   const handleQuickActionUndoComplete = () => {
     if (!quickActionTodo) return;
-    onSaveTodo({
-      ...quickActionTodo,
-      isCompleted: false,
-      completedAt: undefined
-    });
+    const liveTodo = todos.find((item) => item.id === quickActionTodo.id) || quickActionTodo;
+    onSaveTodo(setTodoCompletion(liveTodo, false, liveTodo.isCompleted ? undefined : quickActionOccurrenceDateKey));
     closeQuickActions(true);
   };
 
@@ -231,7 +234,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
   const handleQuickActionSkipNextRecurrence = () => {
     if (!quickActionTodo?.recurrenceRule) return;
 
-    const nextOccurrenceDateKey = getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
+    const nextOccurrenceDateKey = quickActionOccurrenceDateKey || getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
     if (!nextOccurrenceDateKey) return;
 
     const nextTodo: TodoItem = {
@@ -252,7 +255,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
   const handleQuickActionSkipToMaybeDate = (dateKey: string) => {
     if (!quickActionTodo?.recurrenceRule) return;
 
-    const nextOccurrenceDateKey = getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
+    const nextOccurrenceDateKey = quickActionOccurrenceDateKey || getNextRecurrenceOccurrenceDateKey(quickActionTodo.recurrenceRule);
     onSaveTodo({
       ...quickActionTodo,
       maybeDates: normalizeMaybeDates([
@@ -302,6 +305,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
 
   return {
     quickActionTodo,
+    quickActionOccurrenceDateKey,
     quickActionOpenedAt: quickActionOpenedAtRef.current,
     openQuickActions,
     closeQuickActions,

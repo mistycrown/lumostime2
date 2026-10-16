@@ -1,5 +1,6 @@
 /**
  * @file DesktopTodayWidgetView.tsx
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @description 桌面今日小组件的UI视图，采用极其紧凑的单行设计。支持轻量完成/计时（完全后台静默执行，不唤起主窗口），并自带显示设置面板（提供深浅配色切换与窗体透明度滑块调节）。
  * @updated 2026-05-17: 实现了显示设置中“任务颜色”选项，支持按“排期类型”与“任务分类”动态渲染小圆点前缀，并与周/月视图的自定义排期配色联动。
  * @updated 2026-05-18: Added one-level subtask rendering for the desktop today widget, nesting children beneath visible parents and falling back to `@parent` labels when a parent sits in another section.
@@ -368,6 +369,7 @@ export const DesktopTodayWidgetView: React.FC = () => {
     const anchor = await resolveDesktopTodoQuickEditorScreenAnchor(event);
     window.desktopWidget?.openTodoQuickEditor?.({
       todoId,
+      occurrenceDateKey: snapshot?.date,
       theme,
       x: anchor.x,
       y: anchor.y
@@ -375,11 +377,21 @@ export const DesktopTodayWidgetView: React.FC = () => {
   };
 
   const handleToggleTodo = (todoId: string) => {
+    const item = snapshot && [...snapshot.pinned, ...snapshot.today, ...snapshot.maybe, ...snapshot.overdue].find((todo) => todo.todoId === todoId);
+    if (item?.requiresOccurrenceDate) {
+      window.desktopWidget?.openTodoQuickEditor?.({
+        todoId, occurrenceDateKey: snapshot?.date, theme,
+        x: window.screenX + window.innerWidth / 2,
+        y: window.screenY + window.innerHeight / 2
+      });
+      return;
+    }
     setPendingTodoIds((previous) => (
       previous.includes(todoId) ? previous : [...previous, todoId]
     ));
     window.desktopWidget?.requestMainAction({
       type: 'toggle_todo',
+      occurrenceDateKey: snapshot?.date,
       todoId
     });
     window.setTimeout(() => {

@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-16: Stores dated recurring completion separately from series completion.
  * @updated 2026-10-09: Adds independently persisted merge words and stop words for each word cloud.
  * @updated 2026-10-07: Adds optional node classification and persisted node categories.
  * @updated 2026-10-06: Adds lightweight NoteNode metadata for text-derived wiki links.
@@ -569,6 +570,10 @@ export interface TodoDuplicateOptions {
 export type TodoProgressTrackingMode = 'none' | 'manual' | 'subtasks';
 export type TodoKind = 'project' | 'quick';
 
+export interface TodoOccurrenceCompletion {
+  completedAt: string; // Actual timestamp; the map key is the scheduled local date
+}
+
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
@@ -578,6 +583,7 @@ export interface TodoItem {
   title: string;
   isCompleted: boolean;
   completedAt?: string; // ISO Date string for completion time
+  occurrenceCompletions?: Record<string, TodoOccurrenceCompletion>; // YYYY-MM-DD -> single completion
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category
   defaultScopeIds?: string[]; // NEW: Default Scopes when starting this todo - changed from defaultScopeId

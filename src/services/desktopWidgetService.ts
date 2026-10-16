@@ -1,5 +1,6 @@
 /**
  * @file desktopWidgetService.ts
+ * @updated 2026-10-16: Projects dated occurrence completion into today's desktop widget snapshot.
  * @input Persisted todos/categories from localStorage, shared todo schedule utilities, reference date
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
  * @pos Service
@@ -15,6 +16,7 @@
  * @updated 2026-05-17: Added desktop widget route detection plus today/pin/overdue snapshot builders for the Electron desktop today widget and month-widget window, with getDesktopWidgetType helper support.
  * @updated 2026-05-17: Kept completed todos visible in desktop today/quick widget snapshots so the widget views can render them after unfinished rows instead of dropping them.
  */
+import { canCompleteTodoOccurrence, getTodoForOccurrence } from '../utils/todoOccurrenceUtils';
 import { USER_DATA_KEYS, storage } from '../constants/storageKeys';
 import { Category, TodoItem, ActiveSession } from '../types';
 import { getColorHexForCharts } from '../utils/colorAdapterUtils';
@@ -96,12 +98,14 @@ export type DesktopWidgetBadgeLabel = 'PIN' | 'TODAY' | 'LATE' | 'MAYBE';
 
 export interface DesktopTodoQuickEditorWindowPayload {
   todoId: string;
+  occurrenceDateKey?: string;
   theme: 'light' | 'dark';
   x: number;
   y: number;
 }
 
 export interface DesktopWidgetTodoItem {
+  requiresOccurrenceDate?: boolean;
   todoId: string;
   title: string;
   isCompleted: boolean;
@@ -177,11 +181,14 @@ const buildDesktopWidgetTodoItem = (
   todo: TodoItem,
   todos: TodoItem[],
   categories: Category[],
-  badgeLabel: DesktopWidgetBadgeLabel
+  badgeLabel: DesktopWidgetBadgeLabel,
+  occurrenceDateKey = formatDateKey(new Date())
 ): DesktopWidgetTodoItem => {
   const linkedPresentation = resolveTodoLinkedPresentation(todo, todos, categories);
   return {
     todoId: todo.id,
+    ...(todo.recurrenceRule && !todo.isCompleted && !canCompleteTodoOccurrence(todo, occurrenceDateKey)
+      ? { requiresOccurrenceDate: true } : {}),
     title: todo.title,
     isCompleted: todo.isCompleted,
     badgeLabel,
@@ -314,20 +321,20 @@ export const buildDesktopTodayWidgetSnapshot = ({
   const dateKey = formatDateKey(referenceDate);
   const visibleTodayTodos = getTodoAssociationTodayTodos(todos, referenceDate, {
     includeCompleted: true
-  });
+  }).map((todo) => getTodoForOccurrence(todo, dateKey));
   const visibleTodayIds = new Set(visibleTodayTodos.map((todo) => todo.id));
 
   const pinned = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => Boolean(todo.pin))
-  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'PIN'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'PIN', dateKey));
   
   const maybeItems = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => !todo.pin && hasMaybeDate(todo, dateKey, referenceDate))
-  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'MAYBE'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'MAYBE', dateKey));
     
   const todayItems = sortWidgetTodosByCompletionAndTitle(visibleTodayTodos
     .filter((todo) => !todo.pin && !hasMaybeDate(todo, dateKey, referenceDate))
-  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY'));
+  ).map((todo) => buildDesktopWidgetTodoItem(todo, todos, categories, 'TODAY', dateKey));
     
   const overdue = buildOverdueTodos(todos, categories, referenceDate, visibleTodayIds, {
     includeCompleted: true

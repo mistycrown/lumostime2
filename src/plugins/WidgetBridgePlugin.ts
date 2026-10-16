@@ -1,5 +1,6 @@
 /**
  * @file WidgetBridgePlugin.ts
+ * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Native widget bridge calls
  * @output Typed Capacitor widget bridge methods
  * @pos Plugin
@@ -241,6 +242,7 @@ export interface WidgetBridgeTodoPinSourceTodo {
   title: string;
   kind?: 'quick' | 'project';
   isCompleted: boolean;
+  occurrenceCompletions?: Record<string, { completedAt: string }> | null;
   parentTodoId?: string | null;
   linkedCategoryId?: string | null;
   linkedActivityId?: string | null;
@@ -280,6 +282,7 @@ export interface WidgetBridgePendingTodoPinAction {
   todoId: string;
   isCompleted: boolean;
   createdAt: number;
+  occurrenceDateKey?: string | null;
   actionType?: 'completion' | 'create';
   title?: string | null;
 }

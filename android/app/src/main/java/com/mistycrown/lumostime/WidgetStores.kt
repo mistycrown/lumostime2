@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
  * Updated 2026-10-14: Persists preferred timer scope rules and resolves them at widget tap time.
@@ -570,7 +571,8 @@ object WidgetStores {
                         isCompleted = item.optBoolean("isCompleted", false),
                         createdAt = item.getLong("createdAt"),
                         actionType = item.optString("actionType", "completion"),
-                        title = parseNullableString(item.optString("title"))
+                        title = parseNullableString(item.optString("title")),
+                        occurrenceDateKey = parseNullableString(item.optString("occurrenceDateKey"))
                     ))
                 }
             }
@@ -579,7 +581,7 @@ object WidgetStores {
 
     fun appendPendingTodoPinAction(context: Context, action: WidgetPendingTodoPinAction) {
         val actions = loadPendingTodoPinActions(context)
-            .filterNot { it.todoId == action.todoId }
+            .filterNot { it.todoId == action.todoId && it.actionType == action.actionType && it.occurrenceDateKey == action.occurrenceDateKey }
             .toMutableList()
         actions.add(action)
         savePendingTodoPinActions(context, actions)
@@ -1280,6 +1282,7 @@ object WidgetStores {
                 put("isCompleted", action.isCompleted)
                 put("createdAt", action.createdAt)
                 put("actionType", action.actionType)
+                put("occurrenceDateKey", action.occurrenceDateKey ?: JSONObject.NULL)
                 put("title", action.title ?: JSONObject.NULL)
             })
         }
@@ -1784,11 +1787,20 @@ object WidgetStores {
                         deadlineDate = parseNullableString(item.optString("deadlineDate")),
                         maybeDates = item.optJSONArray("maybeDates").toStringList(),
                         recurrenceRule = item.optJSONObject("recurrenceRule")?.toTodoPinSourceRecurrenceRule(),
-                        completedAt = parseNullableString(item.optString("completedAt"))
+                        completedAt = parseNullableString(item.optString("completedAt")),
+                        occurrenceCompletions = item.optJSONObject("occurrenceCompletions").toOccurrenceCompletions()
                     )
                 )
             }
         }
+    }
+
+    private fun JSONObject?.toOccurrenceCompletions(): Map<String, String> {
+        if (this == null) return emptyMap()
+        return keys().asSequence().mapNotNull { dateKey ->
+            val completedAt = optJSONObject(dateKey)?.optString("completedAt")
+            if (completedAt.isNullOrBlank()) null else dateKey to completedAt
+        }.toMap()
     }
 
     private fun JSONObject.toTodoPinSourceRecurrenceRule(): WidgetTodoPinSourceRecurrenceRule? {
@@ -1867,6 +1879,11 @@ object WidgetStores {
                 put("maybeDates", item.maybeDates.toJsonArray())
                 put("recurrenceRule", item.recurrenceRule?.toTodoPinSourceRecurrenceRuleJson() ?: JSONObject.NULL)
                 put("completedAt", item.completedAt ?: JSONObject.NULL)
+                put("occurrenceCompletions", JSONObject().apply {
+                    item.occurrenceCompletions.forEach { (dateKey, completedAt) ->
+                        put(dateKey, JSONObject().put("completedAt", completedAt))
+                    }
+                })
             })
         }
         return array
