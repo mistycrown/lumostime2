@@ -4,6 +4,7 @@
  * @output Migration or unlink confirmation dialog with a searchable target picker
  * @description Shared confirmation UI for scope and todo deletion reference handling.
  * @updated 2026-10-16: Replaces the flat dropdown with a searchable, collapsible parent-child picker.
+ * @updated 2026-10-16: Collapses subtasks by default and expands matching groups only while searching.
  */
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Check, ChevronDown, ChevronRight, Search, Trash2, Unlink, X } from 'lucide-react';
@@ -30,7 +31,7 @@ export const ReferenceDeleteModal: React.FC<ReferenceDeleteModalProps> = ({
   const [targetId, setTargetId] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
+  const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const targetButton = useRef<HTMLButtonElement>(null);
   const pickerBackButton = useRef<HTMLButtonElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -48,7 +49,7 @@ export const ReferenceDeleteModal: React.FC<ReferenceDeleteModalProps> = ({
     setTargetId('');
     setPickerOpen(false);
     setSearch('');
-    setCollapsedIds([]);
+    setExpandedIds([]);
   }, [isOpen, sourceName]);
 
   const closePicker = () => {
@@ -130,12 +131,12 @@ export const ReferenceDeleteModal: React.FC<ReferenceDeleteModalProps> = ({
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-2">
               {groups.map(({ target, children }) => {
-                const expanded = Boolean(search.trim()) || !collapsedIds.includes(target.id);
+                const expanded = Boolean(search.trim()) || expandedIds.includes(target.id);
                 return (
                   <div key={target.id} className="border-b border-stone-100 py-1 last:border-0">
                     <div className="flex items-center">
                       {children.length > 0 && (
-                        <button type="button" aria-label={`${expanded ? '收起' : '展开'}${target.name}的子任务`} aria-expanded={expanded} disabled={Boolean(search.trim())} onClick={() => setCollapsedIds((ids) => ids.includes(target.id) ? ids.filter((id) => id !== target.id) : [...ids, target.id])} className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 enabled:hover:bg-stone-100">
+                        <button type="button" aria-label={`${expanded ? '收起' : '展开'}${target.name}的子任务`} aria-expanded={expanded} disabled={Boolean(search.trim())} onClick={() => setExpandedIds((ids) => ids.includes(target.id) ? ids.filter((id) => id !== target.id) : [...ids, target.id])} className="flex h-11 w-8 shrink-0 items-center justify-center rounded-lg text-stone-400 enabled:hover:bg-stone-100">
                           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </button>
                       )}

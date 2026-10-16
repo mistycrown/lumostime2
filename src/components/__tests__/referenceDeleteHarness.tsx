@@ -4,6 +4,7 @@
  * @output Migration/search/back regression results and responsive screenshot checkpoints
  * @pos Test (Renderer)
  * @updated 2026-10-16: Covers hierarchical search, selection safety, back navigation and short viewports.
+ * @updated 2026-10-16: Verifies default collapsed groups and explicit subtask expansion.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -80,11 +81,13 @@ async function run() {
   await capture('01-confirm');
   await click('选择待办');
   check(!button('选择待办：看完《百年孤独》') && !button('选择待办：看完《百年孤独》 / 整理百年孤独笔记'), 'Deleted subtree is selectable');
-  check(button('选择待办：阅读计划 / 看完《活着》'), 'Child hierarchy is missing');
+  check(!host.querySelector('[aria-expanded="true"]') && !button('选择待办：阅读计划 / 看完《活着》'), 'Subtasks should be collapsed by default');
   check(button('选择待办：已完成的计划')!.disabled, 'Completed parent is selectable');
   await capture('02-hierarchy');
-  passed.push('Hierarchical targets, excluded subtree, completed-parent context and guarded confirmation');
+  passed.push('Default collapsed hierarchy, excluded subtree, completed-parent context and guarded confirmation');
 
+  await click('展开阅读计划的子任务');
+  check(button('选择待办：阅读计划 / 看完《活着》'), 'Explicit expansion did not show children');
   await click('收起阅读计划的子任务');
   check(!button('选择待办：阅读计划 / 看完《活着》'), 'Collapse did not hide children');
   await search('活着');

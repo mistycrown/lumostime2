@@ -1,6 +1,6 @@
 # Components Directory
 
-Update 2026-10-16: `ReferenceDeleteModal` uses an in-dialog migration picker with fixed search, collapsible parent-child rows, contextual search results and selected paths. `node scripts/test-reference-delete.mjs` verifies selection, back navigation, empty/stale targets and mobile/desktop layouts.
+Update 2026-10-16: `ReferenceDeleteModal` uses an in-dialog migration picker with fixed search, parent-child rows collapsed by default, contextual search results that automatically expand matching groups, and selected paths. `node scripts/test-reference-delete.mjs` verifies default collapse, explicit expansion, selection, back navigation, empty/stale targets and mobile/desktop layouts.
 
 Update 2026-10-16: `AppRoutes.tsx` assigns stable period-based identities to fallback weekly/monthly reviews so unrelated route renders keep the same editor draft until it is saved.
 
