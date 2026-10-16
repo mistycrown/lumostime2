@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-16: Supplies parent-child migration targets when deleting todos.
  * @updated 2026-10-13: Uses native widget restore with legacy migration and live preference mirroring.
  * @updated 2026-10-07: Includes node categories in exports and data reset flows.
  * @updated 2026-10-06: Mounts node navigation and includes metadata in backup and reset flows.
@@ -82,6 +83,7 @@ import { TodoDetailModal } from './components/TodoDetailModal';
 import { GoalEditor } from './components/GoalEditor';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ReferenceDeleteModal } from './components/ReferenceDeleteModal';
+import { getTodoReferenceDeleteTargets } from './utils/referenceDeleteTargets';
 import { SyncConflictModal } from './components/SyncConflictModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
 import { BottomNavigation } from './components/BottomNavigation';
@@ -1164,6 +1166,7 @@ const AppContent: React.FC = () => {
 
       {/* Delete Todo Confirmation */}
       <ReferenceDeleteModal
+        key={todoManager.todoToDeleteId || 'todo-delete'}
         isOpen={todoManager.isDeleteTodoConfirmOpen}
         title="删除待办并处理关联"
         description={todoManager.todoDeleteChildCount > 0
@@ -1172,7 +1175,7 @@ const AppContent: React.FC = () => {
         sourceName={todos.find((todo) => todo.id === todoManager.todoToDeleteId)?.title || '待办'}
         targetLabel="待办"
         impact={todoManager.todoDeleteReferenceImpact}
-        targets={todos.filter((todo) => !todo.isCompleted && !todoManager.todoDeleteTargetIds.includes(todo.id)).map((todo) => ({ id: todo.id, name: todo.title }))}
+        targets={getTodoReferenceDeleteTargets(todos, todoManager.todoDeleteTargetIds)}
         onConfirm={todoManager.handleConfirmDeleteTodo}
         onClose={() => todoManager.setIsDeleteTodoConfirmOpen(false)}
       />

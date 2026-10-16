@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-16: `TodoBatchManageView` supplies hierarchical migration targets to the shared deletion picker and keys each pending deletion by todo identity so repeated task names cannot retain the previous decision.
+
 Update 2026-10-16: `SceneView.tsx` delegates weekly/monthly review creation to `useReviewManager`, keeping local period dates, template snapshots and record lookup consistent with the review routes.
 
 Update 2026-10-16: `DailyReviewView.tsx` saves after a 500 ms input pause or field blur, and still commits immediately on return/backgrounding. Renderer checks cover autosave without closing, blur, return before the timer and reopening the saved answer.

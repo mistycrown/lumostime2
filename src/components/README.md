@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-16: `ReferenceDeleteModal` uses an in-dialog migration picker with fixed search, collapsible parent-child rows, contextual search results and selected paths. `node scripts/test-reference-delete.mjs` verifies selection, back navigation, empty/stale targets and mobile/desktop layouts.
+
 Update 2026-10-16: `AppRoutes.tsx` assigns stable period-based identities to fallback weekly/monthly reviews so unrelated route renders keep the same editor draft until it is saved.
 
 Update 2026-10-14: `WidgetSlotEditorModal` applies preferred activity-to-scope rules to timer drafts and offers clickable scope suggestions when automatic association is disabled. Verify configuration, saved scopes and preference changes with `node scripts/test-widget-scope-renderer.mjs`.

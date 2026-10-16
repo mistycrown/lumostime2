@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-16: `referenceDeleteTargets.ts` builds eligible todo migration targets in hierarchy order, retains unavailable parents as nonselectable context, and filters target groups by child or parent names. Reference migration and hierarchy regressions are included in `vitest.todo.config.ts`.
+
 Update 2026-10-14: `widgetScopeUtils.ts` builds native timer scope rules from the auto-link preference and active scopes, then merges matching rules with explicit widget selections without duplicates.
 
 Update 2026-10-11: `nodeUtils.createNode` creates empty metadata for manually added nodes, trims names, enforces link syntax and global name uniqueness, and validates the destination category. It uses the same node fields as automatic discovery.

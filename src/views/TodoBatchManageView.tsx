@@ -1,5 +1,6 @@
 /**
  * @file TodoBatchManageView.tsx
+ * @updated 2026-10-16: Preserves parent-child context in deletion migration targets.
  * @input Todos, Categories
  * @output Updated Categories/Todos (Reorder, CRUD)
  * @pos View (Modal/Page)
@@ -34,6 +35,7 @@ import {
     QUICK_TODO_CATEGORY_NAME
 } from '../utils/todoQuickCategoryUtils';
 import { ReferenceDeleteModal } from '../components/ReferenceDeleteModal';
+import { getTodoReferenceDeleteTargets } from '../utils/referenceDeleteTargets';
 import { getDeletedTodoIds, getTodoReferenceImpact, type ReferenceDeleteDecision } from '../utils/referenceDeletion';
 
 interface TodoBatchManageViewProps {
@@ -819,11 +821,10 @@ export const TodoBatchManageView: React.FC<TodoBatchManageViewProps> = ({ onBack
                 const sourceTodo = initialTodos.find((todo) => todo.id === todoId);
                 if (!sourceTodo) return null;
                 const deletedTodoIds = new Set(getDeletedTodoIds(initialTodos, todoDeleteReview.todos));
-                const migrationTargets = todoDeleteReview.todos
-                    .filter((todo) => !todo.isCompleted && !deletedTodoIds.has(todo.id))
-                    .map((todo) => ({ id: todo.id, name: todo.title }));
+                const migrationTargets = getTodoReferenceDeleteTargets(todoDeleteReview.todos, [...deletedTodoIds]);
                 return (
                     <ReferenceDeleteModal
+                        key={todoId}
                         isOpen
                         title="提交前确认待办关联"
                         description="检测到该待办将被删除。请选择历史记录与当前计时的迁移目标，或取消这些关联。"
