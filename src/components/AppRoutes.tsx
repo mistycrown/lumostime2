@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-16: Keeps fallback weekly/monthly draft identities stable across unrelated route renders.
  * @updated 2026-10-11: Wires arrange/due date selection for route-level todo quick actions.
  * @updated 2026-08-28: Refreshes daily-check auto states whenever logs or filter context changes.
  * @input Application view state, shared data contexts, and route-level handlers
@@ -759,7 +760,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 }));
 
             review = {
-                id: crypto.randomUUID(),
+                id: `weekly-${weekStartStr}-${weekEndStr}`,
                 weekStartDate: weekStartStr,
                 weekEndDate: weekEndStr,
                 createdAt: Date.now(),
@@ -815,7 +816,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 }));
 
             review = {
-                id: crypto.randomUUID(),
+                id: `monthly-${monthStartStr}-${monthEndStr}`,
                 monthStartDate: monthStartStr,
                 monthEndDate: monthEndStr,
                 createdAt: Date.now(),

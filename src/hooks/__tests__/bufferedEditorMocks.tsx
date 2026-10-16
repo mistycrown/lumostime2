@@ -1,10 +1,22 @@
 /**
  * @file bufferedEditorMocks.tsx
+ * @updated 2026-10-16: Adds review state adapters for real manager save/reopen regressions.
  * @input Isolated editor test renders
  * @output Platform and unrelated overlay adapters
  * @pos Test Support
  */
 import React from 'react';
+export const reviewState: any = { dailyReviews: [], weeklyReviews: [], monthlyReviews: [], reviewTemplates: [], checkTemplates: [] };
+export const useReview = () => ({
+  ...reviewState,
+  ...Object.fromEntries(['dailyReviews', 'weeklyReviews', 'monthlyReviews'].map(key => [
+    `set${key[0].toUpperCase()}${key.slice(1)}`,
+    (value: any) => { reviewState[key] = typeof value === 'function' ? value(reviewState[key]) : value; }
+  ]))
+});
+export const useOptionalReview = () => undefined;
+export const useCategoryScope = () => ({ scopes: [] });
+export const narrativeService = { generateDailyNarrative: async () => 'Generated' };
 export const nativeState = { callback: undefined as undefined | ((state: { isActive: boolean }) => void), removals: 0 };
 export const Capacitor = { isNativePlatform: () => true };
 export const App = { addListener: async (_event: string, callback: typeof nativeState.callback) => {

@@ -1,5 +1,9 @@
 # Views Layer
 
+Update 2026-10-16: `SceneView.tsx` delegates weekly/monthly review creation to `useReviewManager`, keeping local period dates, template snapshots and record lookup consistent with the review routes.
+
+Update 2026-10-16: `DailyReviewView.tsx` saves after a 500 ms input pause or field blur, and still commits immediately on return/backgrounding. Renderer checks cover autosave without closing, blur, return before the timer and reopening the saved answer.
+
 Update 2026-10-11: `NodeDetailView` provides 全部关联 beside the 潜在关联 heading, linking all matched logs and daily/weekly/monthly answers through a batched context action. The button disappears after the candidates are associated.
 
 Update 2026-10-11: `NodeDetailView.tsx` uses Lucide `Orbit` in place of the bracket glyph beside the node name.

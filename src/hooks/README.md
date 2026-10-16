@@ -1,5 +1,9 @@
 # Custom Hooks
 
+Update 2026-10-16: `useReviewManager.ts` inserts missing weekly/monthly records when an editor commits on return, matching daily review behavior. The buffered editor renderer regression covers missing-record save/reopen, repeat updates, local period dates and template snapshots.
+
+Update 2026-10-16: `useBufferedRecord.ts` accepts an optional save delay; daily reviews commit after 500 ms without edits and cancel pending timers on commit, discard or exit. Other buffered editors retain their existing save timing.
+
 Update 2026-10-14: `useWidgetBridgeSync` mirrors current timer scope rules through `syncTimerScopeRules` independently of template saves. Android stores these rules separately and resolves them when a timer slot is tapped, so existing templates follow preference and rule changes.
 
 Update 2026-10-11: `useNoteFocus.ts` keeps record-note shortcuts aligned while the keyboard settles, including delayed viewport panning and native container scrolling. Position correction uses instant scrolling, expires after 1.5 seconds, and stops on manual navigation, typing, blur or unmount.

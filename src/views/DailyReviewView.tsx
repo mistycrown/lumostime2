@@ -1,5 +1,6 @@
 /**
  * @file DailyReviewView.tsx
+ * @updated 2026-10-16: Commits edits after a short pause and on field blur, with exit/background saving as a fallback.
  * @updated 2026-10-11: Enables note-style autocomplete in guide answers using full log history.
  * @input Daily Review Data, Logs, Templates
  * @output Updated Review Data, Generated Narrative
@@ -104,7 +105,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     addToast,
     onOpenNewspaper
 }) => {
-    const { value: review, update: onUpdateReview, commit: commitReview, discard: discardReview } = useBufferedRecord(savedReview, saveReview);
+    const { value: review, update: onUpdateReview, commit: commitReview, discard: discardReview } = useBufferedRecord(savedReview, saveReview, 500);
     const { setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate } = useNavigation();
     const { openAIChat } = useAIChatWindow();
     const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'check');
@@ -413,7 +414,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
 
         setAnswers(newAnswers);
 
-        // 保存到页面草稿，退出时提交
+        // 保存到页面草稿，短暂停顿、失焦或退出时提交
         const updatedReview = {
             ...review,
             answers: newAnswers,
@@ -719,7 +720,14 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
     };
 
     return (
-        <div className="h-full bg-[#faf9f6] overflow-y-auto overflow-x-hidden no-scrollbar pb-24 px-7 pt-4">
+        <div
+            className="h-full bg-[#faf9f6] overflow-y-auto overflow-x-hidden no-scrollbar pb-24 px-7 pt-4"
+            onBlurCapture={(event) => {
+                if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+                    commitReview();
+                }
+            }}
+        >
             {/* Date Display Section */}
             <div className="mb-6 flex items-center justify-between">
                 <div>

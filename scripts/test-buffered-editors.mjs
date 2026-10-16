@@ -1,5 +1,6 @@
 /**
  * @file test-buffered-editors.mjs
+ * @updated 2026-10-16: Exercises review manager persistence with isolated review/category contexts.
  * @input Real buffered editor React regression harness
  * @output Isolated Electron renderer regression results
  * @pos Test Runner
@@ -13,12 +14,13 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-editor-test-'));
 const mocks = path.resolve('src/hooks/__tests__/bufferedEditorMocks.tsx');
-const adapters = new Set(['NavigationContext', 'SettingsContext', 'AIChatWindowContext', 'ToastContext', 'IconRenderer', 'UIIcon', 'UIIconSelector', 'FloatingButton', 'CheckItemStreakBadge', 'CountInputModal', 'NarrativeStyleSelectionModal', 'AIQuoteGenerator', 'MoodPicker', 'StatsView', 'TodoAssociation', 'ScopeAssociation', 'FocusScoreSelector', 'MoodScoreSelector', 'ImmersiveTimer', 'ReactionComponents', 'RecommendedNoteTemplates', 'ActivityAttributeFields']);
+const adapters = new Set(['ReviewContext', 'CategoryScopeContext', 'NavigationContext', 'SettingsContext', 'AIChatWindowContext', 'ToastContext', 'IconRenderer', 'UIIcon', 'UIIconSelector', 'FloatingButton', 'CheckItemStreakBadge', 'CountInputModal', 'NarrativeStyleSelectionModal', 'AIQuoteGenerator', 'MoodPicker', 'StatsView', 'TodoAssociation', 'ScopeAssociation', 'FocusScoreSelector', 'MoodScoreSelector', 'ImmersiveTimer', 'ReactionComponents', 'RecommendedNoteTemplates', 'ActivityAttributeFields']);
 await build({
   entryPoints: ['src/hooks/__tests__/bufferedEditorHarness.tsx'], bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
   define: { 'process.env.NODE_ENV': '"development"' },
   plugins: [{ name: 'editor-adapters', setup(builder) {
     builder.onResolve({ filter: /.*/ }, args => {
+      if (path.basename(args.path) === 'narrativeService') return { path: mocks };
       if (args.path === '@capacitor/app' || args.path === '@capacitor/core' || adapters.has(path.basename(args.path))) return { path: mocks };
     });
   } }]

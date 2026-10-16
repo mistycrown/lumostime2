@@ -1,5 +1,6 @@
 /**
  * @file useReviewManager.ts
+ * @updated 2026-10-16: Inserts missing weekly/monthly reviews when committing drafts opened through alternate entry points.
  * @input DataContext (dailyReviews, weeklyReviews, monthlyReviews, reviewTemplates, checkTemplates), ReviewContext (review data setters), NavigationContext (review modal states, currentDate), CategoryScopeContext (scopes), SettingsContext (userPersonalInfo), ToastContext (addToast)
  * @output Review CRUD Operations (handleOpenDailyReview, handleUpdateReview, handleDeleteReview, handleOpenWeeklyReview, handleUpdateWeeklyReview, handleDeleteWeeklyReview, handleOpenMonthlyReview, handleUpdateMonthlyReview, handleDeleteMonthlyReview), Narrative Generation (handleGenerateNarrative, handleGenerateWeeklyNarrative, handleGenerateMonthlyNarrative), Modal Control (handleCloseWeeklyReview, handleCloseMonthlyReview)
  * @pos Hook (Data Manager)
@@ -151,7 +152,9 @@ export const useReviewManager = () => {
     };
 
     const handleUpdateWeeklyReview = (updatedReview: WeeklyReview) => {
-        setWeeklyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        setWeeklyReviews(prev => prev.some(r => r.id === updatedReview.id)
+            ? prev.map(r => r.id === updatedReview.id ? updatedReview : r)
+            : [...prev, updatedReview]);
     };
 
     const handleDeleteWeeklyReview = () => {
@@ -209,7 +212,9 @@ export const useReviewManager = () => {
     };
 
     const handleUpdateMonthlyReview = (updatedReview: MonthlyReview) => {
-        setMonthlyReviews(prev => prev.map(r => r.id === updatedReview.id ? updatedReview : r));
+        setMonthlyReviews(prev => prev.some(r => r.id === updatedReview.id)
+            ? prev.map(r => r.id === updatedReview.id ? updatedReview : r)
+            : [...prev, updatedReview]);
     };
 
     const handleDeleteMonthlyReview = () => {

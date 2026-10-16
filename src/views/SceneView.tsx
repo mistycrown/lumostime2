@@ -1,5 +1,6 @@
 /**
  * @file SceneView.tsx
+ * @updated 2026-10-16: Opens weekly/monthly reviews through the shared manager to use local dates and template snapshots.
  * @updated 2026-08-06: Made the scene time-slot sidebar explicitly prefer configured UI icons over stored emoji fallbacks.
  * @updated 2026-09-30: Defers its local wallpaper to MainLayout while transparent title bars are active so the title and content share one continuous image.
  * @input Scene groups, cards, categories, todos, reviews, active sessions, and background settings
@@ -35,6 +36,7 @@ import { getLocalDateStr } from '../utils/dateUtils';
 import { findAutoSwitchTargetGroup, getActiveSceneGroup, loadSceneGroupStateFromStorage, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { useBackgroundDisplay } from '../hooks/useBackgroundDisplay';
+import { useReviewManager } from '../hooks/useReviewManager';
 import { doesSceneCardMatchCurrentSlotTimeline, getCurrentSceneSlotWindow } from '../utils/sceneTimelineMatchUtils';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { isCheckTemplateItemEnabled } from '../utils/dailyCheckUtils';
@@ -56,7 +58,8 @@ export const SceneView: React.FC<SceneViewProps> = ({
   categories,
   todos = []
 }) => {
-  const { dailyReviews, checkTemplates, reviewTemplates, setDailyReviews, weeklyReviews, setWeeklyReviews, monthlyReviews, setMonthlyReviews } = useReview();
+  const { dailyReviews, checkTemplates, reviewTemplates, setDailyReviews, weeklyReviews, monthlyReviews } = useReview();
+  const { handleOpenWeeklyReview, handleOpenMonthlyReview } = useReviewManager();
   const { logs } = useData();
   const { activeSessions } = useSession();
   const { addToast } = useToast();
@@ -65,12 +68,6 @@ export const SceneView: React.FC<SceneViewProps> = ({
     setCurrentView, 
     setIsDailyReviewOpen, 
     setCurrentReviewDate, 
-    setIsWeeklyReviewOpen, 
-    setCurrentWeeklyReviewStart,
-    setCurrentWeeklyReviewEnd,
-    setIsMonthlyReviewOpen, 
-    setCurrentMonthlyReviewStart,
-    setCurrentMonthlyReviewEnd,
     setPreviousView,
     setStatsRange
   } = useNavigation();
@@ -971,27 +968,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const weekStartStr = weekStart.toISOString().split('T')[0];
-    const weekEndStr = weekEnd.toISOString().split('T')[0];
-
-    let review = weeklyReviews.find(r => r.weekStartDate === weekStartStr);
-
-    if (!review) {
-      review = {
-        id: `weekly-${Date.now()}`,
-        weekStartDate: weekStartStr,
-        weekEndDate: weekEndStr,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        answers: []
-      };
-
-      setWeeklyReviews([...weeklyReviews, review]);
-    }
-
-    setCurrentWeeklyReviewStart(weekStart);
-    setCurrentWeeklyReviewEnd(weekEnd);
-    setIsWeeklyReviewOpen(true);
+    handleOpenWeeklyReview(weekStart, weekEnd);
   };
 
   const handleNavigateToMonthlyReview = () => {
@@ -999,27 +976,7 @@ export const SceneView: React.FC<SceneViewProps> = ({
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
-    const monthStartStr = monthStart.toISOString().split('T')[0];
-    const monthEndStr = monthEnd.toISOString().split('T')[0];
-
-    let review = monthlyReviews.find(r => r.monthStartDate === monthStartStr);
-
-    if (!review) {
-      review = {
-        id: `monthly-${Date.now()}`,
-        monthStartDate: monthStartStr,
-        monthEndDate: monthEndStr,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-        answers: []
-      };
-
-      setMonthlyReviews([...monthlyReviews, review]);
-    }
-
-    setCurrentMonthlyReviewStart(monthStart);
-    setCurrentMonthlyReviewEnd(monthEnd);
-    setIsMonthlyReviewOpen(true);
+    handleOpenMonthlyReview(monthStart, monthEnd);
   };
 
   return (

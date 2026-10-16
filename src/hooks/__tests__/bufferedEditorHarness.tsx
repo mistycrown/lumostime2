@@ -1,19 +1,21 @@
 /**
  * @file bufferedEditorHarness.tsx
+ * @updated 2026-10-16: Covers missing-review commits on return/reopen and shared local-date period creation.
  * @input Real React editors and isolated platform adapters
  * @output Regression results for input, exit, deletion, merge and lifecycle saving
  * @pos Test (Renderer)
  */
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useBufferedRecord } from '../useBufferedRecord';
+import { useReviewManager } from '../useReviewManager';
 import { BufferedTextarea } from '../../components/BufferedTextarea';
 import { DailyReviewView } from '../../views/DailyReviewView';
 import { WeeklyReviewView } from '../../views/WeeklyReviewView';
 import { MonthlyReviewView } from '../../views/MonthlyReviewView';
 import { ReviewTemplateManageView } from '../../views/ReviewTemplateManageView';
 import { FocusDetailView } from '../../views/FocusDetailView';
-import { nativeState } from './bufferedEditorMocks';
+import { nativeState, reviewState } from './bufferedEditorMocks';
 
 declare global { interface Window { __bufferedEditorResult?: { passed: string[]; error?: string }; } }
 const passed: string[] = [];
@@ -28,6 +30,8 @@ const Probe = () => {
   draft = useBufferedRecord(source, value => { saves.push(value); source = value; });
   return <span>{draft.value.text}</span>;
 };
+let manager: ReturnType<typeof useReviewManager>;
+const ManagerProbe = () => { manager = useReviewManager(); return null; };
 const render = async (element: React.ReactNode) => { root.render(element); await delay(); };
 const unmount = () => render(null);
 const input = async (selector: string, value: string) => {
@@ -99,6 +103,43 @@ async function run() {
   const date = new Date(2026, 9, 4);
   const templateSnapshot = [{ id: 'template', title: 'Review', order: 0, questions: [{ id: 'question', question: '今天的回顾', type: 'text' }] }];
   const common: any = { templates: [], checkTemplates: [], categories: [], logs: [], todos: [], todoCategories: [], scopes: [], dailyReviews: [], addToast: () => {}, onClose: () => {}, onGenerateNarrative: async () => 'Generated' };
+  await render(<ManagerProbe />);
+  reviewState.reviewTemplates = [{ ...templateSnapshot[0], isWeeklyTemplate: true, isMonthlyTemplate: true }];
+  await render(<ManagerProbe />);
+  manager.handleOpenWeeklyReview(new Date(2026, 9, 12), new Date(2026, 9, 18, 23, 59, 59));
+  manager.handleOpenMonthlyReview(new Date(2026, 9, 1), new Date(2026, 9, 31));
+  check(reviewState.weeklyReviews[0].weekStartDate === '2026-10-12' && reviewState.weeklyReviews[0].weekEndDate === '2026-10-18', 'Weekly entry shifted the local date');
+  check(reviewState.monthlyReviews[0].monthStartDate === '2026-10-01' && reviewState.monthlyReviews[0].monthEndDate === '2026-10-31', 'Monthly entry shifted the local date');
+  check(reviewState.weeklyReviews[0].templateSnapshot.length === 1 && reviewState.monthlyReviews[0].templateSnapshot.length === 1, 'Alternate entry lost the template snapshot');
+  await render(<ManagerProbe />);
+  manager.handleOpenWeeklyReview(new Date(2026, 9, 12), new Date(2026, 9, 18, 23, 59, 59));
+  manager.handleOpenMonthlyReview(new Date(2026, 9, 1), new Date(2026, 9, 31));
+  check(reviewState.weeklyReviews.length === 1 && reviewState.monthlyReviews.length === 1, 'Reopen duplicated a period');
+  passed.push('Shared weekly/monthly entry uses local dates, templates and existing records');
+
+  for (const [View, collection, save] of [
+    [DailyReviewView, 'dailyReviews', manager.handleUpdateReview],
+    [WeeklyReviewView, 'weeklyReviews', manager.handleUpdateWeeklyReview],
+    [MonthlyReviewView, 'monthlyReviews', manager.handleUpdateMonthlyReview]
+  ] as const) {
+    const existing = { id: 'unrelated-review', answers: [] };
+    reviewState[collection] = [existing];
+    const review: any = { id: `missing-${View.name}`, date: '2026-10-04', weekStartDate: '2026-10-04', weekEndDate: '2026-10-10', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', answers: [], templateSnapshot, createdAt: 1, updatedAt: 1 };
+    const view = (value: any) => <View {...common} key={value.id} review={value} date={date} weekStartDate={date} weekEndDate={date} monthStartDate={date} monthEndDate={date} initialTab="guide" onUpdateReview={save as any} onDelete={() => root.render(null)} />;
+    await render(view(review));
+    await input('textarea', '返回后应保留的回答');
+    await unmount(); // Return without blur or an explicit save button.
+    const saved = reviewState[collection].find((item: any) => item.id === review.id);
+    check(saved?.answers[0]?.answer === '返回后应保留的回答', View.name + ': missing review was silently dropped on return');
+    check(reviewState[collection][0] === existing && reviewState[collection].length === 2, View.name + ': save changed unrelated records');
+    await render(view(saved));
+    check(host.textContent?.includes('返回后应保留的回答'), View.name + ': reopen lost the answer');
+    await unmount();
+    save({ ...saved, summary: '再次保存' });
+    check(reviewState[collection].length === 2 && reviewState[collection][1].summary === '再次保存', View.name + ': update duplicated the saved review');
+    passed.push(View.name + ' missing record survives direct return and reopen through the real manager');
+  }
+
   for (const View of [DailyReviewView, WeeklyReviewView, MonthlyReviewView]) {
     saves.length = 0;
     let review: any = { id: View.name, date: '2026-10-04', weekStartDate: '2026-10-04', weekEndDate: '2026-10-10', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', answers: [], templateSnapshot, createdAt: 1, updatedAt: 1 };
@@ -126,6 +167,33 @@ async function run() {
     check(saves.length === 0, View.name + ': deletion recreated review');
     passed.push(View.name + ' deletion discards draft');
   }
+  let persistedDaily: any = { id: 'daily-autosave', date: '2026-10-04', answers: [], templateSnapshot, createdAt: 1, updatedAt: 1 };
+  let dailySaves = 0;
+  const AutosavingDailyReview = () => {
+    const [review, setReview] = useState(persistedDaily);
+    return <DailyReviewView {...common} review={review} date={date} initialTab="guide"
+      onUpdateReview={(value) => { persistedDaily = value; dailySaves++; setReview(value); }}
+      onDelete={() => root.render(null)} />;
+  };
+  await render(<AutosavingDailyReview />);
+  await input('textarea', '停顿后保存');
+  await new Promise(resolve => setTimeout(resolve, 600));
+  check(dailySaves === 1 && persistedDaily.answers[0].answer === '停顿后保存', 'Daily review did not autosave before return');
+  check((host.querySelector('textarea') as HTMLTextAreaElement).value === '停顿后保存', 'Autosave reset the visible answer');
+  await input('textarea', '失焦立即保存');
+  host.querySelector('textarea')!.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  await delay();
+  check(dailySaves === 2 && persistedDaily.answers[0].answer === '失焦立即保存', 'Daily blur did not commit the latest answer');
+  await input('textarea', '最后输入后立即返回');
+  await unmount();
+  check(dailySaves === 3 && persistedDaily.answers[0].answer === '最后输入后立即返回', 'Daily return lost the pending autosave');
+  await new Promise(resolve => setTimeout(resolve, 600));
+  check(dailySaves === 3, 'Autosave timer fired again after return');
+  await render(<AutosavingDailyReview />);
+  check(host.textContent?.includes('最后输入后立即返回'), 'Daily autosaved answer was missing on reopen');
+  await unmount();
+  passed.push('Daily review autosave, blur, immediate return, reopen and timer cancellation');
+
   saves.length = 0;
   const templates: any[] = [{ id: 'template', title: 'Review template', order: 0, questions: [{ id: 'q', question: 'Question', type: 'choice', choices: ['A'] }] }];
   await render(<ReviewTemplateManageView templates={templates} onUpdateTemplates={value => saves.push(value)} onBack={() => root.render(null)} />);

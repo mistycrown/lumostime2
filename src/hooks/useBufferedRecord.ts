@@ -1,20 +1,22 @@
 /**
  * @file useBufferedRecord.ts
- * @input Persisted record, save callback, local record edits
- * @output Local draft, explicit commit/discard controls, lifecycle saving
+ * @updated 2026-10-16: Supports delayed autosave so review drafts need not wait for teardown to commit.
+ * @input Persisted record, save callback, local record edits, optional autosave delay
+ * @output Local draft, explicit commit/discard controls, lifecycle saving and optional autosave
  * @pos Hook (Editing)
- * @description Buffers edits until exit or backgrounding and merges only edited fields into the latest record.
+ * @description Buffers edits until commit or an optional autosave delay and merges edited fields into the latest record.
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 
-export const useBufferedRecord = <T extends { id: string }>(record: T, onSave: (record: T) => void) => {
+export const useBufferedRecord = <T extends { id: string }>(record: T, onSave: (record: T) => void, saveDelayMs?: number) => {
   const [patch, setPatch] = useState<Partial<T>>({});
   const patchRef = useRef<Partial<T>>({});
   const latest = useRef({ record, onSave });
   const mounted = useRef(false);
   const discarded = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const value = useMemo(() => ({ ...record, ...patch }), [record, patch]);
 
   useLayoutEffect(() => {
@@ -22,6 +24,8 @@ export const useBufferedRecord = <T extends { id: string }>(record: T, onSave: (
   });
 
   const commit = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = undefined;
     if (discarded.current || Object.keys(patchRef.current).length === 0) return;
     const pending = patchRef.current;
     const next = { ...latest.current.record, ...pending };
@@ -32,6 +36,8 @@ export const useBufferedRecord = <T extends { id: string }>(record: T, onSave: (
   }, []);
 
   const discard = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    saveTimer.current = undefined;
     discarded.current = true;
     patchRef.current = {};
     setPatch({});
@@ -47,9 +53,14 @@ export const useBufferedRecord = <T extends { id: string }>(record: T, onSave: (
     if (Object.keys(changes).length === 0) return;
     patchRef.current = { ...patchRef.current, ...changes };
     // AI generation can finish after navigation; save its result without losing the exited draft.
-    if (mounted.current) setPatch(patchRef.current);
-    else commit();
-  }, [value, commit]);
+    if (mounted.current) {
+      setPatch(patchRef.current);
+      if (saveDelayMs !== undefined) {
+        clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(commit, saveDelayMs);
+      }
+    } else commit();
+  }, [value, commit, saveDelayMs]);
 
   useLayoutEffect(() => {
     mounted.current = true;
