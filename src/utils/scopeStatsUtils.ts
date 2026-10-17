@@ -4,12 +4,13 @@
  * @output Shared helpers for scope duration aggregation
  * @description Centralizes scope duration rules so all views count full duration for every linked scope.
  * @updated 2026-08-09: Planned timeline blocks are excluded from scope duration aggregation.
+ * @updated 2026-10-17: Includes the optional planned flag in aggregation input types for shared detail-duration consumers.
  */
 
 import { Log } from '../types';
 import { filterCountableLogs } from './statLogUtils';
 
-type ScopeLogLike = Pick<Log, 'duration' | 'startTime' | 'endTime' | 'scopeIds'>;
+type ScopeLogLike = Pick<Log, 'duration' | 'startTime' | 'endTime' | 'scopeIds' | 'isPlanned'>;
 
 export interface ScopeDurationSummary {
   totalAttributedDuration: number;

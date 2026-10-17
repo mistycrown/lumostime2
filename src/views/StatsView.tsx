@@ -1,6 +1,7 @@
 /**
  * @file StatsView.tsx
  * @updated 2026-10-17: Enables hierarchical log drilldown for category/activity pie rows in every date range.
+ * @updated 2026-10-17: Supplies independent todo/scope sources so tag exclusions cannot alter their detail totals.
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
@@ -836,11 +837,14 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               pieRange={pieRange}
               categories={categories}
               excludedCategoryIds={excludedCategoryIds}
+              todos={todos}
+              todoCategories={todoCategories}
+              scopes={scopes}
               onToggleExclusion={toggleExclusion}
               onExport={handleExportStats}
               onExportImage={handleExportImage}
               isFullScreen={isFullScreen}
-              logDetails={enableLogDetails ? { logs: filteredLogs, date: currentDate, isPrivacyMode } : undefined}
+              logDetails={enableLogDetails ? { logs: filteredLogs, relatedLogs: logs, date: currentDate, isPrivacyMode } : undefined}
             />
           )}
 

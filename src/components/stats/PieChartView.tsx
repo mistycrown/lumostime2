@@ -1,6 +1,7 @@
 /**
  * @file PieChartView.tsx
  * @updated 2026-10-17: Opens category/activity log details across day/week/month/year ranges.
+ * @updated 2026-10-17: Adds the same drilldown to todo categories, individual tasks and scopes, including yearly tasks.
  * @updated 2026-09-09: Added category/activity color modes for the tags chart and its progress bars.
  * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds, optional logDetails
  * @output UI (Pie Charts, hierarchical log dialog), Events (toggleExclusion, onExport)
@@ -17,7 +18,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Category, Log } from '../../types';
+import { Category, Log, Scope, TodoCategory, TodoItem } from '../../types';
 import { TrendingUp, TrendingDown, Share, Image, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../IconRenderer';
 import { StatsLogsModal, type StatsLogSelection } from './StatsLogsModal';
@@ -48,12 +49,15 @@ export interface PieChartViewProps {
   previousScopeStats: PreviousScopeStatsData | null;
   pieRange: 'day' | 'week' | 'month' | 'year';
   categories: Category[];
+  todos?: TodoItem[];
+  todoCategories?: TodoCategory[];
+  scopes?: Scope[];
   excludedCategoryIds: string[];
   onToggleExclusion: (id: string) => void;
   onExport?: () => void;
   onExportImage?: () => void;
   isFullScreen?: boolean;
-  logDetails?: { logs: Log[]; date: Date; isPrivacyMode: boolean };
+  logDetails?: { logs: Log[]; relatedLogs?: Log[]; date: Date; isPrivacyMode: boolean };
 }
 
 type TagsColorMode = 'category' | 'activity';
@@ -67,6 +71,9 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   previousScopeStats,
   pieRange,
   categories,
+  todos,
+  todoCategories,
+  scopes,
   excludedCategoryIds,
   onToggleExclusion,
   onExport,
@@ -408,56 +415,67 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
           <div className="w-full space-y-4">
             {todoStats.categoryStats.map(cat => (
               <div key={cat.id} className="group">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
-                    <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
-                    {previousTodoStats && renderGrowth(
-                      cat.duration,
-                      previousTodoStats.categoryDurations?.get(cat.id) || 0
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-stone-400">
-                      {formatDuration(cat.duration)}
+                <StatRow
+                  type={logDetails ? 'button' : undefined}
+                  onClick={logDetails ? () => setSelectedLogs({ type: 'todoCategory', categoryId: cat.id, color: cat.assignedColor }) : undefined}
+                  aria-label={logDetails ? `查看${cat.name}待办分类的${logPeriodLabel}记录` : undefined}
+                  aria-haspopup={logDetails ? 'dialog' : undefined}
+                  className={`block w-full rounded-lg text-left ${logDetails ? 'cursor-pointer transition-colors hover:bg-stone-100/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300' : ''}`}
+                >
+                  <span className="mb-1.5 flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
+                      <span className="min-w-0 break-words font-bold text-stone-700 text-[13px]">{cat.name}</span>
+                      {previousTodoStats && renderGrowth(
+                        cat.duration,
+                        previousTodoStats.categoryDurations?.get(cat.id) || 0
+                      )}
                     </span>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
-                      {cat.percentage.toFixed(0)}%
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs font-mono text-stone-400">
+                        {formatDuration(cat.duration)}
+                      </span>
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
+                        {cat.percentage.toFixed(0)}%
+                      </span>
+                      {logDetails && <ChevronRight size={12} className="text-stone-300" />}
                     </span>
-                  </div>
+                  </span>
+                  <span className="mb-2 block h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${cat.percentage}%`,
+                        backgroundColor: cat.assignedColor
+                      }}
+                    />
+                  </span>
+                </StatRow>
+                <div className="pl-6 space-y-1">
+                  {cat.items.map(item => (
+                    <StatRow
+                      key={item.id}
+                      type={logDetails ? 'button' : undefined}
+                      onClick={logDetails ? () => setSelectedLogs({ type: 'todo', todoId: item.id, color: cat.assignedColor }) : undefined}
+                      aria-label={logDetails ? `查看${item.name}待办的${logPeriodLabel}记录` : undefined}
+                      aria-haspopup={logDetails ? 'dialog' : undefined}
+                      className="-ml-2 flex w-full items-center justify-between gap-3 rounded px-2 py-0.5 text-left text-[11px] text-stone-500 transition-colors hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300"
+                    >
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span
+                          className="h-1 w-1 shrink-0 rounded-full"
+                          style={{ backgroundColor: cat.assignedColor }}
+                        />
+                        <span className="min-w-0 break-words">{item.name}</span>
+                        {previousTodoStats && renderGrowth(
+                          item.duration,
+                          previousTodoStats.todoDurations.get(item.id) || 0
+                        )}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2"><span className="font-mono opacity-60">{formatDuration(item.duration)}</span>{logDetails && <ChevronRight size={11} className="text-stone-300" />}</span>
+                    </StatRow>
+                  ))}
                 </div>
-                <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${cat.percentage}%`,
-                      backgroundColor: cat.assignedColor
-                    }}
-                  />
-                </div>
-                {pieRange !== 'year' && (
-                  <div className="pl-6 space-y-1">
-                    {cat.items.map(item => (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between text-[11px] text-stone-500 hover:bg-stone-50 rounded px-2 py-0.5 -ml-2 transition-colors"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className="w-1 h-1 rounded-full"
-                            style={{ backgroundColor: cat.assignedColor }}
-                          />
-                          <span>{item.name}</span>
-                          {previousTodoStats && renderGrowth(
-                            item.duration,
-                            previousTodoStats.todoDurations.get(item.id) || 0
-                          )}
-                        </div>
-                        <span className="font-mono opacity-60">{formatDuration(item.duration)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             ))}
           </div>
@@ -487,33 +505,42 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
           <div className="w-full space-y-4">
             {scopeStats.categoryStats.map(scope => (
               <div key={scope.id} className="group">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <IconRenderer icon={scope.icon} uiIcon={scope.uiIcon} size={14} />
-                    <span className="font-bold text-stone-700 text-[13px]">{scope.name}</span>
-                    {previousScopeStats && renderGrowth(
-                      scope.duration,
-                      previousScopeStats.scopeDurations.get(scope.id) || 0
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-stone-400">
-                      {formatDuration(scope.duration)}
+                <StatRow
+                  type={logDetails ? 'button' : undefined}
+                  onClick={logDetails ? () => setSelectedLogs({ type: 'scope', scopeId: scope.id }) : undefined}
+                  aria-label={logDetails ? `查看${scope.name}领域的${logPeriodLabel}记录` : undefined}
+                  aria-haspopup={logDetails ? 'dialog' : undefined}
+                  className={`block w-full rounded-lg text-left ${logDetails ? 'cursor-pointer transition-colors hover:bg-stone-100/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300' : ''}`}
+                >
+                  <span className="mb-1.5 flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <IconRenderer icon={scope.icon} uiIcon={scope.uiIcon} size={14} />
+                      <span className="min-w-0 break-words font-bold text-stone-700 text-[13px]">{scope.name}</span>
+                      {previousScopeStats && renderGrowth(
+                        scope.duration,
+                        previousScopeStats.scopeDurations.get(scope.id) || 0
+                      )}
                     </span>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
-                      {scope.percentage.toFixed(0)}%
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs font-mono text-stone-400">
+                        {formatDuration(scope.duration)}
+                      </span>
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
+                        {scope.percentage.toFixed(0)}%
+                      </span>
+                      {logDetails && <ChevronRight size={12} className="text-stone-300" />}
                     </span>
-                  </div>
-                </div>
-                <div className="w-full h-1.5 bg-stone-50 rounded-full overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${scope.percentage}%`,
-                      backgroundColor: getHexColor(scope.themeColor)
-                    }}
-                  />
-                </div>
+                  </span>
+                  <span className="mb-2 block h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${scope.percentage}%`,
+                        backgroundColor: getHexColor(scope.themeColor)
+                      }}
+                    />
+                  </span>
+                </StatRow>
               </div>
             ))}
           </div>
@@ -524,10 +551,13 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
       {logDetails && selectedLogs && (
         <StatsLogsModal
           selection={selectedLogs}
-          logs={logDetails.logs}
+          logs={selectedLogs.type && selectedLogs.type !== 'tag' ? (logDetails.relatedLogs || logDetails.logs) : logDetails.logs}
           date={logDetails.date}
           range={pieRange}
           categories={categories}
+          todos={todos}
+          todoCategories={todoCategories}
+          scopes={scopes}
           isPrivacyMode={logDetails.isPrivacyMode}
           onClose={closeLogDetails}
         />

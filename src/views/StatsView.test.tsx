@@ -1,6 +1,7 @@
 /**
  * @file StatsView.test.tsx
  * @updated 2026-10-17: Verifies period drilldown receives chart-filtered logs in every range and respects explicit opt-out.
+ * @updated 2026-10-17: Preserves independent source logs for todo/scope drilldown.
  * @input Server-rendered statistics views and isolated hooks
  * @output Range, template filtering and inactive-statistics regression checks
  * @pos Test (Statistics View)
@@ -111,8 +112,9 @@ describe('StatsView matrix date range', () => {
     />);
     const props = vi.mocked(PieChartView).mock.calls.at(-1)![0];
     if (opens) {
-      expect(props.logDetails).toEqual({ logs: filteredLogs, date, isPrivacyMode: false });
+      expect(props.logDetails).toEqual({ logs: filteredLogs, relatedLogs: allLogs, date, isPrivacyMode: false });
       expect(props.logDetails?.logs).toBe(filteredLogs);
+      expect(props.logDetails?.relatedLogs).toBe(allLogs);
     } else {
       expect(props.logDetails).toBeUndefined();
     }

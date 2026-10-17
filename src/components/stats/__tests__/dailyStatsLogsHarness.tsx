@@ -4,15 +4,18 @@
  * @output Interaction assertions and mobile/desktop/dark screenshot checkpoints
  * @updated 2026-10-17: Verifies category/tag filtering, day boundaries, planned logs, dismissal, focus and scrolling.
  * @updated 2026-10-17: Covers week/month/year expansion, empty periods, keyboard wrapping and range reset.
+ * @updated 2026-10-17: Exercises todo/scope sources, multiple tag categories, independent exclusions and scope duration semantics.
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PieChartView } from '../PieChartView';
 import { useStatsCalculation } from '../../../hooks/useStatsCalculation';
 import { runRegisteredHardwareBackHandler } from '../../../utils/hardwareBackHandlerStack';
-import type { Category, Log } from '../../../types';
+import type { Category, Log, Scope, TodoCategory, TodoItem } from '../../../types';
 import { getDateRange } from '../../StatsView/statsUtils';
 import type { StatsLogRange } from '../../../utils/statsLogGroupingUtils';
+import { useTodoStats } from '../../../hooks/useTodoStats';
+import { useScopeStats } from '../../../hooks/useScopeStats';
 
 declare global {
   interface Window {
@@ -51,23 +54,30 @@ const dailyLogs = [...logs];
 let privacy = false;
 let enabled = true;
 let underlyingTouches = 0;
+let todos: TodoItem[] = [];
+let todoCategories: TodoCategory[] = [];
+let scopes: Scope[] = [];
 const root = createRoot(document.getElementById('root')!);
 
 const App = () => {
   const [excluded, setExcluded] = useState<string[]>([]);
+  const dateRange = getDateRange(date, range);
   const { stats, filteredLogs } = useStatsCalculation({
     logs, categories, excludedCategoryIds: excluded,
-    dateRange: getDateRange(date, range)
+    dateRange
   });
+  const { todoStats } = useTodoStats({ logs, todos, todoCategories, dateRange });
+  const { scopeStats } = useScopeStats({ logs, scopes, categories, dateRange });
   return <main className="mx-auto max-w-md px-7 py-6" onTouchEnd={() => underlyingTouches++}>
     <h1 className="mb-8 font-serif text-xl text-stone-800">Daily Review · 数据</h1>
     <PieChartView
       stats={stats} previousStats={null}
-      todoStats={{ totalDuration: 0, categoryStats: [] }} previousTodoStats={null}
-      scopeStats={{ totalDuration: 0, categoryStats: [] }} previousScopeStats={null}
+      todoStats={todoStats} previousTodoStats={null}
+      scopeStats={scopeStats} previousScopeStats={null}
       pieRange={range} categories={categories} excludedCategoryIds={excluded}
+      todos={todos} todoCategories={todoCategories} scopes={scopes}
       onToggleExclusion={id => setExcluded(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id])}
-      logDetails={enabled ? { logs: filteredLogs, date, isPrivacyMode: privacy } : undefined}
+      logDetails={enabled ? { logs: filteredLogs, relatedLogs: logs, date, isPrivacyMode: privacy } : undefined}
     />
   </main>;
 };
@@ -207,6 +217,82 @@ const run = async () => {
   assert(runRegisteredHardwareBackHandler(), 'Grouped hierarchy did not consume Android back');
   await tick(); assert(!dialog(), 'Grouped hierarchy did not close on Android back');
   passed.push('year-to-month-to-week-to-day-to-log expansion, month boundaries, lazy rendering and responsive layouts');
+
+  range = 'day';
+  todos = [
+    { id: 'book', title: '阅读《瓦尔登湖》', categoryId: 'projects', isCompleted: false },
+    { id: 'notes', title: '整理读书笔记', categoryId: 'projects', isCompleted: true },
+    { id: 'other-book', title: '阅读《瓦尔登湖》', categoryId: 'other', isCompleted: false }
+  ];
+  todoCategories = [
+    { id: 'projects', name: '阅读计划', icon: '📝', color: '#e9d5ff' },
+    { id: 'other', name: '生活杂项', icon: '🧺', color: '#bae6fd' }
+  ];
+  scopes = [
+    { id: 'growth', name: '个人成长', icon: '🌱', themeColor: '#a7f3d0', isArchived: false, order: 0 },
+    { id: 'health', name: '身心健康', icon: '🌻', themeColor: '#e9d5ff', isArchived: false, order: 1 }
+  ];
+  logs = [
+    log('todo-reading', 9, 30, { linkedTodoId: 'book', duration: 1200, scopeIds: ['growth', 'health', 'growth'], title: '安静地读一个章节', note: 'TODO_READING' }),
+    log('todo-notes', 10, 20, { activityId: 'writing', linkedTodoId: 'notes', duration: 600, scopeIds: ['growth'], note: 'TODO_NOTES' }),
+    log('todo-other-activity', 18, 26, { categoryId: 'self', activityId: 'reading', linkedTodoId: 'book', duration: 900, scopeIds: ['health'], note: 'TODO_OTHER_ACTIVITY' }),
+    log('duplicate-title', 11, 10, { linkedTodoId: 'other-book', scopeIds: ['health'], note: 'DUPLICATE_TODO' }),
+    log('scope-no-todo', 14, 15, { scopeIds: ['growth'], note: 'NO_TODO' }),
+    log('planned-todo', 20, 30, { linkedTodoId: 'book', scopeIds: ['growth'], isPlanned: true, note: 'PLANNED_TODO' }),
+    log('out-of-period-todo', 9, 30, { linkedTodoId: 'book', scopeIds: ['growth'], startTime: new Date(2025, 9, 16, 9).getTime(), endTime: new Date(2025, 9, 16, 9, 30).getTime(), note: 'OUT_OF_PERIOD' })
+  ];
+  render(); await tick();
+  const tagChip = Array.from(document.querySelectorAll<HTMLButtonElement>('main button')).find(item => item.textContent?.trim().endsWith('学习'))!;
+  assert(tagChip, 'Missing tag exclusion chip');
+  tagChip.click(); await tick();
+  assert(!button('查看学习分类的当日记录'), 'Tag exclusion did not apply');
+  const todoCategoryButton = button('查看阅读计划待办分类的当日记录');
+  todoCategoryButton.querySelector<HTMLElement>('.h-1\\.5')!.click(); await tick();
+  assert(dialog()!.querySelector('h2')?.textContent === '阅读计划' && logRows().length === 3 && dialog()!.textContent?.includes('1小时 16分钟'), 'Todo category did not preserve its own chart totals');
+  assert(!/DUPLICATE_TODO|PLANNED_TODO|OUT_OF_PERIOD|NO_TODO/.test(dialog()!.textContent!), 'Todo category leaked unrelated records');
+  assert(dialog()!.textContent?.includes('运动健身') && dialog()!.textContent?.includes('写作整理'), 'Mixed-category todo records lost their tag labels');
+  await close();
+  await open('查看阅读《瓦尔登湖》待办的当日记录');
+  assert(logRows().length === 2 && dialog()!.textContent?.includes('56分钟') && !dialog()!.textContent?.includes('DUPLICATE_TODO'), 'Individual todo matched a duplicate title or lost another activity category');
+  await capture('stats-todo-logs-mobile', 390, 844);
+  await close();
+  button('查看个人成长领域的当日记录').querySelector<HTMLElement>('.h-1\\.5')!.click(); await tick();
+  assert(logRows().length === 3 && dialog()!.querySelector('header')!.textContent?.includes('45分钟'), 'Scope total did not use stored chart durations');
+  assert(logRows()[0].textContent?.includes('20分钟'), 'Scope row duration differs from its chart');
+  assert(!/TODO_OTHER_ACTIVITY|DUPLICATE_TODO|PLANNED_TODO|OUT_OF_PERIOD/.test(Array.from(logRows()).map(row => row.textContent).join('')), 'Scope selection leaked unmatched records');
+  await close();
+  await open('查看身心健康领域的当日记录');
+  assert(logRows().length === 3 && dialog()!.querySelector('header')!.textContent?.includes('45分钟') && dialog()!.textContent?.includes('TODO_READING'), 'Multi-scope record was split, duplicated or omitted');
+  await close();
+  passed.push('todo/category/scope daily rows and bars, mixed tags, duplicate titles, independent tag exclusions and scope duration rules');
+
+  for (const nextRange of ['week', 'month', 'year'] as const) {
+    range = nextRange; render(); await tick();
+    const periodLabel = { week: '本周', month: '本月', year: '本年' }[range];
+    for (const target of [
+      { label: `查看阅读计划待办分类的${periodLabel}记录`, count: 3, total: '1小时 16分钟', kind: 'todoCategory' },
+      { label: `查看阅读《瓦尔登湖》待办的${periodLabel}记录`, count: 2, total: '56分钟', kind: 'todo' },
+      { label: `查看个人成长领域的${periodLabel}记录`, count: 3, total: '45分钟', kind: 'scope' }
+    ]) {
+      await open(target.label);
+      assert(logRows().length === 0 && dialog()!.querySelector('header')!.textContent?.includes(target.total), `${range} ${target.kind} initial summary differs from chart`);
+      if (range === 'year') await expand('month:2026-10-01');
+      if (range !== 'week') await expand('week:2026-10-12');
+      await expand('day:2026-10-16');
+      assert(logRows().length === target.count && periodButton('day:2026-10-16').textContent?.includes(target.total), `${range} ${target.kind} hierarchy lost its records or duration metric`);
+      periodButton('day:2026-10-16').scrollIntoView({ block: 'start' });
+      if (range === 'month' && target.kind === 'todoCategory') await capture('stats-todo-category-month-desktop', 1100, 820);
+      if (range === 'year' && target.kind === 'todo') await capture('stats-todo-year-mobile', 360, 740);
+      if (range === 'year' && target.kind === 'scope') {
+        document.documentElement.dataset.themeMode = 'dark';
+        await capture('stats-scope-year-dark', 390, 844);
+        delete document.documentElement.dataset.themeMode;
+      }
+      assert(dialog()!.scrollWidth <= dialog()!.clientWidth, 'Related entity detail overflowed horizontally');
+      await close();
+    }
+  }
+  passed.push('todo categories, individual todos and scopes share week/month/year expansion and preserve every level total');
   window.__dailyStatsLogsResult = { passed };
 };
 run().catch(error => { window.__dailyStatsLogsResult = { passed: [], error: String(error.stack || error) }; });

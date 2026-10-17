@@ -4,11 +4,14 @@
  * @output Chronological day/week/month groups with matching durations and record counts
  * @description Builds expandable period summaries; calendar weeks are clipped to their parent month.
  * @updated 2026-10-17: Adds week-to-day, month-to-week and year-to-month log grouping.
+ * @updated 2026-10-17: Preserves scope chart duration semantics throughout all summary levels.
  */
 import type { Log } from '../types';
 import { getLocalDateStr } from './dateUtils';
+import { getLogDurationSeconds } from './scopeStatsUtils';
 
 export type StatsLogRange = 'day' | 'week' | 'month' | 'year';
+export type StatsLogDurationMetric = 'elapsed' | 'scope';
 export interface StatsLogGroup {
   id: string;
   kind: 'day' | 'week' | 'month';
@@ -21,8 +24,8 @@ export interface StatsLogGroup {
   children: StatsLogGroup[];
 }
 
-export const getStatsLogsDuration = (logs: Log[]): number => logs.reduce(
-  (total, log) => total + Math.max(0, (log.endTime - log.startTime) / 1000), 0
+export const getStatsLogsDuration = (logs: Log[], metric: StatsLogDurationMetric = 'elapsed'): number => logs.reduce(
+  (total, log) => total + (metric === 'scope' ? getLogDurationSeconds(log) : Math.max(0, (log.endTime - log.startTime) / 1000)), 0
 );
 
 const shortDate = (date: Date) => `${date.getMonth() + 1}.${String(date.getDate()).padStart(2, '0')}`;
@@ -30,7 +33,8 @@ const shortDate = (date: Date) => `${date.getMonth() + 1}.${String(date.getDate(
 export const buildStatsLogGroups = (
   logs: Log[],
   range: StatsLogRange,
-  period: { start: Date; end: Date }
+  period: { start: Date; end: Date },
+  metric: StatsLogDurationMetric = 'elapsed'
 ): StatsLogGroup[] => {
   if (range === 'day') return [];
   const groups: StatsLogGroup[] = [];
@@ -57,11 +61,11 @@ export const buildStatsLogGroups = (
     const caption = kind === 'day' ? ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][start.getDay()]
       : kind === 'week' ? `${shortDate(start)} — ${shortDate(end)}` : '';
     const children = groupLogs.length > 0 && kind !== 'day'
-      ? buildStatsLogGroups(groupLogs, kind === 'month' ? 'month' : 'week', { start, end })
+      ? buildStatsLogGroups(groupLogs, kind === 'month' ? 'month' : 'week', { start, end }, metric)
       : [];
     groups.push({
       id: `${kind}:${getLocalDateStr(start)}`, kind, label, caption, start, end,
-      logs: groupLogs, duration: getStatsLogsDuration(groupLogs), children
+      logs: groupLogs, duration: getStatsLogsDuration(groupLogs, metric), children
     });
     cursor = next;
   }

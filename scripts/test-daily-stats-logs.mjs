@@ -1,9 +1,9 @@
 /**
  * @file test-daily-stats-logs.mjs
- * @input Real day/week/month/year statistics log renderer harness and production CSS from npm run build
+ * @input Real tag/todo/scope day/week/month/year renderer harness and production CSS from npm run build
  * @output Isolated Electron interaction results and responsive screenshots in a temporary folder
  * @pos Test Runner
- * @updated 2026-10-17: Verifies hierarchical period drilldown with an explicitly loaded Chinese font.
+ * @updated 2026-10-17: Verifies hierarchical tag/todo/scope drilldown and independent totals with an explicitly loaded Chinese font.
  */
 import { build } from 'esbuild';
 import { copyFile, mkdtemp, readdir, writeFile } from 'node:fs/promises';
