@@ -1,18 +1,21 @@
 /**
  * @file StatsLogsModal.tsx
- * @input Chart-filtered logs, selected category/activity, review date and privacy mode
- * @output Read-only daily log dialog with chronological records and matching totals
+ * @input Chart-filtered logs, selected category/activity, date, range and privacy mode
+ * @output Expandable period summaries and chronological records with matching totals
  * @pos Component (Statistics)
- * @description Displays daily statistic records in an editorial timeline with focus and Android back handling.
+ * @description Displays statistics records in an editorial timeline with expandable month/week/day summaries.
+ * @updated 2026-10-17: Adds lazy period expansion and keyboard focus containment across summary controls.
  * @updated 2026-10-17: Adds category/activity log details with portal rendering and scroll locking.
  */
-import React, { useEffect, useId, useMemo, useRef } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import type { Category, Log } from '../../types';
 import { IconRenderer } from '../IconRenderer';
 import { formatDuration, getHexColor } from '../../utils/chartUtils';
 import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
+import { getDateRange } from '../StatsView/statsUtils';
+import { buildStatsLogGroups, getStatsLogsDuration, type StatsLogGroup, type StatsLogRange } from '../../utils/statsLogGroupingUtils';
 
 export interface StatsLogSelection {
   categoryId: string;
@@ -24,6 +27,7 @@ interface StatsLogsModalProps {
   logs: Log[];
   categories: Category[];
   date: Date;
+  range?: StatsLogRange;
   isPrivacyMode: boolean;
   onClose: () => void;
 }
@@ -34,10 +38,11 @@ const formatTime = (timestamp: number) => {
 };
 
 export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
-  selection, logs, categories, date, isPrivacyMode, onClose
+  selection, logs, categories, date, range = 'day', isPrivacyMode, onClose
 }) => {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const category = categories.find(item => item.id === selection.categoryId);
   const activity = category?.activities.find(item => item.id === selection.activityId);
   const entity = activity || category;
@@ -47,7 +52,17 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
       && (!selection.activityId || log.activityId === selection.activityId))
     .sort((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id)),
   [logs, selection.categoryId, selection.activityId]);
-  const totalSeconds = selectedLogs.reduce((total, log) => total + Math.max(0, (log.endTime - log.startTime) / 1000), 0);
+  const totalSeconds = getStatsLogsDuration(selectedLogs);
+  const period = getDateRange(date, range);
+  const periodStart = period.start.getTime();
+  const periodEnd = period.end.getTime();
+  const groups = useMemo(() => buildStatsLogGroups(selectedLogs, range, {
+    start: new Date(periodStart), end: new Date(periodEnd)
+  }), [selectedLogs, range, periodStart, periodEnd]);
+  const dateLabel = range === 'year' ? `${date.getFullYear()}`
+    : range === 'month' ? `${date.getFullYear()} / ${String(date.getMonth() + 1).padStart(2, '0')}`
+    : range === 'week' ? `${period.start.getFullYear()}/${period.start.getMonth() + 1}/${period.start.getDate()} — ${period.end.getFullYear() !== period.start.getFullYear() ? `${period.end.getFullYear()}/` : ''}${period.end.getMonth() + 1}/${period.end.getDate()}`
+    : `${date.getFullYear()} / ${String(date.getMonth() + 1).padStart(2, '0')} / ${String(date.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -64,9 +79,15 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
         event.stopPropagation();
         onClose();
       } else if (event.key === 'Tab') {
-        // Close is the only interactive control in this read-only dialog.
-        event.preventDefault();
-        closeRef.current?.focus();
+        const controls = dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+        if (!controls?.length) return;
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        const outside = !dialogRef.current?.contains(document.activeElement);
+        if (outside || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -90,6 +111,7 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
       onTouchEnd={event => event.stopPropagation()}
     >
       <section
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -98,7 +120,7 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
         <header className="shrink-0 px-6 pb-5 pt-6 sm:px-8 sm:pt-8">
           <div className="mb-5 flex items-center justify-between gap-4">
             <time className="font-mono text-[11px] tracking-[0.16em] text-stone-400">
-              {date.getFullYear()} / {String(date.getMonth() + 1).padStart(2, '0')} / {String(date.getDate()).padStart(2, '0')}
+              {dateLabel}
             </time>
             <button ref={closeRef} type="button" aria-label="关闭记录明细" onClick={onClose} className="-mr-2 rounded-full p-2 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-400">
               <X size={18} />
@@ -122,39 +144,77 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
           {selectedLogs.length === 0 ? (
             <p className="py-12 text-center text-sm text-stone-400">暂无记录</p>
           ) : (
-            <ol>
-              {selectedLogs.map(log => {
-                const logActivity = category?.activities.find(item => item.id === log.activityId);
-                return (
-                  <li key={log.id} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-4 border-b border-stone-200/60 py-5 last:border-b-0">
-                    <div className="pt-0.5 font-mono text-[11px] leading-5">
-                      <time className="block text-stone-600">{formatTime(log.startTime)}</time>
-                      <span className="my-1.5 block h-4 w-px bg-stone-200" />
-                      <time className="block text-stone-400">{formatTime(log.endTime)}</time>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="mb-2 flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-stone-700">
-                          <IconRenderer icon={logActivity?.icon || category?.icon || '◷'} uiIcon={logActivity?.uiIcon} size={13} />
-                          <span className="break-words">{logActivity?.name || '未命名标签'}</span>
-                        </div>
-                        <span className="shrink-0 pt-0.5 font-mono text-[10px] text-stone-400">{formatDuration(Math.max(0, (log.endTime - log.startTime) / 1000))}</span>
-                      </div>
-                      {(log.title || log.note) && (
-                        <div className={isPrivacyMode ? 'blur-sm select-none' : ''}>
-                          {log.title && <p className="mb-1 break-words text-sm font-medium leading-6 text-stone-700">{log.title}</p>}
-                          {log.note && <p className="whitespace-pre-wrap break-words text-[13px] leading-6 text-stone-500">{log.note}</p>}
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+            range === 'day' ? <StatsLogRows logs={selectedLogs} category={category} isPrivacyMode={isPrivacyMode} />
+              : <div>{groups.map(group => <StatsPeriodSection key={group.id} group={group} category={category} isPrivacyMode={isPrivacyMode} />)}</div>
           )}
         </div>
       </section>
     </div>,
     document.body
+  );
+};
+
+interface StatsLogRowsProps {
+  logs: Log[];
+  category?: Category;
+  isPrivacyMode: boolean;
+}
+
+const StatsLogRows: React.FC<StatsLogRowsProps> = ({ logs, category, isPrivacyMode }) => (
+  <ol>
+    {logs.map(log => {
+      const activity = category?.activities.find(item => item.id === log.activityId);
+      return (
+        <li key={log.id} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-4 border-b border-stone-200/60 py-5 last:border-b-0">
+          <div className="pt-0.5 font-mono text-[11px] leading-5">
+            <time className="block text-stone-600">{formatTime(log.startTime)}</time>
+            <span className="my-1.5 block h-4 w-px bg-stone-200" />
+            <time className="block text-stone-400">{formatTime(log.endTime)}</time>
+          </div>
+          <div className="min-w-0">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-stone-700">
+                <IconRenderer icon={activity?.icon || category?.icon || '◷'} uiIcon={activity?.uiIcon} size={13} />
+                <span className="break-words">{activity?.name || '未命名标签'}</span>
+              </div>
+              <span className="shrink-0 pt-0.5 font-mono text-[10px] text-stone-400">{formatDuration(getStatsLogsDuration([log]))}</span>
+            </div>
+            {(log.title || log.note) && <div className={isPrivacyMode ? 'blur-sm select-none' : ''}>
+              {log.title && <p className="mb-1 break-words text-sm font-medium leading-6 text-stone-700">{log.title}</p>}
+              {log.note && <p className="whitespace-pre-wrap break-words text-[13px] leading-6 text-stone-500">{log.note}</p>}
+            </div>}
+          </div>
+        </li>
+      );
+    })}
+  </ol>
+);
+
+const StatsPeriodSection: React.FC<Omit<StatsLogRowsProps, 'logs'> & { group: StatsLogGroup }> = ({ group, category, isPrivacyMode }) => {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
+  const hasLogs = group.logs.length > 0;
+  return (
+    <div className="border-b border-stone-200/60 last:border-b-0">
+      <button
+        type="button"
+        data-stats-period={group.id}
+        aria-expanded={expanded && hasLogs}
+        aria-controls={contentId}
+        disabled={!hasLogs}
+        onClick={() => setExpanded(previous => !previous)}
+        className="flex w-full items-center justify-between gap-3 rounded py-4 text-left transition-colors hover:bg-stone-100/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300 disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <ChevronRight size={14} className={`shrink-0 text-stone-400 transition-transform ${expanded && hasLogs ? 'rotate-90' : ''}`} />
+          <span className="min-w-0"><span className="block text-sm font-medium text-stone-700">{group.label}</span>{group.caption && <span className="mt-0.5 block font-mono text-[10px] text-stone-400">{group.caption}</span>}</span>
+        </span>
+        <span className="shrink-0 text-right"><span className="block font-mono text-xs text-stone-600">{formatDuration(group.duration)}</span><span className="mt-0.5 block text-[10px] text-stone-400">{group.logs.length} 条记录</span></span>
+      </button>
+      {expanded && hasLogs && <div id={contentId} className="ml-1 border-l border-stone-200/70 pl-3">
+        {group.kind === 'day' ? <StatsLogRows logs={group.logs} category={category} isPrivacyMode={isPrivacyMode} />
+          : group.children.map(child => <StatsPeriodSection key={child.id} group={child} category={category} isPrivacyMode={isPrivacyMode} />)}
+      </div>}
+    </div>
   );
 };

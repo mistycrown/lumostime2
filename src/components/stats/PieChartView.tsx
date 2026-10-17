@@ -1,9 +1,9 @@
 /**
  * @file PieChartView.tsx
- * @updated 2026-10-17: Opens daily category/activity log details from statistics rows and bars.
+ * @updated 2026-10-17: Opens category/activity log details across day/week/month/year ranges.
  * @updated 2026-09-09: Added category/activity color modes for the tags chart and its progress bars.
- * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds, optional daily logDetails
- * @output UI (Pie Charts, daily log dialog), Events (toggleExclusion, onExport)
+ * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds, optional logDetails
+ * @output UI (Pie Charts, hierarchical log dialog), Events (toggleExclusion, onExport)
  * @pos Component (Statistics - Pie Chart)
  * @description 环形图统计视图 - 显示活动/待办/领域的时长分布
  * 
@@ -79,8 +79,9 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   const closeLogDetails = useCallback(() => setSelectedLogs(null), []);
   const StatRow = logDetails ? 'button' : 'div';
   const logDate = logDetails?.date.getTime();
+  const logPeriodLabel = { day: '当日', week: '本周', month: '本月', year: '本年' }[pieRange];
 
-  useEffect(() => setSelectedLogs(null), [logDate]);
+  useEffect(() => setSelectedLogs(null), [logDate, pieRange]);
 
   const activityStats = useMemo(() => (
     stats.categoryStats.flatMap(category => category.items.map(activity => ({
@@ -291,7 +292,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
               <StatRow
                 type={logDetails ? 'button' : undefined}
                 onClick={logDetails ? () => setSelectedLogs({ categoryId: cat.id }) : undefined}
-                aria-label={logDetails ? `查看${cat.name}分类的当日记录` : undefined}
+                aria-label={logDetails ? `查看${cat.name}分类的${logPeriodLabel}记录` : undefined}
                 aria-haspopup={logDetails ? 'dialog' : undefined}
                 className={`block w-full rounded-lg text-left ${logDetails ? 'cursor-pointer transition-colors hover:bg-stone-100/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300' : ''}`}
               >
@@ -332,7 +333,7 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
                     key={act.id}
                     type={logDetails ? 'button' : undefined}
                     onClick={logDetails ? () => setSelectedLogs({ categoryId: cat.id, activityId: act.id }) : undefined}
-                    aria-label={logDetails ? `查看${act.name}标签的当日记录` : undefined}
+                    aria-label={logDetails ? `查看${act.name}标签的${logPeriodLabel}记录` : undefined}
                     aria-haspopup={logDetails ? 'dialog' : undefined}
                     className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300"
                   >
@@ -519,12 +520,13 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         </div>
       )}
 
-      {/* Daily log details */}
+      {/* Period log details */}
       {logDetails && selectedLogs && (
         <StatsLogsModal
           selection={selectedLogs}
           logs={logDetails.logs}
           date={logDetails.date}
+          range={pieRange}
           categories={categories}
           isPrivacyMode={logDetails.isPrivacyMode}
           onClose={closeLogDetails}

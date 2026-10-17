@@ -1,8 +1,9 @@
 /**
  * @file dailyStatsLogsHarness.tsx
- * @input Real statistics hook, pie chart and daily log modal
+ * @input Real statistics hook, pie chart and hierarchical period log modal
  * @output Interaction assertions and mobile/desktop/dark screenshot checkpoints
  * @updated 2026-10-17: Verifies category/tag filtering, day boundaries, planned logs, dismissal, focus and scrolling.
+ * @updated 2026-10-17: Covers week/month/year expansion, empty periods, keyboard wrapping and range reset.
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,6 +11,8 @@ import { PieChartView } from '../PieChartView';
 import { useStatsCalculation } from '../../../hooks/useStatsCalculation';
 import { runRegisteredHardwareBackHandler } from '../../../utils/hardwareBackHandlerStack';
 import type { Category, Log } from '../../../types';
+import { getDateRange } from '../../StatsView/statsUtils';
+import type { StatsLogRange } from '../../../utils/statsLogGroupingUtils';
 
 declare global {
   interface Window {
@@ -43,6 +46,8 @@ let logs = [
   log('plan', 20, 30, { isPlanned: true, note: 'PLANNED' })
 ];
 let date = new Date(2026, 9, 16);
+let range: StatsLogRange = 'day';
+const dailyLogs = [...logs];
 let privacy = false;
 let enabled = true;
 let underlyingTouches = 0;
@@ -52,7 +57,7 @@ const App = () => {
   const [excluded, setExcluded] = useState<string[]>([]);
   const { stats, filteredLogs } = useStatsCalculation({
     logs, categories, excludedCategoryIds: excluded,
-    dateRange: { start: new Date(date.getFullYear(), date.getMonth(), date.getDate()), end: new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999) }
+    dateRange: getDateRange(date, range)
   });
   return <main className="mx-auto max-w-md px-7 py-6" onTouchEnd={() => underlyingTouches++}>
     <h1 className="mb-8 font-serif text-xl text-stone-800">Daily Review · 数据</h1>
@@ -60,7 +65,7 @@ const App = () => {
       stats={stats} previousStats={null}
       todoStats={{ totalDuration: 0, categoryStats: [] }} previousTodoStats={null}
       scopeStats={{ totalDuration: 0, categoryStats: [] }} previousScopeStats={null}
-      pieRange="day" categories={categories} excludedCategoryIds={excluded}
+      pieRange={range} categories={categories} excludedCategoryIds={excluded}
       onToggleExclusion={id => setExcluded(previous => previous.includes(id) ? previous.filter(item => item !== id) : [...previous, id])}
       logDetails={enabled ? { logs: filteredLogs, date, isPrivacyMode: privacy } : undefined}
     />
@@ -143,6 +148,65 @@ const run = async () => {
   enabled = false; render(); await tick();
   assert(!button('查看学习分类的当日记录'), 'Non-enabled charts gained log interactions');
   passed.push('long notes, internal scroll, narrow layout and opt-in scope');
+
+  const periodButton = (id: string) => dialog()!.querySelector<HTMLButtonElement>(`button[data-stats-period="${id}"]`)!;
+  const expand = async (id: string) => { const target = periodButton(id); assert(target && !target.disabled, `Missing period ${id}`); target.click(); await tick(); };
+  const logRows = () => dialog()!.querySelectorAll('li');
+  enabled = true; range = 'week'; logs = dailyLogs;
+  render(); await tick(); await open('查看学习分类的本周记录');
+  assert(dialog()!.querySelectorAll('[data-stats-period]').length === 7 && logRows().length === 0, 'Week did not start with collapsed day summaries');
+  assert(periodButton('day:2026-10-12').disabled, 'Empty day was not disabled');
+  assert(dialog()!.textContent?.includes('5 条记录') && dialog()!.textContent?.includes('2小时 48分钟'), 'Weekly chart totals differ from dialog');
+  await expand('day:2026-10-16');
+  assert(logRows().length === 3 && dialog()!.textContent?.includes('早晨的阅读'), 'Weekly day expansion lost logs');
+  assert(!/YESTERDAY|TOMORROW|PLANNED|OTHER_CATEGORY/.test(Array.from(logRows()).map(row => row.textContent).join('')), 'Day expansion leaked adjacent dates');
+  await capture('stats-week-days-mobile', 390, 844);
+  await expand('day:2026-10-16');
+  assert(logRows().length === 0 && periodButton('day:2026-10-16').getAttribute('aria-expanded') === 'false', 'Day collapse did not hide logs');
+  button('关闭记录明细').focus();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+  assert(document.activeElement === periodButton('day:2026-10-17'), 'Shift+Tab did not reach the last enabled summary');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+  assert(document.activeElement === button('关闭记录明细'), 'Tab escaped the expanded dialog');
+  passed.push('weekly day summaries, exact day logs, collapse, empty days and focus containment');
+
+  range = 'month'; render(); await tick(); assert(!dialog(), 'Range change retained a stale selection');
+  await open('查看学习分类的本月记录');
+  assert(dialog()!.querySelectorAll('[data-stats-period]').length === 5 && logRows().length === 0, 'Month did not start with collapsed weeks');
+  assert(periodButton('week:2026-10-01').textContent?.includes('10.01 — 10.04'), 'Partial first week was not clipped');
+  await expand('week:2026-10-12');
+  assert(dialog()!.querySelectorAll('[data-stats-period^="day:"]').length === 7, 'Month week did not expand to days');
+  await expand('day:2026-10-16');
+  assert(logRows().length === 3, 'Month day did not reach the matching logs');
+  await capture('stats-month-weeks-desktop', 1100, 820);
+  privacy = true; render(); await tick();
+  assert(dialog()!.querySelector('.blur-sm')?.textContent?.includes('早晨的阅读'), 'Expanded period lost privacy mode');
+  passed.push('monthly partial weeks, week-to-day-to-log expansion and privacy');
+
+  privacy = false; range = 'year';
+  logs = [
+    ...dailyLogs,
+    log('jan-end', 9, 30, { startTime: new Date(2026, 0, 31, 9).getTime(), endTime: new Date(2026, 0, 31, 9, 30).getTime(), note: 'JANUARY_ONLY' }),
+    log('feb-start', 9, 20, { startTime: new Date(2026, 1, 1, 9).getTime(), endTime: new Date(2026, 1, 1, 9, 20).getTime(), note: 'FEBRUARY_ONLY' })
+  ];
+  render(); await tick(); assert(!dialog(), 'Year range did not clear month selection');
+  await open('查看书籍文献标签的本年记录');
+  assert(dialog()!.querySelectorAll('[data-stats-period]').length === 12 && logRows().length === 0, 'Year did not show twelve collapsed months');
+  assert(periodButton('month:2026-03-01').disabled, 'Empty month was not disabled');
+  await expand('month:2026-01-01'); await expand('week:2026-01-26'); await expand('day:2026-01-31');
+  assert(logRows().length === 1 && logRows()[0].textContent?.includes('JANUARY_ONLY'), 'January included the adjacent month portion');
+  await expand('month:2026-01-01');
+  await expand('month:2026-10-01'); await expand('week:2026-10-12'); await expand('day:2026-10-16');
+  assert(logRows().length === 2 && !Array.from(logRows()).some(row => /写作整理|OTHER_CATEGORY/.test(row.textContent || '')), 'Year activity hierarchy lost category/activity filtering');
+  periodButton('week:2026-10-12').scrollIntoView({ block: 'start' });
+  await capture('stats-year-months-mobile', 360, 740);
+  assert(dialog()!.scrollWidth <= dialog()!.clientWidth && dialog()!.getBoundingClientRect().top >= 0, 'Expanded year overflowed a narrow viewport');
+  document.documentElement.dataset.themeMode = 'dark';
+  await capture('stats-year-months-dark', 390, 844);
+  delete document.documentElement.dataset.themeMode;
+  assert(runRegisteredHardwareBackHandler(), 'Grouped hierarchy did not consume Android back');
+  await tick(); assert(!dialog(), 'Grouped hierarchy did not close on Android back');
+  passed.push('year-to-month-to-week-to-day-to-log expansion, month boundaries, lazy rendering and responsive layouts');
   window.__dailyStatsLogsResult = { passed };
 };
 run().catch(error => { window.__dailyStatsLogsResult = { passed: [], error: String(error.stack || error) }; });

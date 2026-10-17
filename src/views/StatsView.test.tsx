@@ -1,6 +1,6 @@
 /**
  * @file StatsView.test.tsx
- * @updated 2026-10-17: Verifies opt-in daily drilldown receives chart-filtered logs and stays disabled for other ranges.
+ * @updated 2026-10-17: Verifies period drilldown receives chart-filtered logs in every range and respects explicit opt-out.
  * @input Server-rendered statistics views and isolated hooks
  * @output Range, template filtering and inactive-statistics regression checks
  * @pos Test (Statistics View)
@@ -93,8 +93,11 @@ describe('StatsView matrix date range', () => {
   it.each([
     { enabled: true, range: 'day' as const, opens: true },
     { enabled: false, range: 'day' as const, opens: false },
-    { enabled: true, range: 'week' as const, opens: false }
-  ])('scopes log drilldown to enabled daily charts ($enabled, $range)', ({ enabled, range, opens }) => {
+    { enabled: true, range: 'week' as const, opens: true },
+    { enabled: true, range: 'month' as const, opens: true },
+    { enabled: true, range: 'year' as const, opens: true },
+    { enabled: undefined, range: 'week' as const, opens: true }
+  ])('passes chart-filtered logs for each enabled period ($enabled, $range)', ({ enabled, range, opens }) => {
     const allLogs = [{ id: 'other-day' }, { id: 'current-day' }] as Log[];
     const filteredLogs = [allLogs[1]];
     const date = new Date(2026, 9, 16);

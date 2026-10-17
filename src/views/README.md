@@ -1,6 +1,6 @@
 # Views Layer
 
-Update 2026-10-17: `DailyReviewView` enables category/activity log dialogs in its daily pie statistics. `StatsView` passes the exact chart-filtered records; other callers and broader ranges keep their existing interactions. `node scripts/test-daily-stats-logs.mjs` covers record filtering, dismissal, focus, privacy and responsive layouts.
+Update 2026-10-17: `StatsView` enables category/activity log dialogs across daily, weekly, monthly and yearly pie statistics. Days show logs directly; weeks show days; months show weeks; years show months, with expansion continuing down to individual logs. All summaries use the exact chart-filtered records and clip calendar weeks to parent-month boundaries. `node scripts/test-daily-stats-logs.mjs` covers grouping, filtering, dismissal, focus, privacy and responsive layouts.
 
 Update 2026-10-16: `TodoView` moves completed occurrences into today's completed section, keeps recurring series active and passes explicit dates through list/week/bento/month actions. Focus completion uses the session start date. Date-less weekly summaries require selecting an occurrence.
 

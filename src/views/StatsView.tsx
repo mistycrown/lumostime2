@@ -1,6 +1,6 @@
 /**
  * @file StatsView.tsx
- * @updated 2026-10-17: Supplies chart-filtered daily logs for opt-in category/activity detail dialogs.
+ * @updated 2026-10-17: Enables hierarchical log drilldown for category/activity pie rows in every date range.
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
@@ -123,7 +123,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = EMPTY_DAILY_REVIEWS, checkTemplates, enableLogDetails = false, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = EMPTY_DAILY_REVIEWS, checkTemplates, enableLogDetails = true, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const { setIsExportViewOpen } = useNavigation();
   const { scheduleStyle } = useSettings();
@@ -840,7 +840,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               onExport={handleExportStats}
               onExportImage={handleExportImage}
               isFullScreen={isFullScreen}
-              logDetails={enableLogDetails && pieRange === 'day' ? { logs: filteredLogs, date: currentDate, isPrivacyMode } : undefined}
+              logDetails={enableLogDetails ? { logs: filteredLogs, date: currentDate, isPrivacyMode } : undefined}
             />
           )}
 
