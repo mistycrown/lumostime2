@@ -1,5 +1,6 @@
 /**
  * @file SceneSettingsView.tsx
+ * @updated 2026-10-17: Clears stale actions when switching to or saving statistics cards.
  * @updated 2026-08-06: Made scene time-slot previews explicitly prefer configured UI icons over stored emoji fallbacks.
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
  *
@@ -33,6 +34,7 @@ import { COLOR_OPTIONS } from '../constants';
 import { findAutoSwitchTargetGroup, getActiveSceneGroup, isSceneGroupAutoSwitchMatched, loadSceneGroupStateFromStorage, moveSceneGroup, saveSceneGroupStateToStorage } from '../utils/sceneGroupStorage';
 import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { isStoredColorSelected } from '../utils/colorUtils';
+import { getSceneCardAction } from '../utils/sceneCardActionUtils';
 
 interface SceneSettingsViewProps {
   onBack: () => void;
@@ -620,7 +622,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       backText: (editingCard.type === 'principle' && (editingCard.principleSource === 'random' || editingCard.principleSource === 'library')) 
         ? '' 
         : (editingCard.backText || '完成了！'),
-      action: editingCard.action || { type: 'none' },
+      action: getSceneCardAction(editingCard),
       // 保存颜色字段
       ...(editingCard.color && { color: editingCard.color }),
       // 保存自动进入沉浸式计时字段（timer 和 todo 类型）
@@ -1898,7 +1900,11 @@ const CardEditModal: React.FC<{
             </label>
             <CustomSelect
               value={card?.type || 'timer'}
-              onChange={(value) => onChange({ ...card, type: value as SceneCardType })}
+              onChange={(value) => onChange({
+                ...card,
+                type: value as SceneCardType,
+                action: getSceneCardAction({ type: value as SceneCardType, action: card?.action })
+              })}
               options={cardTypes.map(type => ({
                 value: type.value,
                 label: type.label,

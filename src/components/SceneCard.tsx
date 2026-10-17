@@ -1,5 +1,6 @@
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
+ * @updated 2026-10-17: Ignores stale timer and app-launch actions on statistics cards.
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  * @updated 2026-05-11: Timer/todo cards now restore only manual flip storage and ignore legacy auto-flip booleans so out-of-slot logs cannot keep cards stuck on the back side.
  * @updated 2026-05-10: Split timer/todo back-side locking from manual flips so timeline-forced backs block swipe return without persisting that forced state.
@@ -16,6 +17,7 @@ import { CardStatsBadge } from './CardStatsBadge';
 import { AppLauncherService } from '../services/AppLauncherService';
 import { getSceneCardColorPresentation, type SceneCardColorPresentation } from '../utils/colorAdapterUtils';
 import { getSceneCardFlipInteractionState } from '../utils/sceneCardFlipUtils';
+import { getSceneCardAction } from '../utils/sceneCardActionUtils';
 import {
   getSceneCardLegacyFlipStorageKey,
   getSceneCardManualFlipStorageKey,
@@ -295,37 +297,38 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   };
 
   const handleCardClick = async () => {
+    const action = getSceneCardAction(data);
     if (!isFlipped) {
       // 正面点击 - 翻转到反面并执行动作
       setPersistedFlipped(true);
       saveFlipState(true);
       
       // 只在正计时模式下启动应用（补记模式下不启动应用）
-      if (sceneCardTimerMode === 'realtime' && data.action.launchApp && data.action.appPackageName) {
-        const success = await AppLauncherService.launchApp(data.action.appPackageName);
+      if (sceneCardTimerMode === 'realtime' && action.launchApp && action.appPackageName) {
+        const success = await AppLauncherService.launchApp(action.appPackageName);
         
         if (success) {
-          console.log(`[SceneCard] 成功启动应用: ${data.action.appName}`);
+          console.log(`[SceneCard] 成功启动应用: ${action.appName}`);
         } else {
-          console.warn(`[SceneCard] 启动应用失败: ${data.action.appName}`);
+          console.warn(`[SceneCard] 启动应用失败: ${action.appName}`);
         }
       }
       
-      if (data.action.type !== 'none') {
-        if (data.type === 'checklist' && data.action.type === 'toggleCheck') {
+      if (action.type !== 'none') {
+        if (data.type === 'checklist' && action.type === 'toggleCheck') {
           onAction?.({
-            ...data.action,
+            ...action,
             checkActionMode: isCountChecklistCard ? 'increment' : 'toggle'
           }, data.autoEnterFocus);
           return;
         }
         // 对于导航卡片，延迟执行以显示翻转动画
-        if (data.action.type === 'navigate') {
+        if (action.type === 'navigate') {
           setTimeout(() => {
-            onAction?.(data.action, data.autoEnterFocus);
+            onAction?.(action, data.autoEnterFocus);
           }, 300);
         } else {
-          onAction?.(data.action, data.autoEnterFocus);
+          onAction?.(action, data.autoEnterFocus);
         }
       }
     } else {
@@ -334,25 +337,25 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         case 'timer':
         case 'todo':
           // 只在正计时模式下启动应用（补记模式下不启动应用）
-          if (sceneCardTimerMode === 'realtime' && data.action.launchApp && data.action.appPackageName) {
-            await AppLauncherService.launchApp(data.action.appPackageName);
+          if (sceneCardTimerMode === 'realtime' && action.launchApp && action.appPackageName) {
+            await AppLauncherService.launchApp(action.appPackageName);
           }
           
-          if (data.action.type !== 'none') {
-            onAction?.(data.action, data.autoEnterFocus);
+          if (action.type !== 'none') {
+            onAction?.(action, data.autoEnterFocus);
           }
           break;
         
         case 'navigation':
-          if (data.action.type === 'navigate') {
-            onAction?.(data.action, data.autoEnterFocus);
+          if (action.type === 'navigate') {
+            onAction?.(action, data.autoEnterFocus);
           }
           break;
         
         case 'checklist':
-          if (isCountChecklistCard && data.action.type === 'toggleCheck') {
+          if (isCountChecklistCard && action.type === 'toggleCheck') {
             onAction?.({
-              ...data.action,
+              ...action,
               checkActionMode: 'increment'
             }, data.autoEnterFocus);
           }
@@ -364,8 +367,8 @@ export const SceneCard: React.FC<SceneCardProps> = ({
         
         case 'reference':
           // 引用卡片反面点击跳转到对应的日报
-          if (data.action.type === 'reference') {
-            onAction?.(data.action);
+          if (action.type === 'reference') {
+            onAction?.(action);
           }
           break;
       }
