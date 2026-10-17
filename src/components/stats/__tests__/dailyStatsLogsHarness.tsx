@@ -5,6 +5,7 @@
  * @updated 2026-10-17: Verifies category/tag filtering, day boundaries, planned logs, dismissal, focus and scrolling.
  * @updated 2026-10-17: Covers week/month/year expansion, empty periods, keyboard wrapping and range reset.
  * @updated 2026-10-17: Exercises todo/scope sources, multiple tag categories, independent exclusions and scope duration semantics.
+ * @updated 2026-10-17: Verifies bounded rendering and untouched collapsed payloads with 100,800 annual records.
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -19,7 +20,7 @@ import { useScopeStats } from '../../../hooks/useScopeStats';
 
 declare global {
   interface Window {
-    __dailyStatsLogsResult?: { passed: string[]; error?: string };
+    __dailyStatsLogsResult?: { passed: string[]; error?: string; performance?: Record<string, number> };
     __dailyStatsLogsCapture?: { name: string; width: number; height: number };
     __dailyStatsLogsCaptured?: boolean;
   }
@@ -293,6 +294,50 @@ const run = async () => {
     }
   }
   passed.push('todo categories, individual todos and scopes share week/month/year expansion and preserve every level total');
-  window.__dailyStatsLogsResult = { passed };
+
+  range = 'year';
+  const readNotes = new Set<number>();
+  let firstNoteRead = '';
+  logs = Array.from({ length: 100800 }, (_, index): Log => {
+    const month = Math.floor(index / 8400);
+    const day = Math.floor(index / 300) % 28 + 1;
+    const startTime = new Date(2026, month, day, 0, (index % 300) * 2).getTime();
+    return {
+      id: `dense-${index}`, categoryId: 'study', activityId: 'reading', startTime,
+      endTime: startTime + 60000, duration: 60,
+      get note() { if (!firstNoteRead) firstNoteRead = new Error('First record payload access').stack || ''; readNotes.add(index); return `压力测试记录 ${index + 1}`; }
+    };
+  });
+  render(); await tick();
+  Array.from(document.querySelectorAll<HTMLButtonElement>('main button')).find(item => item.textContent?.trim().endsWith('学习'))!.click();
+  await tick();
+  const started = performance.now();
+  await open('查看学习分类的本年记录');
+  const initialMs = Math.round(performance.now() - started);
+  assert(dialog()!.querySelectorAll('[data-stats-period]').length === 12 && logRows().length === 0, 'Large annual view rendered descendants eagerly');
+  assert(readNotes.size === 0, 'Annual summaries read hidden log content: ' + firstNoteRead);
+  await expand('month:2026-10-01');
+  assert(dialog()!.querySelectorAll('[data-stats-period^="week:"]').length === 5 && readNotes.size === 0, 'Month expansion loaded log content');
+  await expand('week:2026-10-12');
+  assert(dialog()!.querySelectorAll('[data-stats-period^="day:"]').length === 7 && readNotes.size === 0, 'Week expansion loaded log content');
+  const dayStarted = performance.now();
+  await expand('day:2026-10-16');
+  const dayMs = Math.round(performance.now() - dayStarted);
+  assert(logRows().length === 50 && readNotes.size === 50, 'Day expansion did not cap its first record batch');
+  const more = Array.from(dialog()!.querySelectorAll<HTMLButtonElement>('button')).find(item => item.textContent === '加载更多');
+  assert(more, 'Record pagination control is missing');
+  more!.click(); await tick();
+  assert(logRows().length === 100 && readNotes.size === 100, 'Next record batch loaded unrelated or excess content');
+  periodButton('day:2026-10-16').scrollIntoView({ block: 'start' });
+  await capture('stats-large-year-paged-mobile', 390, 844);
+  await expand('day:2026-10-16');
+  assert(logRows().length === 0, 'Collapsed day retained mounted records');
+  await expand('day:2026-10-16');
+  assert(logRows().length === 50, 'Reopened day retained an unbounded previous page');
+  await expand('month:2026-10-01');
+  assert(dialog()!.querySelectorAll('[data-stats-period]').length === 12 && logRows().length === 0, 'Collapsed month retained mounted descendants');
+  await close();
+  passed.push('100,800 annual records: 12 initial summaries, untouched hidden payloads, one-level expansion, 50-row batches and collapse cleanup');
+  window.__dailyStatsLogsResult = { passed, performance: { records: logs.length, initialMs, dayMs, initialMonths: 12, firstBatchRows: 50 } };
 };
 run().catch(error => { window.__dailyStatsLogsResult = { passed: [], error: String(error.stack || error) }; });

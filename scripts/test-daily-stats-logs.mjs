@@ -4,6 +4,8 @@
  * @output Isolated Electron interaction results and responsive screenshots in a temporary folder
  * @pos Test Runner
  * @updated 2026-10-17: Verifies hierarchical tag/todo/scope drilldown and independent totals with an explicitly loaded Chinese font.
+ * @updated 2026-10-17: Includes large annual-data lazy-loading and bounded record-batch assertions.
+ * @updated 2026-10-17: Uses production React so development profiling cannot inspect hidden record payloads during pressure checks.
  */
 import { build } from 'esbuild';
 import { copyFile, mkdtemp, readdir, writeFile } from 'node:fs/promises';
@@ -16,7 +18,7 @@ const require = createRequire(import.meta.url);
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-daily-stats-logs-'));
 await build({
   entryPoints: ['src/components/stats/__tests__/dailyStatsLogsHarness.tsx'], bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: { 'process.env.NODE_ENV': '"production"' },
   plugins: [{ name: 'isolated-stats-icons', setup(builder) {
     builder.onResolve({ filter: /IconRenderer$/ }, () => ({ path: path.resolve('src/components/stats/__tests__/dailyStatsLogsMocks.tsx') }));
   } }]

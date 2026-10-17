@@ -5,13 +5,14 @@
  * @pos Component (Statistics)
  * @description Displays statistics records in an editorial timeline with expandable month/week/day summaries.
  * @updated 2026-10-17: Adds lazy period expansion and keyboard focus containment across summary controls.
+ * @updated 2026-10-17: Computes only expanded levels, sorts only days and renders log records in batches of 50.
  * @updated 2026-10-17: Reuses the hierarchy for todo categories, individual todos and scopes with their own duration rules.
  * @updated 2026-10-17: Adds category/activity log details with portal rendering and scroll locking.
  */
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronRight, X } from 'lucide-react';
-import type { Category, Log, Scope, TodoCategory, TodoItem } from '../../types';
+import type { Activity, Category, Log, Scope, TodoCategory, TodoItem } from '../../types';
 import { IconRenderer } from '../IconRenderer';
 import { formatDuration, getHexColor } from '../../utils/chartUtils';
 import { registerHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
@@ -23,6 +24,12 @@ export type { StatsLogSelection } from '../../utils/statsLogDetailsUtils';
 const EMPTY_TODOS: TodoItem[] = [];
 const EMPTY_TODO_CATEGORIES: TodoCategory[] = [];
 const EMPTY_SCOPES: Scope[] = [];
+const LOG_BATCH_SIZE = 50;
+
+interface StatsLogRowLookup {
+  tags: Map<string, { category: Category; activities: Map<string, Activity> }>;
+  todos: Map<string, TodoItem>;
+}
 
 interface StatsLogsModalProps {
   selection: StatsLogSelection;
@@ -57,8 +64,20 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
   const periodEnd = period.end.getTime();
   const selectedLogs = useMemo(() => selectStatsDetailLogs(logs, selection, todos, {
     start: new Date(periodStart), end: new Date(periodEnd)
-  }), [logs, selection, todos, periodStart, periodEnd]);
-  const totalSeconds = getStatsLogsDuration(selectedLogs, durationMetric);
+  }, { sort: range === 'day' }), [logs, selection, todos, periodStart, periodEnd, range]);
+  const totalSeconds = useMemo(() => getStatsLogsDuration(selectedLogs, durationMetric), [selectedLogs, durationMetric]);
+  const loadLookup = useMemo(() => {
+    let cached: StatsLogRowLookup | undefined;
+    return () => {
+      if (!cached) cached = {
+        tags: new Map(categories.map(category => [category.id, {
+          category, activities: new Map(category.activities.map(activity => [activity.id, activity]))
+        }])),
+        todos: new Map(todos.map(todo => [todo.id, todo]))
+      };
+      return cached;
+    };
+  }, [categories, todos]);
   const groups = useMemo(() => buildStatsLogGroups(selectedLogs, range, {
     start: new Date(periodStart), end: new Date(periodEnd)
   }, durationMetric), [selectedLogs, range, periodStart, periodEnd, durationMetric]);
@@ -147,8 +166,8 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
           {selectedLogs.length === 0 ? (
             <p className="py-12 text-center text-sm text-stone-400">暂无记录</p>
           ) : (
-            range === 'day' ? <StatsLogRows logs={selectedLogs} categories={categories} todos={todos} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />
-              : <div>{groups.map(group => <StatsPeriodSection key={group.id} group={group} categories={categories} todos={todos} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />)}</div>
+            range === 'day' ? <StatsLogRows logs={selectedLogs} loadLookup={loadLookup} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />
+              : <div>{groups.map(group => <StatsPeriodSection key={group.id} group={group} loadLookup={loadLookup} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />)}</div>
           )}
         </div>
       </section>
@@ -159,18 +178,22 @@ export const StatsLogsModal: React.FC<StatsLogsModalProps> = ({
 
 interface StatsLogRowsProps {
   logs: Log[];
-  categories: Category[];
-  todos: TodoItem[];
+  loadLookup: () => StatsLogRowLookup;
   durationMetric: StatsLogDurationMetric;
   isPrivacyMode: boolean;
 }
 
-const StatsLogRows: React.FC<StatsLogRowsProps> = ({ logs, categories, todos, durationMetric, isPrivacyMode }) => (
+const StatsLogRows: React.FC<StatsLogRowsProps> = ({ logs, loadLookup, durationMetric, isPrivacyMode }) => {
+  const [visibleCount, setVisibleCount] = useState(LOG_BATCH_SIZE);
+  const lookup = loadLookup();
+  useEffect(() => setVisibleCount(LOG_BATCH_SIZE), [logs]);
+  return <>
   <ol>
-    {logs.map(log => {
-      const category = categories.find(item => item.id === log.categoryId);
-      const activity = category?.activities.find(item => item.id === log.activityId);
-      const todo = todos.find(item => item.id === log.linkedTodoId);
+    {logs.slice(0, visibleCount).map(log => {
+      const tag = lookup.tags.get(log.categoryId);
+      const category = tag?.category;
+      const activity = tag?.activities.get(log.activityId);
+      const todo = log.linkedTodoId ? lookup.todos.get(log.linkedTodoId) : undefined;
       return (
         <li key={log.id} className="grid grid-cols-[3rem_minmax(0,1fr)] gap-4 border-b border-stone-200/60 py-5 last:border-b-0">
           <div className="pt-0.5 font-mono text-[11px] leading-5">
@@ -196,12 +219,18 @@ const StatsLogRows: React.FC<StatsLogRowsProps> = ({ logs, categories, todos, du
       );
     })}
   </ol>
-);
+  {visibleCount < logs.length && <button
+    type="button"
+    onClick={() => setVisibleCount(previous => Math.min(logs.length, previous + LOG_BATCH_SIZE))}
+    className="mb-3 w-full rounded py-3 text-xs text-stone-500 transition-colors hover:bg-stone-100/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300"
+  >加载更多</button>}
+  </>;
+};
 
-const StatsPeriodSection: React.FC<Omit<StatsLogRowsProps, 'logs'> & { group: StatsLogGroup }> = ({ group, categories, todos, durationMetric, isPrivacyMode }) => {
+const StatsPeriodSection: React.FC<Omit<StatsLogRowsProps, 'logs'> & { group: StatsLogGroup }> = ({ group, loadLookup, durationMetric, isPrivacyMode }) => {
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
-  const hasLogs = group.logs.length > 0;
+  const hasLogs = group.count > 0;
   return (
     <div className="border-b border-stone-200/60 last:border-b-0">
       <button
@@ -217,11 +246,11 @@ const StatsPeriodSection: React.FC<Omit<StatsLogRowsProps, 'logs'> & { group: St
           <ChevronRight size={14} className={`shrink-0 text-stone-400 transition-transform ${expanded && hasLogs ? 'rotate-90' : ''}`} />
           <span className="min-w-0"><span className="block text-sm font-medium text-stone-700">{group.label}</span>{group.caption && <span className="mt-0.5 block font-mono text-[10px] text-stone-400">{group.caption}</span>}</span>
         </span>
-        <span className="shrink-0 text-right"><span className="block font-mono text-xs text-stone-600">{formatDuration(group.duration)}</span><span className="mt-0.5 block text-[10px] text-stone-400">{group.logs.length} 条记录</span></span>
+        <span className="shrink-0 text-right"><span className="block font-mono text-xs text-stone-600">{formatDuration(group.duration)}</span><span className="mt-0.5 block text-[10px] text-stone-400">{group.count} 条记录</span></span>
       </button>
       {expanded && hasLogs && <div id={contentId} className="ml-1 border-l border-stone-200/70 pl-3">
-        {group.kind === 'day' ? <StatsLogRows logs={group.logs} categories={categories} todos={todos} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />
-          : group.children.map(child => <StatsPeriodSection key={child.id} group={child} categories={categories} todos={todos} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />)}
+        {group.kind === 'day' ? <StatsLogRows logs={group.loadLogs()} loadLookup={loadLookup} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />
+          : group.loadChildren().map(child => <StatsPeriodSection key={child.id} group={child} loadLookup={loadLookup} durationMetric={durationMetric} isPrivacyMode={isPrivacyMode} />)}
       </div>}
     </div>
   );

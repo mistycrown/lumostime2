@@ -4,10 +4,10 @@
  * @output Matching chronological logs and dialog identity
  * @description Resolves chart drilldown independently for tags, todo categories, individual todos and scopes.
  * @updated 2026-10-17: Adds linked-todo and multi-scope selection without inheriting tag exclusions.
+ * @updated 2026-10-17: Allows unsorted selection for period summaries so annual records are never sorted up front.
  */
 import type { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
-import { filterCountableLogs } from './statLogUtils';
-import { getNormalizedScopeIds } from './scopeStatsUtils';
+import { isCountableLog } from './statLogUtils';
 
 export type StatsLogSelection = (
   | { type?: 'tag'; categoryId: string; activityId?: string }
@@ -24,20 +24,25 @@ export interface StatsLogMetadata {
 }
 
 export const selectStatsDetailLogs = (
-  logs: Log[], selection: StatsLogSelection, todos: TodoItem[], period: { start: Date; end: Date }
+  logs: Log[], selection: StatsLogSelection, todos: TodoItem[], period: { start: Date; end: Date },
+  options: { sort?: boolean } = {}
 ): Log[] => {
   const todoIds = selection.type === 'todoCategory'
     ? new Set(todos.filter(todo => todo.categoryId === selection.categoryId).map(todo => todo.id))
     : null;
-  return filterCountableLogs(logs).filter(log => {
-    if (!(log.startTime >= period.start.getTime() && log.endTime <= period.end.getTime())) return false;
+  const start = period.start.getTime();
+  const end = period.end.getTime();
+  const selected = logs.filter(log => {
+    if (!isCountableLog(log) || !(log.startTime >= start && log.endTime <= end)) return false;
     switch (selection.type) {
-      case 'scope': return getNormalizedScopeIds(log.scopeIds).includes(selection.scopeId);
+      case 'scope': return !!log.scopeIds?.includes(selection.scopeId);
       case 'todo': return log.linkedTodoId === selection.todoId;
       case 'todoCategory': return !!log.linkedTodoId && !!todoIds?.has(log.linkedTodoId);
       default: return log.categoryId === selection.categoryId && (!selection.activityId || log.activityId === selection.activityId);
     }
-  }).sort((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id));
+  });
+  return options.sort === false ? selected
+    : selected.sort((a, b) => a.startTime - b.startTime || a.id.localeCompare(b.id));
 };
 
 export const getStatsDetailIdentity = (selection: StatsLogSelection, metadata: StatsLogMetadata) => {

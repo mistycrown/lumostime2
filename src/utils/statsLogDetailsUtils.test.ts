@@ -38,6 +38,20 @@ const metadata: StatsLogMetadata = {
 };
 
 describe('chart entity log details', () => {
+  it('skips sorting and record content access when selecting annual summaries', () => {
+    const annual = getDateRange(date, 'year');
+    let reads = 0;
+    const records = [1, 0].map(index => ({
+      ...log(`record-${index}`, { startTime: start + index * 3600000, endTime: start + index * 3600000 + 60000 }),
+      get id() { reads++; return `record-${index}`; },
+      get note() { throw new Error('Annual selection should not read notes'); }
+    }));
+    const selected = selectStatsDetailLogs(records, { categoryId: 'study' }, todos, annual, { sort: false });
+    expect(selected[0]).toBe(records[0]);
+    expect(selected[1]).toBe(records[1]);
+    expect(reads).toBe(0);
+  });
+
   it('selects a todo category across activity categories, including completed todos', () => {
     expect(selectStatsDetailLogs(logs, { type: 'todoCategory', categoryId: 'projects' }, todos, period).map(item => item.id)).toEqual(['first', 'second']);
   });
@@ -72,10 +86,12 @@ describe('chart entity log details', () => {
     const selected = selectStatsDetailLogs(logs, { type: 'scope', scopeId: 'growth' }, todos, period);
     const groups = buildStatsLogGroups(selected, 'year', getDateRange(date, 'year'), 'scope');
     const check = (items: StatsLogGroup[]) => items.forEach(group => {
-      expect(group.duration).toBe(getStatsLogsDuration(group.logs, 'scope'));
-      if (group.children.length) {
-        expect(group.children.reduce((sum, child) => sum + child.duration, 0)).toBe(group.duration);
-        check(group.children);
+      const children = group.loadChildren();
+      if (children.length) {
+        expect(children.reduce((sum, child) => sum + child.duration, 0)).toBe(group.duration);
+        check(children);
+      } else if (group.kind === 'day') {
+        expect(group.duration).toBe(getStatsLogsDuration(group.loadLogs(), 'scope'));
       }
     });
     check(groups);
