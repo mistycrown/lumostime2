@@ -1,5 +1,6 @@
 /**
  * @file DailyReviewView.tsx
+ * @updated 2026-10-17: Enables daily log detail dialogs on category/activity statistics rows.
  * @updated 2026-10-16: Commits edits after a short pause and on field blur, with exit/background saving as a fallback.
  * @updated 2026-10-11: Enables note-style autocomplete in guide answers using full log history.
  * @input Daily Review Data, Logs, Templates
@@ -962,6 +963,7 @@ export const DailyReviewView: React.FC<DailyReviewViewProps> = ({
                             hideControls={false}  // 显示控制栏 (用于切换视图)
                             hideRangeControls={true} // 隐藏左侧时间范围切换 (日/周/月/年) - 保持日视图简单
                             hideDateNavigation={true} // 隐藏日期导航 - 页面已有
+                            enableLogDetails
                             forcedRange="day"    // 强制为日视图
                             allowedViews={['pie', 'matrix', 'schedule']} // 允许切换：环形图 / 矩阵图 / 日程
                         />

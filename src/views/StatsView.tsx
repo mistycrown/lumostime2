@@ -1,5 +1,6 @@
 /**
  * @file StatsView.tsx
+ * @updated 2026-10-17: Supplies chart-filtered daily logs for opt-in category/activity detail dialogs.
  * @input Logs, Categories, Todos, Scopes, Current Date
  * @output Navigation Events (Date Change, Back)
  * @pos View (Statistics Dashboard)
@@ -98,6 +99,7 @@ interface StatsViewProps {
   dailyReviews?: DailyReview[]; // Add dailyReviews prop
   checkTemplates?: CheckTemplate[];
   // Daily Review 鏀寔
+  enableLogDetails?: boolean;
   hideControls?: boolean;  // 闅愯棌鎵€鏈夋帶鍒舵潯
   hideRangeControls?: boolean; // 闅愯棌宸︿晶鏃堕棿鑼冨洿閫夋嫨 (鏃?鍛?鏈?骞?
   hideDateNavigation?: boolean; // 闅愯棌涓棿鏃ユ湡瀵艰埅 (< >)
@@ -121,7 +123,7 @@ interface CategoryStat extends Category {
   items: ActivityStat[];
 }
 
-export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = EMPTY_DAILY_REVIEWS, checkTemplates, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
+export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentDate, onBack, onDateChange, isFullScreen, onToggleFullScreen, onToast, onTitleChange, todos, todoCategories, scopes, dailyReviews = EMPTY_DAILY_REVIEWS, checkTemplates, enableLogDetails = false, hideControls = false, hideRangeControls = false, hideDateNavigation = false, forcedView, forcedRange, allowedViews = ['pie', 'matrix', 'line', 'schedule', 'check', 'emoji'] }) => {
   const { isPrivacyMode } = usePrivacy();
   const { setIsExportViewOpen } = useNavigation();
   const { scheduleStyle } = useSettings();
@@ -838,6 +840,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ logs, categories, currentD
               onExport={handleExportStats}
               onExportImage={handleExportImage}
               isFullScreen={isFullScreen}
+              logDetails={enableLogDetails && pieRange === 'day' ? { logs: filteredLogs, date: currentDate, isPrivacyMode } : undefined}
             />
           )}
 

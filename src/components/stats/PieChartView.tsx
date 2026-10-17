@@ -1,8 +1,9 @@
 /**
  * @file PieChartView.tsx
+ * @updated 2026-10-17: Opens daily category/activity log details from statistics rows and bars.
  * @updated 2026-09-09: Added category/activity color modes for the tags chart and its progress bars.
- * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds
- * @output UI (Pie Charts), Events (toggleExclusion, onExport)
+ * @input stats, todoStats, scopeStats, pieRange, categories, excludedCategoryIds, optional daily logDetails
+ * @output UI (Pie Charts, daily log dialog), Events (toggleExclusion, onExport)
  * @pos Component (Statistics - Pie Chart)
  * @description 环形图统计视图 - 显示活动/待办/领域的时长分布
  * 
@@ -14,11 +15,12 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Category } from '../../types';
-import { TrendingUp, TrendingDown, Share, Image } from 'lucide-react';
+import { Category, Log } from '../../types';
+import { TrendingUp, TrendingDown, Share, Image, ChevronRight } from 'lucide-react';
 import { IconRenderer } from '../IconRenderer';
+import { StatsLogsModal, type StatsLogSelection } from './StatsLogsModal';
 import { 
   getHexColor, 
   formatDuration, 
@@ -51,6 +53,7 @@ export interface PieChartViewProps {
   onExport?: () => void;
   onExportImage?: () => void;
   isFullScreen?: boolean;
+  logDetails?: { logs: Log[]; date: Date; isPrivacyMode: boolean };
 }
 
 type TagsColorMode = 'category' | 'activity';
@@ -68,9 +71,16 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
   onToggleExclusion,
   onExport,
   onExportImage,
-  isFullScreen = false
+  isFullScreen = false,
+  logDetails
 }) => {
   const [tagsColorMode, setTagsColorMode] = useState<TagsColorMode>('category');
+  const [selectedLogs, setSelectedLogs] = useState<StatsLogSelection | null>(null);
+  const closeLogDetails = useCallback(() => setSelectedLogs(null), []);
+  const StatRow = logDetails ? 'button' : 'div';
+  const logDate = logDetails?.date.getTime();
+
+  useEffect(() => setSelectedLogs(null), [logDate]);
 
   const activityStats = useMemo(() => (
     stats.categoryStats.flatMap(category => category.items.map(activity => ({
@@ -219,12 +229,12 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
     const isPositive = percentage > 0;
 
     return (
-      <div className={`flex items-center gap-0.5 text-[10px] font-medium ml-1.5 ${
+      <span className={`flex items-center gap-0.5 text-[10px] font-medium ml-1.5 ${
         isPositive ? 'text-emerald-500' : 'text-red-400'
       }`}>
         {isPositive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
         <span>{Math.abs(percentage)}%</span>
-      </div>
+      </span>
     );
   };
 
@@ -278,61 +288,77 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         <div className="w-full space-y-4">
           {stats.categoryStats.map(cat => (
             <div key={cat.id} className="group">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
-                  <span className="font-bold text-stone-700 text-[13px]">{cat.name}</span>
-                  {previousStats && renderGrowth(
-                    cat.duration,
-                    previousStats.catDurations.get(cat.id) || 0
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono text-stone-400">
-                    {formatDuration(cat.duration)}
+              <StatRow
+                type={logDetails ? 'button' : undefined}
+                onClick={logDetails ? () => setSelectedLogs({ categoryId: cat.id }) : undefined}
+                aria-label={logDetails ? `查看${cat.name}分类的当日记录` : undefined}
+                aria-haspopup={logDetails ? 'dialog' : undefined}
+                className={`block w-full rounded-lg text-left ${logDetails ? 'cursor-pointer transition-colors hover:bg-stone-100/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300' : ''}`}
+              >
+                <span className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <IconRenderer icon={cat.icon} uiIcon={cat.uiIcon} size={14} />
+                    <span className="min-w-0 break-words font-bold text-stone-700 text-[13px]">{cat.name}</span>
+                    {previousStats && renderGrowth(
+                      cat.duration,
+                      previousStats.catDurations.get(cat.id) || 0
+                    )}
                   </span>
-                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
-                    {cat.percentage.toFixed(0)}%
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-mono text-stone-400">
+                      {formatDuration(cat.duration)}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-stone-100 rounded text-stone-500">
+                      {cat.percentage.toFixed(0)}%
+                    </span>
+                    {logDetails && <ChevronRight size={12} className="text-stone-300" />}
                   </span>
-                </div>
-              </div>
-              {tagsColorMode === 'category' && (
-                <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${cat.percentage}%`,
-                      backgroundColor: getHexColor(cat.themeColor)
-                    }}
-                  />
-                </div>
-              )}
+                </span>
+                {tagsColorMode === 'category' && (
+                  <span className="mb-2 block h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${cat.percentage}%`,
+                        backgroundColor: getHexColor(cat.themeColor)
+                      }}
+                    />
+                  </span>
+                )}
+              </StatRow>
               <div className="space-y-1 pl-6">
                 {cat.items.map(act => (
-                  <div key={act.id}>
-                    <div className="-ml-2 flex items-center justify-between rounded px-2 py-0.5 text-[11px] text-stone-500 transition-colors hover:bg-stone-50">
-                      <div className="flex items-center gap-1.5">
+                  <StatRow
+                    key={act.id}
+                    type={logDetails ? 'button' : undefined}
+                    onClick={logDetails ? () => setSelectedLogs({ categoryId: cat.id, activityId: act.id }) : undefined}
+                    aria-label={logDetails ? `查看${act.name}标签的当日记录` : undefined}
+                    aria-haspopup={logDetails ? 'dialog' : undefined}
+                    className="block w-full rounded text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-300"
+                  >
+                    <span className="-ml-2 flex items-center justify-between gap-3 rounded px-2 py-0.5 text-[11px] text-stone-500 transition-colors hover:bg-stone-50">
+                      <span className="flex min-w-0 items-center gap-1.5">
                         <IconRenderer icon={act.icon} uiIcon={act.uiIcon} className="text-xs" />
-                        <span>{act.name}</span>
+                        <span className="min-w-0 break-words">{act.name}</span>
                         {previousStats && renderGrowth(
                           act.duration,
                           previousStats.actDurations.get(act.id) || 0
                         )}
-                      </div>
-                      <span className="font-mono opacity-60">{formatDuration(act.duration)}</span>
-                    </div>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2"><span className="font-mono opacity-60">{formatDuration(act.duration)}</span>{logDetails && <ChevronRight size={11} className="text-stone-300" />}</span>
+                    </span>
                     {tagsColorMode === 'activity' && (
-                      <div className="my-1.5 h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
-                        <div
-                          className="h-full rounded-full"
+                      <span className="my-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-stone-50">
+                        <span
+                          className="block h-full rounded-full"
                           style={{
                             width: `${stats.totalDuration > 0 ? (act.duration / stats.totalDuration) * 100 : 0}%`,
                             backgroundColor: getHexColor(act.color)
                           }}
                         />
-                      </div>
+                      </span>
                     )}
-                  </div>
+                  </StatRow>
                 ))}
               </div>
             </div>
@@ -493,6 +519,17 @@ export const PieChartView: React.FC<PieChartViewProps> = ({
         </div>
       )}
 
+      {/* Daily log details */}
+      {logDetails && selectedLogs && (
+        <StatsLogsModal
+          selection={selectedLogs}
+          logs={logDetails.logs}
+          date={logDetails.date}
+          categories={categories}
+          isPrivacyMode={logDetails.isPrivacyMode}
+          onClose={closeLogDetails}
+        />
+      )}
       {/* Export Buttons */}
       {!isFullScreen && onExport && (
         <div className="flex flex-col items-center gap-3 pt-8 mt-4 mb-4">

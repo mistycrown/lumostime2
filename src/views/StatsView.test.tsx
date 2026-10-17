@@ -1,5 +1,6 @@
 /**
  * @file StatsView.test.tsx
+ * @updated 2026-10-17: Verifies opt-in daily drilldown receives chart-filtered logs and stays disabled for other ranges.
  * @input Server-rendered statistics views and isolated hooks
  * @output Range, template filtering and inactive-statistics regression checks
  * @pos Test (Statistics View)
@@ -12,6 +13,7 @@ import { StatsView } from './StatsView';
 import { useStatsCalculation } from '../hooks/useStatsCalculation';
 import { useTodoStats } from '../hooks/useTodoStats';
 import { useScopeStats } from '../hooks/useScopeStats';
+import { PieChartView } from '../components/stats/PieChartView';
 import type { Category, Log, Scope, TodoCategory, TodoItem } from '../types';
 
 vi.hoisted(() => {
@@ -51,6 +53,10 @@ vi.mock('../components/IconRenderer', () => ({
   IconRenderer: () => null,
 }));
 
+vi.mock('../components/stats/PieChartView', () => ({
+  PieChartView: vi.fn(() => null),
+}));
+
 vi.mock('../hooks/useStatsCalculation', () => ({
   useStatsCalculation: vi.fn(() => ({
     stats: { totalDuration: 0, categoryStats: [] },
@@ -84,6 +90,31 @@ vi.mock('../components/stats/MatrixView', () => ({
 }));
 
 describe('StatsView matrix date range', () => {
+  it.each([
+    { enabled: true, range: 'day' as const, opens: true },
+    { enabled: false, range: 'day' as const, opens: false },
+    { enabled: true, range: 'week' as const, opens: false }
+  ])('scopes log drilldown to enabled daily charts ($enabled, $range)', ({ enabled, range, opens }) => {
+    const allLogs = [{ id: 'other-day' }, { id: 'current-day' }] as Log[];
+    const filteredLogs = [allLogs[1]];
+    const date = new Date(2026, 9, 16);
+    vi.mocked(useStatsCalculation).mockReturnValueOnce({
+      stats: { totalDuration: 0, categoryStats: [] }, previousStats: null, filteredLogs
+    });
+    renderToStaticMarkup(<StatsView
+      logs={allLogs} categories={[]} todos={[]} todoCategories={[]} scopes={[]}
+      currentDate={date} onBack={() => {}} isFullScreen={false} onToggleFullScreen={() => {}}
+      forcedView="pie" forcedRange={range} enableLogDetails={enabled}
+    />);
+    const props = vi.mocked(PieChartView).mock.calls.at(-1)![0];
+    if (opens) {
+      expect(props.logDetails).toEqual({ logs: filteredLogs, date, isPrivacyMode: false });
+      expect(props.logDetails?.logs).toBe(filteredLogs);
+    } else {
+      expect(props.logDetails).toBeUndefined();
+    }
+  });
+
   it('avoids scanning unrelated logs, categories, todos and scopes in the annual check view', () => {
     const category: Category = {
       id: 'unused', name: 'unused', icon: '', themeColor: '#123456',

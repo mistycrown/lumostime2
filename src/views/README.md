@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-17: `DailyReviewView` enables category/activity log dialogs in its daily pie statistics. `StatsView` passes the exact chart-filtered records; other callers and broader ranges keep their existing interactions. `node scripts/test-daily-stats-logs.mjs` covers record filtering, dismissal, focus, privacy and responsive layouts.
+
 Update 2026-10-16: `TodoView` moves completed occurrences into today's completed section, keeps recurring series active and passes explicit dates through list/week/bento/month actions. Focus completion uses the session start date. Date-less weekly summaries require selecting an occurrence.
 
 Update 2026-10-16: `TodoBatchManageView` supplies hierarchical migration targets to the shared deletion picker and keys each pending deletion by todo identity so repeated task names cannot retain the previous decision.
