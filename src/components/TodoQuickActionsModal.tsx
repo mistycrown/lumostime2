@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.tsx
+ * @updated 2026-10-18: Portals all quick-action states to the body so isolated todo pages cannot place them below navigation.
  * @updated 2026-10-16: Offers dated single completion, undo and a date picker for undated recurring actions.
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
@@ -40,6 +41,7 @@
  * @updated 2026-04-20: Extracted from TodoView so todo-list taps and week badges can share one quick-actions sheet implementation.
  */
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
 import { TodoCategory, TodoItem } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
@@ -83,7 +85,7 @@ interface TodoQuickActionsModalProps {
   onUpdateNote?: (note: string) => void;
 }
 
-export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
+const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   isOpen,
   todo,
   todoCategories,
@@ -962,4 +964,9 @@ export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = ({
 
     </div>
   );
+};
+
+export const TodoQuickActionsModal: React.FC<TodoQuickActionsModalProps> = (props) => {
+  const content = <TodoQuickActionsModalContent {...props} />;
+  return typeof document === 'undefined' ? content : createPortal(content, document.body);
 };
