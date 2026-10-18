@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Commit long text fields on blur/exit instead of on each keystroke.
  * @file AppAwarenessSettingsView.tsx
+ * @updated 2026-10-18: Adds a master switch that retains individual app and workflow settings.
  * @input App-awareness templates, bindings, Android installed-app list, and category/activity data
  * @output Workflow-template edits plus app-to-workflow binding updates
  * @pos View (Settings Sub-page)
@@ -201,6 +202,8 @@ const getStepIcon = (type: AppAwarenessStepType) => {
 
 export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, scopes, todos, todoCategories }) => {
   const {
+    appAwarenessEnabled,
+    setAppAwarenessEnabled,
     appAwarenessTemplates,
     setAppAwarenessTemplates,
     appAwarenessBindings,
@@ -422,27 +425,8 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
     return registerHardwareBackHandler(handleInternalBack);
   }, [mode, selectedBindingApp, handleInternalBack]);
 
-  const syncBindingsSnapshot = async (bindings: AppAwarenessAppBinding[]) => {
-    if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.syncAppAwarenessBindings !== 'function') {
-      return;
-    }
-
-    try {
-      const payload = bindings.reduce<Record<string, string>>((acc, binding) => {
-        if (binding.enabled) {
-          acc[binding.packageName] = binding.workflowTemplateId;
-        }
-        return acc;
-      }, {});
-      await AppUsage.syncAppAwarenessBindings({ bindings: payload });
-    } catch (error) {
-      console.error('[AppAwarenessSettingsView] Failed to sync native app-awareness bindings', error);
-    }
-  };
-
   const updateBindings = (nextBindings: AppAwarenessAppBinding[]) => {
     setAppAwarenessBindings(nextBindings);
-    void syncBindingsSnapshot(nextBindings);
   };
 
   const updateTemplate = (
@@ -585,6 +569,8 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
   const renderToggleButton = (checked: boolean, onToggle: () => void, label: string) => (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={onToggle}
       className="app-awareness-toggle w-full rounded-2xl border border-stone-200 bg-[#fdfbf7] px-4 py-3 text-stone-700 transition-colors hover:bg-stone-50"
     >
@@ -649,6 +635,7 @@ export const AppAwarenessSettingsView: React.FC<Props> = ({ onBack, categories, 
     <>
       {renderHeader('应用感知', onBack)}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        {renderToggleButton(appAwarenessEnabled, () => setAppAwarenessEnabled((enabled) => !enabled), '启用应用感知')}
         {renderPermissionCard()}
 
         <div className="app-awareness-info-notice rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm leading-relaxed text-blue-700">

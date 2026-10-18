@@ -1,5 +1,6 @@
 /**
  * @file appAwarenessService.ts
+ * @updated 2026-10-18: Persists the master switch separately from individual binding and template states.
  * @input localStorage-backed app-awareness settings and run snapshots
  * @output Normalized workflow templates, app bindings, and active run helpers
  * @pos Service
@@ -364,7 +365,22 @@ export const summarizeAppAwarenessTemplate = (template: AppAwarenessWorkflowTemp
     }
   }).join(' · ');
 
+export const buildAppAwarenessNativeBindings = (
+  enabled: boolean,
+  bindings: AppAwarenessAppBinding[]
+): Record<string, string> => enabled
+  ? Object.fromEntries(bindings.filter((binding) => binding.enabled).map((binding) => [binding.packageName, binding.workflowTemplateId]))
+  : {};
+
 export const appAwarenessService = {
+  getEnabled(): boolean {
+    return storage.getJSON<unknown>(SETTINGS_KEYS.APP_AWARENESS_ENABLED, true) !== false;
+  },
+
+  saveEnabled(enabled: boolean): boolean {
+    return storage.setJSON(SETTINGS_KEYS.APP_AWARENESS_ENABLED, enabled);
+  },
+
   getTemplates(): AppAwarenessWorkflowTemplate[] {
     return normalizeTemplates(storage.getJSON<unknown>(SETTINGS_KEYS.APP_AWARENESS_TEMPLATES, buildPresetTemplates()));
   },

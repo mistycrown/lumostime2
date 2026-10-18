@@ -1,5 +1,6 @@
 /**
  * @file useAppInitialization.ts
+ * @updated 2026-10-18: Applies the app-awareness master switch when syncing native bindings.
  * @input SettingsContext (setAppRules), ToastContext (addToast), DataContext (logs, setLogs)
  * @output App Initialization (data repair, dual icon migration, app rules loading, update check, background service init)
  * @pos Hook (System Integration)
@@ -16,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 import { useSettings } from '../contexts/SettingsContext';
 import { useToast } from '../contexts/ToastContext';
 import AppUsage from '../plugins/AppUsagePlugin';
+import { buildAppAwarenessNativeBindings } from '../services/appAwarenessService';
 import { imageService } from '../services/imageService';
 import { UpdateService } from '../services/updateService';
 import { backgroundService } from '../services/backgroundService';
@@ -30,7 +32,7 @@ import FocusNotification from '../plugins/FocusNotificationPlugin';
 
 // Edge-to-Edge 支持（仅在 Android 上可用）
 export const useAppInitialization = () => {
-    const { setAppRules, appAwarenessBindings, appAwarenessTemplates } = useSettings();
+    const { setAppRules, appAwarenessEnabled, appAwarenessBindings, appAwarenessTemplates } = useSettings();
     const { addToast } = useToast();
     const { logs, setLogs } = useData();
     const hasCleanedImagesRef = useRef(false);
@@ -103,12 +105,7 @@ export const useAppInitialization = () => {
 
         const syncBindings = async () => {
             try {
-                const bindings = appAwarenessBindings.reduce<Record<string, string>>((acc, binding) => {
-                    if (binding.enabled) {
-                        acc[binding.packageName] = binding.workflowTemplateId;
-                    }
-                    return acc;
-                }, {});
+                const bindings = buildAppAwarenessNativeBindings(appAwarenessEnabled, appAwarenessBindings);
 
                 await AppUsage.syncAppAwarenessBindings({ bindings });
             } catch (error) {
@@ -117,7 +114,7 @@ export const useAppInitialization = () => {
         };
 
         void syncBindings();
-    }, [appAwarenessBindings]);
+    }, [appAwarenessEnabled, appAwarenessBindings]);
 
     useEffect(() => {
         if (Capacitor.getPlatform() !== 'android' || typeof AppUsage.syncAppAwarenessTemplates !== 'function') {

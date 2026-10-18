@@ -1,5 +1,6 @@
 /**
  * @file useAppAwarenessRuntime.ts
+ * @updated 2026-10-18: Blocks new workflows and cancels pending prompts while the master switch is off; preserves active timers.
  * @input Native app-awareness detection events, configured workflows, and session runtime state
  * @output Android floating overlay workflow orchestration for app-awareness prompts, countdowns, and overtime reminders
  * @pos Hook (System Integration)
@@ -219,6 +220,7 @@ export const useAppAwarenessRuntime = ({
   scopes
 }: UseAppAwarenessRuntimeOptions) => {
   const {
+    appAwarenessEnabled,
     appAwarenessTemplates,
     appAwarenessBindings,
     appAwarenessActiveRun,
@@ -228,6 +230,8 @@ export const useAppAwarenessRuntime = ({
   const { activeSessions, setActiveSessions } = useSession();
   const { addToast } = useToast();
 
+  const enabledRef = useRef(appAwarenessEnabled);
+  enabledRef.current = appAwarenessEnabled;
   const templatesRef = useRef(appAwarenessTemplates);
   const bindingsRef = useRef(appAwarenessBindings);
   const categoriesRef = useRef(categories);
@@ -505,6 +509,9 @@ export const useAppAwarenessRuntime = ({
     }
 
     const handleDetected = (event: Event) => {
+      if (!enabledRef.current) {
+        return;
+      }
       const detail = parseEventDetail<AppAwarenessDetectionPayload>(event);
       if (!detail?.packageName) {
         return;
@@ -556,7 +563,7 @@ export const useAppAwarenessRuntime = ({
       const detail = parseEventDetail<AppAwarenessOverlayActionPayload>(event);
       const run = activeRunRef.current;
       const template = templatesRef.current.find((item) => item.id === run?.templateId);
-      if (!run || !template || !detail?.actionId) {
+      if (!run || !template || !detail?.actionId || (!enabledRef.current && !run.linkedSessionId)) {
         return;
       }
 
@@ -951,7 +958,24 @@ export const useAppAwarenessRuntime = ({
   }, [addToast, setActiveSessions, setAppAwarenessActiveRun]);
 
   useEffect(() => {
-    if (Capacitor.getPlatform() !== 'android' || !appAwarenessActiveRun || !currentTemplate) {
+    if (appAwarenessEnabled) {
+      return;
+    }
+
+    if (Capacitor.getPlatform() === 'android' && typeof AppUsage.cancelAppAwarenessWorkflow === 'function') {
+      void AppUsage.cancelAppAwarenessWorkflow().catch((error) => {
+        console.error('[useAppAwarenessRuntime] Failed to cancel disabled app-awareness workflow', error);
+      });
+    }
+    if (activeRunRef.current && !activeRunRef.current.linkedSessionId) {
+      activeRunRef.current = null;
+      setAppAwarenessActiveRun(null);
+    }
+  }, [appAwarenessEnabled, setAppAwarenessActiveRun]);
+
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'android' || !appAwarenessActiveRun || !currentTemplate
+      || (!appAwarenessEnabled && !appAwarenessActiveRun.linkedSessionId)) {
       return;
     }
 
@@ -1080,10 +1104,10 @@ export const useAppAwarenessRuntime = ({
         ]
       });
     }
-  }, [appAwarenessActiveRun, currentTemplate]);
+  }, [appAwarenessEnabled, appAwarenessActiveRun, currentTemplate]);
 
   useEffect(() => {
-    if (!appAwarenessActiveRun || !currentTemplate || appAwarenessActiveRun.status !== 'waiting_cooldown' || !appAwarenessActiveRun.stepEndsAt) {
+    if (!appAwarenessEnabled || !appAwarenessActiveRun || !currentTemplate || appAwarenessActiveRun.status !== 'waiting_cooldown' || !appAwarenessActiveRun.stepEndsAt) {
       return;
     }
 
@@ -1107,7 +1131,7 @@ export const useAppAwarenessRuntime = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [appAwarenessActiveRun, currentTemplate, setAppAwarenessActiveRun]);
+  }, [appAwarenessEnabled, appAwarenessActiveRun, currentTemplate, setAppAwarenessActiveRun]);
 
   useEffect(() => {
     if (!appAwarenessActiveRun?.linkedSessionId) {

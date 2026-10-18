@@ -1,5 +1,6 @@
 /**
  * @file storageKeys.ts
+ * @updated 2026-10-18: Adds the device-local app-awareness master switch.
  * @updated 2026-10-09: Adds the personal dictionary preference key.
  * @updated 2026-10-05: Stores a persistent anonymous diagnostics identifier.
  * @description localStorage 键名统一管理
@@ -146,6 +147,7 @@ export const SETTINGS_KEYS = {
     /** 沉浸式计时显示格式 */
     IMMERSIVE_TIMER_DISPLAY_FORMAT: 'immersiveTimerDisplayFormat',
     TODO_SCHEDULE_TYPE_COLORS: 'lumostime_todo_schedule_type_colors',
+    APP_AWARENESS_ENABLED: 'lumostime_app_awareness_enabled',
     APP_AWARENESS_TEMPLATES: 'lumostime_app_awareness_workflow_templates',
     APP_AWARENESS_BINDINGS: 'lumostime_app_awareness_bindings',
     APP_AWARENESS_ACTIVE_RUN: 'lumostime_app_awareness_active_run',

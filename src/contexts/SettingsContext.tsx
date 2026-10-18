@@ -1,5 +1,6 @@
 /**
  * @file SettingsContext.tsx
+ * @updated 2026-10-18: Stores the device-local app-awareness master switch without modifying individual settings.
  * @updated 2026-10-07: Persists device-local daily backup preferences for manual sync mode.
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
  * @updated 2026-05-10: Replaced the old boolean timer auto-open flag with a three-state post-start jump mode and legacy storage migration.
@@ -258,6 +259,8 @@ interface SettingsContextType {
     // 应用规则
     appRules: { [packageName: string]: string };
     setAppRules: React.Dispatch<React.SetStateAction<{ [packageName: string]: string }>>;
+    appAwarenessEnabled: boolean;
+    setAppAwarenessEnabled: React.Dispatch<React.SetStateAction<boolean>>;
     appAwarenessTemplates: AppAwarenessWorkflowTemplate[];
     setAppAwarenessTemplates: React.Dispatch<React.SetStateAction<AppAwarenessWorkflowTemplate[]>>;
     appAwarenessBindings: AppAwarenessAppBinding[];
@@ -397,6 +400,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
 
     const [appRules, setAppRules] = useState<{ [packageName: string]: string }>({});
+    const [appAwarenessEnabled, setAppAwarenessEnabled] = useState(() => appAwarenessService.getEnabled());
     const [appAwarenessTemplates, setAppAwarenessTemplates] = useState<AppAwarenessWorkflowTemplate[]>(
         () => appAwarenessService.getTemplates()
     );
@@ -534,6 +538,10 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
     useEffect(() => {
         localStorage.setItem('lumostime_autoApplyTodoLink', JSON.stringify(autoApplyTodoLink));
     }, [autoApplyTodoLink]);
+
+    useEffect(() => {
+        appAwarenessService.saveEnabled(appAwarenessEnabled);
+    }, [appAwarenessEnabled]);
 
     useEffect(() => {
         appAwarenessService.saveTemplates(appAwarenessTemplates);
@@ -1178,6 +1186,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setStickerSelectorConfig,
             appRules,
             setAppRules,
+            appAwarenessEnabled,
+            setAppAwarenessEnabled,
             appAwarenessTemplates,
             setAppAwarenessTemplates,
             appAwarenessBindings,
