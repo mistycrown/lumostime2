@@ -1,5 +1,6 @@
 /**
  * @file dataValidation.ts
+ * @updated 2026-10-18: Validates optional principle group arrays in backups.
  * @updated 2026-10-07: Validates optional node category datasets and node category identifiers.
  * @updated 2026-10-06: Validates optional node metadata while accepting older backups.
  * @description Data validation helpers for backup, import, and cloud sync payloads.
@@ -72,6 +73,7 @@ export function validateLocalData(data: any): ValidationResult {
     'customNarrativeTemplates',
     'filters',
     'principles',
+    'principleGroups',
     'selfBeliefs',
     'widgetTemplates',
     'routines'

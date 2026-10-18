@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-18: Adds an optional principle group scope for random scene cards.
  * @updated 2026-10-16: Stores dated recurring completion separately from series completion.
  * @updated 2026-10-09: Adds independently persisted merge words and stop words for each word cloud.
  * @updated 2026-10-07: Adds optional node classification and persisted node categories.
@@ -918,6 +919,7 @@ export interface SceneCardData {
   // Principle card source.
   principleSource?: 'library' | 'manual' | 'random';
   principleId?: string;
+  principleGroupId?: string;
   
   // Checklist state.
   isCompleted?: boolean;

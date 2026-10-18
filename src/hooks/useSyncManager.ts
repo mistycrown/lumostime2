@@ -1,5 +1,6 @@
 /**
  * @file useSyncManager.ts
+ * @updated 2026-10-18: Backs up and restores principle groups, clearing stale groups on legacy library restores.
  * @updated 2026-10-07: Runs daily manual-mode uploads only in foreground and recovers missed backups.
  * @updated 2026-10-07: Backs up, restores and tracks node categories with node assignments.
  * @updated 2026-10-06: Includes node metadata in backup payloads, restores and change tracking.
@@ -272,9 +273,15 @@ export const useSyncManager = () => {
             }
             
             // 恢复原则库到 localStorage
+            if (hasField('principleGroups') || hasField('principles')) {
+                localStorage.setItem('lumostime_principle_groups', JSON.stringify(data.principleGroups || []));
+            }
             if (hasField('principles')) {
                 localStorage.setItem('lumostime_principles', JSON.stringify(data.principles));
                 // 触发事件通知原则库页面更新
+                window.dispatchEvent(new Event('principleLibraryChanged'));
+            }
+            if (hasField('principleGroups') && !hasField('principles')) {
                 window.dispatchEvent(new Event('principleLibraryChanged'));
             }
             if (hasField('selfBeliefs')) {
@@ -356,6 +363,7 @@ export const useSyncManager = () => {
         // 从 localStorage 读取原则库
         const principlesStr = localStorage.getItem('lumostime_principles');
         const principles = principlesStr ? JSON.parse(principlesStr) : [];
+        const principleGroups = JSON.parse(localStorage.getItem('lumostime_principle_groups') || '[]');
         const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
         const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
         const widgetTemplates = loadWidgetTemplatesFromStorage();
@@ -376,6 +384,7 @@ export const useSyncManager = () => {
             sceneTimeSlots,
             sceneGroupState,
             principles, // 添加原则库
+            principleGroups,
             selfBeliefs, // 添加自我认知库
             routines: loadRoutines(),
             version: '1.0.0',

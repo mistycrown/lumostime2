@@ -1,5 +1,6 @@
 /**
  * @file PrincipleEditModal.tsx
+ * @updated 2026-10-18: Adds optional principle group assignment.
  * @input Principle edit form state and modal action callbacks
  * @output Shared principle add/edit modal used by settings and AI chat writeback results
  * @pos Component (Settings / AI Integration)
@@ -7,16 +8,19 @@
  * @updated 2026-07-06: Extracted from PrincipleLibraryView for reuse inside AI chat applied-action cards.
  */
 import React from 'react';
+import type { PrincipleGroup } from '../utils/principleGroupUtils';
 
 export interface PrincipleEditFormData {
   title: string;
   frontText: string;
   backText: string;
+  groupId?: string;
 }
 
 interface PrincipleEditModalProps {
   isEditing: boolean;
   formData: PrincipleEditFormData;
+  groups?: PrincipleGroup[];
   onChange: (data: PrincipleEditFormData) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -25,6 +29,7 @@ interface PrincipleEditModalProps {
 export const PrincipleEditModal: React.FC<PrincipleEditModalProps> = ({
   isEditing,
   formData,
+  groups,
   onChange,
   onSave,
   onCancel
@@ -36,6 +41,20 @@ export const PrincipleEditModal: React.FC<PrincipleEditModalProps> = ({
       </h2>
 
       <div className="space-y-3 sm:space-y-4">
+        {groups && (
+          <label className="block text-xs sm:text-sm font-medium text-stone-700">
+            分组
+            <select
+              aria-label="原则分组"
+              value={formData.groupId || ''}
+              onChange={(event) => onChange({ ...formData, groupId: event.target.value || undefined })}
+              className="mt-1 w-full px-3 py-2 text-sm border border-stone-300 rounded-lg bg-white"
+            >
+              <option value="">未分组</option>
+              {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+            </select>
+          </label>
+        )}
         <div>
           <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">
             标题 <span className="text-red-500">*</span>

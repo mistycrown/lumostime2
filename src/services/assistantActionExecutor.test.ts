@@ -1,5 +1,6 @@
 /**
  * @file assistantActionExecutor.test.ts
+ * @updated 2026-10-18: Verifies AI principle edits retain group membership.
  * @input Synthetic local data and assistant tool calls
  * @output Coverage for assistant writeback and rollback
  * @pos Service test
@@ -471,7 +472,8 @@ describe('assistantActionExecutor principle-library tool calls', () => {
       id: 'principle-1',
       title: '启动要轻',
       frontText: '卡住时先开始。',
-      backText: '旧解释'
+      backText: '旧解释',
+      groupId: 'work'
     }]));
 
     const toolCalls: AICreatePrincipleToolCall[] = [{
@@ -493,6 +495,7 @@ describe('assistantActionExecutor principle-library tool calls', () => {
     expect(action.status).toBe('applied');
     expect(stored).toHaveLength(1);
     expect(stored[0].id).toBe('principle-1');
+    expect(stored[0].groupId).toBe('work');
     expect(stored[0].descriptions[0]).toMatchObject({
       text: '今天发现写一个最小步骤能缓解拖延。',
       source: 'ai'
@@ -503,6 +506,7 @@ describe('assistantActionExecutor principle-library tool calls', () => {
     }
 
     expect(action.snapshot.previousPrinciple.backText).toBe('旧解释');
+    expect(action.snapshot.previousPrinciple.groupId).toBe('work');
     expect(action.snapshot.nextPrinciple?.descriptions).toHaveLength(1);
   });
 

@@ -1,5 +1,6 @@
 /**
  * @file dataValidation.test.ts
+ * @updated 2026-10-18: Covers optional principle group backup preservation.
  * @updated 2026-10-07: Covers optional category backups and invalid category identities.
  * @input Modern and legacy backup payloads
  * @output Regression coverage for optional backup blocks
@@ -16,6 +17,12 @@ const createValidPayload = () => ({
 });
 
 describe('dataValidation achievementData support', () => {
+  it('preserves principle groups and accepts legacy backups', () => {
+    const principleGroups = [{ id: 'work', name: '工作' }];
+    expect(validateAndFixData({ ...createValidPayload(), principleGroups }).data.principleGroups).toEqual(principleGroups);
+    expect(validateLocalData({ ...createValidPayload(), principleGroups: {} }).isValid).toBe(false);
+    expect(validateLocalData(createValidPayload()).isValid).toBe(true);
+  });
   it('accepts node categories and rejects malformed or duplicate classifications', () => {
     const category = { id: 'people', name: '人物', createdAt: 1, updatedAt: 2 };
     expect(validateLocalData({ ...createValidPayload(), nodeCategories: [category] }).isValid).toBe(true);

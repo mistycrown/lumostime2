@@ -1,5 +1,6 @@
 ﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿/**
  * @file SceneCard.tsx
+ * @updated 2026-10-18: Resolves group-scoped daily principles and reacts to library changes.
  * @updated 2026-10-17: Ignores stale timer and app-launch actions on statistics cards.
  * @description 场景卡片组件 - 支持正反面翻转和滑动交互
  * @updated 2026-05-11: Timer/todo cards now restore only manual flip storage and ignore legacy auto-flip booleans so out-of-slot logs cannot keep cards stuck on the back side.
@@ -10,6 +11,7 @@
  * @updated 2026-09-26: Added synchronized image backgrounds to scene cards.
  */
 import React, { useState, useRef } from 'react';
+import { resolvePrincipleCard, PRINCIPLE_GROUPS_STORAGE_KEY } from '../utils/principleGroupUtils';
 import { useCardBackground } from '../hooks/useCardBackground';
 import { Check, ChevronRight, Clock, CheckSquare, ListTodo, BarChart3, BookOpen, Link2 } from 'lucide-react';
 import { SceneCardData, DailyReview, Log } from '../types';
@@ -72,81 +74,36 @@ export const SceneCard: React.FC<SceneCardProps> = ({
   const [displayData, setDisplayData] = useState(data);
   
   React.useEffect(() => {
-    if (data.type === 'principle') {
-      if (data.principleSource === 'random') {
-        // 随机选取模式：每天随机选择一个原则
-        const stored = localStorage.getItem('lumostime_principles');
-        if (stored) {
-          const principles = JSON.parse(stored);
-          if (principles.length > 0) {
-            // 获取今天的日期
-            const today = getTodayDateString();
-            const cacheKey = `principle_random_${data.id}_${today}`;
-            
-            // 检查是否有今天的缓存
-            const cachedPrincipleId = localStorage.getItem(cacheKey);
-            let selectedPrinciple;
-            
-            if (cachedPrincipleId) {
-              // 使用缓存的原则
-              selectedPrinciple = principles.find((p: any) => p.id === cachedPrincipleId);
-            }
-            
-            // 如果没有缓存或缓存的原则不存在，重新随机选择
-            if (!selectedPrinciple) {
-              const randomIndex = Math.floor(Math.random() * principles.length);
-              selectedPrinciple = principles[randomIndex];
-              // 保存到缓存
-              localStorage.setItem(cacheKey, selectedPrinciple.id);
-            }
-            
-            setDisplayData({
-              ...data,
-              title: selectedPrinciple.title,
-              frontText: selectedPrinciple.frontText,
-              backText: selectedPrinciple.backText
-            });
-            return;
-          }
-        }
-        // 如果原则库为空，显示提示信息
-        setDisplayData({
-          ...data,
-          title: data.title || '随机原则',
-          frontText: '原则库为空，请先添加原则',
-          backText: '请在设置中添加原则'
-        });
-        return;
-      } else if (data.principleSource === 'library' && data.principleId) {
-        // 从原则库选择模式：根据 principleId 获取原则内容
-        const stored = localStorage.getItem('lumostime_principles');
-        if (stored) {
-          const principles = JSON.parse(stored);
-          const principle = principles.find((p: any) => p.id === data.principleId);
-          if (principle) {
-            setDisplayData({
-              ...data,
-              title: principle.title,
-              frontText: principle.frontText,
-              backText: principle.backText
-            });
-            return;
-          }
-        }
-        // 如果找不到对应的原则，显示提示信息
-        setDisplayData({
-          ...data,
-          title: data.title || '原则',
-          frontText: '原则不存在',
-          backText: '请重新选择原则'
-        });
-        return;
-      }
-    }
-    // 其他情况或手动输入模式，直接使用原始数据
-    setDisplayData(data);
+    const refresh = () => setDisplayData(resolvePrincipleCard(data));
+    const handleStorage = (event: StorageEvent) => {
+      if (!event.key || ['lumostime_principles', PRINCIPLE_GROUPS_STORAGE_KEY].includes(event.key)) refresh();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    refresh();
+    if (data.type !== 'principle' || !['random', 'library'].includes(data.principleSource || '')) return;
+    window.addEventListener('principleLibraryChanged', refresh);
+    window.addEventListener('storage', handleStorage);
+    document.addEventListener('visibilitychange', handleVisibility);
+    const nextDay = new Date();
+    nextDay.setHours(24, 0, 0, 0);
+    let midnightTimer: ReturnType<typeof setTimeout>;
+    const refreshAtMidnight = () => {
+      refresh();
+      const next = new Date();
+      next.setHours(24, 0, 0, 0);
+      midnightTimer = setTimeout(refreshAtMidnight, next.getTime() - Date.now());
+    };
+    midnightTimer = setTimeout(refreshAtMidnight, nextDay.getTime() - Date.now());
+    return () => {
+      window.removeEventListener('principleLibraryChanged', refresh);
+      window.removeEventListener('storage', handleStorage);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearTimeout(midnightTimer);
+    };
   }, [data]);
-  
+
   // 获取今天的日期字符串（YYYY-MM-DD）
   const getTodayDateString = () => {
     const today = new Date();

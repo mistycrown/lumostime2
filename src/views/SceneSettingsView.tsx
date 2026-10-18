@@ -1,5 +1,6 @@
 /**
  * @file SceneSettingsView.tsx
+ * @updated 2026-10-18: Adds principle group selection for daily random cards.
  * @updated 2026-10-17: Clears stale actions when switching to or saving statistics cards.
  * @updated 2026-08-06: Made scene time-slot previews explicitly prefer configured UI icons over stored emoji fallbacks.
  * @description 场景设置页面 - 管理场景组、时间段和快捷方式
@@ -10,6 +11,7 @@
  * - 2026-03-19: 调整根布局为全屏覆盖层，修复页面白屏无法打开的问题。
  */
 import React, { useState, useEffect } from 'react';
+import { loadPrincipleGroups, UNGROUPED_PRINCIPLES } from '../utils/principleGroupUtils';
 import { ArrowLeft, Plus, Trash2, Edit2, Palette, Clock, RotateCcw, ChevronRight, ArrowUp, ArrowDown, Check, Copy } from 'lucide-react';
 import { TimeSlot, SceneCardData, SceneCardType, Category, TodoItem, TodoCategory, CheckTemplate, SceneGroup, SceneGroupAutoSwitchConfig, SceneGroupState, SceneGroupSwitchMode, CustomColorItem } from '../types';
 import { CustomSelect } from '../components/CustomSelect';
@@ -649,7 +651,8 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
       // 保留原则卡片的特有字段
       ...(editingCard.type === 'principle' && {
         principleSource: editingCard.principleSource,
-        principleId: editingCard.principleId
+        principleId: editingCard.principleId,
+        principleGroupId: editingCard.principleGroupId
       })
     };
 
@@ -1044,7 +1047,7 @@ export const SceneSettingsView: React.FC<SceneSettingsViewProps> = ({ onBack }) 
                         {card.type === 'principle' ? (
                           <>
                             {card.principleSource === 'random' ? (
-                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">从原则库中随机</p>
+                              <p className="text-xs text-stone-600 mb-0.5 line-clamp-1">{card.principleGroupId ? `从${card.principleGroupId === UNGROUPED_PRINCIPLES ? '未分组' : loadPrincipleGroups().find((group) => group.id === card.principleGroupId)?.name || '已删除的分组'}中随机` : '从全部原则中随机'}</p>
                             ) : card.principleSource === 'library' ? (
                               <>
                                 {previewContent.frontText && (
@@ -1988,10 +1991,27 @@ const CardEditModal: React.FC<{
                       <Check size={16} className="text-green-600" />
                     )}
                   </div>
-                  <p className="text-xs text-stone-500 mt-1">每次从原则库中随机选择</p>
+                  <p className="text-xs text-stone-500 mt-1">每天从所选范围中随机选择</p>
                 </button>
               </div>
             </div>
+          )}
+
+          {card?.type === 'principle' && card?.principleSource === 'random' && (
+            <label className="block text-xs sm:text-sm font-medium text-stone-700">
+              随机范围
+              <select
+                aria-label="随机原则分组"
+                value={card.principleGroupId || ''}
+                onChange={(event) => onChange({ ...card, principleGroupId: event.target.value || undefined })}
+                className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">全部原则</option>
+                <option value={UNGROUPED_PRINCIPLES}>未分组</option>
+                {loadPrincipleGroups().map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                {card.principleGroupId && card.principleGroupId !== UNGROUPED_PRINCIPLES && !loadPrincipleGroups().some((group) => group.id === card.principleGroupId) && <option value={card.principleGroupId}>已删除的分组</option>}
+              </select>
+            </label>
           )}
 
           {/* 从原则库选择（仅当选择了library模式） */}

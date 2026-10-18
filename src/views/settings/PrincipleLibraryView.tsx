@@ -1,5 +1,6 @@
 /**
  * @file PrincipleLibraryView.tsx
+ * @updated 2026-10-18: Adds group management, filtering, and principle assignment.
  * @description 原则库设置页面 - 管理核心原则卡片和自我认知描述库
  * @updated 2026-07-06: Added the self-belief tab with manual identity/description CRUD backed by localStorage.
  */
@@ -10,6 +11,7 @@ import { PrincipleEditModal, type PrincipleEditFormData } from '../../components
 import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft, type SelfBeliefDescriptionSource } from '../../components/SelfBeliefEditModal';
 import { DEFAULT_PRINCIPLE_PRESETS } from '../../constants/principlePresets';
 import { updateLocalDataTimestamp } from '../../utils/localDataTimestamp';
+import { filterPrinciplesByGroup, loadPrincipleGroups, PRINCIPLE_GROUPS_STORAGE_KEY, UNGROUPED_PRINCIPLES, type PrincipleGroup } from '../../utils/principleGroupUtils';
 
 const PRINCIPLES_STORAGE_KEY = 'lumostime_principles';
 const SELF_BELIEFS_STORAGE_KEY = 'lumostime_self_beliefs';
@@ -22,6 +24,7 @@ export interface Principle {
     title: string;
     frontText: string;
     backText: string;
+    groupId?: string;
     descriptions?: SelfBeliefDescription[];
 }
 
@@ -123,6 +126,7 @@ const normalizePrinciples = (value: unknown): Principle[] => {
             title,
             frontText,
             backText: typeof candidate.backText === 'string' ? candidate.backText.trim() : '',
+            ...(typeof candidate.groupId === 'string' && candidate.groupId.trim() ? { groupId: candidate.groupId.trim() } : {}),
             ...(descriptions.length > 0 ? { descriptions } : {})
         }];
     });
@@ -195,6 +199,10 @@ export const moveItem = <T,>(items: T[], index: number, direction: -1 | 1): T[] 
 
 export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState<PrincipleLibraryTab>('principles');
+    const [groups, setGroups] = useState<PrincipleGroup[]>(loadPrincipleGroups);
+    const [selectedGroupId, setSelectedGroupId] = useState('');
+    const [groupDraft, setGroupDraft] = useState<{ id?: string; name: string } | null>(null);
+    const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
 
     // 从 localStorage 读取原则（如果没有则使用默认预设）
     const [principles, setPrinciples] = useState<Principle[]>(() => {
@@ -245,8 +253,46 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
         window.dispatchEvent(new Event(SELF_BELIEF_LIBRARY_CHANGED_EVENT));
     };
 
+    const saveGroups = (nextGroups: PrincipleGroup[]) => {
+        setGroups(nextGroups);
+        localStorage.setItem(PRINCIPLE_GROUPS_STORAGE_KEY, JSON.stringify(nextGroups));
+        updateLocalDataTimestamp();
+        window.dispatchEvent(new Event(PRINCIPLE_LIBRARY_CHANGED_EVENT));
+    };
+
+    const handleSaveGroup = () => {
+        const name = groupDraft?.name.trim();
+        if (!name || groups.some((group) => group.name === name && group.id !== groupDraft?.id)) return;
+        const id = groupDraft?.id || createId('principle-group');
+        saveGroups(groupDraft?.id
+            ? groups.map((group) => group.id === id ? { ...group, name } : group)
+            : [...groups, { id, name }]);
+        setSelectedGroupId(id);
+        setGroupDraft(null);
+    };
+
+    const confirmDeleteGroup = () => {
+        if (!deleteGroupId) return;
+        // Update both stores before publishing the shared library event.
+        const nextPrinciples = principles.map((principle) => principle.groupId === deleteGroupId
+            ? { ...principle, groupId: undefined } : principle);
+        localStorage.setItem(PRINCIPLES_STORAGE_KEY, JSON.stringify(nextPrinciples));
+        setPrinciples(nextPrinciples);
+        saveGroups(groups.filter((group) => group.id !== deleteGroupId));
+        setSelectedGroupId(UNGROUPED_PRINCIPLES);
+        setDeleteGroupId(null);
+    };
+
+    const visiblePrinciples = filterPrinciplesByGroup(principles, selectedGroupId, groups);
+
     const handleMovePrinciple = (index: number, direction: -1 | 1) => {
-        savePrinciples(moveItem(principles, index, direction));
+        const target = visiblePrinciples[index + direction];
+        if (!target) return;
+        const next = [...principles];
+        const fromIndex = next.findIndex((item) => item.id === visiblePrinciples[index].id);
+        const toIndex = next.findIndex((item) => item.id === target.id);
+        [next[fromIndex], next[toIndex]] = [next[toIndex], next[fromIndex]];
+        savePrinciples(next);
     };
 
     const handleMoveSelfBelief = (index: number, direction: -1 | 1) => {
@@ -257,7 +303,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
     const handleStartCreate = () => {
         setIsCreating(true);
         setEditingPrincipleId(null);
-        setFormData({ title: '', frontText: '', backText: '' });
+        setFormData({ title: '', frontText: '', backText: '', groupId: groups.some((group) => group.id === selectedGroupId) ? selectedGroupId : undefined });
     };
 
     // 开始编辑原则
@@ -267,7 +313,8 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
         setFormData({
             title: principle.title,
             frontText: principle.frontText,
-            backText: principle.backText
+            backText: principle.backText,
+            groupId: groups.some((group) => group.id === principle.groupId) ? principle.groupId : undefined
         });
     };
 
@@ -498,6 +545,25 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
 
                 {activeTab === 'principles' ? (
                     <>
+                        <div className="flex items-center gap-2 border-b border-stone-200 pb-3">
+                            <select
+                                aria-label="筛选原则分组"
+                                value={selectedGroupId}
+                                onChange={(event) => setSelectedGroupId(event.target.value)}
+                                className="min-w-0 flex-1 bg-transparent py-2 text-sm text-stone-700 focus:outline-none"
+                            >
+                                <option value="">全部原则 ({principles.length})</option>
+                                <option value={UNGROUPED_PRINCIPLES}>未分组 ({filterPrinciplesByGroup(principles, UNGROUPED_PRINCIPLES, groups).length})</option>
+                                {groups.map((group) => <option key={group.id} value={group.id}>{group.name} ({principles.filter((item) => item.groupId === group.id).length})</option>)}
+                            </select>
+                            <button type="button" onClick={() => setGroupDraft({ name: '' })} className="p-2 text-stone-500" aria-label="新建分组" title="新建分组"><Plus size={18} /></button>
+                            {groups.some((group) => group.id === selectedGroupId) && (
+                                <>
+                                    <button type="button" onClick={() => setGroupDraft(groups.find((group) => group.id === selectedGroupId)!)} className="p-2 text-stone-500" aria-label="重命名分组" title="重命名分组"><Edit2 size={16} /></button>
+                                    <button type="button" onClick={() => setDeleteGroupId(selectedGroupId)} className="p-2 text-red-500" aria-label="删除分组" title="删除分组"><Trash2 size={16} /></button>
+                                </>
+                            )}
+                        </div>
                         {/* 创建按钮 */}
                         <button
                             onClick={handleStartCreate}
@@ -516,7 +582,8 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
 
                         {/* 原则列表 */}
                         <div className="space-y-3">
-                            {principles.map((principle, index) => (
+                            {visiblePrinciples.length === 0 && <p className="py-8 text-center text-sm text-stone-400">该分组暂无原则</p>}
+                            {visiblePrinciples.map((principle, index) => (
                                 <div
                                     key={principle.id}
                                     className="bg-white rounded-xl p-4 shadow-sm border border-stone-100"
@@ -537,7 +604,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                                             <button
                                                 type="button"
                                                 onClick={() => handleMovePrinciple(index, 1)}
-                                                disabled={index === principles.length - 1}
+                                                disabled={index === visiblePrinciples.length - 1}
                                                 className="p-1.5 hover:bg-stone-100 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-25"
                                                 title="下移"
                                                 aria-label={`${principle.title} 下移`}
@@ -561,6 +628,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                                         </div>
                                     </div>
                                     <div className="space-y-2">
+                                        <p className="text-xs text-stone-400">{groups.find((group) => group.id === principle.groupId)?.name || '未分组'}</p>
                                         <div>
                                             <p className="text-xs text-stone-400 mb-1">正面文字</p>
                                             <p className="text-sm text-stone-700">{principle.frontText}</p>
@@ -692,6 +760,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                 <PrincipleEditModal
                     isEditing={!!editingPrincipleId}
                     formData={formData}
+                    groups={groups}
                     onChange={setFormData}
                     onSave={handleSave}
                     onCancel={handleCancel}
@@ -718,6 +787,30 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                     onCancel={handleCancelSelfBeliefModal}
                 />
             )}
+
+            {groupDraft && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <form onSubmit={(event) => { event.preventDefault(); handleSaveGroup(); }} className="w-full max-w-sm rounded-2xl bg-white p-5">
+                        <h2 className="mb-4 text-lg font-bold">{groupDraft.id ? '重命名分组' : '新建分组'}</h2>
+                        <input autoFocus aria-label="分组名称" placeholder="分组名称" value={groupDraft.name} onChange={(event) => setGroupDraft({ ...groupDraft, name: event.target.value })} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                        {groups.some((group) => group.name === groupDraft.name.trim() && group.id !== groupDraft.id) && <p role="alert" className="mt-2 text-xs text-red-500">分组名称已存在</p>}
+                        <div className="mt-5 flex gap-2">
+                            <button type="button" onClick={() => setGroupDraft(null)} className="flex-1 rounded-lg border border-stone-300 py-2 text-sm">取消</button>
+                            <button type="submit" disabled={!groupDraft.name.trim() || groups.some((group) => group.name === groupDraft.name.trim() && group.id !== groupDraft.id)} className="flex-1 rounded-lg bg-stone-800 py-2 text-sm text-white disabled:opacity-50">保存</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+            <ConfirmModal
+                isOpen={deleteGroupId !== null}
+                title="删除分组"
+                description="删除后，该组原则将移至未分组。"
+                onConfirm={confirmDeleteGroup}
+                onClose={() => setDeleteGroupId(null)}
+                confirmText="删除"
+                cancelText="取消"
+                type="danger"
+            />
 
             {/* 删除确认弹窗 */}
             <ConfirmModal

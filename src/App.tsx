@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-18: Includes principle groups in manual backups.
  * @updated 2026-10-16: Keeps the selected occurrence date when handling desktop widget completion actions.
  * @updated 2026-10-16: Supplies parent-child migration targets when deleting todos.
  * @updated 2026-10-13: Uses native widget restore with legacy migration and live preference mirroring.
@@ -449,6 +450,7 @@ const AppContent: React.FC = () => {
     // 从 localStorage 读取原则库
     const principlesStr = localStorage.getItem('lumostime_principles');
     const principles = principlesStr ? JSON.parse(principlesStr) : [];
+    const principleGroups = JSON.parse(localStorage.getItem('lumostime_principle_groups') || '[]');
     const selfBeliefsStr = localStorage.getItem('lumostime_self_beliefs');
     const selfBeliefs = selfBeliefsStr ? JSON.parse(selfBeliefsStr) : [];
     const widgetTemplates = loadWidgetTemplatesFromStorage();
@@ -469,6 +471,7 @@ const AppContent: React.FC = () => {
       sceneGroupState, // 新版：场景组状态
       sceneTimeSlots, // 添加场景设置
       principles, // 添加原则库
+      principleGroups,
       selfBeliefs, // 添加自我认知库
       version: '1.0.0',
       timestamp: getLocalDataTimestamp()
@@ -990,6 +993,7 @@ const AppContent: React.FC = () => {
   };
 
   const clearPrinciples = () => {
+    localStorage.setItem('lumostime_principle_groups', JSON.stringify([]));
     localStorage.setItem('lumostime_principles', JSON.stringify([]));
     localStorage.setItem('lumostime_self_beliefs', JSON.stringify([]));
     window.dispatchEvent(new Event('principleLibraryChanged'));

@@ -1,5 +1,6 @@
 /**
  * @file assistantActionExecutor.ts
+ * @updated 2026-10-18: Preserves principle group membership during AI writes.
  * @updated 2026-10-09: Executes reversible node writes and links AI notes to dictionary nodes.
  * @input Current logs/todos plus runtime dictionaries, principle-library storage, and assistant tool-call payloads
  * @output Applied assistant action summaries together with the next local logs/todos state
@@ -536,6 +537,7 @@ const PRINCIPLE_LIBRARY_CHANGED_EVENT = 'principleLibraryChanged';
 const SELF_BELIEF_LIBRARY_CHANGED_EVENT = 'selfBeliefLibraryChanged';
 
 export interface StoredPrinciple {
+  groupId?: string;
   id: string;
   title: string;
   frontText: string;
@@ -599,6 +601,7 @@ const normalizeStoredPrinciples = (value: unknown[]): StoredPrinciple[] => (
       id: typeof candidate.id === 'string' && candidate.id.trim() ? candidate.id.trim() : crypto.randomUUID(),
       title,
       frontText,
+      ...(typeof candidate.groupId === 'string' && candidate.groupId.trim() ? { groupId: candidate.groupId.trim() } : {}),
       backText: typeof candidate.backText === 'string' ? candidate.backText.trim() : '',
       ...(Array.isArray((candidate as Partial<StoredPrinciple>).descriptions)
         ? { descriptions: normalizeStoredDescriptions((candidate as Partial<StoredPrinciple>).descriptions, formatTodayDateKey()) }
@@ -1009,6 +1012,7 @@ export const assistantActionExecutor = {
       }
 
       const nextPrinciple: StoredPrinciple = {
+        ...(previousPrinciple?.groupId ? { groupId: previousPrinciple.groupId } : {}),
         id: previousPrinciple?.id || crypto.randomUUID(),
         title,
         frontText,
