@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-18: `FiltersSettingsView` and automatic daily-check configuration share `FilterExpressionInput`, keeping expression editing and AND/OR/exclusion guidance consistent.
+
 Update 2026-10-13: `DesktopWidgetSettingsView` refreshes its toggles when native widget restore or close broadcasts updated preferences.
 
 Update 2026-10-11: `NodeManageView` adds “新增节点” below each category, including empty categories and 未分类. Names edit inline, save into that category, and reject invalid/duplicate names. Cancel, Escape and hardware back dismiss the draft; successful creation clears search so the new capsule is visible.

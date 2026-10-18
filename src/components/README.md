@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-18: `FilterExpressionInput` provides the shared expression field and syntax hint for `AutoCheckItemEditor` and `FiltersSettingsView`; spaces/AND, same-field OR and standalone exclusions use the common filter parser.
+
 Update 2026-10-18: `TodoQuickActionsModal` mounts its sheet and title/note/date/category editors through a body portal. This escapes isolated todo-page stacking contexts so the backdrop covers bottom navigation, matching the global AddLog overlay behavior; the reminder portal remains above the sheet.
 
 Update 2026-10-16: Todo quick actions complete or undo a dated occurrence, with a date picker when the entry has no valid date. Week/month callbacks retain the selected date. Todo detail autosave preserves occurrence history and exposes series end/restore. `node scripts/test-todo-occurrence.mjs` checks actual interactions and Chinese-font mobile/desktop captures.

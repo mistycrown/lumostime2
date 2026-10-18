@@ -9,6 +9,7 @@
  * @updated 2026-08-09: Planned timeline blocks are excluded from filter statistics.
  * @updated 2026-09-05: Note keywords also match saved Activity attribute values, excluding attribute names.
  * @updated 2026-09-25: Added standalone `-keyword` exclusions; negative terms do not participate in OR groups.
+ * @updated 2026-10-18: Accepts case-insensitive explicit AND as the default whitespace conjunction.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -39,7 +40,7 @@ export function normalizeFiltersOrder(filters: Filter[]): Filter[] {
  * - ^emoji: 匹配 Reaction Emoji (例如: ^🌸)
  * - 关键词: 匹配备注全文
  * - OR: 逻辑或 (不区分大小写, 用于连接同类型条件)
- * - 空格: 逻辑与 (默认)
+ * - 空格或 AND: 逻辑与 (AND 不区分大小写)
  * 
  * 特性:
  * - 前缀继承: "#工作 OR 学习" 等同于 "#工作 OR #学习"
@@ -92,6 +93,13 @@ export function parseFilterExpression(expression: string): ParsedFilterCondition
 
     for (const token of tokens) {
         if (!token) continue;
+
+        if (token.toUpperCase() === 'AND') {
+            pendingOR = false;
+            lastType = null;
+            lastWasExcluded = false;
+            continue;
+        }
 
         // 检查 OR 关键字 (不区分大小写)
         if (token.toUpperCase() === 'OR') {

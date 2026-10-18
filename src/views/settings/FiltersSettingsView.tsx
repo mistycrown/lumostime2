@@ -4,6 +4,7 @@
  * @output Filter edits, ordering, and detail navigation.
  * @pos View (Settings)
  * @updated 2026-10-06: Preserves statistic settings when editing expressions and saves detail-card updates.
+ * @updated 2026-10-18: Shares expression editing and AND/OR guidance with automatic daily checks.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, PlusCircle, Edit2, Trash2, X, ArrowUp, ArrowDown } from 'lucide-react';
@@ -12,6 +13,7 @@ import { Filter, Log, Category, Scope, TodoItem, TodoCategory } from '../../type
 import { FilterDetailView } from '../FilterDetailView';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { getFilterStats, normalizeFiltersOrder } from '../../utils/filterUtils';
+import { FilterExpressionInput } from '../../components/FilterExpressionInput';
 
 interface FiltersSettingsViewProps {
     onBack: () => void;
@@ -311,17 +313,12 @@ export const FiltersSettingsView: React.FC<FiltersSettingsViewProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-stone-600 mb-1.5">筛选表达式</label>
-                                <input
-                                    type="text"
-                                    className="w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-800 font-mono outline-none focus:border-stone-400"
-                                    placeholder="例如:瑜伽 OR 跑步 #运动 %健康 ^🌸"
+                                <label htmlFor="custom-filter-expression" className="block text-xs font-bold text-stone-600 mb-1.5">筛选表达式</label>
+                                <FilterExpressionInput
+                                    id="custom-filter-expression"
                                     value={filterExpression}
-                                    onChange={e => setFilterExpression(e.target.value)}
+                                    onChange={setFilterExpression}
                                 />
-                                <p className="text-[10px] text-stone-400 mt-1.5">
-                                    # 标签, % 领域, @ 待办/分类, ^ Reaction, 无符号=备注, - 表示排除, OR 表示"或"（排除条件不参与 OR）
-                                </p>
                             </div>
                         </div>
 

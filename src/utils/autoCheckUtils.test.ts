@@ -1,15 +1,24 @@
+/**
+ * @file autoCheckUtils.test.ts
+ * @input Auto-check configs, dated logs and shared filter context
+ * @output Regression coverage for filter parity, metrics and night-time checks
+ * @pos Test (Auto Check)
+ * @updated 2026-10-18: Verifies AND/OR/exclusions agree with custom-filter statistics.
+ */
 import { describe, expect, it } from 'vitest';
-import type { Category, CheckItem, Log } from '../types';
-import { evaluateAutoCheck, formatTimeValue, hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from './autoCheckUtils';
+import type { CheckItem, Log } from '../types';
+import { evaluateAutoCheck, getAutoCheckMetricForDate, formatTimeValue, hasAutoCheckItemCompletionChanges, updateAutoCheckItems } from './autoCheckUtils';
 import { normalizeCheckItem, normalizeCheckTemplates } from './checkItemNormalizer';
 import type { FilterContext } from './filterUtils';
+import { getFilterStats } from './filterUtils';
 
 const context: FilterContext = {
   categories: [
     {
       id: 'sleep',
       name: '睡眠',
-      color: 'bg-stone-100 text-stone-700',
+      icon: '🛌',
+      themeColor: '#78716c',
       activities: [
         {
           id: 'sleep_act',
@@ -19,7 +28,7 @@ const context: FilterContext = {
         }
       ]
     }
-  ] as Category[],
+  ],
   scopes: [],
   todos: [],
   todoCategories: []
@@ -54,6 +63,49 @@ function createNightSleepCheck(targetValue = 23 * 60): CheckItem {
     }
   };
 }
+
+describe('auto-check and custom-filter matching parity', () => {
+  const targetDate = new Date(2026, 9, 18, 12);
+  const filterContext: FilterContext = {
+    ...context,
+    scopes: [{ id: 'health', name: '健康', icon: '🌿', isArchived: false, order: 0, themeColor: '#00aa88' }],
+    todos: [{ id: 'plan', title: '睡眠计划', categoryId: 'plans', isCompleted: false }],
+    todoCategories: [{ id: 'plans', name: '计划', icon: '📋' }]
+  };
+  const log: Log = {
+    id: 'matching', categoryId: 'sleep', activityId: 'sleep_act',
+    startTime: new Date(2026, 9, 18, 8).getTime(),
+    endTime: new Date(2026, 9, 18, 9).getTime(), duration: 3600,
+    scopeIds: ['health'], linkedTodoId: 'plan', note: '深度 休息', reactions: ['🌸']
+  };
+  const logs: Log[] = [
+    log,
+    { ...log, id: 'without-scope', scopeIds: [] },
+    { ...log, id: 'without-note', note: '浅睡' },
+    { ...log, id: 'excluded', note: '深度 休息 草稿' },
+    { ...log, id: 'planned', isPlanned: true }
+  ];
+
+  it.each([
+    '#睡觉 %健康 深度 休息 @计划 ^🌸 -草稿',
+    '#睡觉 AND %健康 and 深度 AND 休息 AND @计划 AND ^🌸 AND -草稿',
+    '#午睡 OR 睡觉 AND #睡眠 AND %健康 AND 深度 OR 熟睡 AND 休息 -草稿'
+  ])('uses the same matching records for %s', (filterExpression) => {
+    const stats = getFilterStats(logs, { id: 'filter', name: '休息', filterExpression, createdAt: 0 }, filterContext);
+    expect(stats).toEqual({ count: 1, totalDuration: 3600 });
+
+    const check: CheckItem = {
+      ...createNightSleepCheck(),
+      autoConfig: { filterExpression, comparisonType: 'duration', operator: '>=', targetValue: 60 }
+    };
+    expect(getAutoCheckMetricForDate(check, logs, filterContext, targetDate)).toBe(stats.totalDuration / 60);
+    expect(evaluateAutoCheck(check, logs, filterContext, targetDate)).toBe(true);
+    check.autoConfig = { ...check.autoConfig!, targetValue: 61 };
+    expect(evaluateAutoCheck(check, logs, filterContext, targetDate)).toBe(false);
+    check.autoConfig = { ...check.autoConfig, comparisonType: 'count', targetValue: 1 };
+    expect(getAutoCheckMetricForDate(check, logs, filterContext, targetDate)).toBe(stats.count);
+  });
+});
 
 describe('autoCheckUtils nightEarliestStart', () => {
   it('refreshes a following-day review from the previous night', () => {

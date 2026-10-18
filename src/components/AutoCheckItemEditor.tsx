@@ -6,12 +6,14 @@
  * @description 自动日课配置编辑器 - 用于配置自动判断规则
  * @updated 2026-07-21: Added semantic dark-mode styles for automatic daily-check configuration surfaces.
  * @updated 2026-08-10: Uses nightEarliestStart configuration for split cross-midnight sleep records.
+ * @updated 2026-10-18: Reuses the custom-filter expression input and AND/OR syntax hint.
  */
 
 import React, { useState } from 'react';
 import { CheckTemplateItem, AutoCheckConfig } from '../types';
 import { Zap, X } from 'lucide-react';
 import { CustomSelect } from './CustomSelect';
+import { FilterExpressionInput } from './FilterExpressionInput';
 
 interface AutoCheckItemEditorProps {
   item: CheckTemplateItem;
@@ -180,23 +182,15 @@ export const AutoCheckItemEditor: React.FC<AutoCheckItemEditorProps> = ({
 
           {/* 筛选条件 */}
           <div>
-            <label className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">
+            <label htmlFor="auto-check-filter-expression" className="block text-xs font-bold text-stone-500 mb-1.5 uppercase tracking-wider">
               筛选条件
             </label>
-            <input
-              type="text"
+            <FilterExpressionInput
+              id="auto-check-filter-expression"
               value={config.filterExpression}
-              onChange={(e) => {
-                e.stopPropagation();
-                setConfig({ ...config, filterExpression: e.target.value });
-              }}
-              onClick={(e) => e.stopPropagation()}
+              onChange={(filterExpression) => setConfig({ ...config, filterExpression })}
               className="daily-auto-check-input w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-400 transition-all font-serif"
-              placeholder="例如：#学习 %专业输入"
             />
-            <p className="text-xs text-stone-400 mt-1">
-              使用 # 标签、% 领域、@ 待办 来筛选活动
-            </p>
           </div>
 
           {/* 判断类型 */}

@@ -8,6 +8,7 @@
  * @updated 2026-05-11: Added todo hidden-filter coverage for the month-view display-settings expression.
  * @updated 2026-08-28: Added case-insensitive matching coverage across filter fields.
  * @updated 2026-09-05: Added note-filter coverage for text, numeric, single-choice, and multi-choice attribute values.
+ * @updated 2026-10-18: Covers explicit AND, OR grouping and exclusion compatibility in the shared parser.
  */
 
 import { describe, expect, test } from 'vitest';
@@ -118,6 +119,30 @@ const filterContext = {
   scopes,
   todoCategories
 };
+
+describe('parseFilterExpression explicit AND', () => {
+  test('treats case-insensitive AND like whitespace across fields and within a field', () => {
+    expect(parseFilterExpression('#阅读 AND #学习 and %健康 AnD 复盘')).toEqual(
+      parseFilterExpression('#阅读 #学习 %健康 复盘')
+    );
+  });
+
+  test('preserves OR prefix inheritance and starts a fresh group after AND', () => {
+    expect(parseFilterExpression('#阅读 OR 写作 AND #学习 %健康 OR 学校')).toEqual(
+      parseFilterExpression('#阅读 OR 写作 #学习 %健康 OR 学校')
+    );
+    expect(parseFilterExpression('#阅读 AND 复盘').notes).toEqual([['复盘']]);
+  });
+
+  test('keeps exclusions independent and prefixed AND as a literal keyword', () => {
+    expect(parseFilterExpression('#阅读 OR 写作 AND -#跑步 AND -草稿')).toEqual(
+      parseFilterExpression('#阅读 OR 写作 -#跑步 -草稿')
+    );
+    expect(parseFilterExpression('#AND @AND -AND')).toMatchObject({
+      tags: [['AND']], todos: [['AND']], excludedNotes: ['AND']
+    });
+  });
+});
 
 describe('matchesTodoFilterExpression', () => {
   test('returns false for empty expressions so blank month filters do not hide everything', () => {
