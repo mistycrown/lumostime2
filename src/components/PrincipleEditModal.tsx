@@ -1,5 +1,6 @@
 /**
  * @file PrincipleEditModal.tsx
+ * @updated 2026-10-18: Uses the shared themed group dropdown.
  * @updated 2026-10-18: Adds optional principle group assignment.
  * @input Principle edit form state and modal action callbacks
  * @output Shared principle add/edit modal used by settings and AI chat writeback results
@@ -8,6 +9,7 @@
  * @updated 2026-07-06: Extracted from PrincipleLibraryView for reuse inside AI chat applied-action cards.
  */
 import React from 'react';
+import { CustomSelect } from './CustomSelect';
 import type { PrincipleGroup } from '../utils/principleGroupUtils';
 
 export interface PrincipleEditFormData {
@@ -42,18 +44,16 @@ export const PrincipleEditModal: React.FC<PrincipleEditModalProps> = ({
 
       <div className="space-y-3 sm:space-y-4">
         {groups && (
-          <label className="block text-xs sm:text-sm font-medium text-stone-700">
-            分组
-            <select
-              aria-label="原则分组"
+          <div>
+            <CustomSelect
+              ariaLabel="原则分组"
+              label="分组"
               value={formData.groupId || ''}
-              onChange={(event) => onChange({ ...formData, groupId: event.target.value || undefined })}
-              className="mt-1 w-full px-3 py-2 text-sm border border-stone-300 rounded-lg bg-white"
-            >
-              <option value="">未分组</option>
-              {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-            </select>
-          </label>
+              onChange={(value) => onChange({ ...formData, groupId: value || undefined })}
+              options={[{ value: '', label: '未分组' }, ...groups.map((group) => ({ value: group.id, label: group.name }))]}
+              renderDropdownInPortal
+            />
+          </div>
         )}
         <div>
           <label className="block text-xs sm:text-sm font-medium text-stone-700 mb-1">

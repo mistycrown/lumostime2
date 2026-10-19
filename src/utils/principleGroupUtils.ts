@@ -1,5 +1,6 @@
 /**
  * @file principleGroupUtils.ts
+ * @updated 2026-10-18: Adds immutable batch grouping and relative ordering helpers.
  * @input Persisted principle groups, principles, and scene card selections
  * @output Group normalization, filtering, and daily random principle resolution
  * @updated 2026-10-18: Adds stable principle groups and group-scoped daily selection.
@@ -21,6 +22,33 @@ export interface GroupedPrinciple {
 
 export const PRINCIPLE_GROUPS_STORAGE_KEY = 'lumostime_principle_groups';
 export const UNGROUPED_PRINCIPLES = '__ungrouped__';
+
+export const movePrinciplesToGroup = <T extends { id: string; groupId?: string }>(
+  principles: T[], ids: string[], groupId?: string, targetId?: string, after = false
+): T[] => {
+  const selected = new Set(ids);
+  const moving = principles.filter((item) => selected.has(item.id));
+  if (!moving.length || (targetId && selected.has(targetId))) return principles;
+  const remaining = principles.filter((item) => !selected.has(item.id));
+  let index = targetId ? remaining.findIndex((item) => item.id === targetId) : -1;
+  if (index >= 0) {
+    if (after) index++;
+  } else {
+    index = remaining.length;
+    for (let i = remaining.length - 1; i >= 0; i--) {
+      if (remaining[i].groupId === groupId) { index = i + 1; break; }
+    }
+  }
+  return [...remaining.slice(0, index), ...moving.map((item) => ({ ...item, groupId })), ...remaining.slice(index)];
+};
+
+export const reorderPrincipleGroups = (groups: PrincipleGroup[], id: string, targetId: string, after = false): PrincipleGroup[] => {
+  const source = groups.find((group) => group.id === id);
+  if (!source || id === targetId || !groups.some((group) => group.id === targetId)) return groups;
+  const remaining = groups.filter((group) => group.id !== id);
+  const index = remaining.findIndex((group) => group.id === targetId) + (after ? 1 : 0);
+  return [...remaining.slice(0, index), source, ...remaining.slice(index)];
+};
 
 export const normalizePrincipleGroups = (value: unknown): PrincipleGroup[] => {
   if (!Array.isArray(value)) return [];

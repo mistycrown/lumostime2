@@ -1,5 +1,6 @@
 /**
  * @file SceneSettingsView.tsx
+ * @updated 2026-10-18: Uses the shared themed dropdown for principle random scope.
  * @updated 2026-10-18: Adds principle group selection for daily random cards.
  * @updated 2026-10-17: Clears stale actions when switching to or saving statistics cards.
  * @updated 2026-08-06: Made scene time-slot previews explicitly prefer configured UI icons over stored emoji fallbacks.
@@ -1998,20 +1999,22 @@ const CardEditModal: React.FC<{
           )}
 
           {card?.type === 'principle' && card?.principleSource === 'random' && (
-            <label className="block text-xs sm:text-sm font-medium text-stone-700">
-              随机范围
-              <select
-                aria-label="随机原则分组"
+            <div>
+              <CustomSelect
+                label="随机范围"
+                ariaLabel="随机原则分组"
                 value={card.principleGroupId || ''}
-                onChange={(event) => onChange({ ...card, principleGroupId: event.target.value || undefined })}
-                className="mt-2 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">全部原则</option>
-                <option value={UNGROUPED_PRINCIPLES}>未分组</option>
-                {loadPrincipleGroups().map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-                {card.principleGroupId && card.principleGroupId !== UNGROUPED_PRINCIPLES && !loadPrincipleGroups().some((group) => group.id === card.principleGroupId) && <option value={card.principleGroupId}>已删除的分组</option>}
-              </select>
-            </label>
+                onChange={(value) => onChange({ ...card, principleGroupId: value || undefined })}
+                options={[
+                  { value: '', label: '全部原则' },
+                  { value: UNGROUPED_PRINCIPLES, label: '未分组' },
+                  ...loadPrincipleGroups().map((group) => ({ value: group.id, label: group.name })),
+                  ...(card.principleGroupId && card.principleGroupId !== UNGROUPED_PRINCIPLES && !loadPrincipleGroups().some((group) => group.id === card.principleGroupId)
+                    ? [{ value: card.principleGroupId, label: '已删除的分组' }] : [])
+                ]}
+                renderDropdownInPortal
+              />
+            </div>
           )}
 
           {/* 从原则库选择（仅当选择了library模式） */}

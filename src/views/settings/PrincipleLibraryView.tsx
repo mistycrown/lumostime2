@@ -1,11 +1,14 @@
 /**
  * @file PrincipleLibraryView.tsx
+ * @updated 2026-10-18: Uses shared selects, neutral group focus and draft batch management.
  * @updated 2026-10-18: Adds group management, filtering, and principle assignment.
  * @description 原则库设置页面 - 管理核心原则卡片和自我认知描述库
  * @updated 2026-07-06: Added the self-belief tab with manual identity/description CRUD backed by localStorage.
  */
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2, Edit2, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronUp, ChevronDown, Plus, Trash2, Edit2, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { CustomSelect } from '../../components/CustomSelect';
+import { PrincipleBatchManageView } from './PrincipleBatchManageView';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { PrincipleEditModal, type PrincipleEditFormData } from '../../components/PrincipleEditModal';
 import { SelfBeliefEditModal, type SelfBeliefDescriptionDraft, type SelfBeliefDescriptionSource } from '../../components/SelfBeliefEditModal';
@@ -203,6 +206,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
     const [selectedGroupId, setSelectedGroupId] = useState('');
     const [groupDraft, setGroupDraft] = useState<{ id?: string; name: string } | null>(null);
     const [deleteGroupId, setDeleteGroupId] = useState<string | null>(null);
+    const [isBatchManaging, setIsBatchManaging] = useState(false);
 
     // 从 localStorage 读取原则（如果没有则使用默认预设）
     const [principles, setPrinciples] = useState<Principle[]>(() => {
@@ -494,6 +498,20 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
         }
     };
 
+    if (isBatchManaging) {
+        return <PrincipleBatchManageView
+            principles={principles}
+            groups={groups}
+            onCancel={() => setIsBatchManaging(false)}
+            onSave={(nextPrinciples, nextGroups) => {
+                setGroups(nextGroups);
+                localStorage.setItem(PRINCIPLE_GROUPS_STORAGE_KEY, JSON.stringify(nextGroups));
+                savePrinciples(nextPrinciples);
+                setIsBatchManaging(false);
+            }}
+        />;
+    }
+
     return (
         <div className="fixed inset-0 z-50 bg-stone-50 flex flex-col font-serif animate-in slide-in-from-right duration-300 pt-[var(--app-safe-area-top)] pb-[env(safe-area-inset-bottom)]">
             {/* Header */}
@@ -505,6 +523,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                     <ChevronLeft size={24} />
                 </button>
                 <span className="text-stone-800 font-bold text-lg flex-1">原则库</span>
+                {activeTab === 'principles' && <button type="button" aria-label="批量管理原则" onClick={() => setIsBatchManaging(true)} className="flex items-center gap-1.5 py-2 text-xs text-stone-500"><SlidersHorizontal size={15} />批量管理</button>}
                 {activeTab === 'principles' && (
                     <button
                         onClick={() => setIsResetConfirmOpen(true)}
@@ -546,16 +565,18 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                 {activeTab === 'principles' ? (
                     <>
                         <div className="flex items-center gap-2 border-b border-stone-200 pb-3">
-                            <select
-                                aria-label="筛选原则分组"
+                            <CustomSelect
+                                ariaLabel="筛选原则分组"
                                 value={selectedGroupId}
-                                onChange={(event) => setSelectedGroupId(event.target.value)}
-                                className="min-w-0 flex-1 bg-transparent py-2 text-sm text-stone-700 focus:outline-none"
-                            >
-                                <option value="">全部原则 ({principles.length})</option>
-                                <option value={UNGROUPED_PRINCIPLES}>未分组 ({filterPrinciplesByGroup(principles, UNGROUPED_PRINCIPLES, groups).length})</option>
-                                {groups.map((group) => <option key={group.id} value={group.id}>{group.name} ({principles.filter((item) => item.groupId === group.id).length})</option>)}
-                            </select>
+                                onChange={setSelectedGroupId}
+                                className="min-w-0 flex-1"
+                                options={[
+                                    { value: '', label: `全部原则 (${principles.length})` },
+                                    { value: UNGROUPED_PRINCIPLES, label: `未分组 (${filterPrinciplesByGroup(principles, UNGROUPED_PRINCIPLES, groups).length})` },
+                                    ...groups.map((group) => ({ value: group.id, label: `${group.name} (${principles.filter((item) => item.groupId === group.id).length})` }))
+                                ]}
+                                renderDropdownInPortal
+                            />
                             <button type="button" onClick={() => setGroupDraft({ name: '' })} className="p-2 text-stone-500" aria-label="新建分组" title="新建分组"><Plus size={18} /></button>
                             {groups.some((group) => group.id === selectedGroupId) && (
                                 <>
@@ -792,7 +813,7 @@ export const PrincipleLibraryView: React.FC<PrincipleLibraryViewProps> = ({ onBa
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <form onSubmit={(event) => { event.preventDefault(); handleSaveGroup(); }} className="w-full max-w-sm rounded-2xl bg-white p-5">
                         <h2 className="mb-4 text-lg font-bold">{groupDraft.id ? '重命名分组' : '新建分组'}</h2>
-                        <input autoFocus aria-label="分组名称" placeholder="分组名称" value={groupDraft.name} onChange={(event) => setGroupDraft({ ...groupDraft, name: event.target.value })} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                        <input autoFocus aria-label="分组名称" placeholder="分组名称" value={groupDraft.name} onChange={(event) => setGroupDraft({ ...groupDraft, name: event.target.value })} className="w-full rounded-lg border border-stone-300 bg-transparent px-3 py-2 text-sm text-stone-800 outline-none focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400" />
                         {groups.some((group) => group.name === groupDraft.name.trim() && group.id !== groupDraft.id) && <p role="alert" className="mt-2 text-xs text-red-500">分组名称已存在</p>}
                         <div className="mt-5 flex gap-2">
                             <button type="button" onClick={() => setGroupDraft(null)} className="flex-1 rounded-lg border border-stone-300 py-2 text-sm">取消</button>

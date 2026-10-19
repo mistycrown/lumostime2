@@ -1,12 +1,13 @@
 /**
  * @file principleGroupUtils.test.ts
+ * @updated 2026-10-18: Covers immutable batch movement, metadata, and relative ordering.
  * @input Legacy/grouped libraries, daily caches, and stale scene selections
  * @output Regression coverage for group isolation and daily random selection
  * @updated 2026-10-18: Covers groups, cache validation, and deleted/empty states.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SceneCardData } from '../types';
-import { filterPrinciplesByGroup, loadPrincipleGroups, normalizePrincipleGroups, PRINCIPLE_GROUPS_STORAGE_KEY, resolvePrincipleCard, UNGROUPED_PRINCIPLES } from './principleGroupUtils';
+import { filterPrinciplesByGroup, loadPrincipleGroups, movePrinciplesToGroup, normalizePrincipleGroups, PRINCIPLE_GROUPS_STORAGE_KEY, reorderPrincipleGroups, resolvePrincipleCard, UNGROUPED_PRINCIPLES } from './principleGroupUtils';
 
 const groups = [{ id: 'work', name: '工作' }, { id: 'life', name: '生活' }];
 const principles = [
@@ -30,6 +31,26 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('principle groups', () => {
+  it('moves selected principles as an ordered block without losing metadata or mutating the draft source', () => {
+    const source = principles.map((item) => ({ ...item, descriptions: [{ text: 'keep' }] }));
+    const moved = movePrinciplesToGroup(source, ['b', 'a'], 'life', 'c');
+    expect(moved.map((item) => item.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(moved.slice(0, 2).every((item) => item.groupId === 'life')).toBe(true);
+    expect(moved[0].descriptions).toEqual([{ text: 'keep' }]);
+    expect(source[0].groupId).toBe('work');
+    expect(movePrinciplesToGroup(source, ['a'], undefined).find((item) => item.id === 'a')?.groupId).toBeUndefined();
+  });
+
+  it('supports group-end drops, relative ordering and no-op drops onto the selected block', () => {
+    expect(movePrinciplesToGroup(principles, ['a'], 'work', 'b', true).map((item) => item.id)).toEqual(['b', 'a', 'c', 'd']);
+    expect(movePrinciplesToGroup(principles, ['d'], 'life').map((item) => item.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(movePrinciplesToGroup(principles, ['a', 'b'], 'life', 'b')).toBe(principles);
+    expect(movePrinciplesToGroup(principles, ['missing'], 'work')).toBe(principles);
+    expect(reorderPrincipleGroups(groups, 'life', 'work')).toEqual([groups[1], groups[0]]);
+    expect(reorderPrincipleGroups(groups, 'work', 'life', true)).toEqual([groups[1], groups[0]]);
+    expect(reorderPrincipleGroups(groups, 'work', 'missing')).toBe(groups);
+  });
+
   it('normalizes groups and safely reads corrupt storage', () => {
     expect(normalizePrincipleGroups([null, {}, { id: ' work ', name: ' 工作 ' }, groups[0]])).toEqual([groups[0]]);
     localStorage.setItem(PRINCIPLE_GROUPS_STORAGE_KEY, '{bad');

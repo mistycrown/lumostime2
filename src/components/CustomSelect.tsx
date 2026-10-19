@@ -1,5 +1,6 @@
 /**
  * @file CustomSelect.tsx
+ * @updated 2026-10-18: Adds optional accessible naming and semantic selection states.
  * @updated 2026-09-12: Renders portal dropdowns only after measuring their position and removes slide-in motion.
  * @updated 2026-07-21: Added semantic hooks for high-contrast dark-mode select states.
  * @updated 2026-09-09: Added optional portal rendering for dropdowns inside clipped overlays.
@@ -17,6 +18,7 @@ interface Option {
 }
 
 interface CustomSelectProps {
+  ariaLabel?: string;
   label?: string;
   value: string;
   options: Option[];
@@ -29,6 +31,7 @@ interface CustomSelectProps {
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
+  ariaLabel,
   label,
   value,
   options,
@@ -146,6 +149,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       {label && <label className="mb-2 block text-sm font-medium text-stone-700">{label}</label>}
       <button
         type="button"
+        aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         onClick={(e) => {
           e.stopPropagation();
           if (disabled) return;
@@ -182,6 +188,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         const dropdown = (
           <div
             ref={dropdownRef}
+            role="listbox"
+            aria-label={ariaLabel || label || placeholder}
             className={`${renderDropdownInPortal ? 'fixed' : 'absolute'} z-[240] w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg ${
               renderDropdownInPortal
                 ? ''
@@ -199,6 +207,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                 <button
                   key={option.value}
                   type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  data-select-value={option.value}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleSelect(option.value);
