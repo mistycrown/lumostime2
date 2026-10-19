@@ -1,5 +1,6 @@
 /**
  * @file todoAssociationUtils.ts
+ * @updated 2026-10-18: Excludes abandoned tasks from new associations while preserving existing links.
  * @input Flat todo arrays, expanded parent ids, selected todo ids
  * @output Pure row models for hierarchical todo-association pickers
  * @pos Utility (Todo association)
@@ -74,7 +75,7 @@ export const filterTodoAssociationPickerTodos = (
 ): TodoItem[] => (
   todos.filter((todo) => (
     isTodoEligibleForAssociationPicker(todo, linkedTodoId)
-    && (!todo.isCompleted || todo.id === linkedTodoId)
+    && ((!todo.isCompleted && !todo.abandonedAt) || todo.id === linkedTodoId)
   ))
 );
 

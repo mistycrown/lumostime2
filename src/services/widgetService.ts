@@ -1,5 +1,6 @@
 /**
  * @file widgetService.ts
+ * @updated 2026-10-18: Omits abandoned tasks from native widget source data.
  * @updated 2026-10-16: Mirrors occurrence completion history into Android TODAY + PIN snapshots.
  * @input Category/activity data, daily template data, ActiveSession state, widget bridge payloads
  * @output Widget template persistence helpers and app/native conversion utilities
@@ -1474,7 +1475,7 @@ const formatTodoPinTitle = (todo: TodoItem, todos: TodoItem[]): string => {
 };
 
 const buildTodoPinSourceTodos = (todos: TodoItem[]): WidgetBridgeTodoPinSourceTodo[] =>
-  todos.map((todo) => ({
+  todos.filter((todo) => !todo.abandonedAt).map((todo) => ({
     id: todo.id,
     title: todo.title,
     kind: todo.kind === 'quick' ? 'quick' : 'project',

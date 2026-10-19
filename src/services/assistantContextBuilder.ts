@@ -1,5 +1,6 @@
 ﻿/**
  * @file assistantContextBuilder.ts
+ * @updated 2026-10-18: Excludes abandonment from active summaries and exposes it in todo dictionaries.
  * @updated 2026-10-09: Exposes the full node dictionary in JSON and lossless table contexts.
  * @input App runtime dictionaries, logs, todos, conversation turns, and current session state
  * @output Shared assistant state-context and dictionary-context snapshots for unified turns
@@ -306,19 +307,19 @@ export const assistantContextBuilder = {
       }).join('；');
 
     const scheduledTodosForDateSummary = params.todos
-      .filter((todo) => !todo.isCompleted && todo.scheduledDate === params.stateContextDate)
+      .filter((todo) => !todo.isCompleted && !todo.abandonedAt && todo.scheduledDate === params.stateContextDate)
       .slice(0, todoLimit)
       .map((todo) => `- ${formatTodoPath(todo, params.todos)}`)
       .join('\n');
 
     const pinnedTodoSummary = params.todos
-      .filter((todo) => !todo.isCompleted && Boolean(todo.pin))
+      .filter((todo) => !todo.isCompleted && !todo.abandonedAt && Boolean(todo.pin))
       .slice(0, todoLimit)
       .map((todo) => `- ${formatTodoPath(todo, params.todos)}`)
       .join('\n');
 
     const overdueTodoSummary = params.todos
-      .filter((todo) => !todo.isCompleted && typeof todo.deadlineDate === 'string' && todo.deadlineDate < params.stateContextDate)
+      .filter((todo) => !todo.isCompleted && !todo.abandonedAt && typeof todo.deadlineDate === 'string' && todo.deadlineDate < params.stateContextDate)
       .slice(0, todoLimit)
       .map((todo) => `- ${formatTodoPath(todo, params.todos)}（截止 ${todo.deadlineDate}）`)
       .join('\n');
@@ -413,7 +414,8 @@ export const assistantContextBuilder = {
       todo.scheduledDate,
       todo.deadlineDate,
       todo.pin,
-      todo.isCompleted
+      todo.isCompleted,
+      todo.abandonedAt
     ]));
 
     const logRows = (context.logs || []).map((log) => ([
@@ -436,7 +438,7 @@ export const assistantContextBuilder = {
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('Nodes', ['id', 'name', 'aliases', 'description', 'categoryId'], (context.nodes || []).map((node) => [node.id, node.name, node.aliases, node.description, node.categoryId])),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
-      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted'], todoRows),
+      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted', 'abandonedAt'], todoRows),
       buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
     ].join('\n\n');
   },
@@ -497,6 +499,7 @@ export const assistantContextBuilder = {
         ...(todo.scheduledDate ? { scheduledDate: todo.scheduledDate } : {}),
         ...(todo.deadlineDate ? { deadlineDate: todo.deadlineDate } : {}),
         isCompleted: todo.isCompleted,
+        ...(todo.abandonedAt ? { abandonedAt: todo.abandonedAt } : {}),
         pin: Boolean(todo.pin)
       };
     });

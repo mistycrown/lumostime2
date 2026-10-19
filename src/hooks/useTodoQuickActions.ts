@@ -1,5 +1,7 @@
 /**
  * @file useTodoQuickActions.ts
+ * @updated 2026-10-18: Adds mutually exclusive abandon/restore actions using the latest saved task.
+ * @updated 2026-10-18: Saves independent date reminders from quick-action cards against the latest todo state.
  * @updated 2026-10-16: Carries occurrence dates into complete, undo and skip actions.
  * @input Todo save/edit callbacks from TodoView
  * @output Shared quick-actions state and handlers for todo list rows and week-view badges
@@ -21,11 +23,13 @@
  * @updated 2026-04-20: Extracted from TodoView to unify quick-actions behavior across todo-row taps and week badge actions.
  */
 import { useRef, useState } from 'react';
-import { TodoItem } from '../types';
+import { TodoItem, TodoReminderField, TodoReminderSetting } from '../types';
 import { formatDateKey, getNextRecurrenceOccurrenceDateKey, normalizeMaybeDates, normalizeSkipDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { buildTodoParentLink } from '../utils/todoParentLinkUtils';
 import { canCompleteTodoOccurrence, setTodoCompletion } from '../utils/todoOccurrenceUtils';
+import { normalizeTodoReminders } from '../utils/todoReminderUtils';
+import { isTodoClosed, setTodoStatus } from '../utils/todoStatusUtils';
 
 export const QUICK_ACTION_INTERACTION_GUARD_MS = 280;
 
@@ -85,6 +89,18 @@ export const buildQuickActionNoteUpdateTodo = (
 export const getQuickActionTodoNote = (todo: TodoItem | null): string => (
   typeof todo?.note === 'string' ? todo.note : ''
 );
+
+export const buildQuickActionReminderUpdateTodo = (
+  todo: TodoItem | null,
+  field: TodoReminderField,
+  setting?: TodoReminderSetting
+): TodoItem | null => {
+  if (!todo || !todo[field] || isTodoClosed(todo) || todo.recurrenceRule) return null;
+  return {
+    ...todo,
+    reminders: normalizeTodoReminders({ ...todo, reminders: { ...todo.reminders, [field]: setting } })
+  };
+};
 
 interface UseTodoQuickActionsOptions {
   todos: TodoItem[];
@@ -168,6 +184,13 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     if (!quickActionTodo) return;
     const liveTodo = todos.find((item) => item.id === quickActionTodo.id) || quickActionTodo;
     onSaveTodo(setTodoCompletion(liveTodo, false, liveTodo.isCompleted ? undefined : quickActionOccurrenceDateKey));
+    closeQuickActions(true);
+  };
+
+  const handleQuickActionToggleAbandon = () => {
+    if (!quickActionTodo) return;
+    const liveTodo = todos.find((item) => item.id === quickActionTodo.id) || quickActionTodo;
+    onSaveTodo(setTodoStatus(liveTodo, liveTodo.abandonedAt ? 'active' : 'abandoned'));
     closeQuickActions(true);
   };
 
@@ -303,6 +326,15 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     onSaveTodo(nextTodo);
   };
 
+  const handleQuickActionUpdateReminder = (field: TodoReminderField, setting?: TodoReminderSetting) => {
+    if (!quickActionTodo) return;
+    const liveTodo = todos.find((item) => item.id === quickActionTodo.id);
+    const nextTodo = buildQuickActionReminderUpdateTodo(liveTodo || null, field, setting);
+    if (!nextTodo) return;
+    setQuickActionTodo(nextTodo);
+    onSaveTodo(nextTodo);
+  };
+
   return {
     quickActionTodo,
     quickActionOccurrenceDateKey,
@@ -314,6 +346,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
+    handleQuickActionToggleAbandon,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
     handleQuickActionMaybeDates,
@@ -324,6 +357,7 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     handleQuickActionUpgradeToProject,
     handleQuickActionDelete,
     handleQuickActionUpdateTitle,
-    handleQuickActionUpdateNote
+    handleQuickActionUpdateNote,
+    handleQuickActionUpdateReminder
   };
 };

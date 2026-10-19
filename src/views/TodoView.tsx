@@ -1,5 +1,7 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-18: Shows abandonment with a date icon and orders closed tasks by their completion/abandonment date.
+ * @updated 2026-10-18: Wires date-reminder editing into quick-action cards.
  * @updated 2026-10-16: Groups completed recurring occurrences by day and retains dates in quick actions.
  * @updated 2026-10-11: Wires arrange/due date selection into the shared quick-actions sheet.
  * @updated 2026-10-04: Wires searchable main-task association into shared todo quick actions.
@@ -28,7 +30,7 @@
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Scope, TodoItem, TodoCategory, Category, AutoLinkRule, Log, TodoDuplicateOptions } from '../types';
-import { PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, Diff, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
+import { Ban, PlayCircle, Check, CheckCircle2, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronDown, Diff, LayoutList, Rows, Sparkles, SlidersHorizontal, CalendarDays, Flag, Repeat2, TrendingUp, ListTodo, CircleAlert, PanelRightOpen, Pin } from 'lucide-react';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { useToast } from '../contexts/ToastContext';
 import { IconRenderer } from '../components/IconRenderer';
@@ -70,6 +72,7 @@ import { canCompleteTodoOccurrence, getTodoForOccurrence } from '../utils/todoOc
 import { getTodoRowGestureIntent, getTodoRowReleaseAction, TodoRowGestureIntent } from '../utils/todoRowInteraction';
 import { buildTodoTreeItems, getCompletedDirectChildCount, getDirectChildCount, getDirectChildTodosForDisplay, getParentTodo, isIncompleteSubtaskHiddenByCompletedParent } from '../utils/todoHierarchyUtils';
 import { formatTodoCompactScheduleSummary, formatTodoCompletionDate, formatTodoInlineDate, orderTodoItemsByCompletionGroups } from '../utils/todoListDisplayUtils';
+import { isTodoClosed } from '../utils/todoStatusUtils';
 import { useAIChatWindow } from '../contexts/AIChatWindowContext';
 import { UnreadCountBadge } from '../components/UnreadCountBadge';
 import { isQuickTodo } from '../utils/todoKindUtils';
@@ -162,7 +165,7 @@ const SwipeableTodoItem: React.FC<{
   const [translateX, setTranslateX] = useState(0);
   const isQuickReminder = isQuickTodo(todo);
   const isTodayOccurrenceCompleted = !todo.isCompleted && Boolean(todo.recurrenceRule && todo.occurrenceCompletions?.[getTodayDateKey()]);
-  const canQuickToggle = true;
+  const canQuickToggle = !todo.abandonedAt;
   const quickToggleDirection: 'left' = 'left';
   const shouldShowCompactScheduleLabels = viewMode !== 'compact' || compactDisplaySettings.showScheduleType;
   const visibleScheduleMatchLabels = shouldShowCompactScheduleLabels
@@ -174,17 +177,18 @@ const SwipeableTodoItem: React.FC<{
   const scheduledDateLabel = formatTodoInlineDate(todo.scheduledDate);
   const deadlineDateLabel = formatTodoInlineDate(todo.deadlineDate);
   const completedDateLabel = todo.isCompleted ? formatTodoCompletionDate(todo.completedAt) : null;
-  const compactScheduleSummary = viewMode === 'compact' && compactDisplaySettings.showScheduleTime
+  const abandonedDateLabel = formatTodoCompletionDate(todo.abandonedAt);
+  const compactScheduleSummary = viewMode === 'compact' && (compactDisplaySettings.showScheduleTime || todo.abandonedAt)
     ? formatTodoCompactScheduleSummary(todo)
     : null;
-  const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel || completedDateLabel);
+  const hasLooseDateMarkers = viewMode === 'loose' && Boolean(scheduledDateLabel || deadlineDateLabel || completedDateLabel || abandonedDateLabel);
   const progressRatio = (todo.completedUnits || 0) / (todo.totalAmount || 1);
   const progressPercentage = Math.round(progressRatio * 100);
   const progressBarWidth = Math.min(100, Math.max(0, progressRatio * 100));
-  const canStartFocus = !todo.isCompleted && !isQuickReminder;
+  const canStartFocus = !isTodoClosed(todo) && !isQuickReminder;
   const canSwipeRightActions = !isQuickReminder;
   const showLooseRightActions = viewMode === 'loose' && (hasLooseDateMarkers || canStartFocus);
-  const completedProgressOpacity = todo.isCompleted ? 0.38 : 1;
+  const completedProgressOpacity = isTodoClosed(todo) ? 0.38 : 1;
   const baseLooseBadgeClass = 'inline-flex min-h-[1.5rem] max-w-full items-center gap-1 whitespace-nowrap rounded-md border border-stone-200 bg-white/50 px-1.5 py-0.5 text-[11px] font-medium leading-none text-stone-500 align-middle';
   const baseCompactBadgeClass = 'inline-flex max-w-full items-center gap-1 whitespace-nowrap';
   const hierarchyBadgeClass = viewMode === 'compact'
@@ -422,6 +426,7 @@ const SwipeableTodoItem: React.FC<{
     </>
   ) : null;
   const hasMetaBadges = Boolean(
+    todo.abandonedAt ||
     isTodayOccurrenceCompleted ||
     hierarchyBadges ||
     visibleScheduleMatchLabels.length > 0 ||
@@ -473,22 +478,23 @@ const SwipeableTodoItem: React.FC<{
         onClick={handlePrimaryClick}
       >
         {/* Content (Click to Open Quick Actions) */}
-        <div className={`flex-1 cursor-pointer ${todo.isCompleted ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`}>
+        <div className={`flex-1 cursor-pointer ${isTodoClosed(todo) ? 'opacity-60' : ''} ${viewMode === 'compact' ? 'flex items-center gap-2 min-w-0' : 'py-0.5'}`}>
           <div className={`flex gap-2 flex-1 min-w-0 ${viewMode === 'compact' ? 'items-center' : 'items-start'}`}>
             <div className={`min-w-0 flex-1 font-bold ${viewMode === 'compact' ? 'text-sm leading-tight' : 'text-base leading-snug line-clamp-2'} transition-all duration-500`}>
               {viewMode === 'compact' ? (
                 <span className="flex min-w-0 items-baseline">
-                  <span className={`min-w-0 flex-1 truncate ${todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
+                  <span className={`min-w-0 flex-1 truncate ${isTodoClosed(todo) ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
                     {todo.title}
                   </span>
                   {compactScheduleSummary && (
-                    <span className="shrink-0 text-[11px] font-medium leading-none text-stone-400">
+                    <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium leading-none text-stone-400" aria-label={todo.abandonedAt ? `放弃日期 ${compactScheduleSummary}` : undefined}>
+                      {todo.abandonedAt && <Ban size={11} />}
                       {compactScheduleSummary}
                     </span>
                   )}
                 </span>
               ) : (
-                <span className={todo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-800'}>
+                <span className={isTodoClosed(todo) ? 'text-stone-400 line-through' : 'text-stone-800'}>
                   {todo.title}
                 </span>
               )}
@@ -541,7 +547,7 @@ const SwipeableTodoItem: React.FC<{
           {hasMetaBadges && (
           <div className={`flex items-center gap-x-1.5 gap-y-1 flex-wrap flex-shrink-0 ${viewMode === 'compact' ? 'mt-0' : 'mt-1.5'}`}>
             {viewMode === 'loose' && hierarchyBadges}
-            {isTodayOccurrenceCompleted && <span className="text-[11px] text-stone-400">今日已完成</span>}
+            {!todo.abandonedAt && isTodayOccurrenceCompleted && <span className="text-[11px] text-stone-400">今日已完成</span>}
             {visibleScheduleMatchLabels.map((label) => (
               scheduleLabelStyle === 'schedule' ? (
                 <span
@@ -615,7 +621,12 @@ const SwipeableTodoItem: React.FC<{
             {viewMode === 'loose' && (
               hasLooseDateMarkers ? (
                 <div className="flex flex-col items-end gap-0.5 pt-0.5 text-[11px] font-medium text-stone-400" style={cardBackgroundAccentStyle}>
-                  {completedDateLabel ? (
+                  {abandonedDateLabel ? (
+                    <span className="inline-flex items-center gap-1 leading-none" aria-label={`放弃日期 ${abandonedDateLabel}`}>
+                      <Ban size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
+                      <span>{abandonedDateLabel}</span>
+                    </span>
+                  ) : completedDateLabel ? (
                     <span className="inline-flex items-center gap-1 leading-none">
                       <CheckCircle2 size={11} className={cardBackground.active ? '' : 'text-stone-350'} />
                       <span>{completedDateLabel}</span>
@@ -791,7 +802,7 @@ const normalizeTodoCompactDisplaySettings = (value: unknown): TodoCompactDisplay
 };
 
 const filterVisibleTodos = (todos: TodoItem[], showCompletedTodos: boolean): TodoItem[] =>
-  todos.filter((todo) => (showCompletedTodos || !todo.isCompleted) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
+  todos.filter((todo) => (showCompletedTodos || !isTodoClosed(todo)) && !isIncompleteSubtaskHiddenByCompletedParent(todos, todo));
 
 const filterQuickTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => isQuickTodo(todo));
 const filterProjectTodos = (todos: TodoItem[]): TodoItem[] => todos.filter((todo) => !isQuickTodo(todo));
@@ -1160,6 +1171,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionOpenDetail,
     handleQuickActionComplete,
     handleQuickActionUndoComplete,
+    handleQuickActionToggleAbandon,
     handleQuickActionClearDate,
     handleQuickActionTogglePin,
     handleQuickActionMaybeDates,
@@ -1170,6 +1182,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     handleQuickActionDelete,
     handleQuickActionUpdateTitle,
     handleQuickActionUpdateNote,
+    handleQuickActionUpdateReminder,
     handleQuickActionLinkParent
   } = useTodoQuickActions({ todos, onSaveTodo, onEditTodo, onDeleteTodo });
 
@@ -1423,7 +1436,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
 
   const todayFilterCount = useMemo<number>(() => (
     filterVisibleTodos(displayTodos, showCompletedTodos)
-      .filter((todo) => !todo.pin)
+      .filter((todo) => !todo.pin && !todo.abandonedAt)
       .filter((todo) => todo.scheduledDate === todayDateKey || todo.deadlineDate === todayDateKey)
       .filter((todo) => !isHierarchyTodo(todo, todos))
       .length
@@ -1444,7 +1457,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
           filterProjectTodos(
             displayTodos
               .filter((todo) => todo.categoryId === selectedCategoryId)
-              .filter((todo) => showCompletedTodos || !todo.isCompleted)
+              .filter((todo) => showCompletedTodos || !isTodoClosed(todo))
           )
         )
         .map((todo) => buildTodoListEntry(todo, [], { includePinLabel: true }));
@@ -2191,7 +2204,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
     if (!assignModalDate) return [];
 
     return displayTodos.filter((todo) => {
-      if (todo.isCompleted) return false;
+      if (isTodoClosed(todo)) return false;
       if (todo.recurrenceRule && assignModalType !== 'maybe') return false;
       if (isFutureTodoCategoryId(todo.categoryId)) return false;
       return true;
@@ -2291,6 +2304,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       onOpenDetail={handleQuickActionOpenDetail}
       onComplete={handleQuickActionComplete}
       onUndoComplete={handleQuickActionUndoComplete}
+      onToggleAbandon={handleQuickActionToggleAbandon}
       onTogglePin={handleQuickActionTogglePin}
       onDuplicate={() => quickActionTodo && handleOpenDuplicateModal(quickActionTodo)}
       onLinkParent={handleQuickActionLinkParent}
@@ -2306,6 +2320,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
       onUpdateTitle={handleQuickActionUpdateTitle}
       onUpdateNote={handleQuickActionUpdateNote}
+      onUpdateReminder={handleQuickActionUpdateReminder}
     />
   );
 

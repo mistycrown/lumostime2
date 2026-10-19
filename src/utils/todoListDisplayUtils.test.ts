@@ -23,6 +23,20 @@ const buildTodo = (overrides: Partial<TodoItem>): TodoItem => ({
 });
 
 describe('todoListDisplayUtils', () => {
+  test('mixes completion and abandonment by descending end date with stable ties and missing dates', () => {
+    const todos = [
+      buildTodo({ id: 'old-abandoned', abandonedAt: '2026-10-10T12:00:00+08:00', scheduledDate: '2027-01-01' }),
+      buildTodo({ id: 'active' }),
+      buildTodo({ id: 'completed', isCompleted: true, completedAt: '2026-10-18T12:00:00+08:00' }),
+      buildTodo({ id: 'new-abandoned', abandonedAt: '2026-10-19T12:00:00+08:00', scheduledDate: '2020-01-01' }),
+      buildTodo({ id: 'same-date', abandonedAt: '2026-10-18T12:00:00+08:00' }),
+      buildTodo({ id: 'undated', isCompleted: true })
+    ];
+    expect(orderTodoItemsByCompletionGroups(todos).map((todo) => todo.id)).toEqual([
+      'active', 'new-abandoned', 'completed', 'same-date', 'old-abandoned', 'undated'
+    ]);
+    expect(todos[0].id).toBe('old-abandoned');
+  });
   test('formats inline dates as month-day pairs', () => {
     expect(formatTodoInlineDate('2026-05-06')).toBe('05.06');
   });

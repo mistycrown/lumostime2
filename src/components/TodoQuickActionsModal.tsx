@@ -1,6 +1,8 @@
 /**
  * @file TodoQuickActionsModal.tsx
+ * @updated 2026-10-18: Uses icon/date abandonment metadata and places abandon/restore beside delete.
  * @updated 2026-10-18: Portals all quick-action states to the body so isolated todo pages cannot place them below navigation.
+ * @updated 2026-10-18: Adds independent reminder bells to arranged/deadline card headers and reuses the numeric time editor.
  * @updated 2026-10-16: Offers dated single completion, undo and a date picker for undated recurring actions.
  * @input Quick-action visibility, todo item, action callbacks
  * @output Shared todo quick-actions sheet UI for list rows and week-view badges
@@ -42,14 +44,17 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRightLeft, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, SkipForward, Trash2, X } from 'lucide-react';
-import { TodoCategory, TodoItem } from '../types';
+import { ArrowRightLeft, Ban, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, RotateCcw, SkipForward, Trash2, X } from 'lucide-react';
+import { TodoCategory, TodoItem, TodoReminderField, TodoReminderSetting } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { getQuickActionTodoNote, isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
 import { isQuickTodo } from '../utils/todoKindUtils';
 import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
+import { TodoReminderButton } from './TodoReminderButton';
+import { TodoReminderModal } from './TodoReminderModal';
+import { normalizeTodoReminders } from '../utils/todoReminderUtils';
 import { TodoParentPickerModal } from './TodoParentPickerModal';
 import { canTodoLinkToParent } from '../utils/todoParentLinkUtils';
 import { canCompleteTodoOccurrence } from '../utils/todoOccurrenceUtils';
@@ -69,6 +74,7 @@ interface TodoQuickActionsModalProps {
   onComplete: (dateKey?: string) => void;
   occurrenceDateKey?: string;
   onUndoComplete: () => void;
+  onToggleAbandon?: () => void;
   onTogglePin: () => void;
   onDuplicate?: () => void;
   onEditMaybeDates: (values: string[]) => void;
@@ -83,6 +89,7 @@ interface TodoQuickActionsModalProps {
   showUpgradeToProject?: boolean;
   onUpdateTitle?: (title: string) => void;
   onUpdateNote?: (note: string) => void;
+  onUpdateReminder?: (field: TodoReminderField, setting?: TodoReminderSetting) => void;
 }
 
 const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
@@ -98,6 +105,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   onComplete,
   occurrenceDateKey,
   onUndoComplete,
+  onToggleAbandon,
   onTogglePin,
   onDuplicate,
   onEditMaybeDates,
@@ -111,7 +119,8 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   openedAt = 0,
   showUpgradeToProject = false,
   onUpdateTitle,
-  onUpdateNote
+  onUpdateNote,
+  onUpdateReminder
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
   const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
@@ -119,6 +128,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [datePickerType, setDatePickerType] = useState<'scheduled' | 'deadline' | null>(null);
+  const [reminderField, setReminderField] = useState<TodoReminderField | null>(null);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
   const [isCompletionPickerOpen, setIsCompletionPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -137,6 +147,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
     setCategoryPickerMode(null);
     setIsMaybePickerOpen(false);
     setDatePickerType(null);
+    setReminderField(null);
     setIsSkipToPickerOpen(false);
     setIsCompletionPickerOpen(false);
     setIsEditingTitle(false);
@@ -153,6 +164,8 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
     }
 
     return registerHardwareBackHandler(() => {
+      // The reminder editor owns its own nested calendar/back stack, including after parent rerenders.
+      if (reminderField) return false;
       if (isParentPickerOpen) {
         setIsParentPickerOpen(false);
         return true;
@@ -216,7 +229,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, datePickerType, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, datePickerType, reminderField, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -424,6 +437,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
 
   const scheduledQuickActionValue = formatQuickActionDate(todo.scheduledDate);
   const deadlineQuickActionValue = formatQuickActionDate(todo.deadlineDate);
+  const reminders = normalizeTodoReminders(todo);
   const maybeQuickActionValue = (() => {
     const normalizedMaybeDates = normalizeMaybeDates(todo.maybeDates);
     if (!normalizedMaybeDates || normalizedMaybeDates.length === 0) {
@@ -443,7 +457,8 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
     { key: 'scheduled', label: '安排', value: formatQuickActionDate(todo.scheduledDate) },
     { key: 'deadline', label: '截止', value: formatQuickActionDate(todo.deadlineDate) },
     { key: 'maybe', label: 'Maybe', value: maybeQuickActionValue },
-    { key: 'completed', label: '完成', value: formatQuickActionDateTime(todo.completedAt) }
+    { key: 'completed', label: '完成', value: todo.isCompleted ? formatQuickActionDateTime(todo.completedAt) : null },
+    { key: 'abandoned', label: '', value: formatQuickActionDateTime(todo.abandonedAt) }
   ].filter((item): item is { key: string; label: string; value: string } => Boolean(item.value));
   const visibleQuickActionDateRows = isRecurringTodo
     ? quickActionDateRows.filter((item) => item.key !== 'scheduled' && item.key !== 'deadline')
@@ -550,7 +565,8 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
           {visibleQuickActionDateRows.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
               {visibleQuickActionDateRows.map((item) => (
-                <span key={`${item.label}-${item.value}`} className="inline-flex min-w-0 items-center gap-1.5">
+                <span key={`${item.key}-${item.value}`} className="inline-flex min-w-0 items-center gap-1.5" aria-label={item.key === 'abandoned' ? `放弃日期 ${item.value}` : undefined}>
+                  {item.key === 'abandoned' && <Ban size={11} className="shrink-0" />}
                   {item.label && <span className="shrink-0 uppercase tracking-[0.18em] text-stone-400">{item.label}</span>}
                   <span className="text-stone-500">{item.value}</span>
                 </span>
@@ -568,7 +584,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               <PanelRightOpen size={16} />
               </button>
             )}
-            {!todo.isCompleted && !isOccurrenceCompleted && (
+            {!todo.isCompleted && !isOccurrenceCompleted && !todo.abandonedAt && (
               <button
                 type="button"
                 onClick={withActionGuard(() => {
@@ -589,14 +605,19 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
           <div className="space-y-2">
             <div className={isRecurringTodo ? 'hidden' : 'grid grid-cols-2 gap-2'}>
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
+                <div className="flex items-center border-b border-stone-100">
                 <button
                   type="button"
                   onClick={withActionGuard(() => setDatePickerType('scheduled'))}
-                  className="flex w-full items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
                 >
                   <CalendarDays size={12} className="text-stone-400" />
                   <span>安排到</span>
                 </button>
+                {onUpdateReminder && <TodoReminderButton iconOnly date={isRecurringTodo ? undefined : todo.scheduledDate}
+                  field="scheduledDate" setting={reminders?.scheduledDate} completed={todo.isCompleted || Boolean(todo.abandonedAt)}
+                  onClick={withActionGuard(() => setReminderField('scheduledDate'))} />}
+                </div>
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
@@ -623,14 +644,19 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white/80">
+                <div className="flex items-center border-b border-stone-100">
                 <button
                   type="button"
                   onClick={withActionGuard(() => setDatePickerType('deadline'))}
-                  className="flex w-full items-center gap-1.5 border-b border-stone-100 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
+                  className="flex min-w-0 flex-1 items-center gap-1.5 px-4 py-2 text-[10px] uppercase tracking-[0.18em] text-stone-400 transition-colors hover:bg-white hover:text-stone-600"
                 >
                   <Flag size={12} className="text-stone-400" />
                   <span>截止到</span>
                 </button>
+                {onUpdateReminder && <TodoReminderButton iconOnly date={isRecurringTodo ? undefined : todo.deadlineDate}
+                  field="deadlineDate" setting={reminders?.deadlineDate} completed={todo.isCompleted || Boolean(todo.abandonedAt)}
+                  onClick={withActionGuard(() => setReminderField('deadlineDate'))} />}
+                </div>
                 <div className="grid grid-cols-[0.8fr_0.8fr_1.1fr]">
                   <button
                     type="button"
@@ -677,7 +703,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               </button>
             </div>
 
-            {isRecurringTodo && (
+            {isRecurringTodo && !todo.abandonedAt && (
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -813,7 +839,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               </button>
             )}
 
-            {(todo.isCompleted || isOccurrenceCompleted) && (
+            {!todo.abandonedAt && (todo.isCompleted || isOccurrenceCompleted) && (
               <button
                 type="button"
                 onClick={withActionGuard(onUndoComplete)}
@@ -824,25 +850,38 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={withActionGuard(() => {
-                if (isDeleteConfirming) {
-                  onDelete();
-                  return;
-                }
+            <div className={onToggleAbandon ? 'grid grid-cols-2 gap-2' : ''}>
+              {onToggleAbandon && (
+                <button
+                  type="button"
+                  onClick={withActionGuard(onToggleAbandon)}
+                  className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-600 transition-colors hover:border-stone-300 hover:bg-white"
+                >
+                  {todo.abandonedAt ? <RotateCcw size={16} /> : <Ban size={16} />}
+                  <span>{todo.abandonedAt ? '恢复待办' : '放弃任务'}</span>
+                </button>
+              )}
 
-                setIsDeleteConfirming(true);
-              })}
-              className={`flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
-                isDeleteConfirming
-                  ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100'
-                  : 'border-stone-200 bg-white/80 text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
-              }`}
-            >
-              <Trash2 size={16} className={isDeleteConfirming ? 'text-red-500' : 'text-stone-400'} />
-              <span>{isDeleteConfirming ? '确认删除？' : '删除任务'}</span>
-            </button>
+              <button
+                type="button"
+                onClick={withActionGuard(() => {
+                  if (isDeleteConfirming) {
+                    onDelete();
+                    return;
+                  }
+
+                  setIsDeleteConfirming(true);
+                })}
+                className={`flex w-full items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm transition-colors ${
+                  isDeleteConfirming
+                    ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100'
+                    : 'border-stone-200 bg-white/80 text-stone-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600'
+                }`}
+              >
+                <Trash2 size={16} className={isDeleteConfirming ? 'text-red-500' : 'text-stone-400'} />
+                <span>{isDeleteConfirming ? '确认删除？' : '删除任务'}</span>
+              </button>
+            </div>
           </div>
           </div>
       </div>
@@ -858,6 +897,11 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
         />
       )}
 
+      {reminderField && onUpdateReminder && !todo.isCompleted && !todo.abandonedAt && !isRecurringTodo && todo[reminderField] && (
+        <TodoReminderModal key={`${todo.id}-${reminderField}`} field={reminderField} date={todo[reminderField]!}
+          value={reminders?.[reminderField]} onSave={(setting) => onUpdateReminder(reminderField, setting)}
+          onClose={() => setReminderField(null)} />
+      )}
       <TodoDatePickerModal
         isOpen={datePickerType !== null}
         title={datePickerType === 'scheduled' ? '选择安排日期' : '选择截止日期'}

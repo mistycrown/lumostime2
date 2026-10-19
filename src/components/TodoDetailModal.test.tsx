@@ -1,5 +1,7 @@
 /**
  * @file TodoDetailModal.test.tsx
+ * @updated 2026-10-18: Verifies abandoned date editing and terminal status controls in detail rendering.
+ * @updated 2026-10-17: Covers dated reminder entry visibility and isolates unrelated settings providers.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input TodoDetailModal component props
  * @output Regression coverage for parent-task detail rendering from subtask navigation
@@ -23,6 +25,9 @@ vi.mock('../contexts/ToastContext', () => ({
     addToast: vi.fn()
   })
 }));
+
+vi.mock('../contexts/SettingsContext', () => ({ useOptionalSettings: () => null }));
+vi.mock('./DataCollectionSelector', () => ({ DataCollectionSelector: () => null }));
 
 vi.mock('./ScopeAssociation', () => ({
   ScopeAssociation: () => null
@@ -83,6 +88,30 @@ const activityCategories = [
 ] as any;
 
 describe('TodoDetailModal parent navigation regression', () => {
+  test('shows an abandonment date and restore control without a completion date or reminder', () => {
+    const html = renderToStaticMarkup(<TodoDetailModal
+      initialDraft={{ categoryId: 'cat-1', title: 'Abandoned', abandonedAt: '2026-10-18T04:00:00Z', scheduledDate: '2026-10-20' }}
+      currentCategory={todoCategories[0]} displayMode="page" onClose={() => {}} onSave={() => {}}
+      logs={[]} todoCategories={todoCategories} categories={activityCategories} scopes={[]} />);
+    expect(html).toContain('>恢复</button>');
+    expect(html).toContain('放弃日期');
+    expect(html).not.toContain('完成日期');
+    expect(html).not.toContain('设置安排提醒');
+  });
+  test('only exposes reminder actions for selected dates on incomplete todos', () => {
+    const render = (draft: any) => renderToStaticMarkup(<TodoDetailModal
+      initialDraft={{ categoryId: 'cat-1', title: '提醒测试', ...draft }}
+      currentCategory={todoCategories[0]} displayMode="page" onClose={() => {}} onSave={() => {}}
+      logs={[]} todoCategories={todoCategories} categories={activityCategories} scopes={[]} />);
+    expect(render({})).not.toContain('设置安排提醒');
+    expect(render({ scheduledDate: '2026-11-01' })).toContain('设置安排提醒');
+    expect(render({ scheduledDate: '2026-11-01' })).not.toContain('设置截止提醒');
+    expect(render({ deadlineDate: '2026-11-01' })).toContain('设置截止提醒');
+    expect(render({ deadlineDate: '2026-11-01', isCompleted: true })).not.toContain('设置截止提醒');
+    const active = render({ scheduledDate: '2026-11-01', reminders: { scheduledDate: { daysBefore: 1, time: '09:30' } } });
+    expect(active).toContain('编辑安排提醒');
+    expect(active).toContain('提前1天 09:30');
+  });
   test('only renders the completion date field for completed todos', () => {
     const commonProps = {
       currentCategory: todoCategories[0],

@@ -1,5 +1,6 @@
 /**
  * @file excelExportService.ts
+ * @updated 2026-10-18: Includes abandonment state and timestamp in todo exports.
  * @input Log, category, todo, scope, node, collection, and review data.
  * @output XLSX workbook containing time records and related datasets.
  * @pos Service (Excel导出)
@@ -188,6 +189,8 @@ export const buildExcelWorkbook = (
         标题: todo.title,
         已完成: todo.isCompleted ? '是' : '否',
         完成时间: todo.completedAt || '',
+        状态: todo.abandonedAt ? '已放弃' : todo.isCompleted ? '已完成' : '待办',
+        放弃时间: todo.abandonedAt || '',
         关联活动ID: todo.linkedActivityId || '',
         关联分类ID: todo.linkedCategoryId || '',
         默认领域ID: (todo.defaultScopeIds || []).join(', '),
@@ -204,7 +207,7 @@ export const buildExcelWorkbook = (
         重复规则JSON: serializeJsonCell(todo.recurrenceRule),
         重复计划JSON: serializeJsonCell(todo.recurringPlan),
         可能日期JSON: serializeJsonCell(todo.maybeDates)
-    })), ['id', '分类ID', '分类', '类型', '父待办ID', '标题', '已完成', '完成时间', '关联活动ID', '关联分类ID', '默认领域ID', '创建时间', '备注', '封面图', '进度模式', '总量', '单位量', '已完成单位', '置顶', '计划日期', '截止日期', '重复规则JSON', '重复计划JSON', '可能日期JSON']);
+    })), ['id', '分类ID', '分类', '类型', '父待办ID', '标题', '已完成', '完成时间', '状态', '放弃时间', '关联活动ID', '关联分类ID', '默认领域ID', '创建时间', '备注', '封面图', '进度模式', '总量', '单位量', '已完成单位', '置顶', '计划日期', '截止日期', '重复规则JSON', '重复计划JSON', '可能日期JSON']);
 
     appendSheet(workbook, '节点', (relatedData.nodes || []).map((node) => ({
         id: node.id,

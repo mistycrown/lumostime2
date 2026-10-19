@@ -1,5 +1,6 @@
 /**
  * @file TimelineTodoSidebar.tsx
+ * @updated 2026-10-18: Excludes abandoned tasks from active pinned and category shortcuts.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Date-specific scheduled todos, logs, resolved daily checks, review entries, and selection callbacks
  * @output A resizable, in-flow todo-and-daily-check column for the Chronicle split workspace
@@ -107,7 +108,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
     .filter((entry) => entry.primaryKind !== 'inProgress');
   const existingIds = new Set(dateEntries.map((entry) => entry.todo.id));
   const pinnedEntries = todos
-    .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !existingIds.has(todo.id))
+    .filter((todo) => Boolean(todo.pin) && !todo.isCompleted && !todo.abandonedAt && !existingIds.has(todo.id))
     .map((todo): SidebarTodoEntry => ({
       todo,
       dateKey,
@@ -122,7 +123,7 @@ export const buildTimelineSidebarTodoEntries = (todos: TodoItem[], logs: Log[], 
 
 export const buildTimelineSidebarCategoryTodoEntries = (todos: TodoItem[], categoryId: string, dateKey?: string): SidebarTodoEntry[] => (
   todos
-    .filter((todo) => todo.categoryId === categoryId && !todo.isCompleted)
+    .filter((todo) => todo.categoryId === categoryId && !todo.isCompleted && !todo.abandonedAt)
     .map((todo) => createCategoryTodoEntry(todo, dateKey))
     .sort((left, right) => left.todo.title.localeCompare(right.todo.title, 'zh-CN'))
 );

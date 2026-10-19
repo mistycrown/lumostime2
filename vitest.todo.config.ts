@@ -1,5 +1,6 @@
 /**
  * @file vitest.todo.config.ts
+ * @updated 2026-10-18: Includes terminal todo status and dated abandonment regressions.
  * @input Todo scheduling and related sidebar/widget regression tests
  * @output Node test runner independent of Vite's Electron launch plugins
  * @pos Test configuration
@@ -14,6 +15,10 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['src/utils/__tests__/todoTestSetup.ts'],
     include: [
+      'src/utils/todoStatusUtils.test.ts',
+      'src/utils/todoListDisplayUtils.test.ts',
+      'src/services/assistantContextBuilder.test.ts',
+      'src/services/excelExportService.test.ts',
       'src/utils/todoOccurrenceUtils.test.ts',
       'src/utils/todoRecurringPlanUtils.test.ts',
       'src/utils/todoCompletionModeUtils.test.ts',

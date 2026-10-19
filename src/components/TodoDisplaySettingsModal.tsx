@@ -1,5 +1,6 @@
 /**
  * @file TodoDisplaySettingsModal.tsx
+ * @updated 2026-10-18: Clarifies that the closed-task switch includes completion and abandonment.
  * @input Visibility state, compact display settings, and toggle callbacks
  * @output Modal-based todo display setting updates
  * @pos Component (Modal)
@@ -178,7 +179,7 @@ export const TodoDisplaySettingsModal: React.FC<TodoDisplaySettingsModalProps> =
           <div className="space-y-4 px-4 py-4">
             <section className="overflow-hidden rounded-2xl border border-stone-200 bg-white/88">
               <ToggleRow
-                label="显示已完成任务"
+                label="显示完成和放弃的任务"
                 checked={showCompletedTodos}
                 onToggle={onToggleShowCompletedTodos}
               />

@@ -1,5 +1,6 @@
 /**
  * @file todoCompletionModeUtils.ts
+ * @updated 2026-10-18: Excludes abandoned tasks from optional focus-log completion.
  * @updated 2026-10-16: Passes the recorded occurrence date into optional completion.
  * @input Linked todo state, one-shot completion toggle state, and submit callbacks
  * @output Shared helpers for gating and sequencing optional todo completion after log/session submission
@@ -9,7 +10,7 @@
  */
 import type { TodoItem } from '../types';
 
-type TodoCompletionCandidate = Pick<TodoItem, 'id' | 'isCompleted'> | undefined;
+type TodoCompletionCandidate = Pick<TodoItem, 'id' | 'isCompleted' | 'abandonedAt'> | undefined;
 
 interface RunWithOptionalTodoCompletionParams {
   runPrimaryAction: () => void;
@@ -24,7 +25,7 @@ interface RunWithOptionalTodoCompletionResult {
 }
 
 export const isTodoEligibleForCompletionMode = (todo: TodoCompletionCandidate): boolean => (
-  Boolean(todo && !todo.isCompleted)
+  Boolean(todo && !todo.isCompleted && !todo.abandonedAt)
 );
 
 export const getCompletionModeTodoId = (

@@ -1,5 +1,6 @@
 /**
  * @file AssociatedTodoList.tsx
+ * @updated 2026-10-18: Shows abandoned associations with an icon and date without a text status label.
  * @input Filtered associated todos, logs, and todo edit/toggle callbacks
  * @output Shared associated-todo section with one-level parent/subtask hierarchy
  * @pos Component (Todo association display)
@@ -16,7 +17,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Check, ChevronRight } from 'lucide-react';
+import { Ban, Check, ChevronRight } from 'lucide-react';
 import { Log, TodoItem } from '../types';
 import { buildTodoTreeItems } from '../utils/todoHierarchyUtils';
 import { filterCountableLogs } from '../utils/statLogUtils';
@@ -147,6 +148,7 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
                 }`}
               >
                 <button
+                  disabled={Boolean(todo.abandonedAt)}
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggleTodo?.(todo.id);
@@ -154,16 +156,16 @@ export const AssociatedTodoList: React.FC<AssociatedTodoListProps> = ({
                   className="shrink-0 transition-colors"
                 >
                   <div className={`w-4 h-4 shrink-0 rounded-[4px] border-2 flex items-center justify-center transition-colors ${todo.isCompleted ? 'bg-stone-900 border-stone-900' : 'border-stone-300 group-hover:border-stone-400'}`}>
-                    {todo.isCompleted && <Check size={11} strokeWidth={3} className="text-white" />}
+                    {todo.abandonedAt ? <Ban size={11} className="text-stone-400" /> : todo.isCompleted && <Check size={11} strokeWidth={3} className="text-white" />}
                   </div>
                 </button>
-                <span className={`flex-1 text-sm font-medium truncate min-w-0 ${todo.isCompleted ? 'line-through text-stone-300' : 'text-stone-700'}`}>
+                <span className={`flex-1 text-sm font-medium truncate min-w-0 ${todo.isCompleted || todo.abandonedAt ? 'line-through text-stone-300' : 'text-stone-700'}`}>
                   {todo.title}
                 </span>
 
-                {(todo.isCompleted || todoDuration > 0) && (
-                  <span className="text-xs text-stone-300 font-serif whitespace-nowrap shrink-0">
-                    {todo.isCompleted ? formatCompletedDate(todo.completedAt) : ''}
+                {(todo.isCompleted || todo.abandonedAt || todoDuration > 0) && (
+                  <span className="inline-flex items-center gap-1 text-xs text-stone-300 font-serif whitespace-nowrap shrink-0" aria-label={todo.abandonedAt ? '放弃日期' : undefined}>
+                    {todo.abandonedAt ? <><Ban size={11} />{formatCompletedDate(todo.abandonedAt)}</> : todo.isCompleted ? formatCompletedDate(todo.completedAt) : ''}
                     {todoDuration > 0 && `Total ${formatTodoDuration(todoDuration)}`}
                   </span>
                 )}

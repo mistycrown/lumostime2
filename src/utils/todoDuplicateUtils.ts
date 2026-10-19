@@ -1,5 +1,7 @@
 /**
  * @file todoDuplicateUtils.ts
+ * @updated 2026-10-18: Normalizes terminal states and resets abandonment when duplicating.
+ * @updated 2026-10-17: Normalizes local reminders and never copies notification settings to a duplicate.
  * @updated 2026-10-16: Normalizes occurrence history and clears it when duplicating tasks.
  * @input Todo items plus duplicate cleanup options
  * @output Pure helpers for todo duplication and schedule-field normalization
@@ -14,6 +16,8 @@ import { TodoDuplicateOptions, TodoItem } from '../types';
 import { normalizeMaybeDates } from './todoScheduleUtils';
 import { normalizeTodoRecurringPlanConfig } from './todoRecurringPlanUtils';
 import { normalizeOccurrenceCompletions } from './todoOccurrenceUtils';
+import { normalizeTodoReminders } from './todoReminderUtils';
+import { normalizeTodoStatus } from './todoStatusUtils';
 
 export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
   const skipDates = todo.recurrenceRule?.skipDates?.length
@@ -24,8 +28,9 @@ export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
       )).sort((left, right) => left.localeCompare(right))
     : undefined;
 
-  return {
+  return normalizeTodoStatus({
     ...todo,
+    reminders: normalizeTodoReminders(todo),
     occurrenceCompletions: normalizeOccurrenceCompletions(todo.occurrenceCompletions),
     maybeDates: normalizeMaybeDates(todo.maybeDates),
     recurringPlan: todo.recurrenceRule && !todo.parentTodoId && todo.kind !== 'quick'
@@ -37,7 +42,7 @@ export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
           ...(skipDates ? { skipDates } : {})
         }
       : undefined
-  };
+  });
 };
 
 export const buildDuplicatedTodo = (
@@ -56,7 +61,9 @@ export const buildDuplicatedTodo = (
     isCompleted: false,
     pin: false,
     completedAt: undefined,
+    abandonedAt: undefined,
     occurrenceCompletions: undefined,
+    reminders: undefined,
     completedUnits: 0,
     coverImage: undefined,
     note: undefined,

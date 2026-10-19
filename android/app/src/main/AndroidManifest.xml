@@ -6,6 +6,10 @@
     <!-- 用于获取已安装应用列表 -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
 
+    <queries>
+        <provider android:authorities="com.android.calendar" />
+    </queries>
+
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
@@ -591,6 +595,20 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Local todo reminders run without the WebView or assistant service. -->
+        <receiver
+            android:name=".TodoReminderReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".AssistantLetterAlarmReceiver"
             android:enabled="true"
@@ -917,6 +935,10 @@
     <!-- 专注通知相关权限 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Optional todo reminder synchronization; requested only after explicit opt-in. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

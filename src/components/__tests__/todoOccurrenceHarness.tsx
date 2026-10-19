@@ -1,5 +1,6 @@
 /**
  * @file todoOccurrenceHarness.tsx
+ * @updated 2026-10-18: Checks icon/date task rows, inline abandon/delete actions and concise detail controls.
  * @input Real todo views, quick actions, date picker and detail autosave
  * @output Isolated renderer interaction results and responsive screenshot checkpoints
  * @pos Test (Renderer)
@@ -56,6 +57,7 @@ const Probe = () => {
   return <TodoQuickActionsModal isOpen={!!actions.quickActionTodo} todo={actions.quickActionTodo} todos={todos} todoCategories={[category]}
     occurrenceDateKey={actions.quickActionOccurrenceDateKey} openedAt={actions.quickActionOpenedAt}
     onComplete={actions.handleQuickActionComplete} onUndoComplete={actions.handleQuickActionUndoComplete}
+    onToggleAbandon={actions.handleQuickActionToggleAbandon}
     onMoveDate={actions.handleQuickActionMove} onSelectDate={actions.handleQuickActionSelectDate} onClearDate={actions.handleQuickActionClearDate}
     onOpenDetail={actions.handleQuickActionOpenDetail} onTogglePin={actions.handleQuickActionTogglePin}
     onEditMaybeDates={actions.handleQuickActionMaybeDates} onSkipNextRecurrence={actions.handleQuickActionSkipNextRecurrence}
@@ -193,6 +195,69 @@ async function run() {
   await until(() => !tasks[0].isCompleted, 'restore series');
   check(tasks[0].occurrenceCompletions?.[today], 'Restoring series cleared single completion');
   passed.push('Detail autosave, end series and restore preserve completion history');
+
+  await click('放弃');
+  await until(() => tasks[0].abandonedAt, 'detail abandonment autosave');
+  check(!tasks[0].isCompleted && !tasks[0].completedAt, 'Abandonment retained completion');
+  check(button('恢复') && document.body.textContent?.includes('放弃日期'), 'Missing abandonment detail state');
+  await capture('abandoned-detail-mobile');
+  await capture('abandoned-detail-desktop', 1280, 900);
+  const abandonmentLabel = Array.from(document.querySelectorAll('label')).find((item) => item.textContent?.trim() === '放弃日期');
+  const abandonmentDateButton = abandonmentLabel?.nextElementSibling as HTMLButtonElement | null;
+  check(abandonmentDateButton, 'Missing abandonment date editor');
+  abandonmentDateButton!.click();
+  await delay();
+  check(document.body.textContent?.includes('选择放弃日期'), 'Abandonment opened wrong picker');
+  const editedDay = new Date().getDate() === 1 ? 2 : new Date().getDate() - 1;
+  await click(String(editedDay));
+  await until(() => new Date(tasks[0].abandonedAt!).getDate() === editedDay, 'edited abandonment date autosave');
+  const datedLabel = Array.from(document.querySelectorAll('label')).find((item) => item.textContent?.trim() === '放弃日期');
+  datedLabel?.scrollIntoView({ block: 'center' });
+  await delay();
+  await capture('abandoned-date-mobile');
+  document.documentElement.dataset.themeMode = 'dark';
+  await capture('abandoned-date-dark-mobile');
+  document.documentElement.dataset.themeMode = 'light';
+  await click('结束循环');
+  await until(() => tasks[0].isCompleted && !tasks[0].abandonedAt, 'completion replaces abandonment');
+  await click('放弃');
+  await until(() => tasks[0].abandonedAt && !tasks[0].isCompleted && !tasks[0].completedAt, 'abandonment replaces completion');
+  await click('恢复');
+  await until(() => !tasks[0].abandonedAt && !tasks[0].isCompleted, 'detail restore');
+  check(tasks[0].occurrenceCompletions?.[today], 'Abandonment lost historical completions');
+  passed.push('Detail abandonment and completion replace each other, dates autosave and restore preserves history');
+
+  await open(today);
+  await click('放弃任务');
+  await until(() => tasks[0].abandonedAt, 'quick abandonment');
+  await open(today);
+  check(document.querySelector('[aria-label^="放弃日期"] .lucide-ban') && button('恢复待办'), 'Quick sheet lost abandonment date/icon');
+  check(!document.body.textContent?.includes('已放弃'), 'Quick sheet retained redundant status text');
+  const restoreBounds = button('恢复待办')!.getBoundingClientRect();
+  const deleteBounds = button('删除任务')!.getBoundingClientRect();
+  check(Math.abs(restoreBounds.top - deleteBounds.top) < 1 && restoreBounds.right < deleteBounds.left, 'Abandon/restore and delete are not on the same row');
+  check(!button('完成本次') && !button('设置安排提醒'), 'Abandoned quick sheet exposes active actions');
+  await capture('abandoned-quick-mobile');
+  await capture('abandoned-quick-desktop', 1280, 900);
+  document.documentElement.dataset.themeMode = 'dark';
+  await capture('abandoned-quick-dark-mobile');
+  document.documentElement.dataset.themeMode = 'light';
+  for (const rowMode of ['compact', 'loose']) {
+    localStorage.setItem('todoScreenMode', 'list');
+    localStorage.setItem('todoViewMode', rowMode);
+    setMode('list');
+    await delay(150);
+    await click('阅读');
+    check(document.querySelector('[aria-label^="放弃日期"] .lucide-ban'), rowMode + ' row lost abandonment icon/date');
+    check(!document.body.textContent?.includes('已放弃'), rowMode + ' row has redundant status text');
+    await capture('abandoned-list-' + rowMode + '-mobile');
+    setMode('quick');
+    await delay();
+  }
+  await open(today);
+  await click('恢复待办');
+  await until(() => !tasks[0].abandonedAt, 'quick restore');
+  passed.push('Quick abandonment records a date, hides completion, and restores the task');
   window.__todoOccurrenceResult = { passed };
 }
 

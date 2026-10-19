@@ -1,6 +1,8 @@
 /**
  * @file types.ts
+ * @updated 2026-10-18: Stores task abandonment as a timestamp mutually exclusive with completion.
  * @updated 2026-10-18: Adds an optional principle group scope for random scene cards.
+ * @updated 2026-10-18: Adds opt-in system calendar synchronization for individual todo reminders.
  * @updated 2026-10-16: Stores dated recurring completion separately from series completion.
  * @updated 2026-10-09: Adds independently persisted merge words and stop words for each word cloud.
  * @updated 2026-10-07: Adds optional node classification and persisted node categories.
@@ -36,6 +38,7 @@
  * @updated 2026-05-21: Added optional todo `createdAt` metadata so collection timelines and older persisted task flows can share one creation-time fallback.
  * @updated 2026-05-16: Added lightweight daily AI newspaper types so Daily Review can persist structured editorial timeline commentary by log ID.
  * @updated 2026-05-13: Added optional monthly recurrence fallback support so 31st-style rules can land on the last day in shorter months when explicitly enabled.
+ * @updated 2026-10-17: Adds date-relative local reminders for scheduled and deadline dates.
  * @updated 2026-05-13: Added optional todo `kind` support so lightweight quick reminders can share the Todo pipeline while opting out of project-only behavior.
  * @updated 2026-05-12: Added first-pass `DataCollection` and `DataCollectionEntry` types for grouping logs and todos into themed review collections.
  * @updated 2026-05-05: Added optional scene-widget source metadata to active sessions so scene card syncing can stay scoped to one scene group and time slot.
@@ -575,6 +578,16 @@ export interface TodoOccurrenceCompletion {
   completedAt: string; // Actual timestamp; the map key is the scheduled local date
 }
 
+export type TodoReminderField = 'scheduledDate' | 'deadlineDate';
+
+export interface TodoReminderSetting {
+  daysBefore: number; // Calendar days before the source date; negative values are later dates.
+  time: string; // Local wall-clock time, HH:mm.
+  calendarSync?: boolean; // Opt-in Android local calendar reminder; omitted means disabled.
+}
+
+export type TodoReminders = Partial<Record<TodoReminderField, TodoReminderSetting>>;
+
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
@@ -584,6 +597,7 @@ export interface TodoItem {
   title: string;
   isCompleted: boolean;
   completedAt?: string; // ISO Date string for completion time
+  abandonedAt?: string; // ISO timestamp; present means abandoned and requires isCompleted=false, completedAt=undefined
   occurrenceCompletions?: Record<string, TodoOccurrenceCompletion>; // YYYY-MM-DD -> single completion
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category
@@ -607,6 +621,7 @@ export interface TodoItem {
   pin?: boolean; // Defaults to false; lifts the todo to the top of today's schedule tab
   scheduledDate?: string; // YYYY-MM-DD
   deadlineDate?: string; // YYYY-MM-DD
+  reminders?: TodoReminders;
   recurrenceRule?: TodoRecurrenceRule;
   recurringPlan?: TodoRecurringPlanConfig;
   maybeDates?: string[]; // YYYY-MM-DD candidate dates kept only for future possibilities

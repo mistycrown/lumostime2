@@ -1,5 +1,7 @@
 /**
  * @file todoHierarchyUtils.ts
+ * @updated 2026-10-18: Uses shared end-date ordering for completed and abandoned children.
+ * @updated 2026-10-18: Hides active children of abandoned parents without counting abandonment as completion.
  * @input Flat todo arrays and optional parent/child todo records
  * @output Shared helpers for validating one-level todo hierarchy, syncing inherited fields, and building tree views
  * @pos Utility (Todo hierarchy)
@@ -15,6 +17,8 @@
  */
 
 import { TodoItem } from '../types';
+import { isTodoClosed } from './todoStatusUtils';
+import { orderTodoItemsByCompletionGroups } from './todoListDisplayUtils';
 
 export interface TodoTreeItem {
   todo: TodoItem;
@@ -51,21 +55,18 @@ export const getDirectChildTodosForDisplay = (
 ): TodoItem[] => {
   const parentTodo = todos.find((todo) => todo.id === parentTodoId) || null;
   const orderedChildren = getDirectChildTodos(todos, parentTodoId)
-    .filter((todo) => ((options?.includeCompleted ?? true) ? true : !todo.isCompleted))
+    .filter((todo) => ((options?.includeCompleted ?? true) ? true : !isTodoClosed(todo)))
     .filter((todo) => !(
       options?.hideIncompleteWhenParentCompleted
-      && parentTodo?.isCompleted
-      && !todo.isCompleted
+      && parentTodo && isTodoClosed(parentTodo)
+      && !isTodoClosed(todo)
     ));
 
   if (!options?.incompleteFirst) {
     return orderedChildren;
   }
 
-  return [
-    ...orderedChildren.filter((todo) => !todo.isCompleted),
-    ...orderedChildren.filter((todo) => todo.isCompleted)
-  ];
+  return orderTodoItemsByCompletionGroups(orderedChildren);
 };
 
 export const getDirectChildCount = (todos: TodoItem[], parentTodoId: string): number => (
@@ -121,14 +122,14 @@ export const formatCompletedTodoLabel = (
 
 export const isIncompleteSubtaskHiddenByCompletedParent = (
   todos: TodoItem[],
-  todo: Pick<TodoItem, 'id' | 'parentTodoId' | 'isCompleted'>
+  todo: Pick<TodoItem, 'id' | 'parentTodoId' | 'isCompleted' | 'abandonedAt'>
 ): boolean => {
-  if (todo.isCompleted) {
+  if (isTodoClosed(todo)) {
     return false;
   }
 
   const parentTodo = getParentTodo(todos, todo);
-  return Boolean(parentTodo?.isCompleted);
+  return Boolean(parentTodo && isTodoClosed(parentTodo));
 };
 
 export const applyParentTodoInheritance = (todo: TodoItem, parentTodo: TodoItem): TodoItem => ({

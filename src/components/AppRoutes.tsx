@@ -1,6 +1,8 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-18: Wires abandonment into shared quick actions outside the todo view.
+ * @updated 2026-10-18: Enables reminder editing from timeline-launched todo quick actions.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-16: Keeps fallback weekly/monthly draft identities stable across unrelated route renders.
  * @updated 2026-10-11: Wires arrange/due date selection for route-level todo quick actions.
@@ -439,6 +441,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         handleQuickActionOpenDetail,
         handleQuickActionComplete,
         handleQuickActionUndoComplete,
+        handleQuickActionToggleAbandon,
         handleQuickActionClearDate,
         handleQuickActionTogglePin,
         handleQuickActionMaybeDates,
@@ -448,7 +451,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         handleQuickActionUpgradeToProject,
         handleQuickActionDelete,
         handleQuickActionUpdateTitle,
-        handleQuickActionUpdateNote
+        handleQuickActionUpdateNote,
+        handleQuickActionUpdateReminder
     } = useTodoQuickActions({
         todos,
         onSaveTodo: handleSaveTodo,
@@ -948,6 +952,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onOpenDetail={handleQuickActionOpenDetail}
                     onComplete={handleQuickActionComplete}
                     onUndoComplete={handleQuickActionUndoComplete}
+                    onToggleAbandon={handleQuickActionToggleAbandon}
                     onTogglePin={handleQuickActionTogglePin}
                     onEditMaybeDates={handleQuickActionMaybeDates}
                     onSkipNextRecurrence={handleQuickActionSkipNextRecurrence}
@@ -961,6 +966,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     showUpgradeToProject={Boolean(quickActionTodo && isQuickTodo(quickActionTodo))}
                     onUpdateTitle={handleQuickActionUpdateTitle}
                     onUpdateNote={handleQuickActionUpdateNote}
+                    onUpdateReminder={handleQuickActionUpdateReminder}
                 />
                 </>
             );

@@ -1,6 +1,12 @@
 # Custom Hooks
 
+Update 2026-10-18: `useTodoQuickActions` saves abandonment/restoration against the latest todo record through the shared save pipeline. `useTodoManager` rejects focus starts and optional focus-log completion for abandoned tasks; the existing recurring auto-plan cleanup applies when abandoning a series.
+
 Update 2026-10-18: `useAppInitialization` syncs app-awareness bindings through the persistent master switch. `useAppAwarenessRuntime` ignores new detections and cancels pending workflows while disabled, retaining active activity timers and individual settings. Verify with `node scripts/test-app-awareness.mjs`.
+
+Update 2026-10-18: `useTodoQuickActions.handleQuickActionUpdateReminder` edits the selected date's reminder using the latest saved todo and keeps the sheet open so active colors update immediately. Removed, undated, completed and recurring sources are rejected; the other date's reminder is preserved.
+
+Update 2026-10-17: `useTodoReminderNavigation` consumes cold/warm notification targets against live todos, refreshes persisted reminder scheduling on resume, and surfaces native scheduling failures. Android notifications remain independent of the AI assistant.
 
 Update 2026-10-16: Todo manager and quick-action completion preserve the recurring series and accept occurrence dates. Android widget reconciliation replays completion actions per date with the original action time. `vitest.todo.config.ts` covers the shared completion, schedule, modal and widget paths.
 

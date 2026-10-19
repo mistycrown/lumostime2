@@ -1,5 +1,6 @@
 /**
  * @file desktopWidgetService.ts
+ * @updated 2026-10-18: Omits abandoned tasks from active desktop widgets and overdue lists.
  * @updated 2026-10-16: Projects dated occurrence completion into today's desktop widget snapshot.
  * @input Persisted todos/categories from localStorage, shared todo schedule utilities, reference date
  * @output Desktop widget route helpers and compact today-task snapshot builders for the Electron widget window
@@ -228,6 +229,7 @@ const buildOverdueTodos = (
   const todayDateKey = formatDateKey(referenceDate);
 
   return todos
+    .filter((todo) => !todo.abandonedAt)
     .filter((todo) => (options?.includeCompleted ? true : !todo.isCompleted))
     .filter((todo) => !visibleTodayIds.has(todo.id))
     .filter((todo) => (
@@ -395,7 +397,7 @@ export const buildDesktopQuickWidgetSnapshot = ({
   const dateKey = formatDateKey(referenceDate);
 
   // 1. 过滤已完成和未完成的小事
-  const uncompletedQuickTodos = todos.filter((todo) => !todo.isCompleted);
+  const uncompletedQuickTodos = todos.filter((todo) => !todo.isCompleted && !todo.abandonedAt);
   // 已完成的我们仍然只保留今天完成的小事，以便展示已完成列表
   // Completed quick todos stay in the snapshot so the flat widget list can render them at the end.
   const completedQuickTodos = todos.filter((todo) => todo.isCompleted);

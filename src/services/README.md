@@ -1,5 +1,12 @@
 # Services Architecture
 
+Update 2026-10-18: Desktop and Android widget source projections omit abandoned tasks from active/overdue lists. Excel todo exports retain separate status and abandonment timestamp fields alongside completion fields.
+Assistant context also excludes abandoned tasks from active summaries and includes their timestamps in JSON and compact todo dictionaries.
+
+Update 2026-10-18: `todoReminderService` carries optional per-reminder calendar sync, requests native calendar permission only on user action, and refreshes separate calendar error state without rejecting a successful local notification reconciliation. Older packages keep their existing notification behavior.
+
+Update 2026-10-17: `todoReminderService` serializes committed reminder snapshots, retries the latest state on resume, exposes permission status, and provides application-runtime browser notifications outside Android. Native reminders are separate from assistant reminders and Feishu sync.
+
 Update 2026-10-16: Android and Electron today-widget snapshots expose per-date completion while mirrored source tasks retain series state and completion history. Completed recurring occurrences sort after pending tasks and appear pending again on the next scheduled date.
 
 Update 2026-10-11: Audited all 17 theme image save call sites and the direct original-only TimePal writer. Real ZIP import verifies one stored file per theme image. The mood-calendar integration test now checks the unified sync event list without relying on its historical variable name.

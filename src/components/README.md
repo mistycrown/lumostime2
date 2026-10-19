@@ -1,8 +1,20 @@
 # Components Directory
 
+Update 2026-10-18: Abandonment markers use a Ban icon and date without a text status label. Quick actions place abandonment/restoration and deletion in one two-column row; detail controls use `放弃` / `恢复`.
+
+Update 2026-10-18: Todo details and shared quick actions offer `放弃任务` / `恢复待办`. Details autosave an editable abandonment date; quick actions display its timestamp and suppress completion/reminder actions while abandoned. List and associated-task rows distinguish abandonment from completion. The closed-task display switch covers both states; `test-todo-occurrence.mjs` verifies mutual exclusion, dated autosave and restore interactions.
+
 Update 2026-10-18: `FilterExpressionInput` provides the shared expression field and syntax hint for `AutoCheckItemEditor` and `FiltersSettingsView`; spaces/AND, same-field OR and standalone exclusions use the common filter parser.
 
+Update 2026-10-18: `TodoReminderModal` offers per-source opt-in system calendar sync on supported Android packages, requests calendar permission only on explicit enable, preserves local reminders when disabled, and allows calendar-only saving when application notifications are denied. The renderer harness covers permission recovery, persistent toggles and light/dark layouts.
+
 Update 2026-10-18: `TodoQuickActionsModal` mounts its sheet and title/note/date/category editors through a body portal. This escapes isolated todo-page stacking contexts so the backdrop covers bottom navigation, matching the global AddLog overlay behavior; the reminder portal remains above the sheet.
+
+Update 2026-10-18: Arrange/due quick-action card headers expose an icon-only reminder bell when the source date exists. Configured bells change icon color only, with a transparent background and a compact hit area contained in the header in light/dark modes; tapping reuses `TodoReminderModal` without activating the date header or closing the sheet. Todo list and timeline launchers share the latest-state save handler.
+
+Update 2026-10-18: Reminder times use AddLog-style numeric hour/minute segments, select on focus and advance to minutes after two hour digits. The renderer harness types all four digits through Chromium's text insertion and checks focus, replacement and valid ranges; no native time picker is used.
+
+Update 2026-10-17: `TodoReminderButton` appears beside arranged/deadline dates for incomplete named todos. `TodoReminderModal` reuses date-picker paper surfaces, custom date/time selection, permission status, nested hardware-back handling and dark-mode actions. `TodoDetailModal` autosaves source-relative settings and clears settings when dates are removed. Run `node scripts/test-todo-reminders.mjs` after a production build for dialog/persistence interactions and Chinese-font responsive screenshots.
 
 Update 2026-10-16: Todo quick actions complete or undo a dated occurrence, with a date picker when the entry has no valid date. Week/month callbacks retain the selected date. Todo detail autosave preserves occurrence history and exposes series end/restore. `node scripts/test-todo-occurrence.mjs` checks actual interactions and Chinese-font mobile/desktop captures.
 

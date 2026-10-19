@@ -1,5 +1,7 @@
 /**
  * @file TodoQuickActionsModal.test.tsx
+ * @updated 2026-10-18: Verifies abandon/restore entries, dated status and suppressed actions for closed tasks.
+ * @updated 2026-10-18: Verifies dated reminder visibility, independent active state and color-only card actions.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-11: Supplies the shared single-date selection callback.
  * @input TodoQuickActionsModal props
@@ -47,6 +49,7 @@ const baseProps = {
   onOpenDetail: vi.fn(),
   onComplete: vi.fn(),
   onUndoComplete: vi.fn(),
+  onToggleAbandon: vi.fn(),
   onTogglePin: vi.fn(),
   onDuplicate: vi.fn(),
   onEditMaybeDates: vi.fn(),
@@ -63,6 +66,38 @@ const baseProps = {
 };
 
 describe('TodoQuickActionsModal category move', () => {
+  test('shows abandonment with its date and a restore action, without completion or reminder actions', () => {
+    const todo = { id: 'abandoned', categoryId: 'cat-a', title: 'Read', isCompleted: false,
+      abandonedAt: '2026-10-18T04:00:00Z', scheduledDate: '2026-10-20' };
+    const html = renderToStaticMarkup(<TodoQuickActionsModal {...baseProps} todo={todo} onUpdateReminder={vi.fn()} />);
+    expect(html).toContain('aria-label="放弃日期');
+    expect(html).toContain('lucide-ban');
+    expect(html).not.toContain('已放弃');
+    expect(html).toContain('10/18');
+    expect(html).toContain('恢复待办');
+    expect(html).toMatch(/grid grid-cols-2 gap-2"><button[^>]*>[\s\S]*?恢复待办[\s\S]*?<\/button><button[^>]*>[\s\S]*?删除任务[\s\S]*?<\/button><\/div>/);
+    expect(html).not.toContain('title="标记完成"');
+    expect(html).not.toContain('设置安排提醒');
+    expect(renderToStaticMarkup(<TodoQuickActionsModal {...baseProps} todo={{ ...todo, abandonedAt: undefined }} />))
+      .toContain('放弃任务');
+  });
+  test('shows separate icon-only reminder actions only for selected dates and colors configured ones', () => {
+    const todo = { id: 'reminder', categoryId: 'cat-a', title: '写作', isCompleted: false };
+    const render = (patch = {}) => renderToStaticMarkup(<TodoQuickActionsModal {...baseProps}
+      todo={{ ...todo, ...patch }} onUpdateReminder={vi.fn()} />);
+    expect(render()).not.toContain('设置安排提醒');
+    const arranged = render({ scheduledDate: '2026-10-22' });
+    expect(arranged).toContain('设置安排提醒');
+    expect(arranged).not.toContain('设置截止提醒');
+    expect(arranged).toContain('data-active="false" data-icon-only="true"');
+    const configured = render({ scheduledDate: '2026-10-22', deadlineDate: '2026-10-24',
+      reminders: { scheduledDate: { daysBefore: 0, time: '09:15' } } });
+    expect(configured).toContain('aria-label="编辑安排提醒" data-active="true" data-icon-only="true"');
+    expect(configured).toContain('aria-label="设置截止提醒" data-active="false" data-icon-only="true"');
+    expect(configured).toContain('style="color:var(--accent-color)"');
+    expect(configured).not.toContain('background-color:var(--accent-color)');
+    expect(render({ scheduledDate: '2026-10-22', isCompleted: true })).not.toContain('设置安排提醒');
+  });
   test('offers single completion with an explicit occurrence date', () => {
     const todo = {
       id: 'repeat', title: 'Read', categoryId: 'cat-a', isCompleted: false,

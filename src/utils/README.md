@@ -1,6 +1,14 @@
 # Utils Architecture
 
+Update 2026-10-18: Closed category-list tasks interleave completed and abandoned records by descending completion/abandonment timestamp, with stable ties and undated legacy records last. Active tasks retain incoming order. Abandonment date formatting returns date-only text for an accompanying UI icon; child display uses the same ordering.
+
+Update 2026-10-18: `todoStatusUtils` derives active/completed/abandoned states from compatible completion fields plus optional `abandonedAt`. State transitions and normalization keep abandonment and completion dates mutually exclusive. Abandonment stops active schedule matches, recurring auto plans, reminder snapshots and new association suggestions; duplication clears abandonment. Historical logs and occurrence completions remain intact, and abandoned subtasks do not count as completed progress. Native completion replay ignores actions older than abandonment.
+
 Update 2026-10-18: `filterUtils` accepts case-insensitive explicit `AND` as well as whitespace conjunctions. Automatic daily checks reuse this parser and matcher; regression tests compare their duration/count metrics against custom-filter results across AND/OR groups and exclusions.
+
+Update 2026-10-18: Reminder normalization retains `calendarSync` only for literal `true`; defaults and malformed imported flags remain disabled. Calendar opt-in follows each date source through the existing persisted snapshot and cancellation projection.
+
+Update 2026-10-17: `todoReminderUtils` validates arranged/deadline settings, calculates local calendar-day offsets without DST drift and projects incomplete dated todos into native snapshots. Clearing dates/recurrence mode removes obsolete settings; `todoDuplicateUtils` never copies reminders.
 
 Update 2026-10-16: `todoOccurrenceUtils.ts` owns sparse dated completion normalization, display projections, idempotent completion/undo and chronological native action replay. Schedule badges retain historical occurrence dates; recurring Plan replenishment skips completed dates; duplication clears completion history. Display projections must never be saved as whole-task completion.
 

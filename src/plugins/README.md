@@ -1,5 +1,9 @@
 # Plugins Layer
 
+Update 2026-10-18: `TodoReminderPlugin` exposes optional calendar capability/permission/error status and explicit authorization. Native calendar coordination owns only marked events in an independent local calendar; notification scheduling remains independent when calendar operations fail.
+
+Update 2026-10-17: `TodoReminderPlugin.ts` defines the Android reminder snapshot, permissions/settings and one-shot navigation bridge. The native implementation uses durable snapshots and AlarmManager without an assistant or foreground service. See `docs/todo-local-reminders.md` for platform behavior and device verification.
+
 The `plugins/` directory contains definitions and implementations for Capacitor plugins used to access native device features.
 
 ## Architecture

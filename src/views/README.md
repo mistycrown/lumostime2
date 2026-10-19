@@ -1,5 +1,9 @@
 # Views Layer
 
+Update 2026-10-18: Compact and loose todo rows show a Ban icon beside the abandonment date, without `已放弃` or `放弃` status text. Completion and abandonment share end-date ordering instead of placing abandoned tasks after every completed task.
+
+Update 2026-10-18: `TodoView` renders abandoned tasks with muted titles, explicit status/date labels and quick restore actions. Closed tasks follow active tasks in category lists and respect the shared completion/abandonment visibility switch; active schedule groups and focus shortcuts exclude abandonment.
+
 Update 2026-10-17: `StatsView` enables category/activity, todo-category, individual-todo and scope log dialogs across daily, weekly, monthly and yearly pie statistics. Days show logs directly; weeks show days; months show weeks; years show months, with expansion continuing down to individual logs. Todo/scope details use their own date-filtered sources independently of tag exclusions, and scope duration rules apply at every level. Calendar weeks are clipped to parent months. `node scripts/test-daily-stats-logs.mjs` covers grouping, filtering, totals, dismissal, focus, privacy and responsive layouts.
 
 Update 2026-10-16: `TodoView` moves completed occurrences into today's completed section, keeps recurring series active and passes explicit dates through list/week/bento/month actions. Focus completion uses the session start date. Date-less weekly summaries require selecting an occurrence.

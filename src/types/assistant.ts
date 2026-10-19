@@ -1,5 +1,6 @@
 /**
  * @file assistant.ts
+ * @updated 2026-10-18: Exposes optional abandonment timestamps in todo dictionary context.
  * @updated 2026-10-09: Adds node dictionaries and foreground node-description writeback.
  * @input None
  * @output Shared type definitions for the background AI agent, memory, reminders, and system triggers
@@ -412,6 +413,7 @@ export interface AssistantTodoDictionaryItem {
   parentTodoId?: string;
   parentTodoTitle?: string;
   isCompleted?: boolean;
+  abandonedAt?: string;
   pin?: boolean;
 }
 

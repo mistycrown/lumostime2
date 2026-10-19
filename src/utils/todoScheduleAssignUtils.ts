@@ -1,5 +1,6 @@
 /**
  * @file todoScheduleAssignUtils.ts
+ * @updated 2026-10-18: Excludes abandoned tasks from schedule assignment.
  * @input Assignable todo subsets, full todo sources, picker category ids, and schedule-assignment modes
  * @output Shared pure filtering and ordering helpers for the schedule assignment picker
  * @pos Utility (Todo schedule assignment)
@@ -164,6 +165,7 @@ export const getVisibleScheduleAssignTodos = (
     ? [...todos]
     : todos.filter((todo) => todo.categoryId === selectedCategoryId);
   const schedulableTodos = nextTodos.filter((todo) => {
+    if (todo.abandonedAt) return false;
     if (isFutureTodoCategoryId(todo.categoryId)) {
       return false;
     }

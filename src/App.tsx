@@ -2,6 +2,7 @@
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
  * @updated 2026-10-18: Includes principle groups in manual backups.
+ * @updated 2026-10-17: Reconciles local reminders on resume and opens todos from reminder notifications.
  * @updated 2026-10-16: Keeps the selected occurrence date when handling desktop widget completion actions.
  * @updated 2026-10-16: Supplies parent-child migration targets when deleting todos.
  * @updated 2026-10-13: Uses native widget restore with legacy migration and live preference mirroring.
@@ -93,6 +94,7 @@ import { LazyViewRecoveryBoundary } from './components/LazyViewRecoveryBoundary'
 
 import { useLogManager } from './hooks/useLogManager';
 import { useTodoManager } from './hooks/useTodoManager';
+import { useTodoReminderNavigation } from './hooks/useTodoReminderNavigation';
 import { useGoalManager } from './hooks/useGoalManager';
 import { useReviewManager } from './hooks/useReviewManager';
 import { useSyncManager } from './hooks/useSyncManager';
@@ -549,6 +551,7 @@ const AppContent: React.FC = () => {
   useRecurringPlanAutoCreation();
   const logManager = useLogManager();
   const todoManager = useTodoManager();
+  useTodoReminderNavigation(todos, todoManager.openEditTodoModal);
   const goalManager = useGoalManager();
   const reviewManager = useReviewManager();
   const syncManager = useSyncManager(); // This handles visibility sync too

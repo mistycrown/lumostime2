@@ -1,5 +1,6 @@
 /**
  * @file todoScheduleUtils.ts
+ * @updated 2026-10-18: Suppresses abandoned tasks from active schedules while preserving dated history.
  * @updated 2026-10-16: Displays occurrence completion on its scheduled date, including preserved history.
  * @input Todo items with optional schedule fields, reference dates
  * @output Week buckets, daily schedule entries, and badge metadata for todo planning views
@@ -403,6 +404,7 @@ export const isTodoInAssociationTodayCategory = (
   referenceDate: Date = new Date()
 ): boolean => {
   const todayDateKey = formatDateKey(referenceDate);
+  if (todo.abandonedAt) return false;
   if (todo.occurrenceCompletions?.[todayDateKey]) return true;
   if (todo.recurrenceRule && todo.isCompleted
     && (!todo.completedAt || formatDateKey(new Date(todo.completedAt)) < todayDateKey)) return false;
@@ -595,11 +597,11 @@ export const getTodoDateBadges = (
   inProgressLookup?: Map<string, Set<string>>,
   plannedLookup?: Map<string, Set<string>>
 ): TodoDateBadges => normalizeTodoDateBadges({
-  scheduled: todo.scheduledDate === targetDateKey,
-  deadline: todo.deadlineDate === targetDateKey,
-  recurring: matchesRecurrenceRule(todo.recurrenceRule, targetDateKey) && (!todo.isCompleted
+  scheduled: !todo.abandonedAt && todo.scheduledDate === targetDateKey,
+  deadline: !todo.abandonedAt && todo.deadlineDate === targetDateKey,
+  recurring: !todo.abandonedAt && matchesRecurrenceRule(todo.recurrenceRule, targetDateKey) && (!todo.isCompleted
     || Boolean(todo.completedAt && targetDateKey <= formatDateKey(new Date(todo.completedAt)))),
-  maybe: hasMaybeDate(todo, targetDateKey),
+  maybe: !todo.abandonedAt && hasMaybeDate(todo, targetDateKey),
   planned: plannedLookup?.get(todo.id)?.has(targetDateKey) || false,
   completed: Boolean(todo.occurrenceCompletions?.[targetDateKey])
     || (todo.completedAt ? formatDateKey(new Date(todo.completedAt)) === targetDateKey : false),
@@ -612,6 +614,7 @@ export const getTodoScheduleMatches = (
   referenceDate: Date = new Date(),
   plannedLookup?: Map<string, Set<string>>
 ): TodoScheduleMatch[] => {
+  if (todo.abandonedAt) return [];
   const dateKeys = getTodoScheduleRangeDateKeys(range, referenceDate);
 
   return dateKeys.flatMap((dateKey) => {

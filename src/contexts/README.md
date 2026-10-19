@@ -1,5 +1,9 @@
 # Application contexts
 
+Update 2026-10-18: `DataContext.setTodos` normalizes completion/abandonment exclusivity on hydration and updates before snapshots are persisted or passed to reminder reconciliation. Missing `abandonedAt` preserves compatibility with existing data.
+
+Update 2026-10-17: `DataContext` serializes todo saves and only submits local-reminder snapshots after persistence succeeds. Sync reads wait for local writes and reject stale state so rapid edits/cancellations cannot be overwritten by self-broadcasts. Scheduling failures are reported separately from storage errors.
+
 Update 2026-10-16: `DataContext` validates sparse occurrence completion maps during initial hydration and desktop snapshot refresh, retaining valid dates even after recurrence rule edits.
 
 Update 2026-10-11: `NodeContext.associateAll` batches potential associations across logs and daily/weekly/monthly review answers, rechecking the latest text, preserving alias labels and leaving unrelated/already-linked records unchanged.

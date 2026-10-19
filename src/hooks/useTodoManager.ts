@@ -1,5 +1,6 @@
 /**
  * @file useTodoManager.ts
+ * @updated 2026-10-18: Prevents starting focus on abandoned tasks.
  * @updated 2026-10-16: Routes completion through dated occurrence helpers without ending recurring tasks.
  * @input DataContext (todos, setTodos, todoCategories, setTodoCategories, logs, setLogs), NavigationContext (modal states), CategoryScopeContext (categories), ToastContext (addToast), SessionContext (startActivity), SettingsContext (autoLinkRules)
  * @output Todo CRUD Operations with recurring auto-Plan cleanup (handleSaveTodo, handleDeleteTodo, handleToggleTodo, handleDuplicateTodo, handleBatchAddTodos), Modal Control (openAddTodoModal, openEditTodoModal, closeTodoModal), Focus Management (handleStartTodoFocus), Progress Update (updateTodoProgress)
@@ -98,6 +99,8 @@ export const useTodoManager = () => {
       return false;
     }
 
+    if (targetTodo.abandonedAt) return false;
+
     if (targetTodo.isCompleted) {
       return true;
     }
@@ -115,6 +118,10 @@ export const useTodoManager = () => {
   };
 
   const handleStartTodoFocus = (todo: TodoItem) => {
+    if (todo.abandonedAt) {
+      addToast('info', '请先恢复待办');
+      return;
+    }
     if (isQuickTodo(todo)) {
       addToast('info', '小事仅用于备忘与排期，不支持计时。');
       return;

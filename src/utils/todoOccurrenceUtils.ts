@@ -1,11 +1,13 @@
 /**
  * @file todoOccurrenceUtils.ts
+ * @updated 2026-10-18: Clears abandonment when completing and suppresses occurrence actions on abandoned tasks.
  * @input Todo items, occurrence dates and completion commands
  * @output Sparse completion normalization, dated display state and immutable updates
  * @pos Utility
  * @updated 2026-10-16: Separates single occurrence completion from ending a series.
  */
 import type { TodoItem, TodoOccurrenceCompletion } from '../types';
+import { setTodoStatus } from './todoStatusUtils';
 import { formatDateKey, matchesRecurrenceRule, parseDateKey } from './todoScheduleUtils';
 
 export const normalizeOccurrenceCompletions = (value: unknown): TodoItem['occurrenceCompletions'] => {
@@ -18,7 +20,7 @@ export const normalizeOccurrenceCompletions = (value: unknown): TodoItem['occurr
 };
 
 export const canCompleteTodoOccurrence = (todo: TodoItem, dateKey: string): boolean => (
-  Boolean(parseDateKey(dateKey)) && !todo.isCompleted && (
+  Boolean(parseDateKey(dateKey)) && !todo.isCompleted && !todo.abandonedAt && (
     Boolean(todo.occurrenceCompletions?.[dateKey])
     || matchesRecurrenceRule(todo.recurrenceRule, dateKey)
     || Boolean(todo.recurrenceRule && todo.maybeDates?.includes(dateKey))
@@ -28,7 +30,7 @@ export const canCompleteTodoOccurrence = (todo: TodoItem, dateKey: string): bool
 // Display-only projection. Mutations must resolve the live task by id.
 export const getTodoForOccurrence = (todo: TodoItem, dateKey: string): TodoItem => {
   const completion = todo.occurrenceCompletions?.[dateKey];
-  if (!todo.recurrenceRule || todo.isCompleted || !completion) return todo;
+  if (!todo.recurrenceRule || todo.isCompleted || todo.abandonedAt || !completion) return todo;
   return { ...todo, isCompleted: true, completedAt: completion.completedAt };
 };
 
@@ -38,6 +40,7 @@ export const setTodoCompletion = (
   occurrenceDateKey?: string,
   now = new Date()
 ): TodoItem => {
+  if (todo.abandonedAt) return setTodoStatus(todo, completed ? 'completed' : 'active', now);
   if (!todo.recurrenceRule || (todo.isCompleted && !occurrenceDateKey && !completed)) {
     if (todo.isCompleted === completed) return todo;
     return { ...todo, isCompleted: completed, completedAt: completed ? now.toISOString() : undefined };
@@ -69,5 +72,6 @@ export const applyTodoCompletionActions = (todo: TodoItem, actions: Array<{
   .reduce((current, action) => {
     if (current.recurrenceRule && !action.occurrenceDateKey) return current;
     if (!Number.isFinite(action.createdAt)) return current;
+    if (current.abandonedAt && action.createdAt <= Date.parse(current.abandonedAt)) return current;
     return setTodoCompletion(current, action.isCompleted, action.occurrenceDateKey || undefined, new Date(action.createdAt));
   }, todo);

@@ -1,5 +1,8 @@
 /**
  * @file DataContext.tsx
+ * @updated 2026-10-18: Normalizes mutually exclusive todo status during hydration and all state updates.
+ * @updated 2026-10-17: Serializes todo persistence and reconciles local reminders only after successful saves.
+ * @updated 2026-10-17: Rejects stale desktop-sync reads that could resurrect cancelled reminders during queued writes.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @updated 2026-10-07: Applies node rename/merge and related log edits as one React state transition.
  * @updated 2026-10-07: Hydrates and atomically persists node category metadata.
@@ -21,6 +24,7 @@ import { DataCollection, DataCollectionEntry, Log, NoteNode, NodeCategory, TodoC
 import { discoverNodes } from '../utils/nodeUtils';
 import { normalizeTodoMaybeDates } from '../utils/todoScheduleUtils';
 import { normalizeOccurrenceCompletions } from '../utils/todoOccurrenceUtils';
+import { normalizeTodoStatus } from '../utils/todoStatusUtils';
 import { normalizeTodoRecurringPlanConfig } from '../utils/todoRecurringPlanUtils';
 import {
   getLocalDataTimestamp,
@@ -30,6 +34,7 @@ import {
   updateLocalDataTimestamp
 } from '../utils/localDataTimestamp';
 import { reportCriticalDataError } from '../services/errorReporting';
+import { todoReminderService } from '../services/todoReminderService';
 
 interface DataContextType {
   isReady: boolean;
@@ -91,7 +96,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return next.nodes === previous.nodes && next.logs === previous.logs ? previous : next;
     });
   }, [nodes, storedNodes, logs]);
-  const [todos, setTodos] = useState<TodoItem[]>(INITIAL_TODOS);
+  const [todos, setTodoState] = useState<TodoItem[]>(INITIAL_TODOS);
+  const setTodos = useCallback((action: React.SetStateAction<TodoItem[]>) => setTodoState((previous) => {
+    const next = typeof action === 'function' ? action(previous) : action;
+    if (next === previous) return previous;
+    return next.map(normalizeTodoStatus);
+  }), []);
   const [todoCategories, setTodoCategories] = useState<TodoCategory[]>(MOCK_TODO_CATEGORIES);
   const [collections, setCollections] = useState<DataCollection[]>([]);
   const [collectionEntries, setCollectionEntries] = useState<DataCollectionEntry[]>([]);
@@ -104,6 +114,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const persistedNodesRef = useRef<NoteNode[] | null>(null);
   const persistedNodeCategoriesRef = useRef<NodeCategory[] | null>(null);
   const persistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const todoPersistenceQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     latestTodosRef.current = todos;
@@ -211,16 +222,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    void (async () => {
-      try {
+    todoPersistenceQueueRef.current = todoPersistenceQueueRef.current
+      .then(async () => {
         await dataRepository.saveTodos(todos);
         if (!isHydratingRef.current) {
           publishDesktopTodoSyncEvent();
         }
-      } catch (error) {
-        console.error('[DataContext] Failed to persist todos', error);
-      }
-    })();
+        await todoReminderService.syncTodos(todos).catch((error) => {
+          console.error('[DataContext] Failed to reconcile local reminders', error);
+        });
+      })
+      .catch((error) => {
+        reportCriticalDataError(error, '保存待办失败，请重试。', { dataArea: 'todos' });
+      });
   }, [canPersist, isReady, todos]);
 
   useEffect(() => {
@@ -231,7 +245,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const stopTodoSyncSubscription = subscribeDesktopTodoSyncEvent(() => {
       void (async () => {
         try {
+          const localTodosAtRead = latestTodosRef.current;
+          const localWritesAtRead = todoPersistenceQueueRef.current;
+          // Our own save broadcasts can arrive before the following edit/delete has finished saving.
+          await localWritesAtRead;
           const snapshot = await dataRepository.loadDataContextSnapshot();
+          if (localTodosAtRead !== latestTodosRef.current || localWritesAtRead !== todoPersistenceQueueRef.current) return;
           const normalizedTodos = snapshot.todos.map((todo) => normalizeTodoMaybeDates({
             ...todo,
             occurrenceCompletions: normalizeOccurrenceCompletions(todo.occurrenceCompletions),
@@ -246,7 +265,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
           }
 
-          setTodos(normalizedTodos);
+          setTodos((previous) => previous === localTodosAtRead ? normalizedTodos : previous);
         } catch (error) {
           console.error('[DataContext] Failed to refresh todos from desktop sync event', error);
         }

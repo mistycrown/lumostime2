@@ -1,5 +1,6 @@
 /**
  * @file todoRecurringPlanUtils.ts
+ * @updated 2026-10-18: Stops recurring auto plans when tasks are abandoned.
  * @updated 2026-10-16: Excludes completed occurrences from automatic Plan replenishment.
  * @input Todo items, timeline logs, and local reference dates
  * @output Normalized recurring Plan configs, occurrence windows, generated Plan logs, and deletion-lock checks
@@ -187,7 +188,7 @@ export const hasPlanForTodoOnDate = (logs: Log[], todoId: string, dateKey: strin
 );
 
 export const isTodoRecurringPlanEnabled = (todo?: TodoItem | null): boolean => {
-  if (!todo || todo.isCompleted || todo.parentTodoId || todo.kind === 'quick' || !todo.recurrenceRule) {
+  if (!todo || todo.isCompleted || todo.abandonedAt || todo.parentTodoId || todo.kind === 'quick' || !todo.recurrenceRule) {
     return false;
   }
 
@@ -208,7 +209,7 @@ export const getRecurringPlanOccurrenceDateKeys = (
   const config = normalizeTodoRecurringPlanConfig(todo.recurringPlan);
   const recurrenceRule = todo.recurrenceRule;
 
-  if (!config?.enabled || !recurrenceRule || todo.isCompleted || todo.parentTodoId || todo.kind === 'quick') {
+  if (!config?.enabled || !recurrenceRule || todo.isCompleted || todo.abandonedAt || todo.parentTodoId || todo.kind === 'quick') {
     return [];
   }
 

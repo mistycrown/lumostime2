@@ -1,5 +1,6 @@
 /**
  * @file assistantContextBuilder.test.ts
+ * @updated 2026-10-18: Ensures abandoned tasks remain dated in dictionaries and leave active summaries.
  * @input Runtime dictionaries, logs, and assistant date context
  * @output Coverage for assistant state summaries and dictionary serialization
  * @pos Service test
@@ -130,6 +131,19 @@ describe('assistantContextBuilder', () => {
     expect(digest).not.toContain('old-field');
     expect(digest).not.toContain('old-place');
   });
+  it('excludes abandoned tasks from active summaries and retains their date in dictionaries', () => {
+    const abandonedAt = '2026-04-27T09:00:00+08:00';
+    const abandoned = [{ ...todos[1], abandonedAt, deadlineDate: '2026-04-26' }];
+    const state = assistantContextBuilder.buildStateContext({ currentDateTime: abandonedAt,
+      stateContextDate: '2026-04-27', categories, todos: abandoned, logs: [] });
+    expect(state.scheduledTodosForDateSummary).toBeUndefined();
+    expect(state.pinnedTodoSummary).toBeUndefined();
+    expect(state.overdueTodoSummary).toBeUndefined();
+    const dictionary = assistantContextBuilder.buildDictionaryContext({ todos: abandoned });
+    expect(dictionary.todos?.[0].abandonedAt).toBe(abandonedAt);
+    expect(assistantContextBuilder.buildDictionaryDigest(dictionary)).toContain(abandonedAt);
+  });
+
   it('buildStateContext keeps one local-offset current-time anchor and builds an absolute reference table', () => {
     const stateContext = assistantContextBuilder.buildStateContext({
       currentDateTime: '2026-04-27T18:00:00+08:00',

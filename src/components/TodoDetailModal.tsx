@@ -1,5 +1,7 @@
 /**
  * @file TodoDetailModal.tsx
+ * @updated 2026-10-18: Uses concise abandon/restore controls and icon/date abandonment markers for subtasks.
+ * @updated 2026-10-17: Adds independent reminder controls beside arranged and deadline dates.
  * @updated 2026-10-16: Preserves occurrence history on autosave and labels series completion explicitly.
  * @input props: TodoItem, logs, categories
  * @output Modal Interaction (Edit Todo, View History)
@@ -44,11 +46,11 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig } from '../types';
+import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig, TodoReminderField, TodoReminders } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
 import { AssociationOptionGrid } from './AssociationOptionGrid';
-import { Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
+import { Ban, Trash2, Check, CheckCircle2, TrendingUp, ChevronLeft, ChevronRight, Circle, Image as ImageIcon, Pin, RotateCcw, CalendarDays, Flag, Repeat2, Plus, X } from 'lucide-react';
 import { DetailTimelineCard } from './DetailTimelineCard';
 import { FeatureHint } from './FeatureHint';
 import { TimelineImage } from './TimelineImage';
@@ -57,6 +59,9 @@ import { IconRenderer } from './IconRenderer';
 import { useToast } from '../contexts/ToastContext';
 import { formatDateKey, formatMonthlyDayInput, getTodayDateKey, matchesRecurrenceRule, normalizeMaybeDates, normalizeMonthlyDayInput, parseDateKey, parseMonthlyDayInput } from '../utils/todoScheduleUtils';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
+import { TodoReminderButton } from './TodoReminderButton';
+import { TodoReminderModal } from './TodoReminderModal';
+import { normalizeTodoReminders } from '../utils/todoReminderUtils';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
   getCompletedDirectChildCount,
@@ -79,6 +84,7 @@ import {
   parseClockMinutes
 } from '../utils/todoRecurringPlanUtils';
 import { filterCountableLogs } from '../utils/statLogUtils';
+import { setTodoCompletion } from '../utils/todoOccurrenceUtils';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -101,7 +107,7 @@ interface TodoDetailModalProps {
 
 type Tab = '细节' | '子任务' | '时间线';
 type RecurrenceFrequencyMode = TodoRecurrenceFrequency | 'none';
-type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'completedDate' | 'maybeDates' | 'skipDates' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
+type DatePickerField = 'scheduledDate' | 'deadlineDate' | 'completedDate' | 'abandonedDate' | 'maybeDates' | 'skipDates' | 'recurrenceStartDate' | 'recurrenceEndDate' | null;
 
 const WEEKDAY_OPTIONS: Array<{ label: string; value: number }> = [
   { label: '一', value: 1 },
@@ -253,7 +259,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialCategoryId = initialTodo?.categoryId || initialDraft?.categoryId || currentCategory.id;
   const initialTitle = initialTodo?.title || initialDraft?.title || '';
   const initialNote = initialTodo?.note || initialDraft?.note || '';
-  const initialIsCompleted = initialTodo?.isCompleted || initialDraft?.isCompleted || false;
+  const initialAbandonedAt = initialTodo?.abandonedAt || initialDraft?.abandonedAt || '';
+  const initialIsCompleted = !initialAbandonedAt && (initialTodo?.isCompleted || initialDraft?.isCompleted || false);
   const initialCompletedAt = initialTodo?.completedAt
     || initialDraft?.completedAt
     || (initialIsCompleted ? new Date().toISOString() : '');
@@ -293,6 +300,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const [note, setNote] = useState(initialNote);
   const [isCompleted, setIsCompleted] = useState(initialIsCompleted);
   const [completedAt, setCompletedAt] = useState(initialCompletedAt);
+  const [abandonedAt, setAbandonedAt] = useState(initialAbandonedAt);
 
   // Link to Record Activity
   const [linkedCategoryId, setLinkedCategoryId] = useState<string>(initialLinkedCategoryId);
@@ -326,6 +334,11 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   // Schedule State
   const [scheduledDate, setScheduledDate] = useState(initialScheduledDate);
   const [deadlineDate, setDeadlineDate] = useState(initialDeadlineDate);
+  const [reminders, setReminders] = useState<TodoReminders | undefined>(() => normalizeTodoReminders({
+    scheduledDate: initialScheduledDate, deadlineDate: initialDeadlineDate,
+    recurrenceRule: initialRecurrenceRule, reminders: initialTodo?.reminders || initialDraft?.reminders
+  }));
+  const [reminderField, setReminderField] = useState<TodoReminderField | null>(null);
   const [maybeDates, setMaybeDates] = useState<string[]>(initialMaybeDates);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<RecurrenceFrequencyMode>(
     initialParentTodoId ? 'none' : (initialRecurrenceRule?.frequency || 'none')
@@ -599,6 +612,18 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     && recurrenceFrequency !== 'none'
     && recurringPlanConfig?.enabled !== true;
 
+  const effectiveReminders = useMemo(() => normalizeTodoReminders({
+    scheduledDate, deadlineDate, recurrenceRule, reminders
+  }), [scheduledDate, deadlineDate, recurrenceRule, reminders]);
+
+  useEffect(() => {
+    // Clearing a date or enabling recurrence must not leave a hidden reminder to resurrect later.
+    setReminders((previous) => {
+      const next = normalizeTodoReminders({ scheduledDate, deadlineDate, recurrenceRule, reminders: previous });
+      return JSON.stringify(next) === JSON.stringify(previous) ? previous : next;
+    });
+  }, [scheduledDate, deadlineDate, recurrenceRule]);
+
   const handleRecurrenceFrequencyChange = (nextFrequency: RecurrenceFrequencyMode) => {
     if (isSubtask) {
       return;
@@ -657,6 +682,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     ? '选择分配日期'
     : activeDatePicker === 'deadlineDate'
       ? '选择截止日期'
+      : activeDatePicker === 'abandonedDate'
+        ? '选择放弃日期'
       : activeDatePicker === 'completedDate'
         ? '选择完成日期'
       : activeDatePicker === 'recurrenceStartDate'
@@ -669,6 +696,8 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     ? scheduledDate
     : activeDatePicker === 'deadlineDate'
       ? deadlineDate
+      : activeDatePicker === 'abandonedDate'
+        ? formatDateKey(new Date(abandonedAt || new Date().toISOString()))
       : activeDatePicker === 'completedDate'
         ? formatDateKey(new Date(completedAt || new Date().toISOString()))
       : activeDatePicker === 'recurrenceStartDate'
@@ -693,6 +722,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         break;
       case 'completedDate':
         setCompletedAt((previous) => replaceCompletedAtDate(previous, value));
+        break;
+      case 'abandonedDate':
+        setAbandonedAt((previous) => replaceCompletedAtDate(previous, value));
         break;
       case 'recurrenceStartDate':
         setRecurrenceStartDate(value);
@@ -766,6 +798,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     title: title.trim(),
     occurrenceCompletions: persistedTodo ? persistedTodo.occurrenceCompletions : initialTodo?.occurrenceCompletions,
     isCompleted,
+    abandonedAt: abandonedAt || undefined,
     completedAt: isCompleted
       ? (completedAt || (persistedTodo?.isCompleted ? persistedTodo.completedAt : new Date().toISOString()))
       : undefined,
@@ -784,6 +817,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     coverImage: isQuickReminder ? undefined : coverImage,
     scheduledDate: scheduledDate || undefined,
     deadlineDate: deadlineDate || undefined,
+    reminders: effectiveReminders,
     maybeDates: maybeDates.length > 0 ? maybeDates : undefined,
     recurrenceRule: isSubtask || isQuickReminder ? undefined : recurrenceRule,
     recurringPlan: isSubtask || isQuickReminder || !recurrenceRule ? undefined : recurringPlanConfig,
@@ -802,6 +836,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         title.trim() !== persistedTodo.title ||
         note.trim() !== normalizeOptionalText(persistedTodo.note) ||
         isCompleted !== persistedTodo.isCompleted ||
+        (abandonedAt || undefined) !== persistedTodo.abandonedAt ||
         (isCompleted ? completedAt : undefined) !== persistedTodo.completedAt ||
         (isQuickReminder ? '' : effectiveLinkedCategoryId) !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
         (isQuickReminder ? '' : resolvedLinkedActivityId) !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
@@ -818,6 +853,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         (isQuickReminder ? undefined : childOrder) !== persistedTodo.childOrder ||
         scheduledDate !== normalizeOptionalText(persistedTodo.scheduledDate) ||
         deadlineDate !== normalizeOptionalText(persistedTodo.deadlineDate) ||
+        JSON.stringify(effectiveReminders) !== JSON.stringify(normalizeTodoReminders(persistedTodo)) ||
         normalizeMaybeDateListForComparison(maybeDates) !== normalizeMaybeDateListForComparison(persistedTodo.maybeDates) ||
         normalizeRecurrenceRuleForComparison(isSubtask || isQuickReminder ? undefined : recurrenceRule) !== normalizeRecurrenceRuleForComparison(persistedTodo.recurrenceRule) ||
         normalizeRecurringPlanForComparison(isSubtask || isQuickReminder || !recurrenceRule ? undefined : recurringPlanConfig) !== normalizeRecurringPlanForComparison(persistedTodo.recurringPlan);
@@ -826,7 +862,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
 
     onSave(buildTodoPayload());
-  }, [selectedCategoryId, title, note, isCompleted, completedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, isSubtask, recurrenceRule, recurringPlanConfig, initialTodo, onSave, todos]); // 监听所有状态变化
+  }, [selectedCategoryId, title, note, isCompleted, completedAt, abandonedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, effectiveReminders, isSubtask, recurrenceRule, recurringPlanConfig, initialTodo, onSave, todos]); // 监听所有状态变化
 
   React.useEffect(() => {
     if (!title.trim()) return;
@@ -849,6 +885,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   };
 
   const handleCompletionToggle = () => {
+    setAbandonedAt('');
     if (isCompleted) {
       setCompletedAt('');
       setIsCompleted(false);
@@ -857,6 +894,12 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
     setCompletedAt(new Date().toISOString());
     setIsCompleted(true);
+  };
+
+  const handleAbandonToggle = () => {
+    setAbandonedAt(abandonedAt ? '' : new Date().toISOString());
+    setIsCompleted(false);
+    setCompletedAt('');
   };
 
   const handleUpgradeQuickTodoToProject = () => {
@@ -1178,13 +1221,24 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-stone-400">01 / Identity</p>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight text-stone-900">基本信息</h2>
                 </div>
-                <button
-                  onClick={handleCompletionToggle}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
-                >
-                  {isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                  {recurrenceRule ? (isCompleted ? '恢复循环' : '结束循环') : (isCompleted ? '已完成' : '标记完成')}
-                </button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAbandonToggle}
+                    aria-pressed={Boolean(abandonedAt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${abandonedAt ? 'bg-stone-200 text-stone-700' : 'text-stone-400 hover:bg-stone-100 hover:text-stone-600'}`}
+                  >
+                    {abandonedAt ? <RotateCcw size={14} /> : <Ban size={14} />}
+                    {abandonedAt ? '恢复' : '放弃'}
+                  </button>
+                  <button
+                    onClick={handleCompletionToggle}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${isCompleted ? 'bg-stone-900 text-white shadow-md' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'}`}
+                  >
+                    {isCompleted ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                    {recurrenceRule ? (isCompleted ? '恢复循环' : '结束循环') : (isCompleted ? '已完成' : '标记完成')}
+                  </button>
+                </div>
               </div>
               {isSubtask ? (
                 <div>
@@ -1516,6 +1570,21 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
               </div>
 
                 <div className="space-y-4">
+                  {abandonedAt && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
+                        <Ban size={12} />
+                        放弃日期
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setActiveDatePicker('abandonedDate')}
+                        className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+                      >
+                        {formatDateFieldValue(formatDateKey(new Date(abandonedAt)))}
+                      </button>
+                    </div>
+                  )}
                   {isCompleted && (
                     <div className="space-y-1.5">
                       <label className="text-xs text-stone-400 font-medium flex items-center gap-1.5">
@@ -1538,6 +1607,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         <CalendarDays size={12} />
                       分配日期
                     </label>
+                    <div className="flex items-center gap-1">
+                      <TodoReminderButton date={scheduledDate} field="scheduledDate" setting={effectiveReminders?.scheduledDate}
+                        completed={isCompleted || Boolean(abandonedAt)} disabled={!title.trim()} onClick={() => setReminderField('scheduledDate')} />
                     {scheduledDate && (
                       <button
                         type="button"
@@ -1547,6 +1619,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         清除
                       </button>
                     )}
+                    </div>
                   </div>
                     <button
                       type="button"
@@ -1566,6 +1639,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                       <Flag size={12} />
                       截止日期
                     </label>
+                    <div className="flex items-center gap-1">
+                      <TodoReminderButton date={deadlineDate} field="deadlineDate" setting={effectiveReminders?.deadlineDate}
+                        completed={isCompleted || Boolean(abandonedAt)} disabled={!title.trim()} onClick={() => setReminderField('deadlineDate')} />
                     {deadlineDate && (
                       <button
                         type="button"
@@ -1575,6 +1651,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         清除
                       </button>
                     )}
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -1675,7 +1752,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         );
                       })}
                     </div>
-                    <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。循环任务是作为计时项存在的，在结束最后一次循环之前，请勿点击完成。</p>
+                    <p className="text-[11px] text-stone-400">循环规则与分配日期、截止日期互斥。开启循环后会自动清空这两个日期。</p>
 
                     {recurrenceFrequency !== 'none' && (
                       <div className="space-y-4 pt-1 animate-in slide-in-from-top-2 fade-in">
@@ -1966,10 +2043,15 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                         className="group flex w-full cursor-pointer items-start justify-between gap-4 border-b border-stone-200/70 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-stone-300"
                       >
                         <div className="min-w-0">
-                          <div className={`truncate text-base font-semibold transition-colors ${childTodo.isCompleted ? 'text-stone-400 line-through' : 'text-stone-700 group-hover:text-stone-900'}`}>
+                          <div className={`truncate text-base font-semibold transition-colors ${childTodo.isCompleted || childTodo.abandonedAt ? 'text-stone-400 line-through' : 'text-stone-700 group-hover:text-stone-900'}`}>
                             {childTodo.title}
                           </div>
-                          {(childTodo.scheduledDate || childTodo.deadlineDate) && (
+                          {childTodo.abandonedAt ? (
+                            <div className="mt-1 flex items-center gap-1 text-[11px] text-stone-400" aria-label="放弃日期">
+                              <Ban size={11} />
+                              {formatDateFieldValue(formatDateKey(new Date(childTodo.abandonedAt)))}
+                            </div>
+                          ) : (childTodo.scheduledDate || childTodo.deadlineDate) && (
                             <div className="mt-1 text-[11px] tracking-[0.12em] text-stone-400">
                               {childTodo.scheduledDate ? `安排 ${formatDateFieldValue(childTodo.scheduledDate)}` : ''}
                               {childTodo.scheduledDate && childTodo.deadlineDate ? ' · ' : ''}
@@ -1982,11 +2064,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              onSave({
-                                ...childTodo,
-                                isCompleted: !childTodo.isCompleted,
-                                completedAt: !childTodo.isCompleted ? new Date().toISOString() : undefined
-                              });
+                              onSave(setTodoCompletion(childTodo, !childTodo.isCompleted));
                             }}
                             className={`rounded-full p-1 transition-colors ${childTodo.isCompleted ? 'text-stone-900' : 'text-stone-300 hover:text-stone-600'}`}
                           >
@@ -2101,6 +2179,21 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         )}
       </div>
 
+      {reminderField && !isCompleted && !abandonedAt && (reminderField === 'scheduledDate' ? scheduledDate : deadlineDate) && (
+        <TodoReminderModal
+          key={reminderField}
+          field={reminderField}
+          date={reminderField === 'scheduledDate' ? scheduledDate : deadlineDate}
+          value={effectiveReminders?.[reminderField]}
+          onSave={(setting) => setReminders((previous) => {
+            const next = { ...previous };
+            if (setting) next[reminderField] = setting;
+            else delete next[reminderField];
+            return Object.keys(next).length ? next : undefined;
+          })}
+          onClose={() => setReminderField(null)}
+        />
+      )}
       <TodoDatePickerModal
         isOpen={activeDatePicker !== null}
         title={activeDatePicker === 'skipDates' ? '选择 Skip Date' : resolvedDatePickerTitle}
@@ -2120,7 +2213,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
 
           handleMaybeDatesSelect(values);
         }}
-        onClear={activeDatePicker === 'completedDate' ? undefined : () => {
+        onClear={activeDatePicker === 'completedDate' || activeDatePicker === 'abandonedDate' ? undefined : () => {
           if (activeDatePicker === 'skipDates') {
             setSkipDates([]);
             return;

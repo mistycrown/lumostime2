@@ -1,5 +1,8 @@
 /**
  * @file themes.css
+ * @updated 2026-10-18: Removes obsolete native time-picker styling after switching reminders to numeric segments.
+ * @updated 2026-10-18: Distinguishes active quick-action reminder icon colors in dark mode without a filled background.
+ * @updated 2026-10-17: Adds readable theme-aware local reminder choices and primary actions in light/dark modes.
  * @description 配色方案的 CSS 变量定义
  */
 
@@ -2218,6 +2221,40 @@ html[data-theme-mode=dark] .dark\:text-stone-100 {
 }
 
 /* Standalone date picker surfaces and calendar selections. */
+.todo-reminder-choice[aria-pressed='true'] {
+  border-color: var(--accent-color);
+  background-color: var(--accent-color-light);
+  color: var(--accent-color);
+}
+
+.todo-reminder-save {
+  background-color: var(--accent-color);
+  color: #fff;
+}
+
+html[data-theme-mode=dark] .todo-reminder-choice[aria-pressed='true'] {
+  border-color: #d6d3d1 !important;
+  background-color: #57534e !important;
+  color: #fafaf9 !important;
+}
+
+html[data-theme-mode=dark] .todo-reminder-save {
+  background-color: color-mix(in srgb, var(--accent-color) 15%, #f5f5f4);
+  color: #1c1917;
+}
+
+html[data-theme-mode=dark] .todo-reminder-button {
+  color: #d6d3d1 !important;
+}
+
+html[data-theme-mode=dark] .todo-reminder-button[data-icon-only='true'] {
+  color: #a8a29e !important;
+}
+
+html[data-theme-mode=dark] .todo-reminder-button[data-icon-only='true'][data-active='true'] {
+  color: color-mix(in srgb, var(--accent-color) 15%, #f5f5f4) !important;
+}
+
 html[data-theme-mode=dark] .todo-date-picker-backdrop {
   background-color: rgba(0, 0, 0, 0.66) !important;
 }

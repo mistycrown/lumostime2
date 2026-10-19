@@ -1,5 +1,6 @@
 /**
  * @file MainActivity.java
+ * @updated 2026-10-17: Registers independent todo reminders and captures notification navigation.
  * @input Application launch and window configuration
  * @output WebView container with edge-to-edge support
  * @pos Android Entry Point
@@ -53,18 +54,22 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeStatusBarAppearancePlugin.class);
         registerPlugin(WidgetBridgePlugin.class);
         registerPlugin(FeishuNativePlugin.class);
+        registerPlugin(TodoReminderPlugin.class);
         configureWindowForEdgeToEdge();
         super.onCreate(savedInstanceState);
 
         hideUnexpectedNativeActionBar();
         configureWindowForEdgeToEdge();
         AssistantNotificationNavigationStore.captureFromIntent(this, getIntent());
+        TodoReminderPlugin.captureNavigation(this, getIntent());
         ensureStatusBarBackdrop();
         initializeIconState();
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
+        // Store the target before Capacitor emits appUrlOpen to the renderer.
+        TodoReminderPlugin.captureNavigation(this, intent);
         super.onNewIntent(intent);
         setIntent(intent);
         AssistantNotificationNavigationStore.captureFromIntent(this, intent);
