@@ -27,6 +27,7 @@
  * @updated 2026-09-28: Applies independently persisted vertical stretching to new navigation background images.
  * @updated 2026-09-29: Falls back to the default navigation surface in effective dark mode.
  * @updated 2026-09-30: Scales custom navigation image icons from persisted settings.
+ * @updated 2026-10-21: Uses background-specific text tones for both text navigation and icon labels.
  */
 import React, { useState, useEffect } from 'react';
 import { AppView } from '../types';
@@ -39,6 +40,7 @@ import {
     NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
     NAVIGATION_BACKGROUND_PREVIEW_EVENT
 } from '../services/navigationBackgroundService';
+import type { NavigationTextTone } from '../services/navigationBackgroundService';
 import { getNavigationIconFallbackUrl, NAVIGATION_ICON_CHANGE_EVENT, navigationIconService } from '../services/navigationIconService';
 import { useCustomAppearanceEnabled } from '../hooks/useCustomAppearanceEnabled';
 
@@ -83,7 +85,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const [isNewNavigation, setIsNewNavigation] = useState(() => navigationBackgroundService.isEnabled());
     const [isTodoScheduleMode, setIsTodoScheduleMode] = useState(() => localStorage.getItem('todoScreenMode') === 'week');
     const [currentBackground, setCurrentBackground] = useState(() => navigationBackgroundService.getCurrentBackground());
-    const [backgroundUrl, setBackgroundUrl] = useState('');
+    const [backgroundUrl, setBackgroundUrl] = useState(() => navigationBackgroundService.getBackgroundById(currentBackground)?.url || '');
+    const [backgroundTextTone, setBackgroundTextTone] = useState<NavigationTextTone>(() => navigationBackgroundService.getBackgroundById(currentBackground)?.textTone || 'dark');
     const [backgroundSettings, setBackgroundSettings] = useState({
         offsetY: '0px',
         offsetX: '0px',
@@ -138,6 +141,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             setCurrentBackground(backgroundId);
             const background = navigationBackgroundService.getBackgroundById(backgroundId);
             setBackgroundUrl(background?.url || '');
+            setBackgroundTextTone(background?.textTone || 'dark');
             setBackgroundSettings({
                 offsetY: background?.offsetY || '0px',
                 offsetX: background?.offsetX || '0px',
@@ -156,6 +160,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
             const background = navigationBackgroundService.getBackgroundById(event.detail.id);
             setCurrentBackground(event.detail.id);
             setBackgroundUrl(background?.url || '');
+            setBackgroundTextTone(background?.textTone || 'dark');
             setBackgroundSettings(event.detail.settings);
         };
         const handleModeChange = (event: CustomEvent<{ enabled: boolean }>) => {
@@ -215,6 +220,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     const isNoBackgroundNavigation = customAppearanceEnabled && isNewNavigation && currentBackground === 'new-none';
     const useNewNavigationStyle = customAppearanceEnabled && isNewNavigation && currentBackground !== 'new-none';
     const hasNavigationBackground = useNewNavigationStyle && Boolean(backgroundUrl);
+    const useLightNavigationText = hasNavigationBackground && backgroundTextTone === 'light';
     const bgColor = isNoBackgroundNavigation
         ? 'bg-white'
         : hasNavigationBackground
@@ -296,7 +302,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                                         onViewChange(item.view);
                                     }
                                 }}
-                                className={`relative z-10 flex-1 h-full flex items-center justify-center cursor-pointer transition-all duration-200 ${isActive ? 'text-stone-900' : 'text-stone-400'}`}
+                                className={`relative z-10 flex-1 h-full flex items-center justify-center cursor-pointer transition-all duration-200 ${useLightNavigationText ? (isActive ? 'text-white' : 'text-white/70') : (isActive ? 'text-stone-900' : 'text-stone-400')}`}
                             >
                                 {showIcon ? (
                                     <div className={`flex flex-col items-center justify-center ${iconSelection.showLabelWithIcon ? 'gap-0.5' : ''}`}>

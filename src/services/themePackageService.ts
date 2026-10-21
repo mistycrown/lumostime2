@@ -19,6 +19,7 @@
  * @updated 2026-09-30: Accepts mixed-case package IDs used by named theme packages.
  * @updated 2026-09-30: Validates packaged custom navigation icon size scales.
  * @updated 2026-10-21: Validates icon scales defined on navigation icon resources.
+ * @updated 2026-10-21: Validates per-background navigation text tones.
  */
 
 import JSZip from 'jszip';
@@ -377,6 +378,9 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
     if (isRecord(navigationRecord.icons)) {
       validateNavigationIconScale(navigationRecord.icons.iconScale, 'config.navigation.icons.iconScale');
     }
+    if (isRecord(navigationRecord.background)) {
+      validateNavigationTextTone(navigationRecord.background.textTone, 'config.navigation.background.textTone');
+    }
     if (navigationRecord.transparentTitleBar !== undefined && typeof navigationRecord.transparentTitleBar !== 'boolean') {
       throw new ThemePackageValidationError(
         'INVALID_CONFIGURATION',
@@ -478,6 +482,14 @@ const validateNavigationIconScale = (value: unknown, path: string): void => {
   }
 };
 
+const validateNavigationTextTone = (value: unknown, path: string): void => {
+  if (value !== undefined && value !== 'dark' && value !== 'light') {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION', `${path} 只支持 dark 或 light`, path
+    );
+  }
+};
+
 const validateResourceCollections = (resources: Record<string, unknown>, apply: Record<string, unknown>): void => {
   const collections = [
     'backgrounds',
@@ -510,6 +522,7 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
       }
       ids.add(item.id);
       if (key === 'navigationIcons') validateNavigationIconScale(item.iconScale, `${path}.iconScale`);
+      if (key === 'navigationBackgrounds') validateNavigationTextTone(item.textTone, `${path}.textTone`);
       if (key === 'uiIcons' && item.numberedDirectory !== undefined
         && (typeof item.numberedDirectory !== 'string' || !isAssetPath(item.numberedDirectory))) {
         throw new ThemePackageValidationError(

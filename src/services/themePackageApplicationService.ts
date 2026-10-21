@@ -19,6 +19,7 @@
  * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  * @updated 2026-09-30: Applies packaged custom navigation icon size scales.
  * @updated 2026-10-21: Stores packaged navigation icon scales with their schemes.
+ * @updated 2026-10-21: Applies packaged navigation background text tones.
  * @updated 2026-10-05: Waits for legacy navigation image compaction before writing package settings.
  * @updated 2026-10-05: Also compacts calendar image storage through the shared package preparation step.
  */
@@ -216,6 +217,7 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
     offsetX: '0px',
     scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
     verticalStretch: typeof backgroundConfig.verticalStretch === 'number' ? backgroundConfig.verticalStretch : 1,
+    textTone: backgroundConfig.textTone === 'light' ? 'light' : 'dark',
     opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
   });
   writeJson(CUSTOM_NAVIGATION_BACKGROUND_KEY, backgrounds);
@@ -228,6 +230,7 @@ const applyNavigationBackground = async (record: ImportedThemePackageRecord, war
       offsetX: typeof backgroundConfig.offsetX === 'string' ? backgroundConfig.offsetX : '0px',
       scale: typeof backgroundConfig.scale === 'number' ? backgroundConfig.scale : 1,
       verticalStretch: typeof backgroundConfig.verticalStretch === 'number' ? backgroundConfig.verticalStretch : 1,
+      textTone: backgroundConfig.textTone === 'light' ? 'light' : 'dark',
       opacity: typeof backgroundConfig.opacity === 'number' ? backgroundConfig.opacity : 1
     }
   });

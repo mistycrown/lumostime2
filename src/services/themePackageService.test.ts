@@ -1,6 +1,7 @@
 /**
  * @file themePackageService.test.ts
  * @updated 2026-10-21: Covers resource-specific navigation icon scale parsing and validation.
+ * @updated 2026-10-21: Covers navigation background text tone parsing and validation.
  * @input Synthetic ZIP archives containing theme manifests and assets
  * @output Regression coverage for theme package parsing and safety validation
  * @pos Test (Theme Package Import)
@@ -222,6 +223,27 @@ describe('parseThemePackage', () => {
       showLabelWithIcon: true,
       iconScale: 125,
       icons: { files: { record: 'assets/navigation/icons/record.webp' } }
+    });
+  });
+
+  it.each(['dark', 'light'])('preserves navigation background text tone %s', async (textTone) => {
+    const result = await parseThemePackage(await createZip({
+      format: 'lumostime-theme-package', schemaVersion: 2,
+      package: { id: 'navigation-tone', name: 'Navigation Tone', version: '1.0.0' },
+      resources: { navigationBackgrounds: [{ id: 'nav', file: 'assets/nav.webp', textTone }] },
+      apply: { navigation: { mode: 'modern', backgroundId: 'nav' } }
+    }, { 'assets/nav.webp': 'background' }));
+    expect(result.manifest.config.navigation).toMatchObject({ background: { textTone } });
+  });
+
+  it.each(['white', 1, null])('rejects invalid navigation background text tone %s', async (textTone) => {
+    await expect(parseThemePackage(await createZip({
+      format: 'lumostime-theme-package', schemaVersion: 2,
+      package: { id: 'invalid-tone', name: 'Invalid Tone', version: '1.0.0' },
+      resources: { navigationBackgrounds: [{ id: 'nav', textTone }] },
+      apply: {}
+    }))).rejects.toMatchObject({
+      code: 'INVALID_CONFIGURATION', path: 'resources.navigationBackgrounds[0].textTone'
     });
   });
 

@@ -13,6 +13,7 @@
  * @updated 2026-09-30: Covers packaged custom navigation icon size scales.
  * @updated 2026-10-05: Includes pre-application navigation image hydration.
  * @updated 2026-10-21: Covers per-scheme scale persistence and resource/override precedence.
+ * @updated 2026-10-21: Covers packaged light text on dark navigation backgrounds.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -274,6 +275,7 @@ describe('applyImportedThemePackage', () => {
             background: {
               source: 'asset',
               file: 'assets/navigation/main.webp',
+              textTone: 'light',
               verticalStretch: 1.15
             }
           }
@@ -287,8 +289,8 @@ describe('applyImportedThemePackage', () => {
     const backgrounds = JSON.parse(values.get('navigation_new_background_custom_list') || '[]');
     const settings = JSON.parse(values.get('navigation_new_background_settings') || '{}');
     const iconSelection = JSON.parse(values.get('navigation_icon_selection_v1') || '{}');
-    expect(backgrounds).toMatchObject([{ verticalStretch: 1.15 }]);
-    expect(settings['theme:stretched-navigation:navigation-background']).toMatchObject({ verticalStretch: 1.15 });
+    expect(backgrounds).toMatchObject([{ verticalStretch: 1.15, textTone: 'light' }]);
+    expect(settings['theme:stretched-navigation:navigation-background']).toMatchObject({ verticalStretch: 1.15, textTone: 'light' });
     expect(iconSelection).toMatchObject({ mode: 'text', customMapping: {}, showLabelWithIcon: false });
     expect(iconSelection).not.toHaveProperty('iconScale');
     expect(setTransparentNavigationEnabled).toHaveBeenCalledWith(true);

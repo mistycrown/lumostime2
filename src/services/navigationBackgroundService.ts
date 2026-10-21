@@ -10,11 +10,18 @@
  * @updated 2026-09-28: Removed the packaged background image and migrate its saved selection to no background.
  * @updated 2026-09-28: Persists independent vertical stretching for new navigation backgrounds.
  * @updated 2026-10-05: Stores file references only and keeps hydrated background images in memory.
+ * @updated 2026-10-21: Persists a text tone per background for readable navigation on dark images.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
 import { ImageAssetListStorage } from './imageAssetListStorage';
 import type { NavigationDecorationOption } from './navigationDecorationService';
+
+export type NavigationTextTone = 'dark' | 'light';
+
+export interface NavigationBackgroundOption extends NavigationDecorationOption {
+    textTone?: NavigationTextTone;
+}
 
 export type NavigationBackgroundSettings = {
     offsetY?: string;
@@ -22,6 +29,7 @@ export type NavigationBackgroundSettings = {
     scale?: number;
     verticalStretch?: number;
     opacity?: number;
+    textTone?: NavigationTextTone;
 };
 
 const ENABLED_KEY = 'navigation_new_mode_enabled';
@@ -36,8 +44,8 @@ export const NAVIGATION_BACKGROUND_PREVIEW_EVENT = 'navigationBackgroundPreview'
 export const NAVIGATION_TRANSPARENCY_CHANGE_EVENT = 'navigationTransparencyChange';
 
 class NavigationBackgroundService {
-    private readonly customBackgrounds = new ImageAssetListStorage<NavigationDecorationOption>(CUSTOM_KEY);
-    private readonly builtIn: NavigationDecorationOption[] = [
+    private readonly customBackgrounds = new ImageAssetListStorage<NavigationBackgroundOption>(CUSTOM_KEY);
+    private readonly builtIn: NavigationBackgroundOption[] = [
         {
             id: 'new-none',
             name: '无背景',
@@ -84,11 +92,11 @@ class NavigationBackgroundService {
         window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId: resolvedId } }));
     }
 
-    private loadCustomBackgrounds(): NavigationDecorationOption[] {
+    private loadCustomBackgrounds(): NavigationBackgroundOption[] {
         return this.customBackgrounds.load();
     }
 
-    private saveCustomBackgrounds(backgrounds: NavigationDecorationOption[]): void {
+    private saveCustomBackgrounds(backgrounds: NavigationBackgroundOption[]): void {
         this.customBackgrounds.save(backgrounds);
     }
 
@@ -100,7 +108,7 @@ class NavigationBackgroundService {
         });
     }
 
-    getAllBackgrounds(): NavigationDecorationOption[] {
+    getAllBackgrounds(): NavigationBackgroundOption[] {
         return [
             ...this.builtIn.map((background) => ({
                 ...background,
@@ -111,14 +119,15 @@ class NavigationBackgroundService {
         ];
     }
 
-    getBackgroundById(id: string): NavigationDecorationOption | undefined {
+    getBackgroundById(id: string): NavigationBackgroundOption | undefined {
         const background = this.getAllBackgrounds().find((item) => item.id === id);
         if (!background) return undefined;
         const settings = this.getCustomSettings()[id];
         return {
             ...background,
             ...settings,
-            verticalStretch: settings?.verticalStretch ?? background.verticalStretch ?? 1
+            verticalStretch: settings?.verticalStretch ?? background.verticalStretch ?? 1,
+            textTone: (settings?.textTone ?? background.textTone) === 'light' ? 'light' : 'dark'
         };
     }
 
@@ -138,10 +147,10 @@ class NavigationBackgroundService {
         window.dispatchEvent(new CustomEvent(NAVIGATION_BACKGROUND_CHANGE_EVENT, { detail: { backgroundId } }));
     }
 
-    async addCustomBackground(file: File): Promise<NavigationDecorationOption> {
+    async addCustomBackground(file: File): Promise<NavigationBackgroundOption> {
         const imageFilename = await imageService.saveImage(file, 'theme');
         const url = await imageService.getImageUrl(imageFilename);
-        const background: NavigationDecorationOption = {
+        const background: NavigationBackgroundOption = {
             id: `new_custom_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
             name: file.name.replace(/\.[^/.]+$/, ''),
             type: 'custom',
