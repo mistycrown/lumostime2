@@ -9,6 +9,7 @@
  * @updated 2026-09-26: Constrained icon scheme cards to a 96px left-aligned grid.
  * @updated 2026-09-30: Added a live custom navigation image size control.
  * @updated 2026-10-21: Supports independent icon sizing in each scheme editor.
+ * @updated 2026-10-21: Shows compact text-tone buttons below the enabled navigation-label switch.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -28,9 +29,12 @@ import {
     NAVIGATION_ICON_SCALE_MIN
 } from '../services/navigationIconService';
 import { APPEARANCE_RESTORED_EVENT } from '../services/appearanceBackupService';
+import type { NavigationTextTone } from '../services/navigationBackgroundService';
 
 interface NavigationIconSelectorProps {
     onToast: (type: ToastType, message: string) => void;
+    textTone?: NavigationTextTone;
+    onTextToneChange?: (tone: NavigationTextTone) => void;
 }
 
 const SLOT_LABELS: Record<NavigationIconSlot, string> = {
@@ -45,7 +49,7 @@ const getSchemePreview = (scheme: NavigationIconScheme, customIcons: NavigationI
     navigationIconService.getPreviewIconForScheme(scheme) || customIcons[0]
 );
 
-export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ onToast }) => {
+export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ onToast, textTone = 'dark', onTextToneChange }) => {
     const [selection, setSelection] = useState<NavigationIconSelection>(() => navigationIconService.getSelection());
     const [customIcons, setCustomIcons] = useState<NavigationIconOption[]>(() => navigationIconService.getCustomIcons());
     const [schemes, setSchemes] = useState<NavigationIconScheme[]>(() => navigationIconService.getCustomSchemes());
@@ -282,6 +286,24 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                                 <span className={`navigation-setting-switch-thumb absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${selection.showLabelWithIcon ? 'translate-x-5' : 'translate-x-0'}`} />
                             </button>
                         </div>
+                        {selection.showLabelWithIcon && onTextToneChange && (
+                            <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs text-stone-600">导航文字颜色</span>
+                                <div role="group" aria-label="导航文字颜色" className="inline-flex items-center gap-1 rounded-lg bg-stone-100 p-1">
+                                    {(['dark', 'light'] as const).map((tone) => (
+                                        <button
+                                            key={tone}
+                                            type="button"
+                                            aria-pressed={textTone === tone}
+                                            onClick={() => onTextToneChange(tone)}
+                                            className={`rounded-md px-3 py-1 text-xs transition-colors ${textTone === tone ? 'bg-white font-medium text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-800'}`}
+                                        >
+                                            {tone === 'dark' ? '深色' : '浅色'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <label className="flex items-center gap-3 text-xs text-stone-600">
                             <span className="shrink-0">图标大小 {selection.iconScale}%</span>
                             <input

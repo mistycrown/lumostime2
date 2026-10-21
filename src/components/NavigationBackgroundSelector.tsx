@@ -9,7 +9,7 @@
  * @updated 2026-09-26: Adds dedicated dark-mode styling hooks to keep navigation setting switches visible.
  * @updated 2026-09-26: Constrained new navigation background cards to a 96px left-aligned grid.
  * @updated 2026-09-26: Added a no-background option that restores the default navigation surface.
- * @updated 2026-10-21: Adds per-background dark/light navigation text controls.
+ * @updated 2026-10-21: Provides background text tones to the icon-label settings below their visibility switch.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, Plus, Settings, X } from 'lucide-react';
@@ -22,7 +22,6 @@ import {
     NAVIGATION_BACKGROUND_MODE_CHANGE_EVENT,
     NAVIGATION_TRANSPARENCY_CHANGE_EVENT
 } from '../services/navigationBackgroundService';
-import type { NavigationTextTone } from '../services/navigationBackgroundService';
 
 interface NavigationBackgroundSelectorProps {
     onToast: (type: ToastType, message: string) => void;
@@ -205,22 +204,12 @@ export const NavigationBackgroundSelector: React.FC<NavigationBackgroundSelector
                         </button>
                     </div>
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-                    {currentId !== 'new-none' && (
-                        <label className="flex items-center justify-between gap-4 text-xs text-stone-600">
-                            <span>导航文字</span>
-                            <select
-                                aria-label="导航文字颜色"
-                                value={navigationBackgroundService.getBackgroundById(currentId)?.textTone || 'dark'}
-                                onChange={(event) => navigationBackgroundService.saveCustomSettings(currentId, { textTone: event.target.value as NavigationTextTone })}
-                                className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-700"
-                            >
-                                <option value="dark">深色</option>
-                                <option value="light">浅色</option>
-                            </select>
-                        </label>
-                    )}
                     <div className="border-t border-stone-200 pt-4">
-                        <NavigationIconSelector onToast={onToast} />
+                        <NavigationIconSelector
+                            onToast={onToast}
+                            textTone={navigationBackgroundService.getBackgroundById(currentId)?.textTone || 'dark'}
+                            onTextToneChange={currentId === 'new-none' ? undefined : (textTone) => navigationBackgroundService.saveCustomSettings(currentId, { textTone })}
+                        />
                     </div>
                 </>
             )}
