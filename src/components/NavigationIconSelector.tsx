@@ -8,6 +8,7 @@
  * @updated 2026-09-26: Added an opt-in switch for displaying small labels below image icons.
  * @updated 2026-09-26: Constrained icon scheme cards to a 96px left-aligned grid.
  * @updated 2026-09-30: Added a live custom navigation image size control.
+ * @updated 2026-10-21: Supports independent icon sizing in each scheme editor.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -15,6 +16,7 @@ import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { ToastType } from './Toast';
 import {
     getNavigationIconFallbackUrl,
+    normalizeNavigationIconScale,
     NAVIGATION_ICON_CHANGE_EVENT,
     navigationIconService,
     NavigationIconMode,
@@ -190,6 +192,19 @@ export const NavigationIconSelector: React.FC<NavigationIconSelectorProps> = ({ 
                             onChange={(event) => updateSchemeName(event.target.value)}
                             maxLength={20}
                             className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-800 outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-200"
+                        />
+                    </label>
+                    <label className="mt-4 flex items-center gap-3 text-xs text-stone-600">
+                        <span className="shrink-0">图标大小 {normalizeNavigationIconScale(editingScheme.iconScale)}%</span>
+                        <input
+                            type="range"
+                            min={NAVIGATION_ICON_SCALE_MIN}
+                            max={NAVIGATION_ICON_SCALE_MAX}
+                            step={1}
+                            value={normalizeNavigationIconScale(editingScheme.iconScale)}
+                            onChange={(event) => navigationIconService.updateCustomScheme(editingScheme.id, { iconScale: Number(event.target.value) })}
+                            aria-label={`${editingScheme.name}图标大小`}
+                            className="h-1.5 min-w-0 flex-1 cursor-pointer accent-stone-800"
                         />
                     </label>
                     <div className="mt-4 grid grid-cols-5 gap-1.5 border-t border-stone-100 pt-4 pb-1">

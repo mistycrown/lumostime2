@@ -1,5 +1,6 @@
 /**
  * @file themePackageService.test.ts
+ * @updated 2026-10-21: Covers resource-specific navigation icon scale parsing and validation.
  * @input Synthetic ZIP archives containing theme manifests and assets
  * @output Regression coverage for theme package parsing and safety validation
  * @pos Test (Theme Package Import)
@@ -222,6 +223,33 @@ describe('parseThemePackage', () => {
       iconScale: 125,
       icons: { files: { record: 'assets/navigation/icons/record.webp' } }
     });
+  });
+
+  it('preserves a resource-specific navigation icon scale', async () => {
+    const result = await parseThemePackage(await createZip({
+      format: 'lumostime-theme-package',
+      schemaVersion: 2,
+      package: { id: 'scaled-icons', name: 'Scaled Icons', version: '1.0.0' },
+      resources: {
+        navigationIcons: [{ id: 'icons', iconScale: 85, files: { record: 'assets/record.webp' } }]
+      },
+      apply: { navigation: { mode: 'modern', iconsId: 'icons' } }
+    }, { 'assets/record.webp': 'record' }));
+    expect(result.manifest.config.navigation).toMatchObject({ icons: { id: 'icons', iconScale: 85 } });
+  });
+
+  it('rejects invalid scales on navigation icon resources even when not selected', async () => {
+    for (const iconScale of [69, 141, 100.5, '125', null]) {
+      await expect(parseThemePackage(await createZip({
+        format: 'lumostime-theme-package',
+        schemaVersion: 2,
+        package: { id: 'invalid-icons', name: 'Invalid Icons', version: '1.0.0' },
+        resources: { navigationIcons: [{ id: 'icons', iconScale, files: {} }] },
+        apply: {}
+      }))).rejects.toMatchObject({
+        code: 'INVALID_CONFIGURATION', path: 'resources.navigationIcons[0].iconScale'
+      });
+    }
   });
 
   it('rejects invalid custom navigation icon scales', async () => {

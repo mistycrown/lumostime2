@@ -18,6 +18,7 @@
  * @updated 2026-09-30: Preserves packaged navigation labels shown below custom icons.
  * @updated 2026-09-30: Accepts mixed-case package IDs used by named theme packages.
  * @updated 2026-09-30: Validates packaged custom navigation icon size scales.
+ * @updated 2026-10-21: Validates icon scales defined on navigation icon resources.
  */
 
 import JSZip from 'jszip';
@@ -372,17 +373,9 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
         'config.navigation.showLabelWithIcon'
       );
     }
-    if (navigationRecord.iconScale !== undefined && (
-      typeof navigationRecord.iconScale !== 'number'
-      || !Number.isInteger(navigationRecord.iconScale)
-      || navigationRecord.iconScale < 70
-      || navigationRecord.iconScale > 140
-    )) {
-      throw new ThemePackageValidationError(
-        'INVALID_CONFIGURATION',
-        'navigation.iconScale 必须是 70 到 140 之间的整数',
-        'config.navigation.iconScale'
-      );
+    validateNavigationIconScale(navigationRecord.iconScale, 'config.navigation.iconScale');
+    if (isRecord(navigationRecord.icons)) {
+      validateNavigationIconScale(navigationRecord.icons.iconScale, 'config.navigation.icons.iconScale');
     }
     if (navigationRecord.transparentTitleBar !== undefined && typeof navigationRecord.transparentTitleBar !== 'boolean') {
       throw new ThemePackageValidationError(
@@ -473,6 +466,18 @@ const validateConfigurationInvariants = (manifest: ThemePackageManifest): void =
   }
 };
 
+const validateNavigationIconScale = (value: unknown, path: string): void => {
+  if (value !== undefined && (
+    typeof value !== 'number' || !Number.isInteger(value) || value < 70 || value > 140
+  )) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      `${path} 必须是 70 到 140 之间的整数`,
+      path
+    );
+  }
+};
+
 const validateResourceCollections = (resources: Record<string, unknown>, apply: Record<string, unknown>): void => {
   const collections = [
     'backgrounds',
@@ -504,6 +509,7 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
         throw new ThemePackageValidationError('INVALID_CONFIGURATION', `${path}.id 重复：${item.id}`, `${path}.id`);
       }
       ids.add(item.id);
+      if (key === 'navigationIcons') validateNavigationIconScale(item.iconScale, `${path}.iconScale`);
       if (key === 'uiIcons' && item.numberedDirectory !== undefined
         && (typeof item.numberedDirectory !== 'string' || !isAssetPath(item.numberedDirectory))) {
         throw new ThemePackageValidationError(

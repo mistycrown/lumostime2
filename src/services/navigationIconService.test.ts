@@ -5,6 +5,7 @@
  * @pos Test (UI Customization)
  * @updated 2026-09-28: Covers migration from the removed built-in pink icon mode.
  * @updated 2026-09-30: Covers image icon size normalization and persistence.
+ * @updated 2026-10-21: Covers scheme-specific scales, migration, editing and deletion fallback.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -100,6 +101,60 @@ describe('navigationIconService custom schemes', () => {
     ].forEach(([iconScale, expected]) => {
       localStorage.setItem('navigation_icon_selection_v1', JSON.stringify({ iconScale }));
       expect(navigationIconService.getSelection().iconScale).toBe(expected);
+    });
+  });
+
+  it('restores each scheme scale when switching schemes and text mode', () => {
+    const first = navigationIconService.createCustomScheme('First');
+    navigationIconService.setIconScale(125);
+    const second = navigationIconService.createCustomScheme('Second');
+    expect(navigationIconService.getSelection().iconScale).toBe(100);
+    navigationIconService.setIconScale(80);
+
+    navigationIconService.setActiveScheme(first.id);
+    expect(navigationIconService.getSelection().iconScale).toBe(125);
+    navigationIconService.setMode('text');
+    navigationIconService.setMode('custom');
+    expect(navigationIconService.getSelection().iconScale).toBe(125);
+    navigationIconService.setActiveScheme(second.id);
+    expect(navigationIconService.getSelection().iconScale).toBe(80);
+    expect(JSON.parse(localStorage.getItem(NAVIGATION_ICON_SCHEMES_KEY) || '[]')).toMatchObject([
+      { id: first.id, iconScale: 125 },
+      { id: second.id, iconScale: 80 }
+    ]);
+  });
+
+  it('migrates legacy global scales once without changing existing per-scheme scales', () => {
+    localStorage.setItem('navigation_icon_selection_v1', JSON.stringify({
+      mode: 'custom', schemeId: 'first', iconScale: 115
+    }));
+    localStorage.setItem(NAVIGATION_ICON_SCHEMES_KEY, JSON.stringify([
+      { id: 'first', name: 'First', type: 'custom', mapping: {} },
+      { id: 'second', name: 'Second', type: 'custom', mapping: {} },
+      { id: 'third', name: 'Third', type: 'custom', mapping: {}, iconScale: 90 }
+    ]));
+
+    navigationIconService.setIconScale(130);
+    navigationIconService.setActiveScheme('second');
+    expect(navigationIconService.getSelection().iconScale).toBe(115);
+    navigationIconService.setActiveScheme('third');
+    expect(navigationIconService.getSelection().iconScale).toBe(90);
+    navigationIconService.setActiveScheme('first');
+    expect(navigationIconService.getSelection().iconScale).toBe(130);
+  });
+
+  it('edits an inactive scheme scale without changing the active scale', () => {
+    const first = navigationIconService.createCustomScheme('First');
+    const second = navigationIconService.createCustomScheme('Second');
+    navigationIconService.setSchemeMapping(second.id, 'record', 'second-icon');
+    navigationIconService.setIconScale(80);
+    navigationIconService.updateCustomScheme(first.id, { iconScale: 200 });
+    expect(navigationIconService.getSelection().iconScale).toBe(80);
+    navigationIconService.setActiveScheme(first.id);
+    expect(navigationIconService.getSelection().iconScale).toBe(140);
+    navigationIconService.deleteCustomScheme(first.id);
+    expect(navigationIconService.getSelection()).toMatchObject({
+      schemeId: second.id, iconScale: 80, customMapping: { record: 'second-icon' }
     });
   });
 

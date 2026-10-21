@@ -18,6 +18,7 @@
  * @updated 2026-09-29: Applies packaged transparent title-bar preferences.
  * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  * @updated 2026-09-30: Applies packaged custom navigation icon size scales.
+ * @updated 2026-10-21: Stores packaged navigation icon scales with their schemes.
  * @updated 2026-10-05: Waits for legacy navigation image compaction before writing package settings.
  * @updated 2026-10-05: Also compacts calendar image storage through the shared package preparation step.
  */
@@ -285,6 +286,12 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
 
   if (navigation?.mode !== 'legacy') navigationBackgroundService.setEnabled(true);
 
+  const previousSelection = navigationIconService.getSelection();
+  const iconScale = typeof navigation?.iconScale === 'number'
+    ? navigation.iconScale
+    : typeof (icons as Record<string, unknown>).iconScale === 'number'
+      ? (icons as Record<string, unknown>).iconScale as number
+      : previousSelection.iconScale;
   writeJson(NAVIGATION_ICON_CUSTOM_KEY, customIcons);
   const schemes = readArray<Record<string, unknown>>(NAVIGATION_ICON_SCHEMES_KEY)
     .filter((item) => item.id !== getNamespacedId(record, 'navigation-icons'));
@@ -292,7 +299,8 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
     id: getNamespacedId(record, 'navigation-icons'),
     name: record.name,
     type: 'custom',
-    mapping
+    mapping,
+    iconScale
   });
   writeJson(NAVIGATION_ICON_SCHEMES_KEY, schemes);
   writeJson(NAVIGATION_ICON_SELECTION_KEY, {
@@ -301,10 +309,8 @@ const applyNavigationIcons = async (record: ImportedThemePackageRecord, warnings
     customMapping: mapping,
     showLabelWithIcon: typeof navigation?.showLabelWithIcon === 'boolean'
       ? navigation.showLabelWithIcon
-      : navigationIconService.getSelection().showLabelWithIcon,
-    iconScale: typeof navigation?.iconScale === 'number'
-      ? navigation.iconScale
-      : navigationIconService.getSelection().iconScale
+      : previousSelection.showLabelWithIcon,
+    iconScale
   });
   await navigationIconService.hydrateCustomIcons();
   if (typeof window !== 'undefined') {

@@ -9,6 +9,7 @@
  * @updated 2026-09-28: Removed the packaged pink icon set and migrate its saved selection to text.
  * @updated 2026-09-30: Added a normalized size scale for custom navigation images.
  * @updated 2026-10-05: Keeps resolved image URLs in memory and compacts legacy metadata without quota failures.
+ * @updated 2026-10-21: Persists independent icon scales per scheme and migrates legacy global scales.
  */
 import { resolveAssetPath } from '../utils/assetPath';
 import { imageService } from './imageService';
@@ -30,6 +31,7 @@ export interface NavigationIconScheme {
     name: string;
     type: 'preset' | 'custom';
     mapping: Partial<Record<NavigationIconSlot, string>>;
+    iconScale?: number;
 }
 
 export interface NavigationIconSelection {
@@ -111,7 +113,16 @@ class NavigationIconService {
 
     getCustomIcons(): NavigationIconOption[] { return this.loadCustomIcons(); }
     getCustomSchemes(): NavigationIconScheme[] {
-        return this.loadStoredSchemes().filter((scheme) => scheme?.type === 'custom' && typeof scheme.id === 'string');
+        const schemes = this.loadStoredSchemes().filter((scheme) => scheme?.type === 'custom' && typeof scheme.id === 'string');
+        const legacyScale = this.readStoredSelection().iconScale;
+        const normalized = schemes.map((scheme) => ({
+            ...scheme,
+            iconScale: normalizeNavigationIconScale(scheme.iconScale ?? legacyScale)
+        }));
+        if (normalized.some((scheme, index) => scheme.iconScale !== schemes[index].iconScale)) {
+            this.saveSchemes(normalized);
+        }
+        return normalized;
     }
 
     getSelection(): NavigationIconSelection {
@@ -128,7 +139,7 @@ class NavigationIconService {
             schemeId,
             customMapping: activeScheme?.mapping || (stored.customMapping && typeof stored.customMapping === 'object' ? stored.customMapping : {}),
             showLabelWithIcon: stored.showLabelWithIcon === true,
-            iconScale: normalizeNavigationIconScale(stored.iconScale)
+            iconScale: normalizeNavigationIconScale(activeScheme?.iconScale ?? stored.iconScale)
         };
     }
 
@@ -139,23 +150,30 @@ class NavigationIconService {
     }
 
     setIconScale(scale: number): void {
-        this.saveSelection({ ...this.getSelection(), iconScale: normalizeNavigationIconScale(scale) });
+        const selection = this.getSelection();
+        if (selection.schemeId) this.updateCustomScheme(selection.schemeId, { iconScale: scale });
+        else this.saveSelection({ ...selection, iconScale: normalizeNavigationIconScale(scale) });
     }
 
     setActiveScheme(schemeId: string): void {
         const scheme = this.getCustomSchemes().find((item) => item.id === schemeId);
-        if (scheme) this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId, customMapping: scheme.mapping });
+        if (scheme) this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId, customMapping: scheme.mapping, iconScale: normalizeNavigationIconScale(scheme.iconScale) });
     }
 
     createCustomScheme(name = '新方案'): NavigationIconScheme {
-        const scheme: NavigationIconScheme = { id: `custom-scheme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: name.trim() || '新方案', type: 'custom', mapping: {} };
+        const scheme: NavigationIconScheme = { id: `custom-scheme-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: name.trim() || '新方案', type: 'custom', mapping: {}, iconScale: DEFAULT_NAVIGATION_ICON_SCALE };
         this.saveSchemes([...this.getCustomSchemes(), scheme]);
-        this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId: scheme.id, customMapping: {} });
+        this.saveSelection({ ...this.getSelection(), mode: 'custom', schemeId: scheme.id, customMapping: {}, iconScale: DEFAULT_NAVIGATION_ICON_SCALE });
         return scheme;
     }
 
-    updateCustomScheme(schemeId: string, updates: Partial<Pick<NavigationIconScheme, 'name' | 'mapping'>>): void {
-        const schemes = this.getCustomSchemes().map((scheme) => scheme.id === schemeId ? { ...scheme, ...updates, name: updates.name?.trim() || scheme.name } : scheme);
+    updateCustomScheme(schemeId: string, updates: Partial<Pick<NavigationIconScheme, 'name' | 'mapping' | 'iconScale'>>): void {
+        const schemes = this.getCustomSchemes().map((scheme) => scheme.id === schemeId ? {
+            ...scheme,
+            ...updates,
+            name: updates.name?.trim() || scheme.name,
+            iconScale: normalizeNavigationIconScale(updates.iconScale ?? scheme.iconScale)
+        } : scheme);
         this.saveSchemes(schemes);
         const selection = this.getSelection();
         if (selection.schemeId === schemeId) this.saveSelection({ ...selection, customMapping: schemes.find((scheme) => scheme.id === schemeId)?.mapping || {} });
@@ -165,13 +183,13 @@ class NavigationIconService {
     deleteCustomScheme(schemeId: string): boolean {
         const schemes = this.getCustomSchemes();
         if (!schemes.some((scheme) => scheme.id === schemeId)) return false;
+        const selection = this.getSelection();
         const remaining = schemes.filter((scheme) => scheme.id !== schemeId);
         this.saveSchemes(remaining);
-        const selection = this.getSelection();
         if (selection.schemeId === schemeId) {
             const next = remaining[0];
-            if (next) this.saveSelection({ ...selection, mode: 'custom', schemeId: next.id, customMapping: next.mapping });
-            else this.saveSelection({ ...selection, mode: 'text', customMapping: {} });
+            if (next) this.saveSelection({ ...selection, mode: 'custom', schemeId: next.id, customMapping: next.mapping, iconScale: normalizeNavigationIconScale(next.iconScale) });
+            else this.saveSelection({ ...selection, mode: 'text', schemeId: undefined, customMapping: {} });
         } else this.emitChange();
         return true;
     }

@@ -12,6 +12,7 @@
  * @updated 2026-09-30: Covers packaged labels below custom navigation icons.
  * @updated 2026-09-30: Covers packaged custom navigation icon size scales.
  * @updated 2026-10-05: Includes pre-application navigation image hydration.
+ * @updated 2026-10-21: Covers per-scheme scale persistence and resource/override precedence.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -236,6 +237,9 @@ describe('applyImportedThemePackage', () => {
       showLabelWithIcon: true,
       iconScale: 125
     });
+    expect(JSON.parse(values.get('navigation_icon_schemes_v1') || '[]')).toMatchObject([
+      { id: 'theme:asset-theme:navigation-icons', iconScale: 125 }
+    ]);
     expect(hydrateNavigationIcons).toHaveBeenCalledOnce();
     expect(setNavigationEnabled).toHaveBeenCalledWith(true);
     const { backgroundService } = await import('./backgroundService');
@@ -290,7 +294,11 @@ describe('applyImportedThemePackage', () => {
     expect(setTransparentNavigationEnabled).toHaveBeenCalledWith(true);
   });
 
-  it('preserves the current icon scale when an image-icon package omits it', async () => {
+  it.each([
+    { resourceScale: undefined, overrideScale: undefined, expected: 115 },
+    { resourceScale: 85, overrideScale: undefined, expected: 85 },
+    { resourceScale: 85, overrideScale: 125, expected: 125 }
+  ])('stores the resolved scheme scale ($resourceScale, $overrideScale → $expected)', async ({ resourceScale, overrideScale, expected }) => {
     const values = new Map<string, string>();
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => values.get(key) ?? null,
@@ -310,7 +318,8 @@ describe('applyImportedThemePackage', () => {
         package: { id: 'retain-navigation-scale', name: 'Retain Navigation Scale', version: '1.0.0' },
         config: {
           navigation: {
-            icons: { files: { record: 'assets/navigation/record.png' } }
+            iconScale: overrideScale,
+            icons: { iconScale: resourceScale, files: { record: 'assets/navigation/record.png' } }
           }
         }
       },
@@ -322,8 +331,11 @@ describe('applyImportedThemePackage', () => {
     expect(JSON.parse(values.get('navigation_icon_selection_v1') || '{}')).toMatchObject({
       mode: 'custom',
       showLabelWithIcon: true,
-      iconScale: 115
+      iconScale: expected
     });
+    expect(JSON.parse(values.get('navigation_icon_schemes_v1') || '[]')).toMatchObject([
+      { id: 'theme:retain-navigation-scale:navigation-icons', iconScale: expected }
+    ]);
   });
 
   it('sets the imported sticker default page and merges package sets into one selector group', async () => {
