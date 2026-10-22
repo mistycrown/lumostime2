@@ -5,6 +5,7 @@
  * @pos Service (Data Synchronization)
  * @description Manages generic S3-compatible storage using the AWS S3 client while preserving the existing sync object layout.
  * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
+ * @updated 2026-10-22: Uses conditional main-backup reads while retaining full verification reads.
  *
  * 修改历史:
  * - 2026-04-19: Added isolated compatible S3 service so Tencent Cloud COS can remain unchanged while supporting generic S3-compatible storage.
@@ -24,6 +25,7 @@ import { Capacitor } from '@capacitor/core';
 import { HttpRequest, HttpResponse } from '@smithy/protocol-http';
 import type { HttpHandlerOptions } from '@smithy/types';
 import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
+import { CloudJsonCache, CloudJsonReadOptions } from '../utils/cloudJsonCache';
 
 export interface CompatibleS3Config {
   bucketName: string;
@@ -221,6 +223,7 @@ class NativeCompatibleS3RequestHandler {
 }
 
 export class CompatibleS3Service {
+  private jsonCache = new CloudJsonCache();
   private config: CompatibleS3Config | null = null;
   private client: S3Client | null = null;
 
@@ -454,6 +457,7 @@ export class CompatibleS3Service {
   }
 
   saveConfig(config: CompatibleS3Config) {
+    this.jsonCache.clear();
     this.config = this.normalizeConfig(config);
 
     localStorage.removeItem('lumos_compatible_s3_provider');
@@ -472,6 +476,7 @@ export class CompatibleS3Service {
   }
 
   disconnect() {
+    this.jsonCache.clear();
     this.client = null;
     this.config = null;
   }
@@ -544,6 +549,7 @@ export class CompatibleS3Service {
   }
 
   async uploadData(data: any, filename: string = 'lumostime_backup.json'): Promise<boolean> {
+    if (filename === 'lumostime_backup.json') this.jsonCache.clear();
     await this.getClient().send(new PutObjectCommand({
       Bucket: this.getBucket(),
       Key: filename,
@@ -555,18 +561,25 @@ export class CompatibleS3Service {
     return true;
   }
 
-  async downloadData(filename: string = 'lumostime_backup.json'): Promise<any> {
-    const response = await this.getClient().send(new GetObjectCommand({
-      Bucket: this.getBucket(),
-      Key: filename,
-      ResponseCacheControl: 'no-cache, no-store, must-revalidate',
-      ResponseContentDisposition: `inline; filename="${filename}"; fresh=${Date.now()}`,
-      ResponseExpires: new Date(0),
-      ResponseContentType: 'application/json'
-    }));
-
-    const content = await this.normalizeStringBody(response.Body);
-    return JSON.parse(content);
+  async downloadData(filename: string = 'lumostime_backup.json', options: CloudJsonReadOptions = {}): Promise<any> {
+    const fetchJson = async (etag?: string) => {
+      const response = await this.getClient().send(new GetObjectCommand({
+        Bucket: this.getBucket(),
+        Key: filename,
+        ...(etag ? { IfNoneMatch: etag } : {}),
+        ResponseCacheControl: 'no-cache, no-store, must-revalidate',
+        ResponseContentDisposition: `inline; filename="${filename}"; fresh=${Date.now()}`,
+        ResponseExpires: new Date(0),
+        ResponseContentType: 'application/json'
+      }));
+      return {
+        text: await this.normalizeStringBody(response.Body),
+        etag: response.ETag,
+        status: response.$metadata?.httpStatusCode
+      };
+    };
+    if (filename === 'lumostime_backup.json') return this.jsonCache.read(filename, options, fetchJson);
+    return JSON.parse((await fetchJson()).text);
   }
 
   async uploadImage(filename: string, buffer: ArrayBuffer | string | Blob): Promise<boolean> {

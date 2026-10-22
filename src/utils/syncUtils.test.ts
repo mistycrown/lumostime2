@@ -2,6 +2,7 @@
  * @file syncUtils.test.ts
  * @updated 2026-10-02: Covers exact-snapshot restores, missing-object classification, and destination identity.
  * @updated 2026-10-11: Ensures unavailable image inventories stop further uploads.
+ * @updated 2026-10-22: Covers conditional snapshot reads and native manifest inventory reuse.
  * @input Mock cloud services and local sync payloads
  * @output Regression coverage for main-backup upload verification
  * @pos Test
@@ -9,9 +10,9 @@
  * @updated 2026-06-21: Added write-after-read main backup verification coverage.
  */
 
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-const { storage } = vi.hoisted(() => {
+const { storage, isNativePlatform } = vi.hoisted(() => {
   const storage = new Map<string, string>();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => storage.get(key) ?? null,
@@ -19,12 +20,16 @@ const { storage } = vi.hoisted(() => {
     removeItem: (key: string) => storage.delete(key),
     clear: () => storage.clear()
   });
-  return { storage };
+  return { storage, isNativePlatform: vi.fn(() => false) };
 });
+
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform } }));
+afterEach(() => isNativePlatform.mockReturnValue(false));
 
 import { downloadWithBackup, uploadDataToCloud, readCloudSnapshot, getCloudDestinationIdentity } from './syncUtils';
 import { syncService } from '../services/syncService';
 import { imageService } from '../services/imageService';
+import { webdavService } from '../services/webdavService';
 
 vi.mock('../services/imageService', () => ({
   imageService: {
@@ -107,6 +112,26 @@ describe('uploadDataToCloud', () => {
     expect(cloud.downloadData).toHaveBeenCalledWith('lumostime_backup.json');
   });
 
+  test('native WebDAV uses the existing manifest instead of treating unsupported listing as an empty cloud', async () => {
+    isNativePlatform.mockReturnValue(true);
+    let uploadedData: any;
+    const cloud = Object.assign(webdavService, createMockCloudService(vi.fn(async () => uploadedData)));
+    cloud.uploadData.mockImplementation(async data => { uploadedData = data; return true; });
+    cloud.downloadImageList.mockResolvedValue({ images: ['existing.webp'], timestamp: 1 });
+    vi.mocked(imageService.buildReferencedImagesList).mockReturnValueOnce(['existing.webp']);
+    vi.mocked(syncService.uploadImages).mockResolvedValueOnce({
+      uploaded: 0, downloaded: 0, deletedRemote: 0,
+      uploadedFiles: [], downloadedFiles: [], failedFiles: [], errors: []
+    });
+
+    const result = await uploadDataToCloud(cloud as any, buildValidPayload(10));
+
+    expect(result.success).toBe(true);
+    expect(cloud.getDirectoryContents).not.toHaveBeenCalled();
+    expect(syncService.uploadImages).toHaveBeenCalledWith(cloud, undefined, ['existing.webp'], ['existing.webp']);
+    expect(cloud.uploadImageList).toHaveBeenCalledWith({ content: ['existing.webp'], theme: [] });
+  });
+
   test.each(['manifest', 'inventory'])('stops when the cloud image %s returns 503', async source => {
     let uploadedData: any;
     const cloud = createMockCloudService(vi.fn(async () => uploadedData));
@@ -171,6 +196,12 @@ describe('downloadWithBackup', () => {
 });
 
 describe('readCloudSnapshot', () => {
+  test('enables conditional reads only for snapshot checks', async () => {
+    const data = buildValidPayload(10);
+    const cloud = createMockCloudService(vi.fn(async () => data));
+    expect(await readCloudSnapshot(cloud as any)).toEqual(data);
+    expect(cloud.downloadData).toHaveBeenCalledWith('lumostime_backup.json', { conditional: true });
+  });
   test.each([{ status: 404 }, { code: 'NoSuchKey' }, { name: 'NotFound', $metadata: { httpStatusCode: 404 } }])('recognizes an explicitly missing object: %j', async (error) => {
     const cloud = createMockCloudService(vi.fn().mockRejectedValue(error));
     expect(await readCloudSnapshot(cloud as any)).toBeNull();

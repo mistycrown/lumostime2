@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-22: WebDAV, COS and compatible S3 support conditional main-backup GETs using strong ETags. Upload verification stays unconditional; cache entries are invalidated before writes and connection changes. Native WebDAV reads main JSON through native HTTP for response metadata and reuses image manifests when listing is unsupported. Details are in `cloud-sync.md`.
+
 Update 2026-10-18: Desktop and Android widget source projections omit abandoned tasks from active/overdue lists. Excel todo exports retain separate status and abandonment timestamp fields alongside completion fields.
 Assistant context also excludes abandoned tasks from active summaries and includes their timestamps in JSON and compact todo dictionaries.
 

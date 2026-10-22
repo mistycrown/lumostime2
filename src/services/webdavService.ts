@@ -8,6 +8,7 @@
  * @updated 2026-10-10: Uses canonical WebDAV paths without cache-busting queries and retains fresh reads through cache-control headers.
  * @updated 2026-10-11: Treats missing files as completed deletions without reporting WebDAV errors.
  * @updated 2026-10-11: Spaces Nutstore requests, shares HTTP 429/503 cooldown across transports, and propagates failed image inventory reads.
+ * @updated 2026-10-22: Adds conditional main-backup GETs across native and Web/Electron transports.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -18,6 +19,7 @@ import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Buffer } from 'buffer';
 import { isWebDAVUnavailable, WebDAVRequestQueue } from './webdavRequestQueue';
+import { CloudJsonCache, CloudJsonReadOptions, getCloudResponseHeader } from '../utils/cloudJsonCache';
 
 // Ensure Buffer is available globally for webdav lib
 // Note: In Electron, we polyfilled this in preload.js and index.tsx as well.
@@ -43,6 +45,7 @@ export interface WebDAVConfig {
 }
 
 export class WebDAVService {
+    private jsonCache = new CloudJsonCache();
     private client: WebDAVClient | null = null;
     private config: WebDAVConfig | null = null;
     private requestQueue = new WebDAVRequestQueue(() => {
@@ -126,6 +129,7 @@ export class WebDAVService {
     }
 
     saveConfig(config: WebDAVConfig) {
+        this.jsonCache.clear();
         this.config = config;
         localStorage.setItem(STORAGE_KEY_URL, config.url);
         localStorage.setItem(STORAGE_KEY_USER, config.username);
@@ -226,6 +230,7 @@ export class WebDAVService {
     }
 
     clearConfig() {
+        this.jsonCache.clear();
         // 只清理内存中的配置和客户端，保留localStorage中的配置缓存
         this.client = null;
         this.config = null;
@@ -234,6 +239,7 @@ export class WebDAVService {
 
     // 新增：完全清理配置的方法（包括localStorage）
     clearAllConfig() {
+        this.jsonCache.clear();
         localStorage.removeItem(STORAGE_KEY_URL);
         localStorage.removeItem(STORAGE_KEY_USER);
         localStorage.removeItem(STORAGE_KEY_PASS);
@@ -463,6 +469,7 @@ export class WebDAVService {
     }
 
     async uploadData(data: any, filename: string = 'lumostime_backup.json'): Promise<boolean> {
+        if (filename === 'lumostime_backup.json') this.jsonCache.clear();
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
 
         const content = JSON.stringify(data, null, 2);
@@ -518,8 +525,33 @@ export class WebDAVService {
         }
     }
 
-    async downloadData(filename: string = 'lumostime_backup.json'): Promise<any> {
+    async downloadData(filename: string = 'lumostime_backup.json', options: CloudJsonReadOptions = {}): Promise<any> {
         if (!this.config && !this.client) throw new Error('WebDAV not configured');
+
+        if (filename === 'lumostime_backup.json') {
+            return this.jsonCache.read(filename, options, async (etag) => {
+                const headers = { ...READ_CACHE_HEADERS, ...(etag ? { 'If-None-Match': etag } : {}) };
+                if (Capacitor.isNativePlatform() && this.config) {
+                    // Native HTTP exposes the ETag of this exact response. Filesystem
+                    // downloads do not expose response headers and remain in use for backups/images.
+                    const url = this.config.url.endsWith('/') ? `${this.config.url}${filename}` : `${this.config.url}/${filename}`;
+                    const auth = Buffer.from(`${this.config.username}:${this.config.password}`).toString('base64');
+                    const response = await this.sendNativeRequest(url, {
+                        method: 'get',
+                        headers: { ...headers, Authorization: `Basic ${auth}` },
+                        responseType: 'text',
+                        timeout: 60
+                    });
+                    if (response.status !== 200 && response.status !== 304) {
+                        throw this.buildNativeError(`下载 ${filename}`, url, response);
+                    }
+                    return { text: response.data, etag: getCloudResponseHeader(response.headers, 'etag'), status: response.status };
+                }
+                const response = await this.client!.getFileContents(`/${filename}`, { format: 'text', details: true, headers });
+                if (typeof response === 'string' || !('data' in response)) throw new Error('WebDAV response metadata unavailable');
+                return { text: response.data as string, etag: getCloudResponseHeader(response.headers, 'etag'), status: response.status };
+            });
+        }
 
         // NATIVE: Use Filesystem.downloadFile for better performance
         // This avoids passing large JSON through WebView bridge

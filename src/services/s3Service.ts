@@ -5,6 +5,7 @@
  * @pos Service (Data Synchronization)
  * @description Manages Tencent Cloud COS connections and file operations using official COS SDK, providing the same interface as WebDAV service.
  * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
+ * @updated 2026-10-22: Uses conditional COS reads with exact response ETags and full upload verification.
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
@@ -12,6 +13,7 @@
 import COS from 'cos-js-sdk-v5';
 import { Capacitor } from '@capacitor/core';
 import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
+import { CloudJsonCache, CloudJsonReadOptions, CloudJsonResponse, getCloudResponseHeader } from '../utils/cloudJsonCache';
 
 // S3 Configuration Interface (now for Tencent Cloud COS)
 export interface S3Config {
@@ -30,6 +32,7 @@ const STORAGE_KEY_SECRET_KEY = 'lumos_cos_secret_key';
 const STORAGE_KEY_ENDPOINT = 'lumos_cos_endpoint';
 
 export class S3Service {
+    private jsonCache = new CloudJsonCache();
     private config: S3Config | null = null;
     private client: any = null; // COS client instance
 
@@ -96,6 +99,7 @@ export class S3Service {
 
 
     saveConfig(config: S3Config) {
+        this.jsonCache.clear();
         // Trim inputs to prevent copy-paste whitespace errors
         config.bucketName = config.bucketName.trim();
         config.region = config.region.trim();
@@ -122,6 +126,7 @@ export class S3Service {
     }
 
     disconnect() {
+        this.jsonCache.clear();
         this.config = null;
         this.client = null;
     }
@@ -248,6 +253,7 @@ export class S3Service {
      * Upload data to COS
      */
     async uploadData(data: any, filename: string = 'lumostime_backup.json'): Promise<boolean> {
+        if (filename === 'lumostime_backup.json') this.jsonCache.clear();
         if (!this.config || !this.client) throw new Error('COS not configured');
 
         const content = JSON.stringify(data, null, 2);
@@ -283,30 +289,30 @@ export class S3Service {
     /**
      * Download data from COS
      */
-    async downloadData(filename: string = 'lumostime_backup.json'): Promise<any> {
+    async downloadData(filename: string = 'lumostime_backup.json', options: CloudJsonReadOptions = {}): Promise<any> {
         if (!this.config || !this.client) throw new Error('COS not configured');
-
-        return new Promise((resolve, reject) => {
-            // console.log(`[COS] Downloading data: ${filename}`);
-
-
-            this.client.getObject(this.buildFreshJsonDownloadParams(filename), async (err: any, data: any) => {
+        const fetchJson = (etag?: string) => new Promise<CloudJsonResponse>((resolve, reject) => {
+            this.client.getObject({
+                ...this.buildFreshJsonDownloadParams(filename),
+                ...(etag ? { IfNoneMatch: etag } : {})
+            }, async (err: any, data: any) => {
                 if (err) {
-                    console.error(`[COS] Download failed: ${filename}`, err);
                     reject(err);
                 } else {
                     try {
-                        const content = await this.normalizeJsonBody(data.Body);
-                        // console.log(`[COS] ✓ Download completed: ${filename}, size: ${content.length} bytes`);
-                        const parsedData = JSON.parse(content);
-                        resolve(parsedData);
+                        resolve({
+                            text: data.statusCode === 304 ? '' : await this.normalizeJsonBody(data.Body),
+                            etag: getCloudResponseHeader(data.headers, 'etag'),
+                            status: data.statusCode
+                        });
                     } catch (parseError) {
-                        console.error(`[COS] Failed to parse JSON: ${filename}`, parseError);
-                        reject(new Error('Failed to parse downloaded data as JSON'));
+                        reject(parseError);
                     }
                 }
             });
         });
+        if (filename === 'lumostime_backup.json') return this.jsonCache.read(filename, options, fetchJson);
+        return JSON.parse((await fetchJson()).text);
     }
 
     /**

@@ -6,6 +6,8 @@
 
 `syncUtils.ts` retains payload validation, verified safety backups and image transfer, adds a unique `syncRevision`, and restores the already selected snapshot. Only a confirmed missing object permits initial upload; failed reads and malformed payloads stop the transfer.
 
+Since 2026-10-22, snapshot checks request conditional GETs through `cloudJsonCache.ts`. Each provider keeps one memory-only main-backup JSON/strong-ETag pair from the same response. Unchanged reads and upload preflights reuse it only after a server 304; changed objects are downloaded and validated normally. Default `downloadData` calls remain unconditional, including read-after-write verification. Main-backup writes invalidate the cache before sending, even if their response is lost; reconnection/config changes also clear it. Safety backups never replace the cached main backup. Missing/weak ETags fall back to full reads. Rejected conditional headers fall back to a full read; authentication, missing-object, rate-limit and server failures never return cached data. The first read after a process restart still downloads the backup.
+
 `localDataTimestamp.ts` now tracks local edit revisions without a recent-input heuristic. Clearing pending state requires an explicit captured revision. The coordinator additionally checks actual snapshot content before acknowledging it.
 
 Cloud destination identifiers are hashed and include provider, endpoint, account and bucket. Credentials are excluded. Existing payloads without revisions use their content hash as a legacy version. Interrupted uploads retain a receipt so a successfully written version with a lost response can be recognized on retry or restart.

@@ -1,6 +1,7 @@
 /**
  * @file syncUtils.ts
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
+ * @updated 2026-10-22: Uses conditional snapshot reads and native WebDAV manifests to avoid redundant transfers.
  * @updated 2026-10-11: Stops uploads after WebDAV inventory failures instead of treating unavailable storage as empty.
  * @updated 2026-10-02: Publishes unique revisions, distinguishes missing objects from read failures, and restores the exact selected snapshot.
  * @updated 2026-09-25: Builds and uploads separate content/theme image manifest groups with legacy cloud-list compatibility.
@@ -14,6 +15,7 @@
 import { webdavService } from '../services/webdavService';
 import { s3Service } from '../services/s3Service';
 import { compatibleS3Service } from '../services/compatibleS3Service';
+import { Capacitor } from '@capacitor/core';
 import { imageService } from '../services/imageService';
 import { appearanceBackupService } from '../services/appearanceBackupService';
 import { syncService } from '../services/syncService';
@@ -56,7 +58,7 @@ export function getCloudDestinationIdentity(service: CloudService): string {
 export async function readCloudSnapshot(service: CloudService): Promise<any | null> {
   let data: any;
   try {
-    data = await service.downloadData(MAIN_BACKUP_FILENAME);
+    data = await service.downloadData(MAIN_BACKUP_FILENAME, { conditional: true });
   } catch (error: any) {
     const code = error?.code || error?.name;
     const status = error?.status ?? error?.statusCode ?? error?.response?.status ?? error?.$metadata?.httpStatusCode;
@@ -133,6 +135,9 @@ function buildReferencedImageList(data: any): string[] {
 }
 
 async function listCloudImageFiles(service: CloudService): Promise<string[] | null> {
+  // Native WebDAV returns [] when directory listing is unsupported, not when the
+  // cloud directory is empty. Keep the successfully read manifest as the inventory.
+  if (service === webdavService && Capacitor.isNativePlatform()) return null;
   try {
     const directoryPath = service === webdavService ? '/images' : 'images';
     const contents = await service.getDirectoryContents?.(directoryPath);

@@ -5,6 +5,7 @@
  * @pos Test (Cloud Sync)
  * @updated 2026-10-10: Covers Nutstore-compatible native uploads and real WebDAV client requests.
  * @updated 2026-10-11: Covers idempotent DELETE 404 and retained failures with a real WebDAV client.
+ * @updated 2026-10-22: Covers real conditional GETs, native 304s and full verification reads.
  */
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -39,8 +40,9 @@ let WebDAVService: typeof import('./webdavService').WebDAVService;
 const { createServer } = process.getBuiltinModule('node:http') as typeof import('node:http');
 let server: Server;
 let serverUrl: string;
-const requests: { method: string; path: string; cacheControl?: string; body: string }[] = [];
+const requests: { method: string; path: string; cacheControl?: string; ifNoneMatch?: string; body: string }[] = [];
 let unavailable = false;
+let backupEtag = '"backup-v1"';
 const backup = { timestamp: 123, notes: '坚果云同步测试' };
 const freshReadHeaders = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -59,6 +61,7 @@ beforeAll(async () => {
       method: request.method || '',
       path,
       cacheControl: request.headers['cache-control'],
+      ifNoneMatch: request.headers['if-none-match'],
       body: Buffer.concat(chunks).toString('utf8')
     });
     // Reject both actual queries and query text encoded into a filename by the SDK.
@@ -83,7 +86,11 @@ beforeAll(async () => {
     } else if (path.endsWith('.webp')) {
       response.writeHead(200, { 'Content-Type': 'image/webp' }).end(Buffer.from([1, 2, 3]));
     } else {
-      response.writeHead(200, { 'Content-Type': 'application/json' });
+      if (request.headers['if-none-match'] === backupEtag) {
+        response.writeHead(304, { ETag: backupEtag }).end();
+        return;
+      }
+      response.writeHead(200, { 'Content-Type': 'application/json', ETag: backupEtag });
       response.end(JSON.stringify(path.endsWith('lumostime_images.json')
         ? { images: ['photo.webp'], timestamp: 123 }
         : backup));
@@ -102,9 +109,11 @@ beforeEach(() => {
   });
   requests.length = 0;
   unavailable = false;
+  backupEtag = '"backup-v1"';
   adapters.isNativePlatform.mockReturnValue(false);
-  adapters.sendRequest.mockImplementation(async (url: string) => {
+  adapters.sendRequest.mockImplementation(async (url: string, options: any) => {
     if (url.includes('?')) throw { status: 400, error: 'the nutstore path is not valid' };
+    if (options.method === 'get') return { status: 200, data: JSON.stringify(backup), headers: { etag: backupEtag } };
     return { status: 201 };
   });
   adapters.downloadFile.mockResolvedValue({ path: 'temp/download.json' });
@@ -174,18 +183,53 @@ describe('native WebDAV paths', () => {
     await service.downloadImage('photo.webp');
 
     expect(adapters.downloadFile.mock.calls.map(([options]) => options.url)).toEqual([
-      `${baseUrl}/lumostime_backup.json`,
       `${baseUrl}/lumostime_images.json`,
       `${baseUrl}/images/photo.webp`
     ]);
+    expect(adapters.sendRequest.mock.calls[0]).toEqual([`${baseUrl}/lumostime_backup.json`, expect.objectContaining({
+      method: 'get', responseType: 'text', headers: expect.objectContaining(freshReadHeaders)
+    })]);
     for (const [options] of adapters.downloadFile.mock.calls) {
       expect(options.headers).toMatchObject(freshReadHeaders);
       expect(options.headers.Authorization).toMatch(/^Basic /);
     }
   });
+
+  it.each(['resolve', 'reject'])('handles native %s 304 without downloading a file body', async mode => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    const service = configure('https://dav.jianguoyun.com/dav/Lumostime');
+    expect(await service.downloadData()).toEqual(backup);
+    if (mode === 'resolve') adapters.sendRequest.mockResolvedValueOnce({ status: 304, data: '' });
+    else adapters.sendRequest.mockRejectedValueOnce({ status: 304, error: '' });
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(backup);
+    expect(adapters.sendRequest.mock.calls[1][1].headers['If-None-Match']).toBe(backupEtag);
+    expect(adapters.downloadFile).not.toHaveBeenCalled();
+  });
 });
 
 describe('Web/Electron real WebDAV requests', () => {
+  it('revalidates with one conditional GET and keeps default verification unconditional', async () => {
+    const service = configure(serverUrl);
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(backup);
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(backup);
+    backupEtag = '"backup-v2"';
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(backup);
+    await service.downloadData();
+    expect(requests.map(({ method, ifNoneMatch }) => [method, ifNoneMatch])).toEqual([
+      ['GET', undefined], ['GET', '"backup-v1"'], ['GET', '"backup-v1"'], ['GET', undefined]
+    ]);
+  });
+
+  it('invalidates before uploads and config changes', async () => {
+    const service = configure(serverUrl);
+    await service.downloadData();
+    await service.uploadData(backup);
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    service.saveConfig({ url: serverUrl, username: 'another', password: 'test-password' });
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    expect(requests.every(request => !request.ifNoneMatch)).toBe(true);
+  });
+
   it('shares a 503 cooldown between manifest uploads and subsequent backup reads', async () => {
     const service = configure(serverUrl);
     vi.spyOn(console, 'error').mockImplementation(() => {});

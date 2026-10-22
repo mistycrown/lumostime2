@@ -1,5 +1,7 @@
 # Stable AI backup reads
 
+Since 2026-10-22, WebDAV, COS and compatible S3 main-backup downloads accept `{ conditional: true }` for server-confirmed ETag reuse. Default reads remain unconditional for upload verification. Native WebDAV uses Cordova HTTP for main-backup JSON so its ETag and body come from the same response; safety backups and images retain filesystem downloads. These requests share the existing WebDAV request queue and 429/503 cooldown. Native WebDAV image uploads use the downloaded image manifest because its unsupported directory-list operation returns an empty placeholder, not an actual inventory. This prevents existing images from being uploaded again on every text edit.
+
 The 2026-10-02 versioned sync coordinator compares persisted content. `assistantMemoryService.getMemory()` and `dreamService.getState()` therefore persist generated defaults and legacy normalization once, without emitting edit notifications. Repeated reads must not invent new timestamps or IDs. Real writes still update their timestamps and signal synchronization.
 
 Covered by `syncBackupStability.test.ts`, existing memory/backup tests, and the isolated production renderer smoke test. Transfer rules and checkpoint details are in `../utils/cloud-sync.md`.

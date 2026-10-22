@@ -7,8 +7,11 @@
  * @output Observable React contexts and isolated cloud/service adapters
  * @pos Test Support (Cloud Sync)
  * @updated 2026-10-04: Models SettingsProvider reloading sticker metadata during appearance restoration.
+ * @updated 2026-10-22: Models real conditional JSON reads and counts full response bodies.
  */
 import { useSyncExternalStore } from 'react';
+import { CloudJsonCache, CloudJsonReadOptions } from '../../utils/cloudJsonCache';
+import { hashSyncContent } from '../../utils/syncProtocol';
 
 const listeners = new Set<() => void>();
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener); };
@@ -44,21 +47,31 @@ export const useAchievement = () => ({
 export const toasts: any[] = [];
 export const useToast = () => ({ addToast: (...args: any[]) => toasts.push(args) });
 export const cloud = {
-  files: new Map<string, any>(), uploads: [] as string[], reads: 0,
+  files: new Map<string, any>(), uploads: [] as string[], reads: 0, fullReads: 0,
   failReads: false,
   uploadGate: null as null | (() => Promise<void>),
   backupGate: null as null | (() => Promise<void>)
 };
 const clone = (value: any) => JSON.parse(JSON.stringify(value));
+const jsonCache = new CloudJsonCache();
 export const webdavService = {
   getConfig: () => ({ url: 'https://test.invalid/dav', username: 'test', password: 'test-only' }),
-  async downloadData(filename = 'lumostime_backup.json') {
-    cloud.reads++;
-    if (cloud.failReads) throw { status: 503 };
-    if (!cloud.files.has(filename)) throw { status: 404 };
-    return clone(cloud.files.get(filename));
+  async downloadData(filename = 'lumostime_backup.json', options: CloudJsonReadOptions = {}) {
+    const fetchJson = async (previousEtag?: string) => {
+      cloud.reads++;
+      if (cloud.failReads) throw { status: 503 };
+      if (!cloud.files.has(filename)) throw { status: 404 };
+      const text = JSON.stringify(cloud.files.get(filename));
+      const etag = '"' + await hashSyncContent(text) + '"';
+      if (previousEtag === etag) return { status: 304, text: '' };
+      cloud.fullReads++;
+      return { text, etag, status: 200 };
+    };
+    if (filename === 'lumostime_backup.json') return jsonCache.read(filename, options, fetchJson);
+    return JSON.parse((await fetchJson()).text);
   },
   async uploadData(data: any, filename = 'lumostime_backup.json') {
+    if (filename === 'lumostime_backup.json') jsonCache.clear();
     if (filename === 'lumostime_backup.json') await cloud.uploadGate?.();
     else await cloud.backupGate?.();
     cloud.uploads.push(filename);

@@ -1,6 +1,7 @@
 /**
  * @file s3Service.test.ts
  * @description Regression tests for COS data download behavior.
+ * @updated 2026-10-22: Covers conditional COS responses and full verification reads.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -49,6 +50,32 @@ describe('S3Service', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubGlobal('localStorage', createLocalStorageMock());
+  });
+
+  it('uses exact response ETags, accepts resolved/rejected 304s and bypasses cache for verification', async () => {
+    const { S3Service } = await import('./s3Service');
+    const service = new S3Service();
+    service.saveConfig({ bucketName: 'bucket-1234567890', region: 'ap-beijing', secretId: 'id', secretKey: 'key' });
+    const body = { logs: [{ note: '文字' }] };
+    getObjectMock.mockImplementationOnce((_params, callback) => callback(null, { Body: JSON.stringify(body), headers: { ETag: '"v1"' }, statusCode: 200 }))
+      .mockImplementationOnce((_params, callback) => callback(null, { statusCode: 304 }))
+      .mockImplementationOnce((_params, callback) => callback({ statusCode: 304 }))
+      .mockImplementationOnce((_params, callback) => callback(null, { Body: JSON.stringify(body), headers: { etag: '"v1"' } }));
+    for (let i = 0; i < 3; i++) expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(body);
+    await service.downloadData();
+    expect(getObjectMock.mock.calls.map(([params]) => params.IfNoneMatch)).toEqual([undefined, '"v1"', '"v1"', undefined]);
+  });
+
+  it('clears cached ETags before uploads even when the response is lost', async () => {
+    const { S3Service } = await import('./s3Service');
+    const service = new S3Service();
+    service.saveConfig({ bucketName: 'bucket-1234567890', region: 'ap-beijing', secretId: 'id', secretKey: 'key' });
+    getObjectMock.mockImplementation((_params, callback) => callback(null, { Body: '{"logs":[]}', headers: { etag: '"v1"' } }));
+    putObjectMock.mockImplementation((_params, callback) => callback(new Error('lost response')));
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    await expect(service.uploadData({ logs: [] })).rejects.toThrow('lost response');
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    expect(getObjectMock.mock.calls.map(([params]) => params.IfNoneMatch)).toEqual([undefined, undefined]);
   });
 
   it('adds cache-busting query params when downloading JSON data from COS', async () => {

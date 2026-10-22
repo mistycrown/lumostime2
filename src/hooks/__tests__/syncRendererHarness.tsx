@@ -8,6 +8,7 @@
  * @pos Test (Cloud Sync Renderer)
  * @updated 2026-10-04: Verifies modern navigation events schedule appearance uploads.
  * @updated 2026-10-04: Verifies appearance restoration preserves synchronized sticker metadata.
+ * @updated 2026-10-22: Verifies no-op checks and edit preflights transfer no full snapshot bodies.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -51,14 +52,25 @@ async function run() {
   check(uploads() === 1, 'generated export dates must not cause uploads');
   passed.push('startup and no-op export metadata');
 
+  const readsBeforeCheck = cloud.reads;
+  const bodiesBeforeCheck = cloud.fullReads;
+  await manager.handleQuickSync();
+  await waitIdle();
+  check(cloud.reads > readsBeforeCheck, 'no-op sync must still check the server');
+  check(cloud.fullReads === bodiesBeforeCheck, 'unchanged checks must not download full JSON bodies');
+  passed.push('unchanged sync checks use server-confirmed cached snapshots');
+
   backupRead.notifyOnRead = true;
   window.dispatchEvent(new Event('color-scheme-changed'));
   backupRead.notifyOnRead = false;
   check(uploads() === 1, 'nested data notifications should not cause recursive edits');
   passed.push('snapshot tracking ignores reentrant notifications');
 
+  const bodiesBeforeEdit = cloud.fullReads;
   edit('first');
   await until(() => main().logs[0]?.note === 'first' && !state.settings.isSyncing, 'first edit');
+  check(cloud.fullReads === bodiesBeforeEdit + 1, 'edit preflights must reuse versions; full read is required only for upload verification');
+  passed.push('edit upload downloads one full body for verification only');
   localStorage.setItem('test-theme', 'new-theme');
   window.dispatchEvent(new Event('color-scheme-changed'));
   await until(() => main().appearanceData.storage.theme === 'new-theme' && !state.settings.isSyncing, 'appearance');

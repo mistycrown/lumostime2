@@ -1,6 +1,7 @@
 /**
  * @file compatibleS3Service.test.ts
  * @description Regression tests for the compatible S3 service.
+ * @updated 2026-10-22: Covers conditional GET, changed versions and upload/config invalidation.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -99,6 +100,39 @@ describe('CompatibleS3Service', () => {
     vi.resetModules();
     vi.clearAllMocks();
     vi.stubGlobal('localStorage', createLocalStorageMock());
+  });
+
+  const configured = async () => {
+    const { CompatibleS3Service } = await import('./compatibleS3Service');
+    const service = new CompatibleS3Service();
+    service.saveConfig({ bucketName: 'bucket', region: 'r', endpoint: 'https://example.com', accessKeyId: 'ak', secretAccessKey: 'sk', forcePathStyle: true });
+    return service;
+  };
+
+  it('uses conditional reads for unchanged snapshots and full reads for verification', async () => {
+    const service = await configured();
+    const body = { logs: [{ note: 'original' }], timestamp: 1 };
+    sendMock.mockResolvedValueOnce({ Body: JSON.stringify(body), ETag: '"first"' })
+      .mockRejectedValueOnce({ $metadata: { httpStatusCode: 304 } })
+      .mockResolvedValueOnce({ Body: JSON.stringify({ ...body, timestamp: 2 }), ETag: '"second"' })
+      .mockResolvedValueOnce({ Body: JSON.stringify(body), ETag: '"first"' });
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(body);
+    expect(await service.downloadData('lumostime_backup.json', { conditional: true })).toEqual(body);
+    expect((await service.downloadData('lumostime_backup.json', { conditional: true })).timestamp).toBe(2);
+    await service.downloadData();
+    expect(sendMock.mock.calls.map(([command]) => command.input.IfNoneMatch)).toEqual([undefined, '"first"', '"first"', undefined]);
+  });
+
+  it('invalidates before a failed main upload and when changing accounts', async () => {
+    const service = await configured();
+    const result = { Body: '{"logs":[]}', ETag: '"same"' };
+    sendMock.mockResolvedValueOnce(result).mockRejectedValueOnce(new Error('lost upload response')).mockResolvedValue(result);
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    await expect(service.uploadData({ logs: [] })).rejects.toThrow('lost upload response');
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    service.saveConfig({ ...service.getConfig()!, accessKeyId: 'another-account' });
+    await service.downloadData('lumostime_backup.json', { conditional: true });
+    expect(sendMock.mock.calls.map(([command]) => command.input.IfNoneMatch)).toEqual([undefined, undefined, undefined, undefined]);
   });
 
   it('persists config and reconnects from localStorage', async () => {
