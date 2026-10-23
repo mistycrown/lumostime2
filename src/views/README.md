@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-23: Settings also forwards current review templates to Data Management so older journal reviews can recover their original question groups when a snapshot is absent.
+
 Update 2026-10-23: Settings passes current goals and major goals into Data Management for the configurable journal PDF exporter; existing Excel/JSON export entry points remain available.
 
 Update 2026-10-18: Compact and loose todo rows show a Ban icon beside the abandonment date, without `已放弃` or `放弃` status text. Completion and abandonment share end-date ordering instead of placing abandoned tasks after every completed task.

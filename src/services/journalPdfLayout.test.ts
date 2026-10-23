@@ -6,15 +6,20 @@
  * @updated 2026-10-23: Checks facing-page parity, A4 orientation and interleaved cross-month details.
  * @updated 2026-10-23: Requires landscape A4 on all pages and validates shorter landscape contents.
  * @updated 2026-10-23: Verifies rich overnight content, photo bounds, English headings and in-place node styling.
+ * @updated 2026-10-23: Checks A4/A5 integrated statistics, original colors, twelve-month calendars and guidance hierarchy.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
-import { buildJournalModel, shiftJournalDate, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
+import { buildJournalModel, journalSectionsForParts, shiftJournalDate, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
 import { composeJournalPdf, JOURNAL_PRINT_FEATURES, JournalPdfWriter } from './journalPdfLayout';
 import { writeCheckMatrix } from './journalPdfLayout';
 import { writeJournalCover } from './journalPdfCover';
+import { writeAnnualMood } from './journalPdfMood';
+import { writeJournalDistributions } from './journalPdfStatistics';
+import { journalDataColor } from './journalPdfTheme';
+import { journalDemoData } from '../../scripts/fixtures/journal-demo';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -26,7 +31,88 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
-  it.each(['a4', 'a5'] as const)('keeps the independent %s cover within bounds and uses the actual authored summary', async (size) => {
+  it.each(['minimal', 'classic', 'abstract'] as const)('adapts the supplied %s cover to both orientations', async (coverStyle) => {
+    for (const size of ['a4', 'a5'] as const) {
+      const w = await make(size, { includeCover: true, coverStyle, accentColor: '#8844aa' });
+      const values: string[] = []; const text = w.text.bind(w);
+      w.text = (value, x, y, fontSize = 9, color, role) => {
+        expect(x).toBeGreaterThanOrEqual(w.pageMargin);
+        expect(x + w.widthOf(value, fontSize, role)).toBeLessThanOrEqual(w.width - w.pageMargin);
+        expect(y + fontSize).toBeLessThan(w.height - 30);
+        values.push(value); text(value, x, y, fontSize, color, role);
+      };
+      writeJournalCover(w);
+      expect(values).toContain('Life Journal');
+      expect(values).toContain('2026.10.19 - 2026.10.20');
+      expect(values).toContain('记录数');
+      expect(w.pageCount).toBe(1);
+      expect((await w.pdf.save()).length).toBeGreaterThan(1000);
+    }
+  });
+  it('keeps themes isolated per export and defaults to black', async () => {
+    const black = await make('a4');
+    const purple = await make('a4', { accentColor: '#8844aa' });
+    expect(black.accentColor).toMatchObject({ red: 0, green: 0, blue: 0 });
+    expect(purple.accentColor).toMatchObject({ red: 0x88 / 255, green: 0x44 / 255, blue: 0xaa / 255 });
+  });
+  it('exports one independently selected part without the other annual, monthly or daily parts', async () => {
+    const parts = ['monthAgenda'] as const;
+    const w = await make('a4', { startDate: '2026-08-01', endDate: '2026-08-31', parts: [...parts], sections: journalSectionsForParts([...parts]) }, journalDemoData);
+    const titles: string[] = []; const start = w.startPage.bind(w);
+    w.startPage = (value, ...args) => { titles.push(value); start(value, ...args); };
+    await composeJournalPdf(w);
+    expect(titles.some((title) => title.includes('日程明细'))).toBe(true);
+    expect(titles).not.toContain('手账');
+    expect(titles.some((title) => /月计划|年度|周计划|打卡|时间分布|星期|一日一页/.test(title))).toBe(false);
+  });
+  it.each(['a4', 'a5'] as const)('uses original user colors and lays out complete statistics on one %s page', async (size) => {
+    expect(journalDataColor('any-id', '#123456')).toMatchObject({ red: 0x12 / 255, green: 0x34 / 255, blue: 0x56 / 255 });
+    const w = await make(size, { startDate: '2026-08-01', endDate: '2026-08-31' }, journalDemoData);
+    const labels: string[] = []; const text = w.text.bind(w);
+    w.text = (value, ...args) => { labels.push(value); text(value, ...args); };
+    writeJournalDistributions(w, '2026-08', w.model.days);
+    expect(w.pageCount).toBe(1);
+    expect(labels).not.toContain('2026-08 Statistics');
+    for (const label of ['一级标签', '二级标签', '关键字', '领域', '待办分类', '待办']) expect(labels).toContain(label);
+    expect(labels.join('')).toContain('给妈妈寄明信片');
+  });
+  it('renders A4 annual moods as twelve calendars and places every sticker on its original date', async () => {
+    const source = { ...data, dailyReviews: Array.from({ length: 365 }, (_, index) => ({ id: String(index), date: shiftJournalDate('2026-01-01', index), createdAt: 0, updatedAt: 0, answers: [], moodEmoji: 'image:test' })) };
+    const w = await make('a4', { startDate: '2026-01-01', endDate: '2026-12-31' }, source);
+    const months: { x: number; y: number }[] = []; const stickers: { x: number; y: number }[] = [];
+    const text = w.text.bind(w);
+    w.text = (value, x, y, ...args) => { if (/^\d{2} \/ [A-Z]{3}$/.test(value)) months.push({ x, y }); text(value, x, y, ...args); };
+    w.sticker = (_icon, x, y, size) => { expect(y + size).toBeLessThanOrEqual(w.bottom); expect(size).toBe(12); stickers.push({ x, y }); };
+    writeAnnualMood(w, 2026, w.model.days);
+    expect(months).toHaveLength(12);
+    expect(new Set(months.map((month) => month.x)).size).toBe(4);
+    expect(new Set(months.map((month) => month.y)).size).toBe(3);
+    expect(stickers).toHaveLength(365);
+    expect(stickers[0].x).toBeGreaterThan(stickers[4].x); // Thursday Jan 1 precedes Monday Jan 5.
+    expect(stickers[31].x).toBeGreaterThan(stickers[32].x); // Sunday Feb 1 precedes Monday Feb 2.
+  });
+  it('uses vector checkboxes, symbolic associations and three guidance heading levels', async () => {
+    const source: JournalExportData = { ...data,
+      categories: [{ id: 'c', name: '运动', icon: '', themeColor: '#123456', activities: [{ id: 'a', name: 'Surf', icon: '', color: '#abcdef', keywords: ['浪'] }] }],
+      scopes: [{ id: 's', name: '健康', icon: '', themeColor: '#123456', isArchived: false, order: 0 }],
+      todos: [{ id: 't', title: '海边练习', categoryId: 'tc', scheduledDate: '2026-10-19', isCompleted: false }],
+      collections: [{ id: 'col', name: '海边日常', createdAt: 0, updatedAt: 0 }],
+      collectionEntries: [{ id: 'entry', collectionId: 'col', itemType: 'log', itemId: 'surf', addedAt: 0 }],
+      logs: [{ id: 'surf', activityId: 'a', categoryId: 'c', title: 'Surf', note: '今天的浪很平静。', linkedTodoId: 't', scopeIds: ['s'], startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 10).getTime(), duration: 3600 }],
+      dailyReviews: [{ id: 'review', date: '2026-10-19', createdAt: 0, updatedAt: 0, answers: [{ questionId: 'q', question: '想记住什么？', answer: '第一次站上浪板。' }], templateSnapshot: [{ id: 'group', title: '日常发现', questions: [{ id: 'q', question: '想记住什么？', type: 'text' }] }] }]
+    };
+    const w = await make('a4', { sections: ['daily', 'reviews'] }, source);
+    const calls: { value: string; size: number }[] = []; const text = w.text.bind(w);
+    w.text = (value, x, y, size = w.bodySize, ...args) => { calls.push({ value, size }); text(value, x, y, size, ...args); };
+    await composeJournalPdf(w);
+    expect(calls.filter((call) => call.value === 'Surf')).toHaveLength(1);
+    expect(calls.map((call) => call.value)).toEqual(expect.arrayContaining(['#运动', '%健康', '@海边练习', '◬海边日常', 'Arrange']));
+    expect(calls.some((call) => /\[[ x]\]|领域|关联待办|关键字|排期 已完成/.test(call.value))).toBe(false);
+    expect(calls.find((call) => call.value === '引导')?.size).toBe(24);
+    expect(calls.find((call) => call.value === '日常发现')?.size).toBe(12);
+    expect(calls.find((call) => call.value === '想记住什么？')?.size).toBe(9);
+  });
+  it.each(['a4', 'a5'] as const)('keeps the independent %s cover within bounds without quoting a daily summary', async (size) => {
     const source = { ...data, dailyReviews: [{ id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0, answers: [], summary: '这段总结来自用户。' }] };
     const w = await make(size, { includeCover: true }, source);
     const calls: { value: string; role: string }[] = [];
@@ -38,7 +124,7 @@ describe('PDF pagination with bundled Chinese font', () => {
       calls.push({ value, role }); text(value, x, top, fontSize, color, role);
     };
     writeJournalCover(w); w.finish();
-    expect(calls.find((call) => call.value === '这段总结来自用户。')?.role).toBe('hand');
+    expect(calls.some((call) => call.value === '这段总结来自用户。')).toBe(false);
     expect(calls.some((call) => call.value.includes('/   JOURNAL'))).toBe(false);
     expect(calls.some((call) => call.value === '1 / 1')).toBe(false);
     expect(calls.some((call) => call.value === 'Life Journal')).toBe(true);
@@ -114,7 +200,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(moods).toHaveLength(365);
     expect(moods.every((call) => call.size <= 14)).toBe(true);
     expect(pages.filter((page) => page.title.includes('每日一句话与贴纸'))).toHaveLength(1);
-    expect(calls.filter((call) => call.page !== overview[0].page).every((call) => call.size === 18)).toBe(true);
+    expect(calls.filter((call) => call.page !== overview[0].page).every((call) => call.size === 12)).toBe(true);
     expect(pages.filter((page) => page.title === '目录')).toHaveLength(1);
   });
   it.each([false, true])('places A5 overviews on even/odd facing pages, cover=%s', async (includeCover) => {
@@ -251,7 +337,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(calls.filter((value) => value === '唯一计划备注')).toHaveLength(1);
     expect(calls).toContain('第二段正文');
     expect(calls.some((value) => value.includes('提交课程'))).toBe(true);
-    expect(calls).toContain('截止');
+    expect(calls).toContain('Do');
   });
   it('keeps weekly colored time grids separate from detailed log notes', async () => {
     const source: JournalExportData = { ...data, logs: [{ id: 'a', activityId: 'a', categoryId: 'c', title: '阅读记录', note: '完整正文只属于日志', startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 12).getTime(), duration: 10800 }] };

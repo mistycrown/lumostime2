@@ -7,30 +7,21 @@
  * @updated 2026-10-23: Embeds separate Noto Sans printed labels and WenKai handwritten content.
  * @updated 2026-10-23: Snapshots application calendar colors and embeds original daily sticker assets.
  * @updated 2026-10-23: Loads original Log photos and custom reactions without silently dropping missing assets.
+ * @updated 2026-10-23: Uses a vector Collection marker without depending on an unavailable font glyph.
+ * @updated 2026-10-24: Embeds independently selected fonts with safe transformed-WOFF2 outlines and Chinese fallback.
  */
 import { PDFDocument } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
-import { buildJournalModel, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
-import { composeJournalPdf, JOURNAL_FONT_FAMILY, JOURNAL_PRINT_FEATURES, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
+import { buildJournalModel, journalHasPart, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
+import { composeJournalPdf, JOURNAL_FONT_FAMILY, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
 import { getResolvedTodoScheduleTypeColors, todoScheduleColorService } from './todoScheduleColorService';
 import { embedJournalStickers } from './journalPdfStickers';
 import { embedJournalPhotos } from './journalPdfPhotos';
 import { JOURNAL_HEX } from '../utils/journalTheme';
+import { loadJournalFont, embedJournalFont, journalFontkit } from './journalPdfFonts';
 
 export type { JournalPdfProgress } from './journalPdfLayout';
-const fontBytes = new Map<string, Promise<ArrayBuffer>>();
-const loadFont = (filename: string): Promise<ArrayBuffer> => {
-  const cached = fontBytes.get(filename);
-  if (cached) return cached;
-  const loading = fetch(`${import.meta.env.BASE_URL}fonts/${filename}`).then(async (response) => {
-    if (!response.ok) throw new Error('手账中文字体加载失败，请重试');
-    return response.arrayBuffer();
-  }).catch((error) => { fontBytes.delete(filename); throw error; });
-  fontBytes.set(filename, loading);
-  return loading;
-};
 
 export const createJournalPdf = async (
   data: JournalExportData,
@@ -49,14 +40,20 @@ export const createJournalPdf = async (
   };
   const model = buildJournalModel({ ...data, calendarStyle: calendarStyle.colors ? calendarStyle as NonNullable<JournalExportData['calendarStyle']> : undefined }, options);
   const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
+  pdf.registerFontkit(journalFontkit);
   onProgress?.({ message: '正在加载中文字体', pages: 0 });
-  const [bytes, printedBytes] = await Promise.all([loadFont('LXGWWenKaiLite-Journal.ttf'), loadFont('NotoSansSC-Journal.ttf')]);
+  const sources = new Map<string, Promise<ArrayBuffer>>();
+  const load = (id: string) => {
+    if (!sources.has(id)) sources.set(id, loadJournalFont(id));
+    return sources.get(id)!;
+  };
+  const [bytes, printedBytes, fallbackBytes] = await Promise.all([load(options.contentFontId || 'lxgw-wenkai'), load(options.printedFontId || 'default'), load('default')]);
   signal?.throwIfAborted();
   // WenKai subset encoding drops outlines in current fontkit; embed once in full for all pages.
-  const font = await pdf.embedFont(bytes, { subset: false });
-  const printedFont = await pdf.embedFont(printedBytes, { subset: false, features: JOURNAL_PRINT_FEATURES });
-  const characters = new Set(font.getCharacterSet());
+  const font = await embedJournalFont(pdf, bytes);
+  const printedFont = printedBytes === bytes ? font : await embedJournalFont(pdf, printedBytes);
+  const fallback = fallbackBytes === printedBytes ? printedFont : await embedJournalFont(pdf, fallbackBytes);
+  const characters = new Set([...font.getCharacterSet(), ...printedFont.getCharacterSet(), ...fallback.getCharacterSet()]);
   const symbols: JournalSymbols = new Map();
   const values = new Set<string>();
   JSON.stringify(model, (_key, value) => {
@@ -65,7 +62,7 @@ export const createJournalPdf = async (
   });
   const unsupported = new Set<string>();
   values.forEach((value) => journalGraphemes(value.replace(/[\u0000-\u001f\u007f]/g, '')).forEach((glyph) => {
-    if (Array.from(glyph).some((char) => !characters.has(char.codePointAt(0)!))) unsupported.add(glyph);
+    if (glyph !== '◬' && Array.from(glyph).some((char) => !characters.has(char.codePointAt(0)!))) unsupported.add(glyph);
   }));
   // Keep emoji and uncommon symbols without sacrificing searchable Chinese body text.
   if (unsupported.size) {
@@ -98,8 +95,8 @@ export const createJournalPdf = async (
   pdf.setTitle(`LumosTime 手账 ${options.startDate} — ${options.endDate}`);
   pdf.setAuthor('LumosTime');
   pdf.setSubject('个人时间手账');
-  const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont);
-  const logDetails = options.sections.includes('daily') || options.sections.includes('logs');
+  const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont, fallback);
+  const logDetails = (['dayLogs', 'dayPlans', 'monthAgenda', 'weekPlans'] as const).some((part) => journalHasPart(options, part));
   if (options.sections.includes('yearly') || logDetails) {
     onProgress?.({ message: '正在加载每日贴纸', pages: 0 });
     const icons = model.days.flatMap((day) => [day.review?.moodEmoji || '', ...(logDetails ? day.logs.flatMap((log) => log.source.reactions || []) : [])]);

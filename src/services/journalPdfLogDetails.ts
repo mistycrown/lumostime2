@@ -27,9 +27,11 @@ export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog): vo
     });
     w.y += 3;
   };
-  if (log.scopes?.length) field('领域', log.scopes.map((item) => item.name).join(' / '));
-  if (log.keywords?.length) field('关键字', log.keywords.map((item) => item.name).join(' / '));
-  if (log.todo) field('关联待办', `${log.todo.category} / ${log.todo.name}`);
+  const title = log.source.title?.trim() || log.activity;
+  w.paragraph(`#${log.category}${title === log.activity ? '' : ` / ${log.activity}`}`, 9, C.muted, 12, 'hand');
+  if (log.scopes?.length) w.paragraph(log.scopes.map((item) => `%${item.name}`).join('  '), 9, C.muted, 12, 'hand');
+  if (log.todo) w.paragraph(`@${log.todo.name}`, 9, C.muted, 12, 'hand');
+  if (log.collections?.length) w.paragraph(log.collections.map((item) => `◬${item.name}`).join('  '), 9, C.muted, 12, 'hand');
   log.fields?.forEach((item) => field(item.label, item.value));
   w.noteOnce(`log:${log.source.id}`, log.source.note, 12);
   const images = (log.source.images || []).map((key) => {

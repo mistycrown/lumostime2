@@ -1,75 +1,85 @@
 /**
  * @file journalPdfCover.ts
- * @input Selected journal dates, actual time blocks and an optional authored daily summary
+ * @input Selected journal dates and actual totals
  * @output Responsive portrait/landscape journal covers using vector print artwork
  * @pos Service (Journal cover)
- * @updated 2026-10-23: Uses restrained Radix paper, four type tiers and an actual time-grid composition.
+ * @updated 2026-10-23: Keeps covers to the title, date range and actual totals, without automatic quotes.
+ * @updated 2026-10-24: Adapts three supplied HTML vector covers and randomly freezes one style per export.
  */
-import { JOURNAL_COLORS as C } from './journalPdfTheme';
-import { formatJournalDuration, shiftJournalDate } from '../utils/journalExport';
-import { formatDateKey, getStartOfWeek, parseDateKey } from '../utils/todoScheduleUtils';
-import { layoutJournalTimeline } from '../utils/journalTimelineLayout';
-import { journalBlockColor } from './journalPdfTimeline';
+import { concatTransformationMatrix, popGraphicsState, pushGraphicsState } from 'pdf-lib';
+import { JOURNAL_COLORS as C, journalDataColor } from './journalPdfTheme';
+import { JOURNAL_STROKE } from '../utils/journalTheme';
+import { formatJournalDuration, type JournalCoverStyle } from '../utils/journalExport';
+import { JOURNAL_COVER_ART } from './journalPdfCoverArt';
 import type { JournalPdfWriter } from './journalPdfLayout';
 
-const INK = C.ink;
-const MUTED = C.muted;
-const PAPER = C.paper;
+export const JOURNAL_COVER_STYLES: JournalCoverStyle[] = ['minimal', 'classic', 'abstract'];
+export const randomJournalCoverStyle = (): JournalCoverStyle => {
+  const value = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(value);
+  return JOURNAL_COVER_STYLES[value[0] % 3];
+};
+
+// The supplied strokes use only Cartesian SVG commands. Transform coordinates
+// before drawing so nonuniform page scaling cannot change the 0.5px stroke.
+const scaleStroke = (path: string, sx: number, sy: number): string => {
+  let command = 'M'; let index = 0;
+  return (path.match(/[a-zA-Z]|-?\d*\.?\d+/g) || []).map((token) => {
+    if (/^[a-zA-Z]$/.test(token)) { command = token.toUpperCase(); index = 0; return token; }
+    const factor = command === 'H' ? sx : command === 'V' ? sy : index++ % 2 ? sy : sx;
+    return String(Number(token) * factor);
+  }).join(' ');
+};
 
 export const writeJournalCover = (w: JournalPdfWriter): void => {
+  const style = w.model.options.coverStyle || randomJournalCoverStyle();
   w.startCoverPage();
   const wide = w.model.options.paperSize === 'a4';
-  const left = w.pageMargin + (wide ? 12 : 8);
-  const right = w.width - left;
-  const span = right - left;
-  w.rect(0, 0, w.width, w.height, PAPER);
-  const years = w.model.years;
-  const year = years.length === 1 ? String(years[0]) : `${years[0]} / ${years[years.length - 1]}`;
-  const titleWidth = wide ? span * 0.51 : span;
-  const yearSize = w.widthOf(year, 64) <= titleWidth ? 64 : 24;
-  w.text(year, left - 2, wide ? 91 : 99, yearSize, INK);
-  w.text('Life Journal', left, wide ? 203 : 190, 24, INK);
-  w.text(`${w.model.options.startDate.replace(/-/g, '.')} — ${w.model.options.endDate.replace(/-/g, '.')}`, left + 1, wide ? 261 : 239, 8.5, MUTED);
-  const quote = w.model.days.find((day) => day.review?.summary?.trim())?.review?.summary;
-  if (quote) {
-    const size = 12;
-    const lines = w.wrap(quote, wide ? span * 0.45 : span, size, 'hand');
-    const limit = wide ? 3 : 2;
-    lines.slice(0, limit).forEach((line, index) => w.text(index === limit - 1 && lines.length > limit ? w.fitted(lines.slice(index).join(''), wide ? span * 0.45 : span, size, 'hand') : line, left, (wide ? 314 : 276) + index * size * 1.6, size, INK, 'hand'));
-  }
-  const totals = new Map<string, number>();
-  w.model.days.forEach((day) => {
-    const week = formatDateKey(getStartOfWeek(parseDateKey(day.date)!));
-    totals.set(week, (totals.get(week) || 0) + day.actualSeconds);
-  });
-  const week = [...totals].sort((a, b) => b[1] - a[1])[0][0];
-  const days = new Map(w.model.days.map((day) => [day.date, day]));
-  const x = wide ? w.width * 0.57 : left;
-  const width = wide ? right - x : span;
-  const top = wide ? 118 : 349;
-  const height = wide ? 278 : 113;
-  w.text(`${week.replace(/-/g, '.')} — ${shiftJournalDate(week, 6).slice(5).replace('-', '.')}`, x, top - 32, 9, MUTED);
-  const col = width / 7;
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const key = shiftJournalDate(week, dayIndex);
-    const day = days.get(key);
-    w.text(key.slice(8), x + col * dayIndex + 4, top - 15, 9, MUTED);
-    if (!day) w.rect(x + dayIndex * col, top, col, height, C.fill);
-    if (day) layoutJournalTimeline(day.logs.filter((log) => !log.source.isPlanned), key).forEach((block) => {
-      const lane = (col - 4) / block.laneCount;
-      w.rect(x + dayIndex * col + 2 + block.lane * lane, top + block.startMinute / 1440 * height, lane - 1, Math.max(0.5, (block.endMinute - block.startMinute) / 1440 * height - 0.6), journalBlockColor(block.log.activity, block.log.color, 0.45));
+  const tint = (amount: number) => journalDataColor('', w.model.options.accentColor || '#000000', amount);
+  w.rect(0, 0, w.width, w.height, C.paper);
+  if (style !== 'classic') {
+    const artwork = JOURNAL_COVER_ART[style][wide ? 'landscape' : 'portrait'];
+    const [width, height] = artwork.viewBox;
+    const artHeight = style === 'minimal' ? w.height * (wide ? 0.66 : 0.60) : w.height;
+    const scaleX = w.width / width;
+    const scaleY = artHeight / height;
+    w.page.pushOperators(pushGraphicsState(), concatTransformationMatrix(scaleX, 0, 0, scaleY, 0, 0));
+    artwork.paths.forEach((path, index) => {
+      if (path.stroke) return;
+      const colors = style === 'minimal' ? [0.93, 0.80, 0.56, 0.28, 1] : [0.94, 0.72, 0.44, 0.88, 0.64, 0.38, 0.38];
+      w.page.drawSvgPath(path.d, { x: 0, y: height, color: style === 'minimal' && index === 4 ? C.paper : tint(colors[index]) });
     });
+    artwork.circles.forEach((circle) => w.page.drawCircle({ x: circle.cx, y: height - circle.cy, size: circle.r, color: tint(style === 'minimal' ? 0.70 : 0.38) }));
+    w.page.pushOperators(popGraphicsState());
+    artwork.paths.filter((path) => path.stroke).forEach((path) => w.page.drawSvgPath(scaleStroke(path.d, scaleX, scaleY), { x: 0, y: artHeight, borderColor: tint(0.38), borderWidth: JOURNAL_STROKE }));
+  } else {
+    const inset = w.width * 0.065;
+    for (const gap of [0, 7]) w.page.drawRectangle({ x: inset + gap, y: 32 + gap, width: w.width - 2 * (inset + gap), height: w.height - 64 - 2 * gap, borderColor: tint(gap ? 0.76 : 0.38), borderWidth: JOURNAL_STROKE });
+    for (const [x, y, sx, sy] of [[inset, w.height - 32, 1, 1], [w.width - inset, w.height - 32, -1, 1], [w.width - inset, 32, -1, -1], [inset, 32, 1, -1]]) {
+      w.page.pushOperators(pushGraphicsState(), concatTransformationMatrix(sx, 0, 0, sy, x, y));
+      w.page.drawSvgPath('M0 28 V0 H28 M0 12 C12 12 12 0 12 0 M0 22 C20 22 22 20 22 0', { borderColor: tint(0.38), borderWidth: JOURNAL_STROKE });
+      w.page.pushOperators(popGraphicsState());
+    }
+    const x = w.width / 2 - 23;
+    const y = w.height * 0.54;
+    w.page.drawSvgPath('M0 0 H46 V5 H0Z M0 75 H46 V80 H0Z M5 5 C5 25 23 31 23 39 C23 48 5 54 5 75 M41 5 C41 25 23 31 23 39 C23 48 41 54 41 75 M12 20 Q23 26 34 20 M23 42 V57 M11 68 Q23 54 35 68', { x, y, borderColor: tint(0.25), borderWidth: JOURNAL_STROKE });
+    w.page.drawSvgPath('M12 25 Q23 30 34 25 L23 38Z M12 71 Q23 57 34 71Z', { x, y, color: tint(0.65) });
   }
-  for (let hour = 0; hour <= 24; hour += 3) w.line(x, top + hour / 24 * height, width, C.line);
-  for (let colIndex = 0; colIndex <= 7; colIndex++) w.verticalLine(x + colIndex * col, top, height, C.line);
+  const left = style === 'abstract' ? w.width * 0.12 : w.pageMargin + 8;
+  const span = style === 'abstract' && wide ? w.width * 0.56 : w.width - 2 * left;
+  const place = (value: string, top: number, size: number, color = C.ink) => w.text(value, style === 'abstract' ? left : (w.width - w.widthOf(value, size)) / 2, top, size, color);
+  const titleSize = wide ? 64 : 24;
+  const titleTop = w.height * (style === 'abstract' ? 0.27 : 0.18);
+  place('Life Journal', titleTop, titleSize);
+  const range = `${w.model.options.startDate.replace(/-/g, '.')} - ${w.model.options.endDate.replace(/-/g, '.')}`;
+  place(range, titleTop + titleSize + 22, 9, C.muted);
   const actual = w.model.days.flatMap((day) => day.logs.filter((log) => !log.source.isPlanned));
   const metrics = [[String(w.model.days.length), '天数'], [formatJournalDuration(w.model.days.reduce((sum, day) => sum + day.actualSeconds, 0)), '记录时长'], [String(new Set(actual.map((log) => log.source.id)).size), '记录数']];
-  w.line(left, 490, span, C.line);
+  const top = w.height * (style === 'abstract' ? 0.54 : style === 'classic' ? 0.75 : 0.4);
   metrics.forEach(([value, label], index) => {
-    const mx = left + index * span / 3;
-    const size = Math.min(wide ? 20 : 14, (span / 3 - 10) / Math.max(1, w.widthOf(value, 1)));
-    w.text(value, mx, 506, size, INK);
-    w.text(label, mx, 535, 7, MUTED);
+    const center = left + (index + 0.5) * span / 3;
+    const size = w.widthOf(value, 12) > span / 3 - 8 ? 9 : 12;
+    w.text(value, center - w.widthOf(value, size) / 2, top, size, C.ink);
+    w.text(label, center - w.widthOf(label, 9) / 2, top + 22, 9, C.muted);
   });
-  w.text('LumosTime', left, wide ? 553 : 560, 9, MUTED);
 };

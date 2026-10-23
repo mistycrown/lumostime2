@@ -10,15 +10,18 @@
  * @updated 2026-10-23: Keeps the entire A4 book landscape, including all continuations and contents.
  * @updated 2026-10-23: Adds compact balanced columns, standalone covers and centered numeric check cells.
  * @updated 2026-10-23: Keeps four readable print tiers and styled inline nodes, plus measured rich-content column flow.
+ * @updated 2026-10-23: Renders real aligned checkboxes and inline schedule badges instead of Markdown markers.
+ * @updated 2026-10-24: Keeps accents local to each export and falls back for missing selected-font glyphs.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 import { JOURNAL_STROKE } from '../utils/journalTheme';
-import { JOURNAL_COLORS as C } from './journalPdfTheme';
+import { JOURNAL_COLORS as C, journalPdfColor } from './journalPdfTheme';
 import { writeJournalLogDetails } from './journalPdfLogDetails';
 import { journalPageTitle } from '../utils/journalTitles';
 import { journalNoteRuns, wrapJournalNoteRuns, type JournalNoteRun } from '../utils/journalLogContent';
+import { journalDataColor } from './journalPdfTheme';
 
 
 export const JOURNAL_FONT_FAMILY = 'LumosJournal';
@@ -34,6 +37,7 @@ export type JournalTextRole = 'print' | 'hand';
 export interface JournalPdfProgress { message: string; pages: number }
 
 export class JournalPdfWriter {
+  readonly accentColor;
   width: number;
   height: number;
   readonly pageMargin: number;
@@ -47,6 +51,7 @@ export class JournalPdfWriter {
   private widths = new Map<string, number>();
   readonly printedFont: PDFFont;
   private printedCharacters: Set<number>;
+  private fallbackCharacters: Set<number>;
   private printedNotes = new Set<string>();
   private printedLogDetails = new Set<string>();
   private blankPages = new Set<PDFPage>();
@@ -55,13 +60,15 @@ export class JournalPdfWriter {
   readonly stickers = new Map<string, PDFImage>();
   readonly photos = new Map<string, PDFImage>();
 
-  constructor(readonly pdf: PDFDocument, readonly font: PDFFont, readonly model: JournalModel, readonly symbols: JournalSymbols = new Map(), printedFont?: PDFFont) {
+  constructor(readonly pdf: PDFDocument, readonly font: PDFFont, readonly model: JournalModel, readonly symbols: JournalSymbols = new Map(), printedFont?: PDFFont, readonly fallbackFont?: PDFFont) {
+    this.accentColor = journalPdfColor(model.options.accentColor || '#000000');
     [this.width, this.height] = model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.pageMargin = model.options.paperSize === 'a5' ? 28 : 40;
     this.bodySize = 9;
     this.characters = new Set(font.getCharacterSet());
     this.printedFont = printedFont || font;
     this.printedCharacters = new Set(this.printedFont.getCharacterSet());
+    this.fallbackCharacters = new Set(fallbackFont?.getCharacterSet() || []);
   }
 
   get margin(): number { return this.pageMargin + (this.columns ? this.columns.index * (this.columns.width + this.columns.gap) : 0); }
@@ -78,7 +85,12 @@ export class JournalPdfWriter {
   }
 
   private fontFor(glyph: string, role: JournalTextRole): PDFFont {
-    return role === 'print' && Array.from(glyph).every((char) => this.printedCharacters.has(char.codePointAt(0)!)) ? this.printedFont : this.font;
+    const has = (characters: Set<number>) => Array.from(glyph).every((char) => characters.has(char.codePointAt(0)!));
+    const preferred = role === 'print' ? this.printedFont : this.font;
+    if (has(role === 'print' ? this.printedCharacters : this.characters)) return preferred;
+    if (this.fallbackFont && has(this.fallbackCharacters)) return this.fallbackFont;
+    const alternate = role === 'print' ? this.font : this.printedFont;
+    return has(role === 'print' ? this.characters : this.printedCharacters) ? alternate : this.font;
   }
 
   widthOf(value: string, size = this.bodySize, role: JournalTextRole = 'print'): number {
@@ -90,7 +102,7 @@ export class JournalPdfWriter {
       const glyphKey = `${role}:${size}:${glyph}`;
       let advance = this.widths.get(glyphKey);
       if (advance === undefined) {
-        advance = this.symbols.has(glyph) ? this.symbols.get(glyph)!.width * size : this.fontFor(glyph, role).widthOfTextAtSize(glyph, size);
+        advance = glyph === '◬' ? size * 0.95 : this.symbols.has(glyph) ? this.symbols.get(glyph)!.width * size : this.fontFor(glyph, role).widthOfTextAtSize(glyph, size);
         this.widths.set(glyphKey, advance);
       }
       return sum + advance;
@@ -100,6 +112,7 @@ export class JournalPdfWriter {
   }
 
   text(value: string, x: number, top: number, size = this.bodySize, color = INK, role: JournalTextRole = 'print'): void {
+    if (color === C.accent) color = this.accentColor;
     size = this.printSize(size);
     value = value.replace(/[\u0000-\u001f\u007f]/g, ' ');
     let cursor = x;
@@ -113,6 +126,13 @@ export class JournalPdfWriter {
       run = '';
     };
     for (const glyph of journalGraphemes(value)) {
+      if (glyph === '◬') {
+        flush();
+        const width = size * 0.8;
+        this.page.drawSvgPath(`M 0 ${width} L ${width / 2} 0 L ${width} ${width} Z M ${width / 2} ${width * 0.4} V ${width * 0.7}`, { x: cursor, y: this.height - top - 1, borderColor: color, borderWidth: JOURNAL_STROKE });
+        cursor += size * 0.95;
+        continue;
+      }
       const symbol = this.symbols.get(glyph);
       if (symbol) {
         flush();
@@ -128,11 +148,26 @@ export class JournalPdfWriter {
   }
 
   line(x: number, top: number, width: number, color = LINE): void {
+    if (color === C.accent) color = this.accentColor;
     this.page.drawLine({ start: { x, y: this.height - top }, end: { x: x + width, y: this.height - top }, color, thickness: JOURNAL_STROKE });
   }
 
   rect(x: number, top: number, width: number, height: number, fill = PALE): void {
+    if (fill === C.accent) fill = this.accentColor;
     this.page.drawRectangle({ x, y: this.height - top - height, width, height, color: fill });
+  }
+
+  roundedRect(x: number, top: number, width: number, height: number, fill = PALE, radius = 2): void {
+    const r = Math.min(radius, width / 2, height / 2);
+    this.page.drawSvgPath(`M ${r} 0 H ${width - r} Q ${width} 0 ${width} ${r} V ${height - r} Q ${width} ${height} ${width - r} ${height} H ${r} Q 0 ${height} 0 ${height - r} V ${r} Q 0 0 ${r} 0 Z`, { x, y: this.height - top, color: fill });
+  }
+
+  checkbox(x: number, top: number, checked: boolean): void {
+    this.page.drawRectangle({ x, y: this.height - top - 8, width: 8, height: 8, borderColor: checked ? this.accentColor : MUTED, borderWidth: JOURNAL_STROKE });
+    if (checked) {
+      this.page.drawLine({ start: { x: x + 1.5, y: this.height - top - 4 }, end: { x: x + 3.3, y: this.height - top - 6 }, color: this.accentColor, thickness: JOURNAL_STROKE });
+      this.page.drawLine({ start: { x: x + 3.3, y: this.height - top - 6 }, end: { x: x + 6.8, y: this.height - top - 1.8 }, color: this.accentColor, thickness: JOURNAL_STROKE });
+    }
   }
 
   verticalLine(x: number, top: number, height: number, color = LINE): void {
@@ -336,10 +371,20 @@ export const stats = (days: JournalDay[]): string => `${formatJournalDuration(da
 
 export const writePlans = (w: JournalPdfWriter, day: JournalDay, notes = false, details = false): void => {
   getJournalDayPlans(day).forEach((entry) => {
-    w.ensure(w.compact ? 40 : 55);
-    w.text(entry.completed ? '[x]' : '[ ]', w.margin, w.y + 1, 8, ACCENT);
-    w.paragraph(entry.title, w.bodySize + 1, INK, 18);
-    w.paragraph(`${entry.label}${entry.completed ? ' 已完成' : ''}${entry.times.length ? `  ${entry.times.join(' / ')}` : ''}`, 7, MUTED, 18, 'print');
+    w.ensure(32);
+    const badge = entry.completed ? 'Complete' : ({ '截止': 'Do', '重复': 'Repeat', '待定': 'Maybe', '排期': 'Arrange', '计划': 'Plan', '已放弃': 'Abandon' }[entry.label] || entry.label);
+    const badgeWidth = w.widthOf(badge, 9) + 10;
+    const kind = entry.completed ? 'completed' : ({ '截止': 'deadline', '重复': 'recurring', '待定': 'maybe', '排期': 'scheduled', '计划': 'planned', '已放弃': 'maybe' }[entry.label] || 'scheduled');
+    const color = entry.color || (w.model.calendarStyle.colorMode === 'category' ? w.model.calendarStyle.categoryColors[entry.colorKey] : (w.model.calendarStyle.colors as Record<string, string>)[kind]);
+    const first = w.y;
+    w.checkbox(w.margin, first + 1, entry.completed);
+    w.rect(w.margin + w.contentWidth - badgeWidth, first - 1, badgeWidth, 14, journalDataColor('', color, 0.7));
+    w.text(badge, w.margin + w.contentWidth - badgeWidth + 5, first + 1, 9, INK);
+    w.wrap(entry.title, w.contentWidth - 18 - badgeWidth - 8, 9, 'hand').forEach((line) => {
+      w.ensure(13.5); w.text(line, w.margin + 18, w.y, 9, INK, 'hand'); w.y += 13.5;
+    });
+    w.y += 3;
+    if (entry.times.length) w.paragraph(entry.times.join(' / '), 9, MUTED, 18, 'print');
     if (notes) entry.notes.forEach((note) => w.noteOnce(note.key, note.text, 18));
     if (details) entry.logs.forEach((log) => writeJournalLogDetails(w, log));
   });
@@ -351,10 +396,9 @@ export const writeLogs = (w: JournalPdfWriter, day: JournalDay, notes = true): v
     const page = w.page;
     const top = w.y;
     const left = w.margin;
-    w.page.drawCircle({ x: w.margin + 3, y: w.height - top - 4, size: 2, color: ACCENT });
+    w.page.drawCircle({ x: w.margin + 3, y: w.height - top - 4, size: 2, color: w.accentColor });
     w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)} ${formatJournalDuration(log.seconds)}`, 8, ACCENT, 12, 'print');
     w.paragraph(log.source.title || log.activity, w.bodySize + 1, INK, 12);
-    w.paragraph(`${log.category} / ${log.activity}`, 9, MUTED, 12, 'hand');
     if (notes) writeJournalLogDetails(w, log);
     if (w.page === page && w.margin === left) w.verticalLine(left + 3, top + 8, Math.max(0, w.y - top - 12));
     w.rule();

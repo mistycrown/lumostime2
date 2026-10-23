@@ -6,9 +6,10 @@
  * @updated 2026-10-23: Reuses month trace lanes, schedule colors and eight-column book geometry.
  * @updated 2026-10-23: Uses the book's paper orientation for overview and continuation pages.
  * @updated 2026-10-23: Uses Radix fills, readable 9pt calendar entries and half-pixel grid rules.
+ * @updated 2026-10-23: Retains historical review groups and preserves the user schedule/category color settings.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
-import type { DailyReview, MonthlyReview, WeeklyReview } from '../types';
+import type { DailyReview, MonthlyReview, WeeklyReview, ReviewTemplate } from '../types';
 import type { JournalDay } from '../utils/journalExport';
 import { shiftJournalDate } from '../utils/journalExport';
 import { buildTodoMonthWeekLayout, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from '../utils/todoScheduleUtils';
@@ -19,9 +20,9 @@ import { journalBlockColor } from './journalPdfTimeline';
 const INK = C.ink;
 const MUTED = C.muted;
 export type JournalReview = DailyReview | WeeklyReview | MonthlyReview;
-export interface ReviewLine { text: string; role: JournalTextRole }
+export interface ReviewLine { text: string; role: JournalTextRole; level?: 'group' | 'question' }
 
-export const journalReviewLines = (review?: JournalReview): ReviewLine[] => {
+export const journalReviewLines = (review?: JournalReview, templates: ReviewTemplate[] = []): ReviewLine[] => {
   if (!review) return [];
   const lines: ReviewLine[] = [];
   const add = (label: string, value?: string) => {
@@ -30,8 +31,22 @@ export const journalReviewLines = (review?: JournalReview): ReviewLine[] => {
     lines.push({ text: value, role: 'hand' });
   };
   if ('cite' in review) add('引言', review.cite);
-  add('摘要', review.summary);
-  review.answers.forEach((answer) => add(answer.question || '回顾', answer.answer));
+  add('date' in review ? '总结' : '摘要', review.summary);
+  const definitions = [...(review.templateSnapshot || []), ...templates];
+  const groups = new Map<string, { title: string; order: number; answers: typeof review.answers }>();
+  review.answers.filter((answer) => answer.answer.trim()).forEach((answer) => {
+    const template = definitions.find((item) => item.questions.some((question) => question.id === answer.questionId));
+    const id = template?.id || '__ungrouped__';
+    const group = groups.get(id) || { title: template?.title || '未分组问题', order: template ? template.order ?? definitions.indexOf(template) : Number.MAX_SAFE_INTEGER, answers: [] };
+    group.answers.push(answer); groups.set(id, group);
+  });
+  [...groups.values()].sort((a, b) => a.order - b.order).forEach((group) => {
+    lines.push({ text: group.title, role: 'print', level: 'group' });
+    group.answers.forEach((answer) => {
+      lines.push({ text: answer.question || '回顾', role: 'print', level: 'question' });
+      lines.push({ text: answer.answer, role: 'hand' });
+    });
+  });
   add('叙事', review.narrative);
   const news = review.aiNewspaper;
   if (news) {
@@ -64,7 +79,7 @@ export const writeJournalOverview = (
       w.text(reviewLabel, x, y, 9, MUTED);
       y += 25;
       let block = 0;
-      const lines = journalReviewLines(review).flatMap((line) => line.text.replace(/\r\n?/g, '\n').split('\n').flatMap((paragraph) => {
+      const lines = journalReviewLines(review, w.model.reviewTemplates).flatMap((line) => line.text.replace(/\r\n?/g, '\n').split('\n').flatMap((paragraph) => {
         const id = block++;
         return w.wrap(paragraph, width, 9, line.role).map((text) => ({ text, role: line.role, block: id }));
       }));
@@ -124,7 +139,7 @@ export const writeJournalCalendar = (w: JournalPdfWriter, month: string, days: J
           if (!entry || entry.primaryKind === 'inProgress') return;
           const color = journalCalendarColor(w, entry);
           const blockY = y + 23 + lane * laneHeight;
-          w.rect(cellX + 2, blockY, column - 4, laneHeight - 2, journalBlockColor('', color, 0.92));
+          w.rect(cellX + 2, blockY, column - 4, laneHeight - 2, journalBlockColor('', color, 0.65));
           if (entry.primaryKind === 'maybe') w.page.drawRectangle({ x: cellX + 2, y: w.height - blockY - laneHeight + 2, width: column - 4, height: laneHeight - 2, borderColor: journalBlockColor('', color, 0), borderWidth: JOURNAL_STROKE, borderDashArray: [2, 2] });
           const marker = entry.primaryKind === 'deadline' || entry.primaryKind === 'recurring';
           const title = w.fitted(entry.todo.title, column - 11 - (marker ? 8 : 0), 9, 'hand');
@@ -149,7 +164,7 @@ export const writeJournalCalendar = (w: JournalPdfWriter, month: string, days: J
         const segmentX = x + (start - panel.start) * column + 2;
         const width = (end - start + 1) * column - 4;
         const segmentY = y + 23 + segment.laneIndex * laneHeight;
-        w.rect(segmentX, segmentY, width, laneHeight - 2, journalBlockColor('', color, 0.92));
+        w.rect(segmentX, segmentY, width, laneHeight - 2, journalBlockColor('', color, 0.65));
         w.text(w.fitted(`${start > segment.startDayIndex ? '‹ ' : ''}${segment.entry.todo.title}`, width - 6, 9, 'hand'), segmentX + 3, segmentY + 1, 9, MUTED, 'hand');
       });
       w.line(x, y, column * Math.min(panel.count, 7 - panel.start));

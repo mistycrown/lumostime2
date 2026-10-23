@@ -6,6 +6,7 @@
  * @updated 2026-10-23: Verifies eight-digit dates and period shortcuts with varied month-long dual-font examples.
  * @updated 2026-10-23: Serves original sticker assets and checks recoverable missing-sticker failures.
  * @updated 2026-10-23: Checks original photo failures and loads current panel CSS for realistic mobile previews.
+ * @updated 2026-10-23: Exports both full-year A4 calendar and A5 matrix mood examples.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -24,11 +25,14 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { JournalPdfExportPanel } from './src/views/settings/JournalPdfExportPanel';
 import { createJournalPdf } from './src/services/journalPdfService';
-import { JOURNAL_SECTIONS } from './src/utils/journalExport';
+import { JOURNAL_PART_GROUPS } from './src/utils/journalExport';
+import { RedemptionService } from './src/services/redemptionService';
+import { customFontStorageService } from './src/services/customFontStorageService';
 import { getJournalQuickRange } from './src/utils/journalExport';
 import { journalDemoData } from './scripts/fixtures/journal-demo';
 const root = createRoot(document.getElementById('root'));
 const passed = [];
+const appendPassed=passed.push.bind(passed); passed.push=(...messages)=>{window.__stage=messages[messages.length-1];return appendPassed(...messages);};
 const wait = (ms = 40) => new Promise(resolve => setTimeout(resolve, ms));
 const check = (value, message) => { if (!value) throw new Error(message); };
 const until = async (condition, message) => { for(let i=0;i<3000;i++) { if(condition()) return; await wait(); } throw new Error(message); };
@@ -55,6 +59,8 @@ async function run() {
  await document.fonts.load('16px VerifiedChinese','手账导出章节日期');
  check(document.fonts.check('16px VerifiedChinese','手账导出章节日期'),'Chinese UI font did not load');
  check(!document.querySelector('input[type=date]'),'Native date picker remains');
+ check(!document.querySelector('[aria-label="PDF 内容字体"]'),'Locked users see custom font controls');
+ check(!document.querySelector('select'),'Native paper select remains');
  for(const [preset,title] of [['week','本周'],['lastWeek','上周'],['month','本月'],['lastMonth','上月'],['year','本年'],['lastYear','去年']]){
   button(title).click(); await wait(); const expected=getJournalQuickRange(data,preset);
   check(document.querySelector('[aria-label="PDF 起始日期"]').value===expected.startDate.replace(/-/g,'') && document.querySelector('[aria-label="PDF 结束日期"]').value===expected.endDate.replace(/-/g,''),'Incorrect period shortcut: '+title);
@@ -66,9 +72,9 @@ async function run() {
  check(button('导出手账 PDF').disabled && document.querySelector('[role=alert]'),'Reversed dates allowed');
  await setInput('[aria-label="PDF 起始日期"]','20260801');
  await setInput('[aria-label="PDF 结束日期"]','20260831');
- label('一日一页').click(); await wait();
+ label('日计划').click(); await wait();
  button('全选').click(); await wait();
- check([...document.querySelectorAll('input[type=checkbox]')].slice(0,JOURNAL_SECTIONS.length).every(input=>input.checked),'Select all omitted chapters');
+ check([...document.querySelectorAll('input[type=checkbox]')].slice(0,JOURNAL_PART_GROUPS.flatMap(group=>group.items).length).every(input=>input.checked),'Select all omitted chapters');
  await capture('journal-mobile');
  check(document.documentElement.scrollWidth <= innerWidth,'Mobile form overflows horizontally');
  // Simulate a font resource failure before any successful export.
@@ -89,7 +95,7 @@ async function run() {
  check(window.__exports[0].name.endsWith('_20260801_20260831.pdf'),'Download filename does not match selected dates');
  window.__exports[0].name='journal-a4.pdf';
  passed.push('All eight chapters export a real A4 PDF with Chinese, emoji, time grids, separate logs and checks');
- const size=document.getElementById('journal-paper-size'); size.value='a5'; size.dispatchEvent(new Event('change',{bubbles:true})); await wait();
+ document.querySelector('[aria-label="PDF 纸张"]').click(); await wait(); document.querySelector('[data-select-value="a5"]').click(); await wait();
  toast=null; button('导出手账 PDF').click();
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===2&&toast?.type==='success';},'A5 export failed');
  window.__exports[1].name='journal-a5.pdf';
@@ -116,13 +122,46 @@ async function run() {
  const moodYear=await createJournalPdf({...data,dailyReviews:moodDays},{startDate:'2026-01-01',endDate:'2026-12-31',sections:['yearly'],paperSize:'a5',includeCover:false,includeEmptyDays:false});
  const moodBase64=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(new Blob([moodYear.bytes],{type:'application/pdf'}));});
  window.__exports.push({name:'journal-mood-year-a5.pdf',base64:moodBase64});
+ const moodA4=await createJournalPdf({...data,dailyReviews:moodDays},{startDate:'2026-01-01',endDate:'2026-12-31',sections:['yearly'],paperSize:'a4',includeCover:false,includeEmptyDays:false});
+ const moodA4Base64=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(new Blob([moodA4.bytes],{type:'application/pdf'}));});
+ window.__exports.push({name:'journal-mood-year-a4.pdf',base64:moodA4Base64});
  passed.push('A full 365-day compact annual mood-sticker example exports on A5');
  button('清空').click(); await wait(); check(button('导出手账 PDF').disabled,'Empty section selection allowed');
- label('日志').click(); await wait();
+ label('日志图文').click(); await wait();
  // Direct byte export isolates selected-section behavior and empty date handling.
  const one=await createJournalPdf({...data,logs:[],todos:[],dailyReviews:[],goals:[],weeklyReviews:[]},{startDate:'2026-08-03',endDate:'2026-08-03',sections:['logs'],paperSize:'a5',includeCover:false,includeEmptyDays:true});
  check(one.pageCount===2,'Empty timeline should contain contents and a printable date');
  passed.push('Empty book, omitted chapters and section validation');
+ const storePdf=async(name,result)=>{
+   const base64=await new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(new Blob([result.bytes],{type:'application/pdf'}));});
+   window.__exports.push({name,base64});
+ };
+ const sample={...data,logs:[{id:'font-sample',activityId:'a',categoryId:'c',title:'字体排版测试',note:'把时间留给生活。春山与秋水，记录每一份日常。',duration:3600,startTime:new Date(2026,7,3,9).getTime(),endTime:new Date(2026,7,3,10).getTime()}],todos:[],dailyReviews:[],weeklyReviews:[],monthlyReviews:[],goals:[],majorGoals:[]};
+ const sampleOptions={startDate:'2026-08-03',endDate:'2026-08-03',sections:['logs'],paperSize:'a4',includeCover:false,includeEmptyDays:false};
+ for(const style of ['minimal','classic','abstract'])for(const paper of ['a4','a5']){
+   window.__stage='Cover '+style+' '+paper;
+   await storePdf('cover-'+style+'-'+paper+'.pdf',await createJournalPdf(sample,{...sampleOptions,paperSize:paper,includeCover:true,coverStyle:style,accentColor:'#526b5d'}));
+ }
+ for(const id of ['default','lxgw-wenkai','lxgw-neo-zhisong','ding-lie-song','zhuque-fangsong','wenquanyi-bitmap']){
+   window.__stage='Font '+id;
+   await storePdf('font-'+id+'.pdf',await createJournalPdf(sample,{...sampleOptions,printedFontId:id,contentFontId:id}));
+ }
+ const blob=await(await fetch('/fonts/ZhuqueFangsong-Regular.woff2')).blob();
+ await customFontStorageService.saveFont({id:'custom-export-test',displayName:'导出测试字体',familyName:'JournalCustomTest',fileName:'custom.woff2',format:'woff2',size:blob.size,createdAt:0,updatedAt:0,blob});
+ await storePdf('font-uploaded.pdf',await createJournalPdf(sample,{...sampleOptions,printedFontId:'custom-export-test',contentFontId:'custom-export-test'}));
+ RedemptionService.prototype.isVerified=async()=>({isVerified:true});
+ document.documentElement.style.setProperty('--accent-color','#8844aa');
+ root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel key="unlocked" data={data} onToast={(type,message)=>{toast={type,message};}} /></main>);
+ await until(()=>document.querySelector('[aria-label="PDF 内容字体"]'),'Unlocked font controls did not mount');
+ document.querySelector('[aria-label="PDF 内容字体"]').click(); await until(()=>[...document.querySelectorAll('[role=option]')].some(item=>item.textContent==='导出测试字体'),'Uploaded font absent from selector');
+ document.querySelector('[data-select-value="custom-export-test"]').click(); await wait();
+ check(document.querySelector('[aria-label="PDF 内容字体"]').textContent.includes('导出测试字体'),'Content font selection did not persist');
+ check(document.querySelector('[aria-label="PDF 排版字体"]').textContent.includes('默认黑体'),'Content font changed layout font');
+ check(document.querySelector('[aria-label="PDF 自定义主题色"]').value==='#8844aa','Theme color was not inherited');
+ label('跟随主题').click(); await wait();
+ await setInput('[aria-label="PDF 自定义主题色"]','#526b5d');
+ check(document.querySelector('[aria-label="PDF 自定义主题色"]').value==='#526b5d','Custom color input failed');
+ passed.push('All six cover layouts, six built-in fonts, an uploaded WOFF2 font, entitlement visibility and independent font/color controls');
  await capture('journal-desktop');
  document.documentElement.classList.add('dark'); await capture('journal-dark');
  window.__result={passed};
@@ -153,12 +192,16 @@ await writeFile(path.join(directory, 'main.cjs'), `
 const {app,BrowserWindow}=require('electron');
 const fs=require('node:fs/promises'); const path=require('node:path');
 app.setPath('userData',path.join(__dirname,'profile'));
-setTimeout(()=>app.exit(1),240000);
+setTimeout(()=>app.exit(1),600000);
 app.whenReady().then(async()=>{
  const window=new BrowserWindow({show:false,width:390,height:1000,webPreferences:{contextIsolation:true,backgroundThrottling:false,offscreen:true}});
  await window.loadURL(${JSON.stringify(url)});
- let result;
- for(let i=0;i<4000;i++){
+ let result; let stage; let saved=0;
+ for(let i=0;i<14000;i++){
+  const status=await window.webContents.executeJavaScript('window.__stage');
+  if(status&&status!==stage){stage=status;console.log(stage);}
+  const pending=await window.webContents.executeJavaScript('window.__exports.slice('+saved+')');
+  for(const file of pending){await fs.writeFile(path.join(__dirname,file.name),Buffer.from(file.base64,'base64'));saved++;}
   const capture=await window.webContents.executeJavaScript('window.__capture');
   if(capture){
    if(capture==='journal-desktop')window.setSize(1000,1100);

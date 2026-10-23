@@ -11,6 +11,7 @@
 """
 from pathlib import Path
 import json
+import re
 import sys
 
 import fitz
@@ -24,6 +25,8 @@ def inspect_mood_year(source):
     page = overview[0]
     images = page.get_image_info()
     assert len(images) == 365, f'Expected 365 mood stickers, got {len(images)}'
+    if source.stem.endswith('a4'):
+        assert len(re.findall(r'^\d{2} / [A-Z]{3}$', page.get_text(), re.MULTILINE)) == 12, 'A4 moods are not twelve mini calendars'
     assert all(image['bbox'][2] - image['bbox'][0] < 15 and image['bbox'][3] - image['bbox'][1] < 15 for image in images), 'Annual stickers are too large'
     summaries = [page for page in document if 'One Line a Day' in next(iter(page.get_text().splitlines()), '')]
     assert len(summaries) == 1, 'Sixteen one-line summaries should fit one compact page'
@@ -36,24 +39,26 @@ def inspect_mood_year(source):
 
 def inspect(filename):
     source = Path(filename)
-    if source.stem == 'journal-mood-year-a5':
+    if source.stem.startswith('journal-mood-year-'):
         return inspect_mood_year(source)
     document = fitz.open(source)
     text = '\n'.join(page.get_text() for page in document)
     continuous = text.replace('\n', '')
     assert 'Contents' in text and 'Goals' in text, 'Missing contents/annual data'
-    for title in ['Monthly Planner', 'Weekly Planner', '一日一页', 'Weekly Timeline', '日志', 'Habit Tracker', '日复盘', '每周回顾', 'Time Distribution', 'One Line a Day']:
+    for title in ['Monthly Planner', 'Weekly Planner', '一日一页', 'Weekly Timeline', '日志', 'Habit Tracker', '引导', '每周回顾', 'Time Distribution', 'One Line a Day']:
         assert title in text, f'Missing chapter: {title}'
     assert text.count('把这页书的余味留给明天。') == 1, 'Full log note repeated across chapters or lost'
     assert text.count('关灯前，把它抄在了纸上。') == 1, 'Overnight log note duplicated on the second date'
     assert text.count('周五前发给设计组讨论。') == 1, 'Plan note repeated at schedule/deadline or across chapters'
     assert '2/3' in text, 'Counted check missing'
     assert '计数明细' not in text, 'Counted checks still have a redundant appendix'
-    for value in ['阅读页数', '32 页', '小说 / 随笔', '摘录感受', '进度增量', '关联待办', '专注评分', '心情评分', 'Reaction', '评论', '旧书', '夏日散步']:
+    for value in ['阅读页数', '32 页', '小说 / 随笔', '摘录感受', '进度增量', '@产品方案初稿', '%学习成长', '#学习与创作', '夏日阅读', '专注评分', '心情评分', 'Reaction', '评论', '旧书', '夏日散步']:
         assert value in continuous, f'Missing rich Log field: {value}'
     assert continuous.count('下次读书会可以从这一章开始。') == 1, 'Comment lost or duplicated'
     assert continuous.count('把摘录和照片一起留在这里。') == 1, 'Comment paragraphs lost or duplicated'
     assert '[[' not in text and 'Connections' not in text, 'Nodes should be styled only inside the note'
+    assert '[x]' not in text and '[ ]' not in text, 'Unrendered Markdown checkboxes remain'
+    assert 'Statistics' not in text, 'Statistics should be integrated with the bar charts'
     assert any(document.xref_get_key(xref, 'Contents')[1] == '阅读笔记' for page in document for xref, _, _ in page.annot_xrefs()), 'Canonical node target missing'
     assert '\ufffd' not in text, 'Invalid Chinese text extraction'
     assert any(document.extract_font(font[0])[3] for font in document[0].get_fonts()), 'No embedded font'
@@ -87,7 +92,7 @@ def inspect(filename):
         for drawing in page.get_drawings():
             if drawing.get('color') and drawing.get('width', 0) > 0:
                 assert abs(drawing['width'] - 0.375) < 0.01, f'Unexpected border width on page {index + 1}'
-        if any(image[2] > 200 and image[3] > 200 for image in page.get_images()) and '每日一句话' in page.get_text():
+        if any(image[2] > 200 and image[3] > 200 for image in page.get_images()) and '总结' in page.get_text():
             sticker_pages.append(index)
         for block in page.get_text('dict')['blocks']:
             for line in block.get('lines', []):
@@ -99,10 +104,10 @@ def inspect(filename):
         pixmap = page.get_pixmap(matrix=fitz.Matrix(1.4, 1.4), alpha=False)
         # Extraction succeeds even with a broken WOFF2 subset; verify visible ink in the title itself.
         title_area = fitz.Rect(margin, margin, page.rect.width - margin, margin + 32)
-        if index == 0 and 'LumosTime' in page.get_text():
+        if index == 0 and 'Life Journal' in page.get_text():
             assert 'Life Journal' in page.get_text(), 'Cover title missing'
             assert 'LUMOSTIME   /   JOURNAL' not in page.get_text(), 'Cover still uses body header'
-            title_area = fitz.Rect(margin, 180, page.rect.width - margin, 250)
+            title_area = page.search_for('Life Journal')[0]
         title = page.get_pixmap(matrix=fitz.Matrix(1, 1), clip=title_area, alpha=False)
         if not page.get_text().strip():
             blank_indices.append(index)
@@ -130,7 +135,12 @@ def inspect(filename):
     # This explicit new paragraph must have a blank baseline above it, on the same page as the first paragraph.
     paragraph = next(span for span in spans if '把这页书' in span['text'])
     previous = [span for span in spans if span['page'] == paragraph['page'] and 'WenKai' in span['font'] and abs(span['bbox'][0] - paragraph['bbox'][0]) < 1 and span['bbox'][1] < paragraph['bbox'][1] and span['bbox'][1] > paragraph['bbox'][1] - 100]
-    assert previous and paragraph['bbox'][1] - max(span['bbox'][1] for span in previous) > paragraph['size'] * 2.5, 'Explicit paragraph spacing was flattened'
+    if previous:
+        assert paragraph['bbox'][1] - max(span['bbox'][1] for span in previous) > paragraph['size'] * 2.5, 'Explicit paragraph spacing was flattened'
+    else:
+        # A paragraph starting in the next column already has a physical flow break.
+        margin = 28 if 'a5' in source.stem else 40
+        assert paragraph['bbox'][0] > margin + 25 or paragraph['page'] > 2, 'Paragraph separation was lost'
     assert timeline_pages and all('00:00' in page.get_text() and '24:00' in page.get_text() for page in timeline_pages), 'Timeline is not a 24-hour grid'
     populated = [page for page in timeline_pages if '2026-08-10 — 2026-08-16' in page.get_text()]
     assert 'MON' in ''.join(page.get_text() for page in populated) and 'SUN' in ''.join(page.get_text() for page in populated), 'Seven-day overview incomplete'
@@ -141,7 +151,12 @@ def inspect(filename):
     stat_text = ''.join(page.get_text() for page in statistics)
     for label in ['一级标签', '二级标签', '关键字', '领域', '待办分类', '待办', '关联时长']:
         assert label in stat_text, f'Missing distribution dimension: {label}'
-    assert sum(len([drawing for drawing in page.get_drawings() if drawing.get('fill')]) for page in statistics) > 20, 'Donut charts are missing'
+    assert sum(len([drawing for drawing in page.get_drawings() if drawing.get('fill')]) for page in statistics) > 20, 'Bar charts are missing'
+    assert len(statistics) == 1, 'Sample statistics should fit a single integrated page'
+    def has_color(pages, color):
+        return any(drawing.get('fill') and all(abs(drawing['fill'][i] - color[i]) < 0.002 for i in range(3)) for page in pages for drawing in page.get_drawings())
+    assert has_color(statistics, (0x52 / 255, 0x6b / 255, 0x5d / 255)), 'Statistics did not retain the user category color'
+    assert has_color(populated, tuple(0.5 + 0.5 * value / 255 for value in [0x9a, 0x9d, 0xbd])), 'Weekly blocks did not retain the user activity color'
     if 'a5' in source.stem:
         for indices in [month_indices, timeline_indices]:
             assert len(indices) % 2 == 0

@@ -38,3 +38,16 @@
 .journal-export-actions button:first-child { background: var(--jade-9); color: var(--jade-1); }
 .journal-export-actions button:first-child:hover { background: var(--jade-10); }
 .journal-export button:disabled { opacity: 0.5; cursor: default; }
+.journal-export-part-group + .journal-export-part-group { margin-top: 18px; }
+.journal-export-part-group h4 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--sage-11); }
+.journal-export-appearance { display: grid; gap: 16px; }
+.journal-export-paper > div { min-width: 0; width: min(66%, 240px); }
+.journal-export-paper > div > button { width: 100%; border: 0.5px solid var(--sage-7); border-radius: 4px; background: var(--sage-2); padding: 9px 12px; font-size: 14px; box-shadow: none; transition: none; }
+.journal-export-paper [role='option'] { border-radius: 2px; font-size: 14px; box-shadow: none; transition: none; }
+.journal-export-paper [role='listbox'] { border: 0.5px solid var(--sage-7); border-radius: 4px; background: var(--sage-2); color: var(--sage-12); box-shadow: none; }
+.journal-export-paper [role='option'][aria-selected='true'] { background: var(--sage-4); color: var(--sage-12); }
+.journal-export-paper > div > button span, .journal-export-paper [role='option'] { color: var(--sage-12); }
+.journal-export-paper svg { color: var(--sage-11); transition: none; }
+.journal-export-color { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+.journal-export-color label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.journal-export-color input[type='color'] { width: 32px; height: 28px; border: 0.5px solid var(--sage-7); padding: 2px; background: var(--sage-2); border-radius: 2px; }

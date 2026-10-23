@@ -9,8 +9,10 @@
  * @updated 2026-10-23: Projects goal progress and shared calendar colors for nested book layouts.
  * @updated 2026-10-23: Snapshots keyword, scope and todo identities for six actual-time distributions.
  * @updated 2026-10-23: Resolves historical Log fields and retains planned record metadata alongside deduplicated task plans.
+ * @updated 2026-10-23: Projects Collection membership and current review templates, preserving authored colors without palette remapping.
+ * @updated 2026-10-24: Maps seventeen independent parts to backward-compatible chapters and accepts per-export appearance.
  */
-import type { Category, CheckItem, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
+import type { Category, CheckItem, DailyReview, DataCollection, DataCollectionEntry, Goal, Log, MajorGoal, MonthlyReview, ReviewTemplate, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
 import { evaluateAutoCheck } from './autoCheckUtils';
 import { getCheckItemCountState } from './dailyCheckUtils';
@@ -33,6 +35,22 @@ export const JOURNAL_SECTIONS = [
   { id: 'reviews', label: '复盘' }
 ] as const;
 export type JournalSection = typeof JOURNAL_SECTIONS[number]['id'];
+export const JOURNAL_PART_GROUPS = [
+  { label: '年度', items: [ { id: 'annualReview', label: '年度回顾', section: 'yearly' }, { id: 'goals', label: '目标与子目标', section: 'yearly' }, { id: 'mood', label: '心情年历', section: 'yearly' }, { id: 'oneLine', label: '每日一句话', section: 'yearly' } ] },
+  { label: '每月', items: [ { id: 'monthCalendar', label: '月历', section: 'monthly' }, { id: 'monthAgenda', label: '日程明细', section: 'monthly' }, { id: 'monthReview', label: '月复盘', section: 'reviews' }, { id: 'monthChecks', label: '月打卡', section: 'checks' }, { id: 'monthStatistics', label: '时间分布与统计', section: 'checks' } ] },
+  { label: '每周', items: [ { id: 'weekPlans', label: '周计划', section: 'weekly' }, { id: 'weekTimeline', label: '周时间轴', section: 'timeline' }, { id: 'weekReview', label: '周复盘', section: 'reviews' } ] },
+  { label: '每日', items: [ { id: 'dayPlans', label: '日计划', section: 'daily' }, { id: 'dayLogs', label: '日志图文', section: 'logs' }, { id: 'dayChecks', label: '日课', section: 'daily' }, { id: 'daySummary', label: '总结与贴纸', section: 'daily' }, { id: 'dayReview', label: '引导', section: 'reviews' } ] }
+] as const;
+export type JournalPart = typeof JOURNAL_PART_GROUPS[number]['items'][number]['id'];
+const JOURNAL_PARTS = JOURNAL_PART_GROUPS.flatMap<typeof JOURNAL_PART_GROUPS[number]['items'][number]>((group) => group.items);
+export type JournalCoverStyle = 'minimal' | 'classic' | 'abstract';
+export const journalSectionsForParts = (parts: JournalPart[]): JournalSection[] => [...new Set(JOURNAL_PARTS.filter((item) => parts.includes(item.id)).map((item) => item.section))];
+export const journalHasPart = (options: JournalExportOptions, part: JournalPart): boolean => {
+  if (options.parts) return options.parts.includes(part);
+  if (part === 'monthStatistics') return options.sections.includes('monthly') || options.sections.includes('checks');
+  if (part === 'dayLogs') return options.sections.includes('daily') || options.sections.includes('logs');
+  return options.sections.includes(JOURNAL_PARTS.find((item) => item.id === part)!.section);
+};
 export interface JournalExportOptions {
   startDate: string;
   endDate: string;
@@ -40,6 +58,11 @@ export interface JournalExportOptions {
   paperSize: 'a4' | 'a5';
   includeCover: boolean;
   includeEmptyDays: boolean;
+  parts?: JournalPart[];
+  accentColor?: string;
+  printedFontId?: string;
+  contentFontId?: string;
+  coverStyle?: JournalCoverStyle;
 }
 export interface JournalExportData {
   logs: Log[];
@@ -52,6 +75,9 @@ export interface JournalExportData {
   monthlyReviews: MonthlyReview[];
   goals?: Goal[];
   majorGoals?: MajorGoal[];
+  collections?: DataCollection[];
+  collectionEntries?: DataCollectionEntry[];
+  reviewTemplates?: ReviewTemplate[];
   calendarStyle?: { colorMode: 'category' | 'schedule'; colors: Record<TodoScheduleTypeColorKey, string> };
 }
 export interface JournalLog {
@@ -67,6 +93,7 @@ export interface JournalLog {
   scopes?: JournalStatLabel[];
   todo?: JournalStatLabel & { categoryId: string; category: string; categoryColor?: string };
   fields?: JournalField[];
+  collections?: JournalStatLabel[];
 }
 export interface JournalStatLabel { id: string; name: string; color?: string }
 export interface JournalDay {
@@ -90,6 +117,7 @@ export interface JournalModel {
   calendarStyle: { colorMode: 'category' | 'schedule'; colors: Record<TodoScheduleTypeColorKey, string>; categoryColors: Record<string, string> };
   goalProgress: Record<string, { current: number; target: number; percentage: number }>;
   majorGoalIds: string[];
+  reviewTemplates: ReviewTemplate[];
 }
 
 export const shiftJournalDate = (key: string, days: number): string => {
@@ -135,6 +163,8 @@ export const validateJournalOptions = (options: JournalExportOptions): string | 
   const dayCount = (Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000 + 1;
   if (dayCount > 3660) return '一次最多导出 3660 天，请缩小日期范围';
   if (!options.sections.length) return '请至少选择一个导出章节';
+  if (options.parts && (!options.parts.length || options.parts.some((part) => !JOURNAL_PART_GROUPS.some((group) => group.items.some((item) => item.id === part))))) return '请选择有效的导出内容';
+  if (options.accentColor && !/^#[0-9a-f]{6}$/i.test(options.accentColor)) return '请输入有效的主题色';
   if (options.sections.some((section) => !JOURNAL_SECTIONS.some((item) => item.id === section))) return '存在不支持的导出章节';
   if (!['a4', 'a5'].includes(options.paperSize)) return '请选择 A4 或 A5 纸张';
   return null;
@@ -236,6 +266,13 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
   const scopeMap = new Map(data.scopes.map((scope) => [scope.id, scope]));
   const todoMap = new Map(data.todos.map((todo) => [todo.id, todo]));
   const todoCategoryMap = new Map(data.todoCategories.map((category) => [category.id, category]));
+  const collectionMap = new Map((data.collections || []).map((collection) => [collection.id, collection]));
+  const collectionsByLog = new Map<string, JournalStatLabel[]>();
+  (data.collectionEntries || []).filter((entry) => entry.itemType === 'log').forEach((entry) => {
+    const entries = collectionsByLog.get(entry.itemId) || [];
+    if (!entries.some((item) => item.id === entry.collectionId)) entries.push({ id: entry.collectionId, name: collectionMap.get(entry.collectionId)?.name || `已删除合集 (${entry.collectionId})` });
+    collectionsByLog.set(entry.itemId, entries);
+  });
   // Project each intersecting log only onto touched days; elapsed proportions retain recorded durations.
   data.logs.forEach((log) => {
     if (!Number.isFinite(log.startTime) || !Number.isFinite(log.endTime) || log.endTime <= log.startTime) return;
@@ -244,9 +281,12 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
     if (start >= end) return;
     const names = activities.get(log.activityId);
     const activity = activityDefinitions.get(log.activityId);
-    const keywordRecords = syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || [], () => '#7c9686');
+    const keywordRecords = syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || [], () => names?.color || '#8a918e');
     const attribute = activity?.attributes?.find((item) => item.isKeywordSource && !item.isArchived && (item.type === 'single' || item.type === 'multi'));
-    const keywords = getLogMatchedDetailTimelineKeywords(log, keywordRecords, attribute).map((name) => ({ id: `${log.activityId}:${name}`, name, color: keywordRecords.find((item) => item.label === name)?.color }));
+    const keywords = getLogMatchedDetailTimelineKeywords(log, keywordRecords, attribute).map((name) => {
+      const stored = activity?.keywords?.find((item) => typeof item !== 'string' && item.label === name);
+      return { id: `${log.activityId}:${name}`, name, color: typeof stored === 'object' && stored.color ? stored.color : names?.color };
+    });
     const scopes = getNormalizedScopeIds(log.scopeIds).map((id) => ({ id, name: scopeMap.get(id)?.name || '已删除领域', color: getColorHexForCharts(scopeMap.get(id)?.themeColor || '') }));
     const todoItem = log.linkedTodoId ? todoMap.get(log.linkedTodoId) : undefined;
     const todoCategory = todoItem ? todoCategoryMap.get(todoItem.categoryId) : undefined;
@@ -255,7 +295,7 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
       const key = formatDateKey(new Date(start));
       const next = Math.min(end, parseDateKey(shiftJournalDate(key, 1))!.getTime());
       const seconds = Math.max(0, Number.isFinite(log.duration) ? log.duration : (log.endTime - log.startTime) / 1000) * (next - start) / (log.endTime - log.startTime);
-      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类', color: names?.color, categoryColor: getColorHexForCharts(categoryMap.get(log.categoryId)?.themeColor || ''), keywords, scopes, todo, fields: journalLogFields(log, activity) });
+      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类', color: names?.color, categoryColor: getColorHexForCharts(categoryMap.get(log.categoryId)?.themeColor || ''), keywords, scopes, todo, fields: journalLogFields(log, activity), collections: collectionsByLog.get(log.id) || [] });
       start = next;
     }
   });
@@ -296,6 +336,7 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
       categoryColors: Object.fromEntries(data.todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')]))
     },
     majorGoalIds: [...majorGoalIds],
+    reviewTemplates: data.reviewTemplates || [],
     goalProgress: Object.fromEntries([...(data.majorGoals || []), ...(data.goals || [])].map((goal) => {
       const progress = majorGoalIds.has(goal.id)
         ? calculateMajorGoalProgress(goal as MajorGoal, data.goals || [], progressLogs, progressTodos)

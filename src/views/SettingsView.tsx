@@ -31,6 +31,7 @@
  * @updated 2026-08-26: Added the Record settings group and Routine settings editor.
  * @updated 2026-09-12: Prevents stale full-data sync writes from overwriting Routine associations or appearance settings.
  * @updated 2026-09-12: Keeps Routine edits from restoring appearance data such as custom fonts.
+ * @updated 2026-10-23: Provides current review groups to journal export through Data Management.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -1003,6 +1004,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                 onCleanupCloudBackups={handleCleanupCloudBackups}
                 onCheckCloudImageConsistency={handleCheckCloudImageConsistency}
                 onCleanupCloudImages={handleCleanupCloudImages}
+                reviewTemplates={reviewTemplates}
                 goals={syncData.goals || []}
                 majorGoals={syncData.majorGoals || []}
                 logs={logs}

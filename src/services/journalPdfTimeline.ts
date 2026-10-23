@@ -6,6 +6,7 @@
  * @updated 2026-10-23: Adds reference-style hourly grids, weekend tinting and overlap lanes.
  * @updated 2026-10-23: Shares eight-column A5 spreads/A4 landscape geometry and review sidebars.
  * @updated 2026-10-23: Maps activity hues to Radix scales and retains readable 9pt block labels.
+ * @updated 2026-10-23: Joins daily columns, rounds each Log block and treats Saturday/Sunday like other days.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { JournalDay } from '../utils/journalExport';
@@ -15,15 +16,16 @@ import type { JournalPdfWriter } from './journalPdfLayout';
 import type { WeeklyReview } from '../types';
 import { writeJournalOverview } from './journalPdfOverview';
 
-export { journalRadixColor as journalBlockColor } from './journalPdfTheme';
-import { journalRadixColor as journalBlockColor } from './journalPdfTheme';
+export { journalDataColor as journalBlockColor } from './journalPdfTheme';
+import { journalDataColor as journalBlockColor } from './journalPdfTheme';
 
 export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: JournalDay[], review?: WeeklyReview): void => {
   writeJournalOverview(w, '时间轴 周概览', `${week} — ${shiftJournalDate(week, 6)}`, (panel) => {
   const compact = w.model.options.paperSize === 'a5';
   const axis = 29;
   const x0 = panel.x + axis;
-  const column = panel.column;
+  const visibleDays = Math.min(panel.count, 7 - panel.start);
+  const column = (panel.column * visibleDays - axis) / visibleDays;
   const top = panel.top + 35;
   const height = w.bottom - top - 23;
   const hour = height / 24;
@@ -35,32 +37,29 @@ export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: Jou
     if (index < panel.start || index >= panel.start + panel.count) return;
     const x = x0 + (index - panel.start) * column;
     const day = dayMap.get(date);
-    const background = !day ? C.fill : index === 5 ? C.fill : index === 6 ? C.weekend : C.paper;
-    w.rect(x, top - 31, column - axis, height + 31, background);
+    const background = !day ? C.fill : C.paper;
+    w.rect(x, top - 31, column, height + 31, background);
     w.text(date.slice(8), x + 4, top - 29, compact ? 12 : 15, day ? ink : C.muted);
     w.text(['MON 一', 'TUE 二', 'WED 三', 'THU 四', 'FRI 五', 'SAT 六', 'SUN 日'][index], x + 4, top - 10, compact ? 5 : 6, ink);
   });
   for (let half = 0; half <= 48; half++) {
     const y = top + half * hour / 2;
-    w.line(x0, y, column * Math.min(panel.count, 7 - panel.start) - axis, half % 2 ? C.fill : C.line);
+    w.line(x0, y, column * visibleDays, half % 2 ? C.fill : C.line);
     if (half % 2 === 0) w.text(`${String(half / 2).padStart(2, '0')}:00`, w.margin, y - 3, compact ? 5 : 6, C.muted);
   }
-  for (let index = 0; index < Math.min(panel.count, 7 - panel.start); index++) {
-    w.verticalLine(x0 + index * column, top - 31, height + 31);
-    w.verticalLine(x0 + (index + 1) * column - axis, top - 31, height + 31);
-  }
+  for (let index = 0; index <= visibleDays; index++) w.verticalLine(x0 + index * column, top - 31, height + 31);
   days.forEach((day) => {
     const index = dates.indexOf(day.date);
     if (index < panel.start || index >= panel.start + panel.count) return;
     layoutJournalTimeline(day.logs, day.date).forEach((block) => {
       const log = block.log;
       colors.set(log.activity, log.color);
-      const laneWidth = (column - axis - 4) / block.laneCount;
-      const x = x0 + (index - panel.start) * column + 2 + block.lane * laneWidth;
+      const laneWidth = (column - 2) / block.laneCount;
+      const x = x0 + (index - panel.start) * column + 1 + block.lane * laneWidth;
       const y = top + block.startMinute / 1440 * height;
       const blockHeight = Math.max(0.7, (block.endMinute - block.startMinute) / 1440 * height - 0.7);
       const width = Math.max(1, laneWidth - 1);
-      w.rect(x, y, width, blockHeight, journalBlockColor(log.activity, log.color, log.source.isPlanned ? 0.86 : 0.5));
+      w.roundedRect(x, y, width, blockHeight, journalBlockColor(log.activity, log.color, log.source.isPlanned ? 0.86 : 0.5));
       if (width < 19 || blockHeight < 12) return;
       const size = 9;
       let cursor = y + 2;

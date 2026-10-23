@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-23: Data Management passes Collections, membership entries and review templates into PDF projection; this keeps symbolic Log associations and the section/group/question guidance hierarchy complete.
+
 Update 2026-10-23: `JournalPdfExportPanel.css` uses semantic Radix light/dark scales, flat controls, 0.5px borders and only 12/14/18px text. Decorative cards, motion, duplicate descriptions and middle-dot separators are omitted.
 
 Update 2026-10-23: Journal export offers eight independent sections. 周计划 contains task lists, 时间轴 is the weekly colored calendar overview, and 日志 contains full chronological records and notes. The latter two are selected separately.
@@ -109,3 +111,5 @@ Update 2026-10-06: Settings → 内容 → 节点 opens `NodesSettingsView.tsx`,
 2026-10-03：手动同步增加更新、删除和分类迁移计数；删除由完整本地快照与账号账本比对，空范围仍可同步。日期变化或数据重新加载时停止后续批次，避免把尚未加载的记录判成删除。
 
 2026-10-03：日期下方增加紧凑的“忽略分类”多选按钮，不显示分类色点，选中用深色背景和小勾表示。本机记住选择，并更新导入数量预览。忽略分类的记录不新增、更新、迁移或删除；来源分类也被忽略的迁移记录保留原日程，取消勾选后恢复同步。
+
+2026-10-24：手账 PDF 按年度、每月、每周、每日提供 17 项独立内容选择，纸张使用共享 CustomSelect。兑换码验证后显示主题色和排版/内容两个字体选项，复用投喂小鱼干的上传字体；未解锁时使用黑色强调色及默认黑体/文楷，不显示字体自定义。

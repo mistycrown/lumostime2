@@ -4,6 +4,7 @@
  * @output Regression checks for all six journal time attribution dimensions
  * @pos Tests (Journal statistics)
  * @updated 2026-10-23: Verifies clipping, identity, full multi-attribution and source immutability.
+ * @updated 2026-10-23: Requires explicit keyword colors and inherited activity colors instead of generated palette colors.
  */
 import { describe, expect, it } from 'vitest';
 import { buildJournalModel, type JournalExportData } from './journalExport';
@@ -22,6 +23,7 @@ describe('journal time distributions', () => {
         { id: 'plan', activityId: 'a', categoryId: 'a', title: '阅读课程', scopeIds: ['s'], linkedTodoId: 'task1', isPlanned: true, startTime: new Date(2026, 9, 20, 13).getTime(), endTime: new Date(2026, 9, 20, 14).getTime(), duration: 3600 }
       ], dailyReviews: [], weeklyReviews: [], monthlyReviews: []
     };
+    data.categories[0].activities[0].keywords = [{ label: '阅读', source: 'manual', color: '#123456' }, '课程'];
     const original = JSON.stringify(data);
     const model = buildJournalModel(data, { startDate: '2026-10-20', endDate: '2026-10-20', sections: ['monthly'], paperSize: 'a4', includeCover: false, includeEmptyDays: false });
     const groups = new Map(buildJournalDistributions(model.days).map((group) => [group.id, group]));
@@ -31,6 +33,8 @@ describe('journal time distributions', () => {
     expect(groups.get('activities')!.items.every((item) => item.name === '阅读' && item.seconds === 3600)).toBe(true);
     expect(groups.get('keywords')!.total).toBe(7200);
     expect(groups.get('keywords')!.items).toHaveLength(2);
+    expect(groups.get('keywords')!.items.find((item) => item.name === '阅读')?.color).toBe('#123456');
+    expect(groups.get('keywords')!.items.find((item) => item.name === '课程')?.color).toBe('#557755');
     expect(groups.get('scopes')!.total).toBe(10800);
     expect(groups.get('scopes')!.items.find((item) => item.id === 's')!.seconds).toBe(3600);
     expect(groups.get('scopes')!.attributed).toBe(true);

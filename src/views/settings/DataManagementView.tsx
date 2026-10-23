@@ -4,6 +4,7 @@
  * @updated 2026-10-23: Adds date- and section-selectable journal PDF export alongside Excel.
  * @updated 2026-07-21: Replaced backup and image-list native confirmations with in-app confirmation modals and dark-mode image controls.
  * @updated 2026-03-24: 图片备份支持自定义每包张数的分块导出，降低移动端导出时的内存压力。
+ * @updated 2026-10-23: Passes Collections and review template groups into journal export.
  */
 import React, { useState, useRef } from 'react';
 import { ChevronLeft, Database, Download, Upload, Trash2, Cloud, FileSpreadsheet, ImageIcon, Search, RefreshCw, Package } from 'lucide-react';
@@ -17,7 +18,7 @@ import { imageCleanupService } from '../../services/imageCleanupService';
 import { imageExportService, type ImageExportProgress } from '../../services/imageExportService';
 import { ConfirmModal } from '../../components/ConfirmModal';
 import { JournalPdfExportPanel } from './JournalPdfExportPanel';
-import type { Goal, MajorGoal } from '../../types';
+import type { Goal, MajorGoal, ReviewTemplate } from '../../types';
 
 interface ImageExportSummary {
     totalImages: number;
@@ -45,6 +46,7 @@ interface DataManagementViewProps {
     collectionEntries: DataCollectionEntry[];
     goals?: Goal[];
     majorGoals?: MajorGoal[];
+    reviewTemplates?: ReviewTemplate[];
     onCleanupCloudBackups: () => Promise<void>;
     onCheckCloudImageConsistency: () => Promise<string>;
     onCleanupCloudImages: () => Promise<{ message: string; report: string }>;
@@ -71,6 +73,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     collectionEntries,
     goals = [],
     majorGoals = [],
+    reviewTemplates = [],
     onCleanupCloudBackups,
     onCheckCloudImageConsistency,
     onCleanupCloudImages
@@ -641,7 +644,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 </div>
 
                 <JournalPdfExportPanel
-                    data={{ logs, categories, todos, todoCategories, scopes, dailyReviews, weeklyReviews, monthlyReviews, goals, majorGoals }}
+                    data={{ logs, categories, todos, todoCategories, scopes, dailyReviews, weeklyReviews, monthlyReviews, goals, majorGoals, collections, collectionEntries, reviewTemplates }}
                     onToast={onToast}
                 />
 

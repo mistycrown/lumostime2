@@ -6,9 +6,10 @@
  * @updated 2026-10-23: Replaces repeated placeholder text with natural, distinct entries.
  * @updated 2026-10-23: Includes original image stickers, linked actual traces and parent/child goal progress.
  * @updated 2026-10-23: Includes rich photo logs, historical attribute fields, comments, reactions and inline node aliases.
+ * @updated 2026-10-23: Exercises saved review groups and Collection membership in rich Log exports.
  */
 import type { JournalExportData } from '../../src/utils/journalExport';
-import type { DailyReview, Log, TodoItem } from '../../src/types';
+import type { DailyReview, Log, TodoItem, ReviewTemplateSnapshot } from '../../src/types';
 
 const stamp = (day: number, hour = 0, minute = 0) => new Date(2026, 7, day, hour, minute).getTime();
 const key = (day: number) => `2026-08-${String(day).padStart(2, '0')}`;
@@ -73,6 +74,10 @@ for (let day = 10; day <= 16; day++) {
   logs.push({ id: `time-plan-${index}`, categoryId: 'study', activityId: 'book', title: task.title, linkedTodoId: task.id, isPlanned: true, startTime: stamp(day, 14), endTime: stamp(day, 15, 30), duration: 5400 });
 });
 
+const guidanceGroups: ReviewTemplateSnapshot[] = [
+  { id: 'memories', title: '值得记住', order: 0, questions: [{ id: 'memory', question: '今天有哪些值得记住的小事？', type: 'text' }] },
+  { id: 'tomorrow', title: '留给明天', order: 1, questions: [{ id: 'tomorrow', question: '明天想为自己留出什么时间？', type: 'text' }] }
+];
 const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24, 26, 28, 30, 31].map((day, index) => ({
   id: `review-${day}`, date: key(day), createdAt: stamp(day), updatedAt: stamp(day, 22),
   summary: notes[index + 5],
@@ -83,7 +88,8 @@ const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24,
     { id: 'read', category: '慢慢生长', content: '睡前读几页书', isCompleted: index % 4 !== 2 },
     { id: 'journal', category: '慢慢生长', content: '记下今天的小事', isCompleted: true }
   ],
-  answers: day === 3 ? [{ questionId: 'memory', question: '今天有哪些值得记住的小事？', answer: '中午收到朋友寄来的明信片，上面画了一只趴在窗边的猫。\n\n晚上把它放在书桌前，希望明天也能记得这样轻松的心情。' }] : []
+  templateSnapshot: guidanceGroups,
+  answers: day === 3 ? [{ questionId: 'memory', question: '今天有哪些值得记住的小事？', answer: '中午收到朋友寄来的明信片，上面画了一只趴在窗边的猫。\n\n晚上把它放在书桌前，希望明天也能记得这样轻松的心情。' }, { questionId: 'tomorrow', question: '明天想为自己留出什么时间？', answer: '留半小时安静阅读，读完再看看窗外。' }] : []
 }));
 
 logs.forEach((log) => {
@@ -101,6 +107,8 @@ logs.forEach((log) => {
 
 export const journalDemoData: JournalExportData = {
   logs, todos, dailyReviews,
+  collections: [{ id: 'summer-reading', name: '夏日阅读', createdAt: 0, updatedAt: 0 }],
+  collectionEntries: [{ id: 'summer-reading-log', collectionId: 'summer-reading', itemType: 'log', itemId: 'demo-log-1', addedAt: 0 }],
   categories: [{ id: 'study', name: '学习与创作', icon: '📚', themeColor: '#526b5d', activities: [{ id: 'book', name: '阅读与学习', icon: '📖', color: '#77a891', keywords: ['阅读', '课程', '学习', '照片'], attributes: [
     { id: 'pages', name: '阅读页数', type: 'number', unit: '页', order: 0, createdAt: 0, updatedAt: 0 },
     { id: 'genre', name: '题材', type: 'multi', options: [{ id: 'fiction', label: '小说' }, { id: 'memoir', label: '随笔' }], order: 1, createdAt: 0, updatedAt: 0 },

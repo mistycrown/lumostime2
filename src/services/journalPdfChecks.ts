@@ -1,7 +1,7 @@
 /**
  * @file journalPdfChecks.ts
  * @input Historical daily check snapshots for one month
- * @output Aligned vector checks and direct numeric counts with readable half-month A5 bands
+ * @output Aligned completion circles, incomplete dashes and direct counts without a heavy grid
  * @pos Service (Journal monthly checks)
  * @updated 2026-10-23: Keeps dates and values centered at 9pt without a separate count appendix.
  */
@@ -21,7 +21,12 @@ export const writeJournalCheckMatrix = (w: JournalPdfWriter, month: string, days
   const labelWidth = w.contentWidth * 0.32;
   const maxValue = Math.max(w.widthOf('31', 9), ...days.flatMap((day) => day.checks.filter((item) => item.manualMode === 'count').map((item) => w.widthOf(String(getCheckItemCountState(item).current), 9))));
   const perBand = Math.max(1, Math.min(w.model.options.paperSize === 'a5' ? 16 : count, Math.floor((w.contentWidth - labelWidth) / (maxValue + 2))));
-  w.paragraph('勾 完成   叉 未完成   数字 次数   — 无记录', 9, C.muted, 0, 'print');
+  w.page.drawCircle({ x: w.margin + 3, y: w.height - w.y - 5, size: 2.5, borderColor: w.accentColor, borderWidth: JOURNAL_STROKE });
+  w.text('完成', w.margin + 12, w.y, 9, C.muted);
+  w.line(w.margin + 46, w.y + 5, 6, C.muted);
+  w.text('未完成', w.margin + 58, w.y, 9, C.muted);
+  w.text('数字 次数', w.margin + 103, w.y, 9, C.muted);
+  w.y += 26;
   for (let start = 1; start <= count; start += perBand) {
     const end = Math.min(count, start + perBand - 1);
     const length = end - start + 1;
@@ -53,18 +58,11 @@ export const writeJournalCheckMatrix = (w: JournalPdfWriter, month: string, days
         const x = w.margin + labelWidth + (date - start) * cell;
         const center = x + cell / 2;
         const cy = w.y + rowHeight / 2;
-        if (!day) w.rect(x, w.y, cell, rowHeight, C.fill);
-        else if (!item) w.line(center - 2, cy, 4, C.line);
-        else if (item.manualMode === 'count') {
+        if (item?.manualMode === 'count') {
           const value = String(getCheckItemCountState(item).current);
           w.text(value, center - w.widthOf(value, 9) / 2, cy - 5.5, 9, item.isCompleted ? C.accent : C.muted);
-        } else {
-          const color = item.isCompleted ? C.accent : C.danger;
-          const stroke = (x1: number, y1: number, x2: number, y2: number) => w.page.drawLine({ start: { x: x1, y: w.height - y1 }, end: { x: x2, y: w.height - y2 }, color, thickness: JOURNAL_STROKE });
-          if (item.isCompleted) { stroke(center - 2.5, cy, center - 0.8, cy + 2.5); stroke(center - 0.8, cy + 2.5, center + 2.5, cy - 2.5); }
-          else { stroke(center - 2.5, cy - 2.5, center + 2.5, cy + 2.5); stroke(center - 2.5, cy + 2.5, center + 2.5, cy - 2.5); }
-        }
-        w.verticalLine(x, w.y, rowHeight, C.line);
+        } else if (item?.isCompleted) w.page.drawCircle({ x: center, y: w.height - cy, size: 2.5, borderColor: w.accentColor, borderWidth: JOURNAL_STROKE });
+        else if (item) w.line(center - 2.5, cy, 5, C.muted);
       }
       w.y += rowHeight;
       w.line(w.margin, w.y, w.contentWidth, C.line);
