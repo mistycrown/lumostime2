@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-23: Custom trend charts suppress the browser focus outline while keeping the selected-point marker, date readout and keyboard navigation. The renderer harness captures the mobile chart while focused.
+
 Update 2026-10-23: `stats/InteractiveTrendChart.tsx` gives custom detail-statistics trends a persistent date/value readout, full-width click/tap selection, previous/next controls and keyboard navigation. `ActivityAttributeStatistics.tsx` shares it across category, tag, scope/filter record-duration and numeric cards, includes all selected dates instead of truncating at 14 records, and displays zero-duration days without inventing missing numeric measurements.
 
 Update 2026-10-18: Abandonment markers use a Ban icon and date without a text status label. Quick actions place abandonment/restoration and deletion in one two-column row; detail controls use `放弃` / `恢复`.

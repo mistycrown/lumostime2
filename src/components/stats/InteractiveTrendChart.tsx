@@ -4,6 +4,7 @@
  * @output Clickable trend with a persistent date/value readout and keyboard navigation.
  * @pos Component (Custom Detail Statistics)
  * @updated 2026-10-23: Adds touch-friendly date selection without obscuring the plot.
+ * @updated 2026-10-23: Suppresses the chart focus outline while preserving date selection and keyboard controls.
  */
 import React, { useId, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -77,7 +78,8 @@ export const InteractiveTrendChart: React.FC<InteractiveTrendChartProps> = ({ ti
     <div className="mt-5 py-1">
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="aspect-[40/13] w-full cursor-crosshair rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-4 focus-visible:outline-stone-400"
+        className="aspect-[40/13] w-full cursor-crosshair rounded-sm"
+        style={{ outline: 'none' }}
         role="slider"
         tabIndex={0}
         aria-label={`${title} 每日趋势`}

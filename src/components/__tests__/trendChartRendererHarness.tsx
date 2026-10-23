@@ -4,6 +4,7 @@
  * @output Browser regression checks for date selection, responsive layout and range updates.
  * @pos Test (Custom Statistics Renderer)
  * @updated 2026-10-23: Covers category/tag/record sources, sparse days and keyboard navigation.
+ * @updated 2026-10-23: Captures the mobile chart while focused to verify its border-free presentation.
  */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -74,7 +75,7 @@ async function run() {
     check(status().includes('1h') && slider().getAttribute('aria-valuenow') === '15', 'Native touch should select nearest date');
     passed.push(`${source}: 30-day totals, click/touch, zero days and keyboard boundaries`);
     if (source === 'categoryDuration') {
-      slider().blur();
+      slider().focus();
       await capture('trend-mobile');
       for (const range of ['7d', 'year'] as const) {
         const next = { ...activity, statisticCards: activity.statisticCards!.map(card => ({ ...card, range })) };
