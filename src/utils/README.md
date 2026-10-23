@@ -1,5 +1,9 @@
 # Utils Architecture
 
+Update 2026-10-23: Journal sections distinguish `timeline` (weekly time-block calendar) and `logs` (full text). `journalTimelineLayout.ts` maps clipped records to local clock minutes and stable overlap-cluster lanes, preserving adjacent intervals at full width and midnight at 24:00.
+
+Update 2026-10-23: Journal export accepts strict eight-digit input and complete current/previous calendar periods (Monday–Sunday, first–last day of month, January–December). Invalid edits never fall back to a stale range. `getJournalDayPlans` merges linked time plans with task occurrences for calendar cells and agenda details.
+
 Update 2026-10-23: `journalExport.ts` projects an inclusive local-date range into journal days and calendar groups. It clips overnight logs proportionally, excludes planned blocks from actual totals, reuses todo occurrence rules, refreshes stored automatic checks (including previous-night checks), preserves missing check snapshots and selects only fully contained week/month reviews. Date validation and all-data shortcuts share these helpers.
 
 Update 2026-10-22: `cloudJsonCache.ts` retains one main-backup JSON/ETag pair per provider instance and reuses it only after server confirmation. `syncUtils.readCloudSnapshot` opts into conditional GET; verification stays unconditional. Native WebDAV upload inventory falls back to its manifest instead of an unsupported empty listing. Details are in `cloud-sync.md`.

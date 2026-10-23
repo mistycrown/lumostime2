@@ -2,7 +2,7 @@
  * @file journalPdfService.test.ts
  * @input Bundled font, real PDF service and mocked native filesystem
  * @output Android/iOS save-path, cancellation and failed-save recovery regressions
- * @updated 2026-10-23: Verifies completed PDF bytes reach native storage without partial cancellation saves.
+ * @updated 2026-10-23: Verifies native saves with independently loaded printed/handwritten fonts.
  */
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -18,7 +18,8 @@ const options: JournalExportOptions = { startDate: '2026-10-23', endDate: '2026-
 
 beforeAll(async () => {
   const font = await readFile('public/fonts/LXGWWenKaiLite-Journal.ttf');
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(font)));
+  const printed = await readFile('public/fonts/NotoSansSC-Journal.ttf');
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => new Response(url.includes('NotoSansSC') ? printed : font)));
   vi.stubGlobal('FileReader', class {
     result?: string;
     onload?: () => void;

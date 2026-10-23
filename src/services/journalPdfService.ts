@@ -4,22 +4,26 @@
  * @output Offline, searchable PDF bytes or a completed platform download
  * @pos Service (Journal PDF export)
  * @updated 2026-10-23: Embeds the complete TrueType font because fontkit subsets omit WenKai glyph outlines.
+ * @updated 2026-10-23: Embeds separate Noto Sans printed labels and WenKai handwritten content.
  */
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { buildJournalModel, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
-import { composeJournalPdf, JOURNAL_FONT_FAMILY, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
+import { composeJournalPdf, JOURNAL_FONT_FAMILY, JOURNAL_PRINT_FEATURES, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
 
 export type { JournalPdfProgress } from './journalPdfLayout';
-let fontBytes: Promise<ArrayBuffer> | undefined;
-const loadFont = (): Promise<ArrayBuffer> => {
-  fontBytes ??= fetch(`${import.meta.env.BASE_URL}fonts/LXGWWenKaiLite-Journal.ttf`).then(async (response) => {
+const fontBytes = new Map<string, Promise<ArrayBuffer>>();
+const loadFont = (filename: string): Promise<ArrayBuffer> => {
+  const cached = fontBytes.get(filename);
+  if (cached) return cached;
+  const loading = fetch(`${import.meta.env.BASE_URL}fonts/${filename}`).then(async (response) => {
     if (!response.ok) throw new Error('手账中文字体加载失败，请重试');
     return response.arrayBuffer();
-  }).catch((error) => { fontBytes = undefined; throw error; });
-  return fontBytes;
+  }).catch((error) => { fontBytes.delete(filename); throw error; });
+  fontBytes.set(filename, loading);
+  return loading;
 };
 
 export const createJournalPdf = async (
@@ -37,10 +41,11 @@ export const createJournalPdf = async (
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   onProgress?.({ message: '正在加载中文字体', pages: 0 });
-  const bytes = await loadFont();
+  const [bytes, printedBytes] = await Promise.all([loadFont('LXGWWenKaiLite-Journal.ttf'), loadFont('NotoSansSC-Journal.ttf')]);
   signal?.throwIfAborted();
   // WenKai subset encoding drops outlines in current fontkit; embed once in full for all pages.
   const font = await pdf.embedFont(bytes, { subset: false });
+  const printedFont = await pdf.embedFont(printedBytes, { subset: false, features: JOURNAL_PRINT_FEATURES });
   const characters = new Set(font.getCharacterSet());
   const symbols: JournalSymbols = new Map();
   const values = new Set<string>();
@@ -83,7 +88,7 @@ export const createJournalPdf = async (
   pdf.setTitle(`LumosTime 手账 ${options.startDate} — ${options.endDate}`);
   pdf.setAuthor('LumosTime');
   pdf.setSubject('个人时间手账');
-  const writer = new JournalPdfWriter(pdf, font, model, symbols);
+  const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont);
   await composeJournalPdf(writer, onProgress, signal);
   const output = await pdf.save();
   signal?.throwIfAborted();

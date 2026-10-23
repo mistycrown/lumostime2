@@ -4,12 +4,12 @@
  * @output Date/section/paper selection and cancellable PDF export controls
  * @pos Settings (Data Management)
  * @updated 2026-10-23: Adds configurable offline journal PDF export alongside Excel.
+ * @updated 2026-10-23: Replaces date pickers with eight-digit entry and adds complete current/previous periods.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, Download, Loader2 } from 'lucide-react';
 import type { ToastType } from '../../components/Toast';
-import { JOURNAL_SECTIONS, getJournalDataRange, validateJournalOptions, type JournalExportData, type JournalExportOptions, type JournalSection } from '../../utils/journalExport';
-import { formatDateKey, getStartOfWeek } from '../../utils/todoScheduleUtils';
+import { JOURNAL_SECTIONS, getJournalQuickRange, parseJournalDateInput, validateJournalOptions, type JournalExportData, type JournalExportOptions, type JournalRangePreset, type JournalSection } from '../../utils/journalExport';
 import type { JournalPdfProgress } from '../../services/journalPdfService';
 
 interface JournalPdfExportPanelProps {
@@ -19,14 +19,14 @@ interface JournalPdfExportPanelProps {
 
 export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ data, onToast }) => {
   const [options, setOptions] = useState<JournalExportOptions>(() => {
-    const today = new Date();
     return {
-      startDate: formatDateKey(new Date(today.getFullYear(), today.getMonth(), 1)),
-      endDate: formatDateKey(today),
-      sections: ['yearly', 'monthly', 'weekly', 'timeline', 'checks', 'reviews'],
+      ...getJournalQuickRange(data, 'month'),
+      sections: ['yearly', 'monthly', 'weekly', 'timeline', 'logs', 'checks', 'reviews'],
       paperSize: 'a4', includeCover: true, includeEmptyDays: false
     };
   });
+  const [startInput, setStartInput] = useState(() => options.startDate.replace(/-/g, ''));
+  const [endInput, setEndInput] = useState(() => options.endDate.replace(/-/g, ''));
   const [progress, setProgress] = useState<JournalPdfProgress | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -38,19 +38,11 @@ export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ da
   }, []);
   const update = (patch: Partial<JournalExportOptions>) => setOptions((previous) => ({ ...previous, ...patch }));
   const toggleSection = (section: JournalSection) => update({ sections: options.sections.includes(section) ? options.sections.filter((item) => item !== section) : [...options.sections, section] });
-  const quickRange = (range: string) => {
-    const today = new Date();
-    let start = today;
-    let end = today;
-    if (range === 'week') start = getStartOfWeek(today);
-    if (range === 'month') start = new Date(today.getFullYear(), today.getMonth(), 1);
-    if (range === 'lastMonth') { start = new Date(today.getFullYear(), today.getMonth() - 1, 1); end = new Date(today.getFullYear(), today.getMonth(), 0); }
-    if (range === 'year') start = new Date(today.getFullYear(), 0, 1);
-    if (range === 'all') {
-      update(getJournalDataRange(data, today));
-      return;
-    }
-    update({ startDate: formatDateKey(start), endDate: formatDateKey(end) });
+  const quickRange = (range: JournalRangePreset) => {
+    const dates = getJournalQuickRange(data, range);
+    setStartInput(dates.startDate.replace(/-/g, ''));
+    setEndInput(dates.endDate.replace(/-/g, ''));
+    update(dates);
   };
   const error = validateJournalOptions(options);
   const handleExport = async () => {
@@ -79,14 +71,14 @@ export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ da
         <legend className="sr-only">PDF 导出选项</legend>
         <div className="grid grid-cols-2 gap-3">
           <label className="min-w-0 text-xs text-stone-500 dark:text-stone-400">起始日期
-            <input aria-label="PDF 起始日期" type="date" min="1900-01-01" max="9999-12-31" value={options.startDate} onChange={(event) => update({ startDate: event.target.value })} className="mt-2 block w-full min-w-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-transparent px-2 py-2.5 text-sm text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300" />
+            <input aria-label="PDF 起始日期" type="text" inputMode="numeric" maxLength={8} placeholder="YYYYMMDD" value={startInput} onChange={(event) => { const value = event.target.value.replace(/\D/g, '').slice(0, 8); setStartInput(value); update({ startDate: parseJournalDateInput(value) }); }} className="mt-2 block w-full min-w-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-transparent px-3 py-2.5 text-sm font-mono text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300" />
           </label>
           <label className="min-w-0 text-xs text-stone-500 dark:text-stone-400">结束日期
-            <input aria-label="PDF 结束日期" type="date" min="1900-01-01" max="9999-12-31" value={options.endDate} onChange={(event) => update({ endDate: event.target.value })} className="mt-2 block w-full min-w-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-transparent px-2 py-2.5 text-sm text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300" />
+            <input aria-label="PDF 结束日期" type="text" inputMode="numeric" maxLength={8} placeholder="YYYYMMDD" value={endInput} onChange={(event) => { const value = event.target.value.replace(/\D/g, '').slice(0, 8); setEndInput(value); update({ endDate: parseJournalDateInput(value) }); }} className="mt-2 block w-full min-w-0 rounded-lg border border-stone-200 dark:border-stone-700 bg-transparent px-3 py-2.5 text-sm font-mono text-stone-800 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-stone-300" />
           </label>
         </div>
         <div className="flex flex-wrap gap-2" aria-label="PDF 日期快捷选择">
-          {([['today', '今天'], ['week', '本周'], ['month', '本月'], ['lastMonth', '上月'], ['year', '今年'], ['all', '全部']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => quickRange(id)} className="px-3 py-1.5 text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg">{label}</button>)}
+          {([['today', '今天'], ['week', '本周'], ['lastWeek', '上周'], ['month', '本月'], ['lastMonth', '上月'], ['year', '本年'], ['lastYear', '去年'], ['all', '全部']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => quickRange(id)} className="px-3 py-1.5 text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-lg">{label}</button>)}
         </div>
         <div>
           <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-700 pb-2 mb-2">

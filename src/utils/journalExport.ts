@@ -4,6 +4,8 @@
  * @output Validated, date-bounded journal model without mutating source records
  * @pos Utility (Journal PDF)
  * @updated 2026-10-23: Adds calendar grouping, midnight clipping, plan projection and historical checks.
+ * @updated 2026-10-23: Strictly parses eight-digit entry and uses full current/previous calendar periods.
+ * @updated 2026-10-23: Adds separate log/timeline chapters and retains activity colors for weekly blocks.
  */
 import type { Category, CheckItem, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
@@ -13,9 +15,10 @@ import { getCheckItemCountState } from './dailyCheckUtils';
 export const JOURNAL_SECTIONS = [
   { id: 'yearly', label: '年计划' },
   { id: 'monthly', label: '月计划与月历' },
-  { id: 'weekly', label: '一周一页' },
+  { id: 'weekly', label: '周计划' },
   { id: 'daily', label: '一日一页' },
   { id: 'timeline', label: '时间轴' },
+  { id: 'logs', label: '日志' },
   { id: 'checks', label: '打卡表' },
   { id: 'reviews', label: '复盘' }
 ] as const;
@@ -47,6 +50,7 @@ export interface JournalLog {
   seconds: number;
   activity: string;
   category: string;
+  color?: string;
 }
 export interface JournalDay {
   date: string;
@@ -72,6 +76,34 @@ export const shiftJournalDate = (key: string, days: number): string => {
   const date = parseDateKey(key)!;
   date.setDate(date.getDate() + days);
   return formatDateKey(date);
+};
+
+export const parseJournalDateInput = (input: string): string => {
+  if (!/^\d{8}$/.test(input)) return '';
+  const key = `${input.slice(0, 4)}-${input.slice(4, 6)}-${input.slice(6)}`;
+  return parseDateKey(key) && Number(input.slice(0, 4)) >= 1900 ? key : '';
+};
+
+export type JournalRangePreset = 'today' | 'week' | 'lastWeek' | 'month' | 'lastMonth' | 'year' | 'lastYear' | 'all';
+export const getJournalQuickRange = (data: JournalExportData, preset: JournalRangePreset, today = new Date()): { startDate: string; endDate: string } => {
+  if (preset === 'all') return getJournalDataRange(data, today);
+  let start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let end = new Date(start);
+  if (preset === 'week' || preset === 'lastWeek') {
+    start = getStartOfWeek(today);
+    if (preset === 'lastWeek') start.setDate(start.getDate() - 7);
+    end = new Date(start); end.setDate(end.getDate() + 6);
+  }
+  if (preset === 'month' || preset === 'lastMonth') {
+    const offset = preset === 'lastMonth' ? -1 : 0;
+    start = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    end = new Date(today.getFullYear(), today.getMonth() + offset + 1, 0);
+  }
+  if (preset === 'year' || preset === 'lastYear') {
+    const year = today.getFullYear() - (preset === 'lastYear' ? 1 : 0);
+    start = new Date(year, 0, 1); end = new Date(year, 11, 31);
+  }
+  return { startDate: formatDateKey(start), endDate: formatDateKey(end) };
 };
 
 export const validateJournalOptions = (options: JournalExportOptions): string | null => {
@@ -110,6 +142,40 @@ export const journalCheckValue = (item: CheckItem): string => item.manualMode ==
   ? `${getCheckItemCountState(item).current}/${getCheckItemCountState(item).target}`
   : item.isCompleted ? '已完成' : '未完成';
 
+export interface JournalCalendarEntry {
+  key: string;
+  title: string;
+  label: string;
+  times: string[];
+  completed: boolean;
+  colorKey: string;
+  color?: string;
+  notes: { key: string; text: string }[];
+}
+
+export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
+  const entries = day.todos.filter((entry) => entry.primaryKind !== 'inProgress').map((entry) => ({
+    key: `todo:${entry.todo.id}`,
+    title: entry.todo.title,
+    label: journalTodoStatus(entry) === '已放弃' ? '已放弃' : entry.badges.deadline ? '截止' : entry.badges.recurring ? '重复' : entry.badges.maybe ? '待定' : '排期',
+    times: [] as string[],
+    completed: journalTodoStatus(entry) === '已完成',
+    colorKey: entry.todo.categoryId,
+    color: undefined as string | undefined,
+    notes: entry.todo.note ? [{ key: `todo:${entry.todo.id}`, text: entry.todo.note }] : []
+  }));
+  day.logs.filter((log) => log.source.isPlanned).forEach((log) => {
+    const linked = entries.find((entry) => entry.key === `todo:${log.source.linkedTodoId}`);
+    const time = `${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)}`;
+    if (linked) {
+      linked.color = log.color;
+      if (!linked.times.includes(time)) linked.times.push(time);
+      if (log.source.note && !linked.notes.some((note) => note.text === log.source.note)) linked.notes.push({ key: `log:${log.source.id}`, text: log.source.note });
+    } else entries.push({ key: `log:${log.source.id}`, title: log.source.title || log.activity, label: '计划', times: [time], completed: false, colorKey: log.category, color: log.color, notes: log.source.note ? [{ key: `log:${log.source.id}`, text: log.source.note }] : [] });
+  });
+  return entries;
+};
+
 export const getJournalDataRange = (data: JournalExportData, today = new Date()): { startDate: string; endDate: string } => {
   const keys = [formatDateKey(today)];
   const add = (value?: string) => { if (value && /^\d{4}-\d{2}-\d{2}$/.test(value) && parseDateKey(value)) keys.push(value); };
@@ -141,7 +207,7 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
   const byDate = new Map(days.map((day) => [day.date, day]));
   const rangeStart = parseDateKey(options.startDate)!.getTime();
   const rangeEnd = parseDateKey(shiftJournalDate(options.endDate, 1))!.getTime();
-  const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name }] as const)));
+  const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name, color: activity.color || category.themeColor }] as const)));
   // Project each intersecting log only onto touched days; elapsed proportions retain recorded durations.
   data.logs.forEach((log) => {
     if (!Number.isFinite(log.startTime) || !Number.isFinite(log.endTime) || log.endTime <= log.startTime) return;
@@ -152,7 +218,7 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
       const key = formatDateKey(new Date(start));
       const next = Math.min(end, parseDateKey(shiftJournalDate(key, 1))!.getTime());
       const seconds = Math.max(0, Number.isFinite(log.duration) ? log.duration : (log.endTime - log.startTime) / 1000) * (next - start) / (log.endTime - log.startTime);
-      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类' });
+      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类', color: names?.color });
       start = next;
     }
   });

@@ -6,7 +6,7 @@
  * @updated 2026-10-23: Covers midnight, recurrence, automatic/manual checks and partial reviews.
  */
 import { describe, expect, it } from 'vitest';
-import { buildJournalModel, getJournalDataRange, journalCheckValue, journalTodoStatus, validateJournalOptions, type JournalExportData, type JournalExportOptions } from './journalExport';
+import { buildJournalModel, getJournalDataRange, getJournalDayPlans, getJournalQuickRange, parseJournalDateInput, journalCheckValue, journalTodoStatus, validateJournalOptions, type JournalExportData, type JournalExportOptions } from './journalExport';
 import type { DailyReview, Log, TodoItem } from '../types';
 
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-25', sections: ['monthly', 'timeline'], paperSize: 'a4', includeCover: true, includeEmptyDays: false };
@@ -15,6 +15,19 @@ const log = (start: string, end: string, patch: Partial<Log> = {}): Log => ({ id
 const review = (date: string, patch: Partial<DailyReview> = {}): DailyReview => ({ id: date, date, createdAt: 0, updatedAt: 0, answers: [], ...patch });
 
 describe('journal date validation', () => {
+  it('accepts exactly eight real date digits and never reuses stale valid input', () => {
+    expect(parseJournalDateInput('20240229')).toBe('2024-02-29');
+    for (const input of ['20260229', '202610', '20261301', '20260132', '2026-01-01', '']) expect(parseJournalDateInput(input)).toBe('');
+  });
+  it('uses full current and previous weeks, months and years across year boundaries', () => {
+    const today = new Date(2026, 0, 1);
+    expect(getJournalQuickRange(data(), 'week', today)).toEqual({ startDate: '2025-12-29', endDate: '2026-01-04' });
+    expect(getJournalQuickRange(data(), 'lastWeek', today)).toEqual({ startDate: '2025-12-22', endDate: '2025-12-28' });
+    expect(getJournalQuickRange(data(), 'month', today)).toEqual({ startDate: '2026-01-01', endDate: '2026-01-31' });
+    expect(getJournalQuickRange(data(), 'lastMonth', today)).toEqual({ startDate: '2025-12-01', endDate: '2025-12-31' });
+    expect(getJournalQuickRange(data(), 'year', today)).toEqual({ startDate: '2026-01-01', endDate: '2026-12-31' });
+    expect(getJournalQuickRange(data(), 'lastYear', today)).toEqual({ startDate: '2025-01-01', endDate: '2025-12-31' });
+  });
   it('rejects rolled-over, noncanonical and reversed dates and empty sections', () => {
     for (const startDate of ['2026-02-30', '2026-2-01', '2026-10-19-extra', '']) expect(validateJournalOptions({ ...options, startDate })).toBeTruthy();
     expect(validateJournalOptions({ ...options, startDate: '2026-11-01' })).toContain('晚于');
@@ -31,6 +44,13 @@ describe('journal date validation', () => {
 });
 
 describe('journal record projection', () => {
+  it('merges linked plan logs into a single readable calendar schedule entry', () => {
+    const model = buildJournalModel(data({ todos: [{ id: 't', categoryId: 'c', title: '完成作业', isCompleted: false, scheduledDate: '2026-10-19' }], logs: [log('2026-10-19T09:00:00', '2026-10-19T10:00:00', { isPlanned: true, linkedTodoId: 't', title: '完成作业' })] }), options);
+    const entries = getJournalDayPlans(model.days[0]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].title).toBe('完成作业');
+    expect(entries[0].times).toEqual(['09:00–10:00']);
+  });
   it('finds all-history dates from reviews and planned occurrences, including future periods', () => {
     expect(getJournalDataRange(data({
       monthlyReviews: [{ monthStartDate: '2020-01-01', monthEndDate: '2020-01-31' }] as never,

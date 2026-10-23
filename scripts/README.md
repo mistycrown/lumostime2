@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-23：手账示例数据改为 `scripts/fixtures/journal-demo.ts` 中整月分布的自然记录与排期；压力测试文本不再用于预览交付。字体准备脚本同时生成 Noto Sans SC 印刷字体，源文件为本地 `public/fonts/NotoSansSC-500.woff`。PDF 检查脚本新增字体角色、段落间隔、日程格内容、溢出标记和备注仅出现一次的断言。
+
 2026-10-23：手账 PDF 使用 `python scripts/prepare-journal-font.py` 从现有本地文楷 WOFF2 生成 TrueType 资源（需要 fontTools 和 Brotli，生成资源遵循 public/ 不入库的现有规则）。构建后运行 `node scripts/test-journal-pdf-renderer.mjs` 检查实际表单、A4/A5 下载、取消和失败恢复；随后运行 `python scripts/check-journal-pdf.py <a4.pdf> <a5.pdf>` 验证中文实际可见、正文完整和页面边界，并输出逐页 PNG 与联系表。
 
 2026-10-11：`node scripts/check-note-autocomplete-smoke.mjs` 增加真实补记弹窗在桌面/手机宽度下的首次定位回归，模拟键盘缩放、延迟移动和原生过度滚动，并检查手动滚动、输入、失焦、超时和卸载会停止校正。

@@ -3,7 +3,7 @@
  * @input Real journal export panel/service, production CSS and synthetic Chinese records
  * @output Native Chromium assertions, A4/A5 PDFs and mobile/desktop screenshots in a temp directory
  * @pos Test runner
- * @updated 2026-10-23: Verifies date/section controls, real downloads, cancellation and font-load recovery.
+ * @updated 2026-10-23: Verifies eight-digit dates and period shortcuts with varied month-long dual-font examples.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -23,6 +23,8 @@ import { createRoot } from 'react-dom/client';
 import { JournalPdfExportPanel } from './src/views/settings/JournalPdfExportPanel';
 import { createJournalPdf } from './src/services/journalPdfService';
 import { JOURNAL_SECTIONS } from './src/utils/journalExport';
+import { getJournalQuickRange } from './src/utils/journalExport';
+import { journalDemoData } from './scripts/fixtures/journal-demo';
 const root = createRoot(document.getElementById('root'));
 const passed = [];
 const wait = (ms = 40) => new Promise(resolve => setTimeout(resolve, ms));
@@ -44,30 +46,26 @@ HTMLAnchorElement.prototype.click = async function() {
  const base64 = await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(r.result.split(',')[1]); r.readAsDataURL(blob); });
  window.__exports.push({ name: this.download, base64 });
 };
-const logs = [
- { id:'reading', categoryId:'study', activityId:'book', title:'八月读书 🌿', note:'沿着书页走进夏天。这段完整记录需要自动换行。'.repeat(150)+'记录结束标记', startTime:new Date(2026,7,3,9).getTime(), endTime:new Date(2026,7,3,10,30).getTime(), duration:5400, focusScore:5 },
- { id:'night', categoryId:'study', activityId:'book', title:'跨午夜阅读', note:'从昨晚延续到今天', startTime:new Date(2026,7,3,23,30).getTime(), endTime:new Date(2026,7,4,0,30).getTime(), duration:3600 },
- { id:'plan', categoryId:'study', activityId:'book', title:'下午散步计划', startTime:new Date(2026,7,3,15).getTime(), endTime:new Date(2026,7,3,16).getTime(), duration:3600, isPlanned:true }
-];
-const data = { logs, categories:[{ id:'study', name:'学习', activities:[{ id:'book', name:'阅读' }] }], scopes:[], todoCategories:[],
- todos:[{ id:'todo', categoryId:'todo', title:'完成本月阅读清单', note:'先读短篇，再读长篇。', isCompleted:false, scheduledDate:'2026-08-03', deadlineDate:'2026-08-31' }],
- dailyReviews:[{ id:'review', date:'2026-08-03', createdAt:0, updatedAt:0, summary:'在日常中找到自己的节奏。', moodEmoji:'😊',
- checkItems:Array.from({length:35},(_,i)=>({ id:'check'+i, category:'日常', content:i===34?'这是很长很长的打卡项目名称'.repeat(10):'习惯 '+(i+1), isCompleted:i%3===0, ...(i===0?{manualMode:'count',currentCount:2,targetCount:3}:{}) })),
- answers:[{ questionId:'q', question:'今天有哪些值得记住的小事？'.repeat(8), answer:'散步、读书，和朋友聊起最近的生活。'.repeat(15) }], narrative:'夏天的光落在书页上。把这一刻记下来。' }],
- weeklyReviews:[{id:'week',weekStartDate:'2026-08-03',weekEndDate:'2026-08-09',answers:[],summary:'一周的脚步，慢慢向前。'}], monthlyReviews:[],
- goals:[{id:'goal',title:'这一年，读完十二本书',scopeId:'',metric:'record_count',targetValue:12,startDate:'2026-01-01',endDate:'2026-12-31',status:'active'}],majorGoals:[] };
+const data = journalDemoData;
 async function run() {
  root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel data={data} onToast={(type,message)=>{toast={type,message};}} /></main>);
  await until(()=>button('导出手账 PDF'),'Panel did not mount');
  await document.fonts.load('16px VerifiedChinese','手账导出章节日期');
  check(document.fonts.check('16px VerifiedChinese','手账导出章节日期'),'Chinese UI font did not load');
- await setInput('[aria-label="PDF 起始日期"]','2026-08-10');
- await setInput('[aria-label="PDF 结束日期"]','2026-08-03');
+ check(!document.querySelector('input[type=date]'),'Native date picker remains');
+ for(const [preset,title] of [['week','本周'],['lastWeek','上周'],['month','本月'],['lastMonth','上月'],['year','本年'],['lastYear','去年']]){
+  button(title).click(); await wait(); const expected=getJournalQuickRange(data,preset);
+  check(document.querySelector('[aria-label="PDF 起始日期"]').value===expected.startDate.replace(/-/g,'') && document.querySelector('[aria-label="PDF 结束日期"]').value===expected.endDate.replace(/-/g,''),'Incorrect period shortcut: '+title);
+ }
+ await setInput('[aria-label="PDF 起始日期"]','20260230');
+ check(button('导出手账 PDF').disabled,'Impossible date reuses previous valid range');
+ await setInput('[aria-label="PDF 起始日期"]','20260810');
+ await setInput('[aria-label="PDF 结束日期"]','20260803');
  check(button('导出手账 PDF').disabled && document.querySelector('[role=alert]'),'Reversed dates allowed');
- await setInput('[aria-label="PDF 起始日期"]','2026-08-01');
- await setInput('[aria-label="PDF 结束日期"]','2026-08-31');
+ await setInput('[aria-label="PDF 起始日期"]','20260801');
+ await setInput('[aria-label="PDF 结束日期"]','20260831');
  button('全选').click(); await wait();
- check([...document.querySelectorAll('input[type=checkbox]')].slice(0,7).every(input=>input.checked),'Select all omitted chapters');
+ check([...document.querySelectorAll('input[type=checkbox]')].slice(0,JOURNAL_SECTIONS.length).every(input=>input.checked),'Select all omitted chapters');
  await capture('journal-mobile');
  check(document.documentElement.scrollWidth <= innerWidth,'Mobile form overflows horizontally');
  // Simulate a font resource failure before any successful export.
@@ -77,7 +75,7 @@ async function run() {
  await until(()=>toast?.type==='error' && button('导出手账 PDF') && !button('导出手账 PDF').disabled,'Export failure did not recover controls');
  check(window.__exports.length===0,'Failed export downloaded a partial file');
  window.fetch=originalFetch;
- passed.push('Strict date validation, all seven sections, mobile bounds and font-failure recovery');
+ passed.push('Strict date validation, all eight sections, mobile bounds and font-failure recovery');
  toast=null; button('导出手账 PDF').click();
  await until(()=>button('取消'),'Cancel control did not appear'); button('取消').click();
  await until(()=>toast?.type==='info' && button('导出手账 PDF'),'Cancellation did not restore controls');
@@ -87,16 +85,16 @@ async function run() {
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===1&&toast?.type==='success';},'A4 export failed');
  check(window.__exports[0].name.endsWith('_20260801_20260831.pdf'),'Download filename does not match selected dates');
  window.__exports[0].name='journal-a4.pdf';
- passed.push('All seven chapters export a real A4 PDF with Chinese, emoji, long notes, goals and counted checks');
+ passed.push('All eight chapters export a real A4 PDF with Chinese, emoji, time grids, separate logs and checks');
  const size=document.getElementById('journal-paper-size'); size.value='a5'; size.dispatchEvent(new Event('change',{bubbles:true})); await wait();
  toast=null; button('导出手账 PDF').click();
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===2&&toast?.type==='success';},'A5 export failed');
  window.__exports[1].name='journal-a5.pdf';
  passed.push('A5 export through actual paper selection');
  button('清空').click(); await wait(); check(button('导出手账 PDF').disabled,'Empty section selection allowed');
- label('时间轴').click(); await wait();
+ label('日志').click(); await wait();
  // Direct byte export isolates selected-section behavior and empty date handling.
- const one=await createJournalPdf({...data,logs:[],todos:[],dailyReviews:[],goals:[],weeklyReviews:[]},{startDate:'2026-08-03',endDate:'2026-08-03',sections:['timeline'],paperSize:'a5',includeCover:false,includeEmptyDays:true});
+ const one=await createJournalPdf({...data,logs:[],todos:[],dailyReviews:[],goals:[],weeklyReviews:[]},{startDate:'2026-08-03',endDate:'2026-08-03',sections:['logs'],paperSize:'a5',includeCover:false,includeEmptyDays:true});
  check(one.pageCount===2,'Empty timeline should contain contents and a printable date');
  passed.push('Empty book, omitted chapters and section validation');
  await capture('journal-desktop');
