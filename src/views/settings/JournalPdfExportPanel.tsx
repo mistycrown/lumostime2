@@ -5,6 +5,7 @@
  * @pos Settings (Data Management)
  * @updated 2026-10-23: Adds configurable offline journal PDF export alongside Excel.
  * @updated 2026-10-23: Replaces date pickers with eight-digit entry and adds complete current/previous periods.
+ * @updated 2026-10-23: Defaults to daily detail and labels overview orientation for A4/A5.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, Download, Loader2 } from 'lucide-react';
@@ -21,7 +22,7 @@ export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ da
   const [options, setOptions] = useState<JournalExportOptions>(() => {
     return {
       ...getJournalQuickRange(data, 'month'),
-      sections: ['yearly', 'monthly', 'weekly', 'timeline', 'logs', 'checks', 'reviews'],
+      sections: ['yearly', 'monthly', 'weekly', 'daily', 'timeline', 'logs', 'checks', 'reviews'],
       paperSize: 'a4', includeCover: true, includeEmptyDays: false
     };
   });
@@ -91,7 +92,7 @@ export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ da
         </div>
         <div className="flex items-center justify-between border-t border-stone-100 dark:border-stone-800 pt-4">
           <label htmlFor="journal-paper-size" className="text-sm">纸张</label>
-          <select id="journal-paper-size" value={options.paperSize} onChange={(event) => update({ paperSize: event.target.value as 'a4' | 'a5' })} className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm"><option value="a4">A4</option><option value="a5">A5</option></select>
+          <select id="journal-paper-size" value={options.paperSize} onChange={(event) => update({ paperSize: event.target.value as 'a4' | 'a5' })} className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 px-3 py-2 text-sm"><option value="a4">A4 · 概览横版</option><option value="a5">A5 · 竖版跨页</option></select>
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-3 pb-1">
           <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={options.includeCover} onChange={(event) => update({ includeCover: event.target.checked })} className="h-4 w-4 accent-stone-700" />封面</label>

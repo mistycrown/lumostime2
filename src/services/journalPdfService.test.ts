@@ -3,6 +3,7 @@
  * @input Bundled font, real PDF service and mocked native filesystem
  * @output Android/iOS save-path, cancellation and failed-save recovery regressions
  * @updated 2026-10-23: Verifies native saves with independently loaded printed/handwritten fonts.
+ * @updated 2026-10-23: Includes both facing A5 overview pages in native export counts.
  */
 import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -32,7 +33,7 @@ describe('native journal save', () => {
   it.each([['android', 'Download/LumosTime/', 'EXTERNAL'], ['ios', 'LumosTime/', 'DOCUMENTS']])('writes a complete PDF to the %s export folder', async (platform, prefix, directory) => {
     vi.mocked(Capacitor.getPlatform).mockReturnValue(platform);
     const result = await exportJournalPdf(data, options);
-    expect(result.pageCount).toBe(2);
+    expect(result.pageCount).toBe(3);
     const saved = vi.mocked(Filesystem.writeFile).mock.lastCall![0];
     expect(saved.path).toBe(`${prefix}LumosTime手账_20261023_20261023.pdf`);
     expect(saved.directory).toBe(directory);
@@ -45,6 +46,6 @@ describe('native journal save', () => {
     expect(vi.mocked(Filesystem.writeFile).mock.calls.length).toBe(count);
     vi.mocked(Filesystem.writeFile).mockRejectedValueOnce(new Error('storage unavailable'));
     await expect(exportJournalPdf(data, options)).rejects.toThrow('storage unavailable');
-    await expect(exportJournalPdf(data, options)).resolves.toMatchObject({ pageCount: 2 });
+    await expect(exportJournalPdf(data, options)).resolves.toMatchObject({ pageCount: 3 });
   });
 });

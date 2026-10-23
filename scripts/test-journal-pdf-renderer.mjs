@@ -4,6 +4,7 @@
  * @output Native Chromium assertions, A4/A5 PDFs and mobile/desktop screenshots in a temp directory
  * @pos Test runner
  * @updated 2026-10-23: Verifies eight-digit dates and period shortcuts with varied month-long dual-font examples.
+ * @updated 2026-10-23: Serves original sticker assets and checks recoverable missing-sticker failures.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -64,6 +65,7 @@ async function run() {
  check(button('导出手账 PDF').disabled && document.querySelector('[role=alert]'),'Reversed dates allowed');
  await setInput('[aria-label="PDF 起始日期"]','20260801');
  await setInput('[aria-label="PDF 结束日期"]','20260831');
+ label('一日一页').click(); await wait();
  button('全选').click(); await wait();
  check([...document.querySelectorAll('input[type=checkbox]')].slice(0,JOURNAL_SECTIONS.length).every(input=>input.checked),'Select all omitted chapters');
  await capture('journal-mobile');
@@ -91,6 +93,22 @@ async function run() {
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===2&&toast?.type==='success';},'A5 export failed');
  window.__exports[1].name='journal-a5.pdf';
  passed.push('A5 export through actual paper selection');
+ let stickerFailure='';
+ try {
+  await createJournalPdf({...data,dailyReviews:[{id:'missing',date:'2026-08-03',createdAt:0,updatedAt:0,answers:[],moodEmoji:'image:/sticker/missing-for-test.webp'}]}, {startDate:'2026-08-03',endDate:'2026-08-03',sections:['daily'],paperSize:'a5',includeCover:false,includeEmptyDays:false});
+ } catch(error) { stickerFailure=String(error.message); }
+ check(stickerFailure.includes('贴纸图片读取失败'),'Missing sticker was silently omitted');
+ check(window.__exports.length===2,'Failed sticker export created a partial download');
+ passed.push('Original sticker images render and missing assets surface a recoverable export error');
+ const moodDays=Array.from({length:365},(_,index)=>{
+  const date=new Date(2026,0,index+1);
+  const key=date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+  return data.dailyReviews.find(review=>review.date===key)||{id:'year-mood-'+index,date:key,createdAt:0,updatedAt:0,answers:[],moodEmoji:'image:/sticker/water3/'+String(index%16+1).padStart(2,'0')+'.webp'};
+ });
+ const moodYear=await createJournalPdf({...data,dailyReviews:moodDays},{startDate:'2026-01-01',endDate:'2026-12-31',sections:['yearly'],paperSize:'a5',includeCover:false,includeEmptyDays:false});
+ const moodBase64=await new Promise(resolve=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.readAsDataURL(new Blob([moodYear.bytes],{type:'application/pdf'}));});
+ window.__exports.push({name:'journal-mood-year-a5.pdf',base64:moodBase64});
+ passed.push('A full 365-day compact annual mood-sticker example exports on A5');
  button('清空').click(); await wait(); check(button('导出手账 PDF').disabled,'Empty section selection allowed');
  label('日志').click(); await wait();
  // Direct byte export isolates selected-section behavior and empty date handling.
@@ -113,7 +131,7 @@ await writeFile(path.join(directory, 'index.html'), '<!doctype html><html><meta 
 const server = createServer(async (request, response) => {
   try {
     const relative = decodeURIComponent(new URL(request.url, 'http://localhost').pathname).replace(/^\/+/, '');
-    const base = relative.startsWith('fonts/') ? path.join(workspace, 'public') : directory;
+    const base = /^(fonts|sticker)\//.test(relative) ? path.join(workspace, 'public') : directory;
     const filename = path.resolve(base, relative || 'index.html');
     if (!filename.startsWith(base + path.sep)) { response.writeHead(403).end(); return; }
     response.setHeader('Content-Type', ({ '.html':'text/html', '.css':'text/css', '.js':'application/javascript', '.woff2':'font/woff2' })[path.extname(filename)] || 'application/octet-stream');

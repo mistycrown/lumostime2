@@ -5,6 +5,7 @@
  * @pos Service (Journal PDF export)
  * @updated 2026-10-23: Embeds the complete TrueType font because fontkit subsets omit WenKai glyph outlines.
  * @updated 2026-10-23: Embeds separate Noto Sans printed labels and WenKai handwritten content.
+ * @updated 2026-10-23: Snapshots application calendar colors and embeds original daily sticker assets.
  */
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -12,6 +13,8 @@ import { Capacitor } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { buildJournalModel, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
 import { composeJournalPdf, JOURNAL_FONT_FAMILY, JOURNAL_PRINT_FEATURES, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
+import { getResolvedTodoScheduleTypeColors, todoScheduleColorService } from './todoScheduleColorService';
+import { embedJournalStickers } from './journalPdfStickers';
 
 export type { JournalPdfProgress } from './journalPdfLayout';
 const fontBytes = new Map<string, Promise<ArrayBuffer>>();
@@ -37,7 +40,11 @@ export const createJournalPdf = async (
   // Allow controls and progress to paint before projecting larger ranges.
   await new Promise((resolve) => setTimeout(resolve, 0));
   signal?.throwIfAborted();
-  const model = buildJournalModel(data, options);
+  const calendarStyle = data.calendarStyle || {
+    colorMode: (typeof localStorage !== 'undefined' && localStorage.getItem('todoMonthViewMarkerColorMode') === 'category' ? 'category' : 'schedule') as 'category' | 'schedule',
+    colors: typeof localStorage === 'undefined' ? undefined : getResolvedTodoScheduleTypeColors(todoScheduleColorService.getSettings())
+  };
+  const model = buildJournalModel({ ...data, calendarStyle: calendarStyle.colors ? calendarStyle as NonNullable<JournalExportData['calendarStyle']> : undefined }, options);
   const pdf = await PDFDocument.create();
   pdf.registerFontkit(fontkit);
   onProgress?.({ message: '正在加载中文字体', pages: 0 });
@@ -89,6 +96,11 @@ export const createJournalPdf = async (
   pdf.setAuthor('LumosTime');
   pdf.setSubject('个人时间手账');
   const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont);
+  if (options.sections.includes('yearly') || options.sections.includes('daily')) {
+    onProgress?.({ message: '正在加载每日贴纸', pages: 0 });
+    const stickers = await embedJournalStickers(pdf, model.days.flatMap((day) => day.review?.moodEmoji ? [day.review.moodEmoji] : []), signal);
+    stickers.forEach((image, key) => writer.stickers.set(key, image));
+  }
   await composeJournalPdf(writer, onProgress, signal);
   const output = await pdf.save();
   signal?.throwIfAborted();

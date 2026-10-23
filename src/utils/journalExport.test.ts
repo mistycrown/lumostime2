@@ -4,6 +4,7 @@
  * @output Regression coverage for export boundaries, schedule/check semantics and source immutability
  * @pos Tests (Journal PDF)
  * @updated 2026-10-23: Covers midnight, recurrence, automatic/manual checks and partial reviews.
+ * @updated 2026-10-23: Verifies parent/child progress cutoffs and skips unanswered daily templates.
  */
 import { describe, expect, it } from 'vitest';
 import { buildJournalModel, getJournalDataRange, getJournalDayPlans, getJournalQuickRange, parseJournalDateInput, journalCheckValue, journalTodoStatus, validateJournalOptions, type JournalExportData, type JournalExportOptions } from './journalExport';
@@ -102,7 +103,7 @@ describe('journal record projection', () => {
     expect(journalCheckValue(model.days[0].checks[1])).toBe('2/2');
     expect(source.dailyReviews[0].checkItems![2].isCompleted).toBe(false);
   });
-  it('includes only complete-period reviews and intersects goals without leaking daily reviews', () => {
+  it('includes overlapping review periods and intersects goals without leaking daily reviews', () => {
     const source = data({
       dailyReviews: [review('2026-10-18'), review('2026-10-19')],
       weeklyReviews: [ { id: 'partial', weekStartDate: '2026-10-12', weekEndDate: '2026-10-19', answers: [] }, { id: 'full', weekStartDate: '2026-10-19', weekEndDate: '2026-10-25', answers: [] } ] as never,
@@ -110,9 +111,25 @@ describe('journal record projection', () => {
       goals: [{ id: 'goal', title: '目标', startDate: '2026-01-01', endDate: '2026-12-31' }, { id: 'old', startDate: '2025-01-01', endDate: '2025-12-31' }] as never
     });
     const model = buildJournalModel(source, options);
-    expect(model.weeklyReviews.map((item) => item.id)).toEqual(['full']);
-    expect(model.monthlyReviews).toHaveLength(0);
+    expect(model.weeklyReviews.map((item) => item.id)).toEqual(['partial', 'full']);
+    expect(model.monthlyReviews).toHaveLength(1);
     expect(model.goals.map((item) => item.id)).toEqual(['goal']);
     expect(model.days.flatMap((day) => day.review ? [day.review.id] : [])).toEqual(['2026-10-19']);
+  });
+  it('calculates parent/child goal progress as of the export end and keeps planned/future logs out', () => {
+    const source = data({
+      logs: [log('2026-10-19T09:00', '2026-10-19T10:00', { id: 'actual', scopeIds: ['s'] }), log('2026-10-26T09:00', '2026-10-26T10:00', { id: 'future', scopeIds: ['s'] }), log('2026-10-20T09:00', '2026-10-20T10:00', { id: 'plan', scopeIds: ['s'], isPlanned: true })],
+      goals: [{ id: 'child', majorGoalId: 'parent', title: '子目标', scopeId: 's', metric: 'duration_raw', targetValue: 7200, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active' }],
+      majorGoals: [{ id: 'parent', title: '大目标', scopeId: 's', metric: 'duration_raw', targetValue: 14400, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' }]
+    });
+    const model = buildJournalModel(source, options);
+    expect(model.goalProgress.child).toEqual({ current: 3600, target: 7200, percentage: 50 });
+    expect(model.goalProgress.parent).toEqual({ current: 3600, target: 14400, percentage: 25 });
+    expect(source.logs).toHaveLength(3);
+  });
+  it('does not treat an unanswered review template as a populated daily page', () => {
+    const source = data({ dailyReviews: [review('2026-10-19', { answers: [{ questionId: 'q', question: '今天怎么样？', answer: '' }] })] });
+    const model = buildJournalModel(source, options);
+    expect(model.days[0].hasContent).toBe(false);
   });
 });

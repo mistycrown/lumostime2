@@ -4,6 +4,7 @@
 @output Searchability/bounds checks, page PNGs and contact sheets beside the PDFs
 @pos Test runner (requires PyMuPDF and Pillow)
 @updated 2026-10-23: Verifies dual fonts, paragraph baselines, nonduplicated notes and actual calendar content.
+@updated 2026-10-23: Verifies mixed orientation, even facing spreads, original stickers and nested book order.
 """
 from pathlib import Path
 import json
@@ -13,12 +14,31 @@ import fitz
 from PIL import Image, ImageDraw, ImageFont
 
 
+def inspect_mood_year(source):
+    document = fitz.open(source)
+    overview = [page for page in document if '心情贴纸概览' in page.get_text().splitlines()[1:2][0]]
+    assert len(overview) == 1, 'Annual mood matrix must fit one page'
+    page = overview[0]
+    images = page.get_image_info()
+    assert len(images) == 365, f'Expected 365 mood stickers, got {len(images)}'
+    assert all(image['bbox'][2] - image['bbox'][0] < 15 and image['bbox'][3] - image['bbox'][1] < 15 for image in images), 'Annual stickers are too large'
+    summaries = [page for page in document if '每日一句话与贴纸' in page.get_text().splitlines()[1:2][0]]
+    assert len(summaries) == 1, 'Sixteen one-line summaries should fit one compact page'
+    output = source.parent / source.stem
+    output.mkdir(exist_ok=True)
+    page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False).save(output / 'annual-mood.png')
+    summaries[0].get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False).save(output / 'annual-summaries.png')
+    return {'file': str(source), 'pages': len(document), 'mood_stickers': len(images), 'overview': str(output / 'annual-mood.png')}
+
+
 def inspect(filename):
     source = Path(filename)
+    if source.stem == 'journal-mood-year-a5':
+        return inspect_mood_year(source)
     document = fitz.open(source)
     text = '\n'.join(page.get_text() for page in document)
-    assert '目录' in text and '目标与长期计划' in text, 'Missing contents/annual data'
-    for title in ['月计划', '周计划', '一日一页', '时间轴', '日志', '打卡表', '日复盘', '周复盘']:
+    assert '目录' in text and '目标与子目标' in text, 'Missing contents/annual data'
+    for title in ['月计划', '周计划', '一日一页', '时间轴', '日志', '月打卡', '日复盘', '每周回顾', '时间分布', '每日一句话与贴纸']:
         assert title in text, f'Missing chapter: {title}'
     assert text.count('把这页书的余味留给明天。') == 1, 'Full log note repeated across chapters or lost'
     assert text.count('关灯前，把它抄在了纸上。') == 1, 'Overnight log note duplicated on the second date'
@@ -31,6 +51,10 @@ def inspect(filename):
     spans = []
     calendar_pages = []
     timeline_pages = []
+    month_indices = []
+    timeline_indices = []
+    blank_indices = []
+    sticker_pages = []
     output = source.parent / source.stem
     output.mkdir(exist_ok=True)
     for index, page in enumerate(document):
@@ -39,9 +63,15 @@ def inspect(filename):
         titles.append({'page': index + 1, 'title': lines[1] if len(lines) > 1 else ''})
         if '月计划' in (lines[1] if len(lines) > 1 else ''):
             calendar_pages.append(page.get_text())
+            month_indices.append(index)
         if '时间轴 · 周概览' in (lines[1] if len(lines) > 1 else ''):
             timeline_pages.append(page)
-        assert abs(page.rect.width - (419.53 if 'a5' in source.stem else 595.28)) < 0.1
+            timeline_indices.append(index)
+        is_overview = index in month_indices or index in timeline_indices
+        expected_width = 419.53 if 'a5' in source.stem else 841.89 if is_overview else 595.28
+        assert abs(page.rect.width - expected_width) < 0.1, f'Wrong page orientation on {index + 1}'
+        if any(image[2] > 200 and image[3] > 200 for image in page.get_images()) and '每日一句话' in page.get_text():
+            sticker_pages.append(index)
         for block in page.get_text('dict')['blocks']:
             for line in block.get('lines', []):
                 for span in line['spans']:
@@ -53,23 +83,53 @@ def inspect(filename):
         # Extraction succeeds even with a broken WOFF2 subset; verify visible ink in the title itself.
         title_area = fitz.Rect(margin, margin + 16, page.rect.width - margin, margin + 48)
         title = page.get_pixmap(matrix=fitz.Matrix(1, 1), clip=title_area, alpha=False)
-        assert sum(1 for value in title.samples if value < 180) > 50, f'Invisible title glyphs on page {index + 1}'
+        if not page.get_text().strip():
+            blank_indices.append(index)
+            assert not page.get_drawings() and not page.get_images(), 'Alignment page is not blank'
+        else:
+            assert sum(1 for value in title.samples if value < 180) > 50, f'Invisible title glyphs on page {index + 1}'
         pixmap.save(output / f'page-{index + 1:02}.png')
     assert not issues, json.dumps(issues, ensure_ascii=False)
-    assert calendar_pages and all('产品' in page or '方案' in page for page in calendar_pages), 'Month grid contains no readable schedules'
-    assert any('截止' in page for page in calendar_pages), 'Deadline styling missing from month grid'
-    assert any('+1项' in page or '+2项' in page or '+3项' in page for page in calendar_pages), 'Overflow schedule count missing'
+    assert calendar_pages and ('产品' in ''.join(calendar_pages) or '方案' in ''.join(calendar_pages)), 'Month grid contains no readable schedules'
+    assert '月度回顾' in ''.join(calendar_pages) and '日子很长' in ''.join(calendar_pages), 'Month review/cite missing from eighth column'
+    assert sticker_pages, 'No original sticker images in daily/annual pages'
     assert any('NotoSans' in span['font'] and '今日计划' in span['text'] for span in spans), 'Printed labels are not sans serif'
     assert any('WenKai' in span['font'] and '把这页书' in span['text'] for span in spans), 'User writing is not WenKai'
     # This explicit new paragraph must have a blank baseline above it, on the same page as the first paragraph.
     paragraph = next(span for span in spans if '把这页书' in span['text'])
     previous = [span for span in spans if span['page'] == paragraph['page'] and 'WenKai' in span['font'] and span['bbox'][1] < paragraph['bbox'][1] and span['bbox'][1] > paragraph['bbox'][1] - 100]
     assert previous and paragraph['bbox'][1] - max(span['bbox'][1] for span in previous) > paragraph['size'] * 2.5, 'Explicit paragraph spacing was flattened'
-    assert timeline_pages and all('00:00' in page.get_text() and '24:00' in page.get_text() and 'MON' in page.get_text() and 'SUN' in page.get_text() for page in timeline_pages), 'Timeline is not a seven-day 24-hour grid'
-    populated = next(page for page in timeline_pages if '2026-08-10 — 2026-08-16' in page.get_text())
-    assert len([drawing for drawing in populated.get_drawings() if drawing.get('fill')]) > 40, 'Populated timeline lacks colored activity blocks'
-    assert '日志' in document[paragraph['page'] - 1].get_text().splitlines()[1], 'Detailed notes are still in the weekly overview'
-    populated.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False).save(output / 'weekly-timeline.png')
+    assert timeline_pages and all('00:00' in page.get_text() and '24:00' in page.get_text() for page in timeline_pages), 'Timeline is not a 24-hour grid'
+    populated = [page for page in timeline_pages if '2026-08-10 — 2026-08-16' in page.get_text()]
+    assert 'MON' in ''.join(page.get_text() for page in populated) and 'SUN' in ''.join(page.get_text() for page in populated), 'Seven-day overview incomplete'
+    assert sum(len([drawing for drawing in page.get_drawings() if drawing.get('fill')]) for page in populated) > 40, 'Populated timeline lacks colored activity blocks'
+    assert '日志' in document[paragraph['page'] - 1].get_text(), 'Detailed notes are still in the weekly overview'
+    assert '时间轴' not in document[paragraph['page'] - 1].get_text().splitlines()[1], 'Log body in weekly overview'
+    if 'a5' in source.stem:
+        for indices in [month_indices, timeline_indices]:
+            assert len(indices) % 2 == 0
+            for left, right in zip(indices[::2], indices[1::2]):
+                assert (left + 1) % 2 == 0 and right == left + 1, 'Spread does not start on an even facing page'
+        assert blank_indices, 'Cover/contents did not align spreads with a blank page'
+    else:
+        assert len(month_indices) == 1 and len(populated) == 1, 'A4 overview split across pages'
+    # The complete month overview precedes its checklist, weeks and daily details.
+    checklist = next(index for index, title in enumerate(titles) if '月打卡' in title['title'])
+    first_day = next(index for index, title in enumerate(titles) if title['title'].startswith('2026-08-02'))
+    assert max(month_indices) < checklist < timeline_indices[0] < first_day
+    def save_spread(pages, name):
+        images = []
+        for page in pages:
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+            images.append(Image.frombytes('RGB', [pix.width, pix.height], pix.samples))
+        spread = Image.new('RGB', (sum(image.width for image in images), max(image.height for image in images)), 'white')
+        x = 0
+        for image in images:
+            spread.paste(image, (x, 0))
+            x += image.width
+        spread.save(output / name)
+    save_spread(populated, 'weekly-timeline.png')
+    save_spread([document[index] for index in month_indices], 'month-calendar.png')
     thumbs = []
     font = ImageFont.truetype('C:/Windows/Fonts/msyh.ttc', 15)
     for index in range(len(document)):

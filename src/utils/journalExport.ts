@@ -6,14 +6,19 @@
  * @updated 2026-10-23: Adds calendar grouping, midnight clipping, plan projection and historical checks.
  * @updated 2026-10-23: Strictly parses eight-digit entry and uses full current/previous calendar periods.
  * @updated 2026-10-23: Adds separate log/timeline chapters and retains activity colors for weekly blocks.
+ * @updated 2026-10-23: Projects goal progress and shared calendar colors for nested book layouts.
  */
 import type { Category, CheckItem, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
 import { evaluateAutoCheck } from './autoCheckUtils';
 import { getCheckItemCountState } from './dailyCheckUtils';
+import { calculateGoalProgress } from './goalUtils';
+import { calculateMajorGoalProgress } from './majorGoalUtils';
+import { getColorHexForCharts } from './colorAdapterUtils';
+import { DEFAULT_TODO_SCHEDULE_TYPE_COLORS, type TodoScheduleTypeColorKey } from '../services/todoScheduleColorService';
 
 export const JOURNAL_SECTIONS = [
-  { id: 'yearly', label: '年计划' },
+  { id: 'yearly', label: '年度回顾与目标' },
   { id: 'monthly', label: '月计划与月历' },
   { id: 'weekly', label: '周计划' },
   { id: 'daily', label: '一日一页' },
@@ -42,6 +47,7 @@ export interface JournalExportData {
   monthlyReviews: MonthlyReview[];
   goals?: Goal[];
   majorGoals?: MajorGoal[];
+  calendarStyle?: { colorMode: 'category' | 'schedule'; colors: Record<TodoScheduleTypeColorKey, string> };
 }
 export interface JournalLog {
   source: Log;
@@ -70,6 +76,9 @@ export interface JournalModel {
   goals: (Goal | MajorGoal)[];
   weeklyReviews: WeeklyReview[];
   monthlyReviews: MonthlyReview[];
+  calendarStyle: { colorMode: 'category' | 'schedule'; colors: Record<TodoScheduleTypeColorKey, string>; categoryColors: Record<string, string> };
+  goalProgress: Record<string, { current: number; target: number; percentage: number }>;
+  majorGoalIds: string[];
 }
 
 export const shiftJournalDate = (key: string, days: number): string => {
@@ -207,7 +216,7 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
   const byDate = new Map(days.map((day) => [day.date, day]));
   const rangeStart = parseDateKey(options.startDate)!.getTime();
   const rangeEnd = parseDateKey(shiftJournalDate(options.endDate, 1))!.getTime();
-  const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name, color: activity.color || category.themeColor }] as const)));
+  const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name, color: getColorHexForCharts(activity.color || category.themeColor || '') }] as const)));
   // Project each intersecting log only onto touched days; elapsed proportions retain recorded durations.
   data.logs.forEach((log) => {
     if (!Number.isFinite(log.startTime) || !Number.isFinite(log.endTime) || log.endTime <= log.startTime) return;
@@ -237,15 +246,33 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
       return { ...item };
     });
     day.actualSeconds = day.logs.filter((log) => !log.source.isPlanned).reduce((sum, log) => sum + log.seconds, 0);
-    day.hasContent = Boolean(day.logs.length || day.todos.length || day.checks.length || day.review);
+    day.hasContent = Boolean(day.logs.length || day.todos.length || day.checks.length || day.review?.summary?.trim() || day.review?.moodEmoji || day.review?.narrative?.trim() || day.review?.aiNewspaper || day.review?.answers.some((answer) => answer.answer.trim()));
   });
+  const progressLogs = data.logs.filter((log) => log.startTime < rangeEnd).map((log) => {
+    if (log.endTime <= rangeEnd || log.endTime <= log.startTime) return log;
+    return { ...log, endTime: rangeEnd, duration: log.duration * (rangeEnd - log.startTime) / (log.endTime - log.startTime) };
+  });
+  const progressTodos = data.todos.filter((todo) => !todo.isCompleted || !todo.completedAt || Date.parse(todo.completedAt) < rangeEnd);
+  const majorGoalIds = new Set((data.majorGoals || []).map((goal) => goal.id));
   return {
     options: { ...options, sections: [...new Set(options.sections)] }, days,
     months: [...new Set(days.map((day) => day.date.slice(0, 7)))],
     years: [...new Set(days.map((day) => Number(day.date.slice(0, 4))))],
     weeks: [...new Set(days.map((day) => formatDateKey(getStartOfWeek(parseDateKey(day.date)!))))],
     goals: [...(data.majorGoals || []), ...(data.goals || [])].filter((goal) => goal.startDate <= options.endDate && goal.endDate >= options.startDate),
-    weeklyReviews: data.weeklyReviews.filter((review) => review.weekStartDate >= options.startDate && review.weekEndDate <= options.endDate).sort((a, b) => a.weekStartDate.localeCompare(b.weekStartDate)),
-    monthlyReviews: data.monthlyReviews.filter((review) => review.monthStartDate >= options.startDate && review.monthEndDate <= options.endDate).sort((a, b) => a.monthStartDate.localeCompare(b.monthStartDate))
+    weeklyReviews: data.weeklyReviews.filter((review) => review.weekStartDate <= options.endDate && review.weekEndDate >= options.startDate).sort((a, b) => a.weekStartDate.localeCompare(b.weekStartDate)),
+    monthlyReviews: data.monthlyReviews.filter((review) => review.monthStartDate <= options.endDate && review.monthEndDate >= options.startDate).sort((a, b) => a.monthStartDate.localeCompare(b.monthStartDate)),
+    calendarStyle: {
+      colorMode: data.calendarStyle?.colorMode || 'schedule',
+      colors: { ...(data.calendarStyle?.colors || DEFAULT_TODO_SCHEDULE_TYPE_COLORS) },
+      categoryColors: Object.fromEntries(data.todoCategories.map((category) => [category.id, getColorHexForCharts(category.color || '')]))
+    },
+    majorGoalIds: [...majorGoalIds],
+    goalProgress: Object.fromEntries([...(data.majorGoals || []), ...(data.goals || [])].map((goal) => {
+      const progress = majorGoalIds.has(goal.id)
+        ? calculateMajorGoalProgress(goal as MajorGoal, data.goals || [], progressLogs, progressTodos)
+        : calculateGoalProgress(goal as Goal, progressLogs, progressTodos);
+      return [goal.id, progress];
+    }))
   };
 };

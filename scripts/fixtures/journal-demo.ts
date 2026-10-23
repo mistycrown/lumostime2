@@ -4,6 +4,7 @@
  * @output Varied month-long data with schedules, paragraphs, habits and reviews for visual QA
  * @pos Test fixture (presentation sample, separate from stress tests)
  * @updated 2026-10-23: Replaces repeated placeholder text with natural, distinct entries.
+ * @updated 2026-10-23: Includes original image stickers, linked actual traces and parent/child goal progress.
  */
 import type { JournalExportData } from '../../src/utils/journalExport';
 import type { DailyReview, Log, TodoItem } from '../../src/types';
@@ -66,7 +67,7 @@ for (let day = 10; day <= 16; day++) {
 const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24, 26, 28, 30, 31].map((day, index) => ({
   id: `review-${day}`, date: key(day), createdAt: stamp(day), updatedAt: stamp(day, 22),
   summary: notes[index + 5],
-  moodEmoji: index % 2 ? '☀️' : '🌿',
+  moodEmoji: index % 3 === 0 ? `image:/sticker/water3/${String(index + 1).padStart(2, '0')}.webp` : index % 2 ? '☀️' : '🌿',
   checkItems: [
     { id: 'water', category: '照顾自己', content: '喝够三杯水', manualMode: 'count', currentCount: index === 0 ? 2 : 3, targetCount: 3, isCompleted: index !== 0 },
     { id: 'walk', category: '照顾自己', content: '散步半小时', isCompleted: index % 3 !== 1 },
@@ -76,12 +77,22 @@ const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24,
   answers: day === 3 ? [{ questionId: 'memory', question: '今天有哪些值得记住的小事？', answer: '中午收到朋友寄来的明信片，上面画了一只趴在窗边的猫。\n\n晚上把它放在书桌前，希望明天也能记得这样轻松的心情。' }] : []
 }));
 
+logs.forEach((log) => { if (log.categoryId === 'study') log.scopeIds = ['learning']; });
+// Actual linked sessions create the same cross-day trace strips as the application calendar.
+[3, 4, 5, 6].forEach((day) => {
+  const log = logs.find((entry) => !entry.isPlanned && new Date(entry.startTime).getDate() === day);
+  if (log) log.linkedTodoId = 'demo-todo-1';
+});
+
 export const journalDemoData: JournalExportData = {
   logs, todos, dailyReviews,
   categories: [{ id: 'study', name: '学习与创作', icon: '📚', themeColor: '#526b5d', activities: [{ id: 'book', name: '阅读与学习', icon: '📖', color: '#77a891' }, { id: 'work', name: '工作与创作', icon: '✏️', color: '#879bc4' }] }, { id: 'life', name: '生活', icon: '🌱', themeColor: '#b28666', activities: [{ id: 'walk', name: '运动与日常', icon: '🌿', color: '#a1af7d' }, { id: 'sleep', name: '睡眠', icon: '🌙', color: '#9a9dbd' }, { id: 'meal', name: '三餐', icon: '🍞', color: '#cfad7f' }, { id: 'rest', name: '休闲', icon: '🎵', color: '#ba97a8' }] }],
   scopes: [], todoCategories: [],
-  weeklyReviews: [{ id: 'week-review', weekStartDate: key(3), weekEndDate: key(9), createdAt: stamp(9), updatedAt: stamp(9, 22), summary: '这一周完成了方案初稿，也给生活留下了空白。', answers: [{ questionId: 'week', question: '下周想继续保持什么？', answer: '上午先做需要专注的工作。\n下午留一小段时间散步，不把日程排得太满。' }] }],
-  monthlyReviews: [{ id: 'month-review', monthStartDate: key(1), monthEndDate: key(31), createdAt: stamp(31), updatedAt: stamp(31, 22), summary: '八月的关键词：留白、阅读、慢慢完成。', answers: [{ questionId: 'month', question: '这个月最想珍藏的三个瞬间', answer: '和朋友重逢的晚餐。\n美术馆里那幅蓝色的画。\n傍晚在桥边吹到的风。' }] }],
-  goals: [{ id: 'reading-goal', title: '这一年，读完十二本书', scopeId: '', metric: 'record_count', targetValue: 12, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', motivation: '留一点时间，听听不同的人如何理解这个世界。' }],
-  majorGoals: []
+  weeklyReviews: [
+    { id: 'week-review', weekStartDate: key(3), weekEndDate: key(9), createdAt: stamp(9), updatedAt: stamp(9, 22), summary: '这一周完成了方案初稿，也给生活留下了空白。', answers: [{ questionId: 'week', question: '下周想继续保持什么？', answer: '上午先做需要专注的工作。\n下午留一小段时间散步，不把日程排得太满。' }] },
+    { id: 'busy-week-review', weekStartDate: key(10), weekEndDate: key(16), createdAt: stamp(16), updatedAt: stamp(16, 22), summary: '给写作留出整块时间，周末也有自己的节奏。', answers: [{ questionId: 'balance', question: '这周的时间花在哪里？', answer: '上午的写作最专注。\n三餐和休息成为每天稳定的锚点。' }, { questionId: 'next', question: '下周的小调整', answer: '晚上少安排一件事，提早半小时放下手机。' }] }
+  ],
+  monthlyReviews: [{ id: 'month-review', monthStartDate: key(1), monthEndDate: key(31), createdAt: stamp(31), updatedAt: stamp(31, 22), cite: '日子很长，值得慢慢写。', summary: '八月的关键词：留白、阅读、慢慢完成。', answers: [{ questionId: 'month', question: '这个月最想珍藏的三个瞬间', answer: '和朋友重逢的晚餐。\n美术馆里那幅蓝色的画。\n傍晚在桥边吹到的风。' }] }],
+  goals: [{ id: 'reading-goal', majorGoalId: 'learning-year', title: '八月阅读与课程学习', scopeId: 'learning', metric: 'duration_raw', targetValue: 40 * 3600, startDate: key(1), endDate: key(31), status: 'active', motivation: '留一点时间，听听不同的人如何理解这个世界。' }],
+  majorGoals: [{ id: 'learning-year', title: '保持学习和创作的节奏', scopeId: 'learning', metric: 'duration_raw', targetValue: 120 * 3600, startDate: '2026-01-01', endDate: '2026-12-31', status: 'active', description: '把阅读、课程与写作连成一条慢慢积累的线。', createdAt: new Date(stamp(1)).toISOString(), updatedAt: new Date(stamp(31)).toISOString() }]
 };
