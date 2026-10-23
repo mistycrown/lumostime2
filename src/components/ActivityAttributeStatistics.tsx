@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-23: Shares interactive daily trends across custom category, tag, scope and numeric cards; includes the complete selected range.
  * @updated 2026-10-10: Protects node names and aliases alongside manual dictionary words.
  * @updated 2026-10-09: Reactively protects personal words in every text cloud.
  * @updated 2026-10-09: Adds per-cloud word settings for attribute, conditional, and note statistics.
@@ -53,6 +54,7 @@ import type { ChartPalette } from '../utils/chartPalette';
 import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
 import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 import { PetalTimelineChart, type RhythmRange } from './stats/PetalTimelineChart';
+import { InteractiveTrendChart } from './stats/InteractiveTrendChart';
 
 export { getTextTerms } from '../utils/textSegmentation';
 
@@ -240,7 +242,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
   const statisticAccent = chartPalette.accent;
   const accentSoft = chartPalette.accentSoft;
   const accentMuted = chartPalette.muted;
-  const areaGradientId = `number-area-gradient-${React.useId().replace(/:/g, '')}`;
 
   const filteredLogs = useMemo(() => {
     // Card callers already apply their range before entering this legacy renderer.
@@ -366,8 +367,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 const key = getLocalDateKey(log.startTime);
                 trendMap.set(key, (trendMap.get(key) || 0) + value.value);
               }));
-              const trend: TrendPoint[] = [...trendMap.entries()].sort((left, right) => left[0].localeCompare(right[0])).slice(-14).map(([key, value]) => ({ key, value }));
-              const trendMax = Math.max(...trend.map((point) => point.value), 1);
+              const trend: TrendPoint[] = isDurationNumber
+                ? getDateKeysForRange(range).map(key => ({ key, value: trendMap.get(key) || 0 }))
+                : [...trendMap.entries()].sort((left, right) => left[0].localeCompare(right[0])).map(([key, value]) => ({ key, value }));
               const histogramMin = numbers.reduce((minimum, value) => Math.min(minimum, value), Infinity);
               const histogramMax = numbers.reduce((maximum, value) => Math.max(maximum, value), -Infinity);
               const histogramBinCount = Math.min(8, Math.max(3, Math.ceil(Math.sqrt(numbers.length))));
@@ -381,10 +383,6 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
               const chartWidth = 320;
               const chartHeight = 96;
               const chartBottom = 86;
-              const getChartX = (index: number) => trend.length === 1 ? chartWidth / 2 : (index / (trend.length - 1)) * chartWidth;
-              const getChartY = (value: number) => chartBottom - (value / trendMax) * 68;
-              const points = trend.map((point, index) => `${getChartX(index)},${getChartY(point.value)}`).join(' ');
-              const areaPoints = `${points} ${trend.length ? `${getChartX(trend.length - 1)},${chartBottom} 0,${chartBottom}` : ''}`;
               if (chartVariant === 'numberCalendar') {
                 const calendarDays = range === '7d' ? getDateKeysForRange(range) : getCalendarDaysForRange(range);
                 const dailyValues = new Map<string, number>();
@@ -468,16 +466,14 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                     ].map(([label, value]) => <div key={label} className="border-stone-200 px-3 py-3 odd:border-r sm:border-r sm:last:border-r-0"><div className="text-[10px] text-stone-400">{label}</div><div className="mt-1 font-mono text-base" style={{ color: statisticAccent }}>{value}</div></div>)}
                   </div>}
                   {chartVariant !== 'numberKpi' && trend.length > 0 && (
-                    <div className="mt-5 py-1">
-                      <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="aspect-[10/3] w-full overflow-visible">
-                        {chartVariant === 'numberArea' && <defs><linearGradient id={areaGradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={statisticAccent} stopOpacity="0.28" /><stop offset="100%" stopColor={statisticAccent} stopOpacity="0" /></linearGradient></defs>}
-                        <line x1="0" y1={chartBottom} x2={chartWidth} y2={chartBottom} stroke="#e7e5e4" strokeWidth="1" />
-                        {chartVariant === 'numberArea' && trend.length > 1 && <polygon points={areaPoints} fill={`url(#${areaGradientId})`} />}
-                        {trend.length > 1 && <polyline points={points} fill="none" stroke={statisticAccent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
-                        {trend.map((point, index) => <circle key={point.key} cx={getChartX(index)} cy={getChartY(point.value)} r="3.5" fill={statisticAccent} vectorEffect="non-scaling-stroke" />)}
-                      </svg>
-                      <div className="mt-1 flex justify-between text-[10px] text-stone-400"><span>{getDateLabel(trend[0].key)}</span><span>{getDateLabel(trend[trend.length - 1].key)}</span></div>
-                    </div>
+                    <InteractiveTrendChart
+                      key={`${activity.id}-${attribute.id}-${range}`}
+                      title={attribute.name}
+                      points={trend}
+                      accent={statisticAccent}
+                      formatValue={value => `${formatNumericValue(value)}${numericUnit}`}
+                      area={chartVariant === 'numberArea'}
+                    />
                   )}
                 </AttributeSection>
               );

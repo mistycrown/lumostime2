@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-23: `stats/InteractiveTrendChart.tsx` gives custom detail-statistics trends a persistent date/value readout, full-width click/tap selection, previous/next controls and keyboard navigation. `ActivityAttributeStatistics.tsx` shares it across category, tag, scope/filter record-duration and numeric cards, includes all selected dates instead of truncating at 14 records, and displays zero-duration days without inventing missing numeric measurements.
+
 Update 2026-10-18: Abandonment markers use a Ban icon and date without a text status label. Quick actions place abandonment/restoration and deletion in one two-column row; detail controls use `放弃` / `恢复`.
 
 Update 2026-10-18: Todo details and shared quick actions offer `放弃任务` / `恢复待办`. Details autosave an editable abandonment date; quick actions display its timestamp and suppress completion/reminder actions while abandoned. List and associated-task rows distinguish abandonment from completion. The closed-task display switch covers both states; `test-todo-occurrence.mjs` verifies mutual exclusion, dated autosave and restore interactions.
