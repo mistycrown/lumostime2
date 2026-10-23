@@ -1,6 +1,7 @@
 /**
  * @file DataManagementView.tsx
  * @description 数据管理页面 - 备份、导入、导出、清理等
+ * @updated 2026-10-23: Adds date- and section-selectable journal PDF export alongside Excel.
  * @updated 2026-07-21: Replaced backup and image-list native confirmations with in-app confirmation modals and dark-mode image controls.
  * @updated 2026-03-24: 图片备份支持自定义每包张数的分块导出，降低移动端导出时的内存压力。
  */
@@ -15,6 +16,8 @@ import { imageService } from '../../services/imageService';
 import { imageCleanupService } from '../../services/imageCleanupService';
 import { imageExportService, type ImageExportProgress } from '../../services/imageExportService';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { JournalPdfExportPanel } from './JournalPdfExportPanel';
+import type { Goal, MajorGoal } from '../../types';
 
 interface ImageExportSummary {
     totalImages: number;
@@ -40,6 +43,8 @@ interface DataManagementViewProps {
     nodeCategories: NodeCategory[];
     collections: DataCollection[];
     collectionEntries: DataCollectionEntry[];
+    goals?: Goal[];
+    majorGoals?: MajorGoal[];
     onCleanupCloudBackups: () => Promise<void>;
     onCheckCloudImageConsistency: () => Promise<string>;
     onCleanupCloudImages: () => Promise<{ message: string; report: string }>;
@@ -64,6 +69,8 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     nodeCategories,
     collections,
     collectionEntries,
+    goals = [],
+    majorGoals = [],
     onCleanupCloudBackups,
     onCheckCloudImageConsistency,
     onCleanupCloudImages
@@ -632,6 +639,11 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                         )}
                     </div>
                 </div>
+
+                <JournalPdfExportPanel
+                    data={{ logs, categories, todos, todoCategories, scopes, dailyReviews, weeklyReviews, monthlyReviews, goals, majorGoals }}
+                    onToast={onToast}
+                />
 
                 {/* Excel导出 */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">

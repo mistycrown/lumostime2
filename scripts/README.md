@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-23：手账 PDF 使用 `python scripts/prepare-journal-font.py` 从现有本地文楷 WOFF2 生成 TrueType 资源（需要 fontTools 和 Brotli，生成资源遵循 public/ 不入库的现有规则）。构建后运行 `node scripts/test-journal-pdf-renderer.mjs` 检查实际表单、A4/A5 下载、取消和失败恢复；随后运行 `python scripts/check-journal-pdf.py <a4.pdf> <a5.pdf>` 验证中文实际可见、正文完整和页面边界，并输出逐页 PNG 与联系表。
+
 2026-10-11：`node scripts/check-note-autocomplete-smoke.mjs` 增加真实补记弹窗在桌面/手机宽度下的首次定位回归，模拟键盘缩放、延迟移动和原生过度滚动，并检查手动滚动、输入、失焦、超时和卸载会停止校正。
 
 2026-10-11：`node scripts/check-note-autocomplete-smoke.mjs` 同时验证回顾引导回答的历史补全、真实回答更新、Tab/点击/原生触屏接受、输入法、展开、节点括号及阅读/选择题模式，输出桌面和手机截图。

@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-23: `journalExport.ts` projects an inclusive local-date range into journal days and calendar groups. It clips overnight logs proportionally, excludes planned blocks from actual totals, reuses todo occurrence rules, refreshes stored automatic checks (including previous-night checks), preserves missing check snapshots and selects only fully contained week/month reviews. Date validation and all-data shortcuts share these helpers.
+
 Update 2026-10-22: `cloudJsonCache.ts` retains one main-backup JSON/ETag pair per provider instance and reuses it only after server confirmation. `syncUtils.readCloudSnapshot` opts into conditional GET; verification stays unconditional. Native WebDAV upload inventory falls back to its manifest instead of an unsupported empty listing. Details are in `cloud-sync.md`.
 
 Update 2026-10-18: Closed category-list tasks interleave completed and abandoned records by descending completion/abandonment timestamp, with stable ties and undated legacy records last. Active tasks retain incoming order. Abandonment date formatting returns date-only text for an accompanying UI icon; child display uses the same ordering.

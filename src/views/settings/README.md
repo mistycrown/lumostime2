@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-23: Data Management includes `JournalPdfExportPanel.tsx` above Excel export. It provides inclusive start/end dates, shortcuts, seven selectable journal chapters, A4/A5, optional cover/empty dates and cancellable progress. Annual plans receive current goals and major goals from Settings. Validation errors and export failures recover without changing application data.
+
 Update 2026-10-18: `FiltersSettingsView` and automatic daily-check configuration share `FilterExpressionInput`, keeping expression editing and AND/OR/exclusion guidance consistent.
 
 Update 2026-10-13: `DesktopWidgetSettingsView` refreshes its toggles when native widget restore or close broadcasts updated preferences.

@@ -1,0 +1,185 @@
+/**
+ * @file journalExport.ts
+ * @input Local app datasets and journal export options
+ * @output Validated, date-bounded journal model without mutating source records
+ * @pos Utility (Journal PDF)
+ * @updated 2026-10-23: Adds calendar grouping, midnight clipping, plan projection and historical checks.
+ */
+import type { Category, CheckItem, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
+import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
+import { evaluateAutoCheck } from './autoCheckUtils';
+import { getCheckItemCountState } from './dailyCheckUtils';
+
+export const JOURNAL_SECTIONS = [
+  { id: 'yearly', label: '年计划' },
+  { id: 'monthly', label: '月计划与月历' },
+  { id: 'weekly', label: '一周一页' },
+  { id: 'daily', label: '一日一页' },
+  { id: 'timeline', label: '时间轴' },
+  { id: 'checks', label: '打卡表' },
+  { id: 'reviews', label: '复盘' }
+] as const;
+export type JournalSection = typeof JOURNAL_SECTIONS[number]['id'];
+export interface JournalExportOptions {
+  startDate: string;
+  endDate: string;
+  sections: JournalSection[];
+  paperSize: 'a4' | 'a5';
+  includeCover: boolean;
+  includeEmptyDays: boolean;
+}
+export interface JournalExportData {
+  logs: Log[];
+  categories: Category[];
+  todos: TodoItem[];
+  todoCategories: TodoCategory[];
+  scopes: Scope[];
+  dailyReviews: DailyReview[];
+  weeklyReviews: WeeklyReview[];
+  monthlyReviews: MonthlyReview[];
+  goals?: Goal[];
+  majorGoals?: MajorGoal[];
+}
+export interface JournalLog {
+  source: Log;
+  start: number;
+  end: number;
+  seconds: number;
+  activity: string;
+  category: string;
+}
+export interface JournalDay {
+  date: string;
+  logs: JournalLog[];
+  todos: TodoDateEntry[];
+  checks: CheckItem[];
+  review?: DailyReview;
+  actualSeconds: number;
+  hasContent: boolean;
+}
+export interface JournalModel {
+  options: JournalExportOptions;
+  days: JournalDay[];
+  months: string[];
+  years: number[];
+  weeks: string[];
+  goals: (Goal | MajorGoal)[];
+  weeklyReviews: WeeklyReview[];
+  monthlyReviews: MonthlyReview[];
+}
+
+export const shiftJournalDate = (key: string, days: number): string => {
+  const date = parseDateKey(key)!;
+  date.setDate(date.getDate() + days);
+  return formatDateKey(date);
+};
+
+export const validateJournalOptions = (options: JournalExportOptions): string | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(options.startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(options.endDate)) return '请输入有效的起止日期';
+  const start = parseDateKey(options.startDate);
+  const end = parseDateKey(options.endDate);
+  if (!start || !end || start.getFullYear() < 1900 || end.getFullYear() > 9999) return '请输入有效的起止日期';
+  if (start > end) return '起始日期不能晚于结束日期';
+  const dayCount = (Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000 + 1;
+  if (dayCount > 3660) return '一次最多导出 3660 天，请缩小日期范围';
+  if (!options.sections.length) return '请至少选择一个导出章节';
+  if (options.sections.some((section) => !JOURNAL_SECTIONS.some((item) => item.id === section))) return '存在不支持的导出章节';
+  if (!['a4', 'a5'].includes(options.paperSize)) return '请选择 A4 或 A5 纸张';
+  return null;
+};
+
+export const formatJournalDuration = (seconds: number): string => {
+  const minutes = Math.round(seconds / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分` : `${minutes} 分钟`;
+};
+
+export const formatJournalTime = (timestamp: number, dayKey: string): string => {
+  if (formatDateKey(new Date(timestamp)) > dayKey) return '24:00';
+  const date = new Date(timestamp);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+};
+
+export const journalTodoStatus = (entry: TodoDateEntry): string => {
+  if (entry.todo.abandonedAt && entry.todo.abandonedAt.slice(0, 10) <= (entry.dateKey || '')) return '已放弃';
+  if (entry.todo.occurrenceCompletions?.[entry.dateKey || ''] || entry.badges.completed) return '已完成';
+  if (!entry.todo.recurrenceRule && entry.todo.isCompleted) return '已完成';
+  return '待办';
+};
+
+export const journalCheckValue = (item: CheckItem): string => item.manualMode === 'count'
+  ? `${getCheckItemCountState(item).current}/${getCheckItemCountState(item).target}`
+  : item.isCompleted ? '已完成' : '未完成';
+
+export const getJournalDataRange = (data: JournalExportData, today = new Date()): { startDate: string; endDate: string } => {
+  const keys = [formatDateKey(today)];
+  const add = (value?: string) => { if (value && /^\d{4}-\d{2}-\d{2}$/.test(value) && parseDateKey(value)) keys.push(value); };
+  const addTimestamp = (timestamp?: number) => { if (Number.isFinite(timestamp)) add(formatDateKey(new Date(timestamp!))); };
+  data.logs.forEach((log) => { addTimestamp(log.startTime); addTimestamp(log.endTime > log.startTime ? log.endTime - 1 : log.endTime); });
+  data.dailyReviews.forEach((review) => add(review.date));
+  data.weeklyReviews.forEach((review) => { add(review.weekStartDate); add(review.weekEndDate); });
+  data.monthlyReviews.forEach((review) => { add(review.monthStartDate); add(review.monthEndDate); });
+  data.todos.forEach((todo) => {
+    add(todo.scheduledDate); add(todo.deadlineDate); add(todo.recurrenceRule?.startDate); add(todo.recurrenceRule?.endDate);
+    todo.maybeDates?.forEach(add);
+    Object.keys(todo.occurrenceCompletions || {}).forEach(add);
+    if (todo.completedAt) addTimestamp(Date.parse(todo.completedAt));
+  });
+  [...(data.goals || []), ...(data.majorGoals || [])].forEach((goal) => { add(goal.startDate); add(goal.endDate); });
+  keys.sort();
+  return { startDate: keys[0], endDate: keys[keys.length - 1] };
+};
+
+export const buildJournalModel = (data: JournalExportData, options: JournalExportOptions): JournalModel => {
+  const error = validateJournalOptions(options);
+  if (error) throw new Error(error);
+  const days: JournalDay[] = [];
+  const last = parseDateKey(options.endDate)!;
+  for (const date = parseDateKey(options.startDate)!; date <= last; date.setDate(date.getDate() + 1)) {
+    const key = formatDateKey(date);
+    days.push({ date: key, logs: [], todos: [], checks: [], actualSeconds: 0, hasContent: false });
+  }
+  const byDate = new Map(days.map((day) => [day.date, day]));
+  const rangeStart = parseDateKey(options.startDate)!.getTime();
+  const rangeEnd = parseDateKey(shiftJournalDate(options.endDate, 1))!.getTime();
+  const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name }] as const)));
+  // Project each intersecting log only onto touched days; elapsed proportions retain recorded durations.
+  data.logs.forEach((log) => {
+    if (!Number.isFinite(log.startTime) || !Number.isFinite(log.endTime) || log.endTime <= log.startTime) return;
+    let start = Math.max(log.startTime, rangeStart);
+    const end = Math.min(log.endTime, rangeEnd);
+    const names = activities.get(log.activityId);
+    while (start < end) {
+      const key = formatDateKey(new Date(start));
+      const next = Math.min(end, parseDateKey(shiftJournalDate(key, 1))!.getTime());
+      const seconds = Math.max(0, Number.isFinite(log.duration) ? log.duration : (log.endTime - log.startTime) / 1000) * (next - start) / (log.endTime - log.startTime);
+      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类' });
+      start = next;
+    }
+  });
+  const todos = buildTodoDateEntryMap(data.todos, data.logs, days.map((day) => day.date));
+  const reviews = new Map(data.dailyReviews.map((review) => [review.date, review]));
+  const context = { categories: data.categories, scopes: data.scopes, todos: data.todos, todoCategories: data.todoCategories };
+  days.forEach((day) => {
+    day.logs.sort((left, right) => left.start - right.start || left.source.id.localeCompare(right.source.id));
+    day.todos = todos[day.date] || [];
+    day.review = reviews.get(day.date);
+    day.checks = (day.review?.checkItems || []).map((item) => {
+      if (item.type === 'auto' && item.autoConfig) {
+        return { ...item, isCompleted: evaluateAutoCheck(item, data.logs, context, parseDateKey(item.autoConfig.comparisonType === 'nightEarliestStart' ? shiftJournalDate(day.date, -1) : day.date)!) };
+      }
+      if (item.manualMode === 'count') return { ...item, isCompleted: getCheckItemCountState(item).isCompleted };
+      return { ...item };
+    });
+    day.actualSeconds = day.logs.filter((log) => !log.source.isPlanned).reduce((sum, log) => sum + log.seconds, 0);
+    day.hasContent = Boolean(day.logs.length || day.todos.length || day.checks.length || day.review);
+  });
+  return {
+    options: { ...options, sections: [...new Set(options.sections)] }, days,
+    months: [...new Set(days.map((day) => day.date.slice(0, 7)))],
+    years: [...new Set(days.map((day) => Number(day.date.slice(0, 4))))],
+    weeks: [...new Set(days.map((day) => formatDateKey(getStartOfWeek(parseDateKey(day.date)!))))],
+    goals: [...(data.majorGoals || []), ...(data.goals || [])].filter((goal) => goal.startDate <= options.endDate && goal.endDate >= options.startDate),
+    weeklyReviews: data.weeklyReviews.filter((review) => review.weekStartDate >= options.startDate && review.weekEndDate <= options.endDate).sort((a, b) => a.weekStartDate.localeCompare(b.weekStartDate)),
+    monthlyReviews: data.monthlyReviews.filter((review) => review.monthStartDate >= options.startDate && review.monthEndDate <= options.endDate).sort((a, b) => a.monthStartDate.localeCompare(b.monthStartDate))
+  };
+};

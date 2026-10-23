@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-23: Passes goals and major goals to journal PDF export in data management.
  * @updated 2026-10-10: Uses the dictionary-specific BookA icon for personal words.
  * @updated 2026-10-09: Adds personal dictionary management under Content.
  * @updated 2026-10-08: Removes node metadata from the Obsidian export view inputs.
@@ -1002,6 +1003,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                 onCleanupCloudBackups={handleCleanupCloudBackups}
                 onCheckCloudImageConsistency={handleCheckCloudImageConsistency}
                 onCleanupCloudImages={handleCleanupCloudImages}
+                goals={syncData.goals || []}
+                majorGoals={syncData.majorGoals || []}
                 logs={logs}
                 dailyReviews={dailyReviews}
                 weeklyReviews={weeklyReviews}

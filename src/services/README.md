@@ -1,5 +1,9 @@
 # Services Architecture
 
+Update 2026-10-23: `journalPdfService.ts` generates offline, searchable Chinese journals with optional annual/month/week/day, timeline, check matrix and review chapters. `journalPdfLayout.ts` measures and paginates full text with contents, continued headers and page numbers. Font bytes and PDF dependencies load on demand. A TrueType copy of bundled WenKai embeds once in full (about 8 MB per book) because current fontkit subsets drop glyph outlines. Browser/Electron download the PDF; Capacitor writes to the same export directory as Excel. Exports support cancellation and explicit date/page limits.
+
+The existing `public/` asset policy also applies to the generated PDF font. Prepare it once after restoring the local font assets with `python scripts/prepare-journal-font.py` (`fontTools` with Brotli support required). This creates `public/fonts/LXGWWenKaiLite-Journal.ttf` from the existing WOFF2 without changing the app's selected font. Runtime exports remain fully offline. Run `node scripts/test-journal-pdf-renderer.mjs` after a production build, then `python scripts/check-journal-pdf.py <a4.pdf> <a5.pdf>` to inspect the generated PDFs, visible Chinese glyphs and contact sheets.
+
 Update 2026-10-22: WebDAV, COS and compatible S3 support conditional main-backup GETs using strong ETags. Upload verification stays unconditional; cache entries are invalidated before writes and connection changes. Native WebDAV reads main JSON through native HTTP for response metadata and reuses image manifests when listing is unsupported. Details are in `cloud-sync.md`.
 
 Update 2026-10-18: Desktop and Android widget source projections omit abandoned tasks from active/overdue lists. Excel todo exports retain separate status and abandonment timestamp fields alongside completion fields.
