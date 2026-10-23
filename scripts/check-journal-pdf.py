@@ -5,6 +5,7 @@
 @pos Test runner (requires PyMuPDF and Pillow)
 @updated 2026-10-23: Verifies dual fonts, paragraph baselines, nonduplicated notes and actual calendar content.
 @updated 2026-10-23: Verifies mixed orientation, even facing spreads, original stickers and nested book order.
+@updated 2026-10-23: Requires every A4 page to be landscape and every A5 page to be portrait.
 """
 from pathlib import Path
 import json
@@ -67,9 +68,9 @@ def inspect(filename):
         if '时间轴 · 周概览' in (lines[1] if len(lines) > 1 else ''):
             timeline_pages.append(page)
             timeline_indices.append(index)
-        is_overview = index in month_indices or index in timeline_indices
-        expected_width = 419.53 if 'a5' in source.stem else 841.89 if is_overview else 595.28
+        expected_width = 419.53 if 'a5' in source.stem else 841.89
         assert abs(page.rect.width - expected_width) < 0.1, f'Wrong page orientation on {index + 1}'
+        assert abs(page.rect.height - 595.28) < 0.1, f'Wrong page height on {index + 1}'
         if any(image[2] > 200 and image[3] > 200 for image in page.get_images()) and '每日一句话' in page.get_text():
             sticker_pages.append(index)
         for block in page.get_text('dict')['blocks']:

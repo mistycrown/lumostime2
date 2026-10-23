@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-23: A4 journal books are landscape on every page, including covers, contents, annual moods, agendas, day details and continuations. A5 stays portrait with facing overviews. Contents capacity follows the actual printable height.
+
 Update 2026-10-23: `journalPdfMood.ts` keeps all 365/366 annual mood stickers in one 12-month by 31-day matrix with 11–14 pt stickers. The separate one-line summary collection uses 18 pt stickers in two A5 columns or three A4 columns. Daily-page stickers use 28 pt. Mood-only days appear in the matrix without generating empty summary rows.
 
 Update 2026-10-23: `journalPdfBook.ts` interleaves annual front matter, months, weeks and days. `journalPdfOverview.ts` reuses application month sorting, trace lanes and schedule/category colors; A5 overviews occupy even/odd facing portrait pages, while A4 uses one landscape page. Eighth-column reviews continue without truncation. Agendas flow through two columns, monthly checks/time distribution precede weeks, and daily detail uses actual Log timelines without empty check/summary headings. `journalPdfStickers.ts` embeds original bundled/managed mood images once. The writer reserves contents before layout and skips headers/footers on alignment blanks.

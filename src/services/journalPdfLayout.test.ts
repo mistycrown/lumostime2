@@ -4,6 +4,7 @@
  * @output Real PDF pagination, searchability encoding and cancellation checks
  * @updated 2026-10-23: Verifies dual-font wrapping, explicit paragraphs, calendar entries and single-copy notes.
  * @updated 2026-10-23: Checks facing-page parity, A4 orientation and interleaved cross-month details.
+ * @updated 2026-10-23: Requires landscape A4 on all pages and validates shorter landscape contents.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -57,8 +58,8 @@ describe('PDF pagination with bundled Chinese font', () => {
     }
     if (includeCover) expect(w.pdf.getPages()[2].node.Contents()).toBeUndefined();
   });
-  it('uses one landscape A4 page per overview and restores portrait for daily details', async () => {
-    const w = await make('a4', { sections: ['monthly', 'timeline', 'daily'], includeEmptyDays: true });
+  it('keeps every A4 page landscape including cover, contents, annual review and daily detail', async () => {
+    const w = await make('a4', { sections: ['yearly', 'monthly', 'timeline', 'daily'], includeCover: true, includeEmptyDays: true });
     const pages: { title: string; width: number; height: number }[] = [];
     const original = w.startPage.bind(w);
     w.startPage = (...args) => { original(...args); pages.push({ title: args[0], width: w.width, height: w.height }); };
@@ -66,7 +67,9 @@ describe('PDF pagination with bundled Chinese font', () => {
     const overviews = pages.filter((page) => page.title.includes('月计划') || page.title.includes('时间轴'));
     expect(overviews).toHaveLength(2);
     expect(overviews.every((page) => page.width > page.height && page.width === 841.89)).toBe(true);
-    expect(pages.filter((page) => page.title.includes('周一') || page.title.includes('周二')).every((page) => page.width < page.height)).toBe(true);
+    expect(pages.some((page) => page.title.includes('周一'))).toBe(true);
+    expect(pages.every((page) => page.width === 841.89 && page.height === 595.28)).toBe(true);
+    expect(w.pdf.getPages().every((page) => page.getWidth() === 841.89 && page.getHeight() === 595.28)).toBe(true);
   });
   it('interleaves months, weeks and dates without duplicating a cross-month week or losing actual logs', async () => {
     const source = { ...data, logs: [{ id: 'real', categoryId: 'c', activityId: 'a', title: '真实记录', note: '跨月日志正文', startTime: new Date(2026, 8, 1, 9).getTime(), endTime: new Date(2026, 8, 1, 10).getTime(), duration: 3600 }] };
@@ -87,8 +90,8 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(calls).not.toContain('今日打卡');
     expect(calls).not.toContain('今日一句');
   });
-  it('reserves long contents before composing and preserves spread parity across all twelve months', async () => {
-    const w = await make('a5', { startDate: '2026-01-01', endDate: '2026-12-31', sections: ['yearly', 'monthly'] });
+  it.each(['a4', 'a5'] as const)('reserves long contents within %s bounds before composing all twelve months', async (size) => {
+    const w = await make(size, { startDate: '2026-01-01', endDate: '2026-12-31', sections: ['yearly', 'monthly'] });
     const pages: { title: string; page: number }[] = [];
     const start = w.startPage.bind(w);
     w.startPage = (...args) => { start(...args); pages.push({ title: args[0], page: w.pageCount }); };
@@ -102,8 +105,8 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(pages.filter((page) => page.title === '目录')).toHaveLength(2);
     expect(pages.at(-1)!.title).toBe('2026-12 月计划');
     const months = pages.filter((page) => page.title.endsWith('月计划'));
-    expect(months).toHaveLength(24);
-    expect(months.filter((_, index) => index % 2 === 0).every((page) => page.page % 2 === 0)).toBe(true);
+    expect(months).toHaveLength(size === 'a5' ? 24 : 12);
+    if (size === 'a5') expect(months.filter((_, index) => index % 2 === 0).every((page) => page.page % 2 === 0)).toBe(true);
   });
   it('continues a long review after the facing spread without truncating or repeating its body', async () => {
     const body = Array.from({ length: 80 }, (_, index) => `第${index + 1}条回顾，记录这个月发生的小事。`).join('\n');
@@ -146,7 +149,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(bytes.length).toBeLessThan(12000000);
     const reloaded = await PDFDocument.load(bytes);
     expect(reloaded.getPageCount()).toBe(w.pageCount);
-    expect(reloaded.getPages()[0].getWidth()).toBeCloseTo(size === 'a4' ? 595.28 : 419.53);
+    expect(reloaded.getPages()[0].getWidth()).toBeCloseTo(size === 'a4' ? 841.89 : 419.53);
   });
   it('preserves paragraph breaks and separates printed labels from handwriting', async () => {
     const w = await make('a5');

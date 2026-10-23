@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Separates printed/handwritten content, keeps paragraphs and renders scheduled calendar entries.
  * @updated 2026-10-23: Uses full month color blocks and separates weekly timeline grids from detailed logs.
  * @updated 2026-10-23: Supports mixed page orientation, facing-page parity, column flow and sticker images.
+ * @updated 2026-10-23: Keeps the entire A4 book landscape, including all continuations and contents.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, type JournalDay, type JournalModel } from '../utils/journalExport';
@@ -49,7 +50,7 @@ export class JournalPdfWriter {
   readonly stickers = new Map<string, PDFImage>();
 
   constructor(readonly pdf: PDFDocument, readonly font: PDFFont, readonly model: JournalModel, readonly symbols: JournalSymbols = new Map(), printedFont?: PDFFont) {
-    [this.width, this.height] = model.options.paperSize === 'a5' ? [419.53, 595.28] : [595.28, 841.89];
+    [this.width, this.height] = model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.pageMargin = model.options.paperSize === 'a5' ? 28 : 40;
     this.bodySize = model.options.paperSize === 'a5' ? 9 : 10;
     this.characters = new Set(font.getCharacterSet());
@@ -139,12 +140,12 @@ export class JournalPdfWriter {
     return result + '…';
   }
 
-  startPage(title: string, subtitle = '', continued = false, landscape = false): void {
+  startPage(title: string, subtitle = '', continued = false): void {
     if (this.pageCount >= 1000) throw new Error('手账超过 1000 页，请缩小日期范围或减少章节');
     if (!continued) { this.title = title; this.subtitle = subtitle; this.continuation = 0; }
     else this.continuation++;
     this.columns = undefined;
-    [this.width, this.height] = this.model.options.paperSize === 'a5' ? [419.53, 595.28] : landscape ? [841.89, 595.28] : [595.28, 841.89];
+    [this.width, this.height] = this.model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.page = this.pdf.addPage([this.width, this.height]);
     this.rect(this.width - this.margin - 34, this.margin - 10, 34, 3, ACCENT);
     this.text('LUMOSTIME   /   JOURNAL', this.margin, this.margin - 8, 7, MUTED);

@@ -5,6 +5,7 @@
  * @pos Service (Journal book composition)
  * @updated 2026-10-23: Adds goal progress, summary stickers, two-column agendas and monthly statistics.
  * @updated 2026-10-23: Uses a compact annual mood matrix and small multi-column summary stickers.
+ * @updated 2026-10-23: Sizes contents capacity from the printable height of the selected paper.
  */
 import { rgb } from 'pdf-lib';
 import type { Goal, MajorGoal } from '../types';
@@ -124,7 +125,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
   // Reserve enough contents pages before composing so facing-page parity never shifts afterwards.
   const hasMonthlyContent = model.options.sections.some((section) => section !== 'yearly');
   const labels = model.years.flatMap((year) => [ ...(selected.has('yearly') ? [`${year} 年度回顾与目标`] : []), ...(hasMonthlyContent ? model.months.filter((month) => month.startsWith(String(year))).map((month) => `${month} 月 / 周 / 日`) : []) ]);
-  const rowsPerPage = model.options.paperSize === 'a5' ? 11 : 17;
+  const rowsPerPage = Math.floor((w.bottom - w.pageMargin - 86) / 38);
   const contentsPages = Array.from({ length: Math.max(1, Math.ceil(labels.length / rowsPerPage)) }, () => {
     w.startPage('目录', rangeLabel(model.days));
     return w.page;

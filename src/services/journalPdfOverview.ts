@@ -4,6 +4,7 @@
  * @output A5 facing spreads or a single landscape A4 overview with an eighth review column
  * @pos Service (Journal overview layouts)
  * @updated 2026-10-23: Reuses month trace lanes, schedule colors and eight-column book geometry.
+ * @updated 2026-10-23: Uses the book's paper orientation for overview and continuation pages.
  */
 import { rgb } from 'pdf-lib';
 import type { DailyReview, MonthlyReview, WeeklyReview } from '../types';
@@ -50,7 +51,7 @@ export const writeJournalOverview = (
   if (spread) w.alignSpread();
   let remaining: ReviewLine[] = [];
   for (let side = 0; side < (spread ? 2 : 1); side++) {
-    w.startPage(title, `${subtitle}${spread ? ` · ${side ? '右页' : '左页'}` : ''}`, false, !spread);
+    w.startPage(title, `${subtitle}${spread ? ` · ${side ? '右页' : '左页'}` : ''}`);
     const count = spread ? 4 : 8;
     const panel: OverviewPanel = { start: side * 4, count, x: w.margin, top: w.y, width: w.contentWidth, height: w.bottom - w.y - 10, column: w.contentWidth / count };
     draw(panel);

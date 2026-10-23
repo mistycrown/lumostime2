@@ -4,7 +4,7 @@ Update 2026-10-23: Journal export offers eight independent sections. 周计划 c
 
 Update 2026-10-23: Journal PDF dates use eight-digit numeric text fields with 今天/本周/上周/本月/上月/本年/去年/全部 shortcuts. Current periods include their complete calendar interval. Handwriting stays fixed to WenKai for this version; no custom-font picker is introduced yet.
 
-Update 2026-10-23: Data Management includes `JournalPdfExportPanel.tsx` above Excel export. It provides eight-digit inclusive dates, shortcuts, eight selectable content groups, A4/A5 overview-orientation labels, optional cover/empty dates and cancellable progress. Daily detail is selected by default. Annual plans receive current goals and major goals from Settings. Validation errors and export failures recover without changing application data.
+Update 2026-10-23: Data Management includes `JournalPdfExportPanel.tsx` above Excel export. It provides eight-digit inclusive dates, shortcuts, eight selectable content groups, A4 whole-book landscape/A5 portrait-spread labels, optional cover/empty dates and cancellable progress. Daily detail is selected by default. Annual plans receive current goals and major goals from Settings. Validation errors and export failures recover without changing application data.
 
 Update 2026-10-18: `FiltersSettingsView` and automatic daily-check configuration share `FilterExpressionInput`, keeping expression editing and AND/OR/exclusion guidance consistent.
 
