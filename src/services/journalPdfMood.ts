@@ -4,13 +4,14 @@
  * @output A compact one-page annual mood matrix plus flowing multi-column one-line summaries
  * @pos Service (Journal annual mood layouts)
  * @updated 2026-10-23: Keeps 12 months and 31 day rows on one page with small original stickers.
+ * @updated 2026-10-23: Aligns the compact annual day labels at the 9pt minimum print size.
  */
-import { rgb } from 'pdf-lib';
+import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { JournalDay } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
 
-const MUTED = rgb(0.46, 0.48, 0.45);
-const INK = rgb(0.19, 0.21, 0.19);
+const MUTED = C.muted;
+const INK = C.ink;
 
 export const writeAnnualMood = (w: JournalPdfWriter, year: number, days: JournalDay[]): void => {
   const moods = days.filter((day) => day.review?.moodEmoji);
@@ -31,13 +32,13 @@ export const writeAnnualMood = (w: JournalPdfWriter, year: number, days: Journal
         const y = top + (date - 1) * row;
         const key = `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
         const day = map.get(key);
-        if (!day || date > count) w.rect(x, y, column, row, rgb(0.96, 0.96, 0.95));
+        if (!day || date > count) w.rect(x, y, column, row, C.fill);
         if (date <= count && day?.review?.moodEmoji) w.sticker(day.review.moodEmoji, x + (column - size) / 2, y + 1, size);
-        if (month === 1) w.text(String(date).padStart(2, '0'), w.margin, y + (row - 6) / 2, 6, MUTED);
+        if (month === 1) w.text(String(date).padStart(2, '0'), w.margin, y + (row - 9) / 2, 9, MUTED);
       }
     }
-    for (let date = 0; date <= 31; date++) w.line(x0, top + date * row, column * 12, rgb(0.9, 0.91, 0.88));
-    for (let month = 0; month <= 12; month++) w.verticalLine(x0 + month * column, top, row * 31, rgb(0.9, 0.91, 0.88));
+    for (let date = 0; date <= 31; date++) w.line(x0, top + date * row, column * 12, C.line);
+    for (let month = 0; month <= 12; month++) w.verticalLine(x0 + month * column, top, row * 31, C.line);
     w.y = w.bottom;
   }
   const summaries = days.filter((day) => day.review?.summary?.trim());
@@ -54,10 +55,10 @@ export const writeAnnualMood = (w: JournalPdfWriter, year: number, days: Journal
     const icon = day.review!.moodEmoji;
     if (icon) w.sticker(icon, x, top, 18);
     const indent = icon ? 25 : 0;
-    for (const line of w.wrap(day.review!.summary!, w.contentWidth - indent, 8, 'hand')) {
-      w.ensure(11);
-      w.text(line, w.margin + indent, w.y, 8, INK, 'hand');
-      w.y += 11;
+    for (const line of w.wrap(day.review!.summary!, w.contentWidth - indent, 9, 'hand')) {
+      w.ensure(13.5);
+      w.text(line, w.margin + indent, w.y, 9, INK, 'hand');
+      w.y += 13.5;
     }
     w.y += 3;
     if (w.page === page && w.margin === x) w.y = Math.max(w.y, top + 22);

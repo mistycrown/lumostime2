@@ -5,8 +5,9 @@
  * @pos Service (Journal PDF timeline)
  * @updated 2026-10-23: Adds reference-style hourly grids, weekend tinting and overlap lanes.
  * @updated 2026-10-23: Shares eight-column A5 spreads/A4 landscape geometry and review sidebars.
+ * @updated 2026-10-23: Maps activity hues to Radix scales and retains readable 9pt block labels.
  */
-import { rgb } from 'pdf-lib';
+import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { JournalDay } from '../utils/journalExport';
 import { formatJournalTime, shiftJournalDate } from '../utils/journalExport';
 import { layoutJournalTimeline } from '../utils/journalTimelineLayout';
@@ -14,18 +15,13 @@ import type { JournalPdfWriter } from './journalPdfLayout';
 import type { WeeklyReview } from '../types';
 import { writeJournalOverview } from './journalPdfOverview';
 
-const palette = ['#709586', '#8b99bd', '#ca9c76', '#ae91aa', '#a5ad75', '#7ba5b2'];
-export const journalBlockColor = (key: string, hex?: string, tint = 0.74) => {
-  let color = hex;
-  if (!/^#[a-f0-9]{6}$/i.test(color || '')) color = palette[Array.from(key).reduce((n, char) => n + char.codePointAt(0)!, 0) % palette.length];
-  const channels = [1, 3, 5].map((offset) => parseInt(color!.slice(offset, offset + 2), 16) / 255);
-  return rgb(...channels.map((value) => value + (1 - value) * tint) as [number, number, number]);
-};
+export { journalRadixColor as journalBlockColor } from './journalPdfTheme';
+import { journalRadixColor as journalBlockColor } from './journalPdfTheme';
 
 export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: JournalDay[], review?: WeeklyReview): void => {
-  writeJournalOverview(w, '时间轴 · 周概览', `${week} — ${shiftJournalDate(week, 6)}`, (panel) => {
+  writeJournalOverview(w, '时间轴 周概览', `${week} — ${shiftJournalDate(week, 6)}`, (panel) => {
   const compact = w.model.options.paperSize === 'a5';
-  const axis = 19;
+  const axis = 29;
   const x0 = panel.x + axis;
   const column = panel.column;
   const top = panel.top + 35;
@@ -34,20 +30,20 @@ export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: Jou
   const colors = new Map<string, string | undefined>();
   const dayMap = new Map(days.map((day) => [day.date, day]));
   const dates = Array.from({ length: 7 }, (_, index) => shiftJournalDate(week, index));
-  const ink = rgb(0.19, 0.23, 0.21);
+  const ink = C.ink;
   dates.forEach((date, index) => {
     if (index < panel.start || index >= panel.start + panel.count) return;
     const x = x0 + (index - panel.start) * column;
     const day = dayMap.get(date);
-    const background = !day ? rgb(0.95, 0.95, 0.94) : index === 5 ? rgb(0.94, 0.98, 0.98) : index === 6 ? rgb(0.99, 0.95, 0.97) : rgb(1, 1, 1);
+    const background = !day ? C.fill : index === 5 ? C.fill : index === 6 ? C.weekend : C.paper;
     w.rect(x, top - 31, column - axis, height + 31, background);
-    w.text(date.slice(8), x + 4, top - 29, compact ? 12 : 15, day ? ink : rgb(0.68, 0.69, 0.68));
+    w.text(date.slice(8), x + 4, top - 29, compact ? 12 : 15, day ? ink : C.muted);
     w.text(['MON 一', 'TUE 二', 'WED 三', 'THU 四', 'FRI 五', 'SAT 六', 'SUN 日'][index], x + 4, top - 10, compact ? 5 : 6, ink);
   });
   for (let half = 0; half <= 48; half++) {
     const y = top + half * hour / 2;
-    w.line(x0, y, column * Math.min(panel.count, 7 - panel.start) - axis, half % 2 ? rgb(0.93, 0.94, 0.93) : rgb(0.82, 0.84, 0.81));
-    if (half % 2 === 0) w.text(`${String(half / 2).padStart(2, '0')}:00`, w.margin, y - 3, compact ? 5 : 6, rgb(0.48, 0.51, 0.48));
+    w.line(x0, y, column * Math.min(panel.count, 7 - panel.start) - axis, half % 2 ? C.fill : C.line);
+    if (half % 2 === 0) w.text(`${String(half / 2).padStart(2, '0')}:00`, w.margin, y - 3, compact ? 5 : 6, C.muted);
   }
   for (let index = 0; index < Math.min(panel.count, 7 - panel.start); index++) {
     w.verticalLine(x0 + index * column, top - 31, height + 31);
@@ -65,12 +61,11 @@ export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: Jou
       const blockHeight = Math.max(0.7, (block.endMinute - block.startMinute) / 1440 * height - 0.7);
       const width = Math.max(1, laneWidth - 1);
       w.rect(x, y, width, blockHeight, journalBlockColor(log.activity, log.color, log.source.isPlanned ? 0.86 : 0.5));
-      w.verticalLine(x, y, blockHeight, journalBlockColor(log.activity, log.color, 0));
-      if (width < 15 || blockHeight < 8) return;
-      const size = compact ? 6.5 : 7;
+      if (width < 19 || blockHeight < 12) return;
+      const size = 9;
       let cursor = y + 2;
       if (blockHeight >= size * 3.5) {
-        w.text(w.fitted(`${log.source.isPlanned ? '计划 ' : ''}${formatJournalTime(log.start, day.date)}`, width - 5, size - 0.5), x + 3, cursor, size - 0.5, ink);
+        w.text(w.fitted(`${log.source.isPlanned ? '计划 ' : ''}${formatJournalTime(log.start, day.date)}`, width - 5, size), x + 3, cursor, size, ink);
         cursor += size + 3;
       }
       const title = `${log.source.isPlanned && blockHeight < size * 3.5 ? '计划 ' : ''}${log.source.title || log.activity}`;

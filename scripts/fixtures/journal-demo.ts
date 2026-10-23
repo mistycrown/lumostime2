@@ -5,6 +5,7 @@
  * @pos Test fixture (presentation sample, separate from stress tests)
  * @updated 2026-10-23: Replaces repeated placeholder text with natural, distinct entries.
  * @updated 2026-10-23: Includes original image stickers, linked actual traces and parent/child goal progress.
+ * @updated 2026-10-23: Includes rich photo logs, historical attribute fields, comments, reactions and inline node aliases.
  */
 import type { JournalExportData } from '../../src/utils/journalExport';
 import type { DailyReview, Log, TodoItem } from '../../src/types';
@@ -45,6 +46,14 @@ const logs: Log[] = Array.from({ length: 26 }, (_, index) => {
   };
 });
 logs.push({ id: 'night-reading', categoryId: 'study', activityId: 'book', title: '夜读与摘录', note: '夜里读到一段很喜欢的话。\n\n关灯前，把它抄在了纸上。', startTime: stamp(18, 23, 30), endTime: stamp(19, 0, 30), duration: 3600 });
+const richLog = logs.find((log) => log.id === 'demo-log-1')!;
+richLog.note += '\n\n把它与[[旧书丨阅读笔记]]联系起来，也想到了[[夏日散步]]。';
+richLog.attributeValues = [{ attributeId: 'pages', value: 32 }, { attributeId: 'genre', optionIds: ['fiction', 'memoir'] }, { attributeId: 'excerpt', value: '有些文字要隔一段时间再读，才会看到不同的风景。' }];
+richLog.images = ['/background/sea.webp', '/background/plant.webp', '/background/forest.webp'];
+richLog.progressIncrement = 32;
+richLog.moodScore = 5;
+richLog.reactions = ['❤️', '✨', 'image:/sticker/water3/04.webp'];
+richLog.comments = [{ id: 'reading-comment', content: '下次读书会可以从这一章开始。\n\n把摘录和照片一起留在这里。', createdAt: stamp(4, 20, 15) }];
 // A fully populated week makes the seven-column time-block overview reviewable.
 for (let index = logs.length - 1; index >= 0; index--) {
   const day = new Date(logs[index].startTime).getDate();
@@ -77,7 +86,13 @@ const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24,
   answers: day === 3 ? [{ questionId: 'memory', question: '今天有哪些值得记住的小事？', answer: '中午收到朋友寄来的明信片，上面画了一只趴在窗边的猫。\n\n晚上把它放在书桌前，希望明天也能记得这样轻松的心情。' }] : []
 }));
 
-logs.forEach((log) => { if (log.categoryId === 'study') log.scopeIds = ['learning']; });
+logs.forEach((log) => {
+  if (log.categoryId === 'study') log.scopeIds = log.activityId === 'work' ? ['learning', 'career'] : ['learning'];
+  if (log.activityId === 'walk') log.scopeIds = ['wellbeing'];
+  const date = new Date(log.startTime).getDate();
+  const task = todos.find((todo) => todo.scheduledDate === key(date));
+  if (!log.isPlanned && task && log.categoryId === 'study') log.linkedTodoId = task.id;
+});
 // Actual linked sessions create the same cross-day trace strips as the application calendar.
 [3, 4, 5, 6].forEach((day) => {
   const log = logs.find((entry) => !entry.isPlanned && new Date(entry.startTime).getDate() === day);
@@ -86,8 +101,13 @@ logs.forEach((log) => { if (log.categoryId === 'study') log.scopeIds = ['learnin
 
 export const journalDemoData: JournalExportData = {
   logs, todos, dailyReviews,
-  categories: [{ id: 'study', name: '学习与创作', icon: '📚', themeColor: '#526b5d', activities: [{ id: 'book', name: '阅读与学习', icon: '📖', color: '#77a891' }, { id: 'work', name: '工作与创作', icon: '✏️', color: '#879bc4' }] }, { id: 'life', name: '生活', icon: '🌱', themeColor: '#b28666', activities: [{ id: 'walk', name: '运动与日常', icon: '🌿', color: '#a1af7d' }, { id: 'sleep', name: '睡眠', icon: '🌙', color: '#9a9dbd' }, { id: 'meal', name: '三餐', icon: '🍞', color: '#cfad7f' }, { id: 'rest', name: '休闲', icon: '🎵', color: '#ba97a8' }] }],
-  scopes: [], todoCategories: [],
+  categories: [{ id: 'study', name: '学习与创作', icon: '📚', themeColor: '#526b5d', activities: [{ id: 'book', name: '阅读与学习', icon: '📖', color: '#77a891', keywords: ['阅读', '课程', '学习', '照片'], attributes: [
+    { id: 'pages', name: '阅读页数', type: 'number', unit: '页', order: 0, createdAt: 0, updatedAt: 0 },
+    { id: 'genre', name: '题材', type: 'multi', options: [{ id: 'fiction', label: '小说' }, { id: 'memoir', label: '随笔' }], order: 1, createdAt: 0, updatedAt: 0 },
+    { id: 'excerpt', name: '摘录感受', type: 'text', order: 2, createdAt: 0, updatedAt: 0 }
+  ] }, { id: 'work', name: '工作与创作', icon: '✏️', color: '#879bc4', keywords: ['项目', '写作', '设计'] }] }, { id: 'life', name: '生活', icon: '🌱', themeColor: '#b28666', activities: [{ id: 'walk', name: '运动与日常', icon: '🌿', color: '#a1af7d', keywords: ['散步', '拉伸'] }, { id: 'sleep', name: '睡眠', icon: '🌙', color: '#9a9dbd' }, { id: 'meal', name: '三餐', icon: '🍞', color: '#cfad7f' }, { id: 'rest', name: '休闲', icon: '🎵', color: '#ba97a8' }] }],
+  scopes: [{ id: 'learning', name: '学习成长', icon: '📚', themeColor: '#77a891', order: 0, isArchived: false }, { id: 'career', name: '创作与工作', icon: '✏️', themeColor: '#879bc4', order: 1, isArchived: false }, { id: 'wellbeing', name: '照顾自己', icon: '🌿', themeColor: '#a1af7d', order: 2, isArchived: false }],
+  todoCategories: [{ id: 'work', name: '工作与学业', icon: '📚', color: '#879bc4' }, { id: 'life', name: '日常生活', icon: '🌿', color: '#a1af7d' }],
   weeklyReviews: [
     { id: 'week-review', weekStartDate: key(3), weekEndDate: key(9), createdAt: stamp(9), updatedAt: stamp(9, 22), summary: '这一周完成了方案初稿，也给生活留下了空白。', answers: [{ questionId: 'week', question: '下周想继续保持什么？', answer: '上午先做需要专注的工作。\n下午留一小段时间散步，不把日程排得太满。' }] },
     { id: 'busy-week-review', weekStartDate: key(10), weekEndDate: key(16), createdAt: stamp(16), updatedAt: stamp(16, 22), summary: '给写作留出整块时间，周末也有自己的节奏。', answers: [{ questionId: 'balance', question: '这周的时间花在哪里？', answer: '上午的写作最专注。\n三餐和休息成为每天稳定的锚点。' }, { questionId: 'next', question: '下周的小调整', answer: '晚上少安排一件事，提早半小时放下手机。' }] }

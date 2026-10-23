@@ -5,6 +5,7 @@
  * @pos Test runner
  * @updated 2026-10-23: Verifies eight-digit dates and period shortcuts with varied month-long dual-font examples.
  * @updated 2026-10-23: Serves original sticker assets and checks recoverable missing-sticker failures.
+ * @updated 2026-10-23: Checks original photo failures and loads current panel CSS for realistic mobile previews.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -99,6 +100,13 @@ async function run() {
  } catch(error) { stickerFailure=String(error.message); }
  check(stickerFailure.includes('贴纸图片读取失败'),'Missing sticker was silently omitted');
  check(window.__exports.length===2,'Failed sticker export created a partial download');
+ let photoFailure='';
+ try {
+  await createJournalPdf({...data,logs:[{...data.logs[0],images:['missing-original-photo.webp']}]}, {startDate:'2026-08-02',endDate:'2026-08-02',sections:['logs'],paperSize:'a5',includeCover:false,includeEmptyDays:false});
+ } catch(error) { photoFailure=String(error.message); }
+ check(photoFailure.includes('日志图片读取失败'),'Missing original photo was silently omitted');
+ check(window.__exports.length===2,'Failed photo export created a partial download');
+ passed.push('Original Log photos, metadata, reactions, node styling and comments export; missing photos fail explicitly');
  passed.push('Original sticker images render and missing assets surface a recoverable export error');
  const moodDays=Array.from({length:365},(_,index)=>{
   const date=new Date(2026,0,index+1);
@@ -126,12 +134,13 @@ run().catch(error=>window.__result={error:String(error.stack||error),passed});
 });
 const css = (await readdir(path.join(workspace, 'dist/assets'))).filter(file => file.endsWith('.css'));
 if (!css.length) throw new Error('Run npm run build first');
-await writeFile(path.join(directory, 'test.css'), (await Promise.all(css.map(file => readFile(path.join(workspace, 'dist/assets', file), 'utf8')))).join('\n'), 'utf8');
+const panelCss = await readFile(path.join(directory, 'test.css'), 'utf8');
+await writeFile(path.join(directory, 'test.css'), (await Promise.all(css.map(file => readFile(path.join(workspace, 'dist/assets', file), 'utf8')))).join('\n') + '\n' + panelCss, 'utf8');
 await writeFile(path.join(directory, 'index.html'), '<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="test.css"><style>@font-face{font-family:VerifiedChinese;src:url(/fonts/LXGWWenKaiLite-Regular.woff2)}body{background:#f5f5f4;font-family:VerifiedChinese}.dark body{background:#0c0a09}</style><body><div id="root"></div><script src="test.js"></script></body></html>', 'utf8');
 const server = createServer(async (request, response) => {
   try {
     const relative = decodeURIComponent(new URL(request.url, 'http://localhost').pathname).replace(/^\/+/, '');
-    const base = /^(fonts|sticker)\//.test(relative) ? path.join(workspace, 'public') : directory;
+    const base = /^(fonts|sticker|background)\//.test(relative) ? path.join(workspace, 'public') : directory;
     const filename = path.resolve(base, relative || 'index.html');
     if (!filename.startsWith(base + path.sep)) { response.writeHead(403).end(); return; }
     response.setHeader('Content-Type', ({ '.html':'text/html', '.css':'text/css', '.js':'application/javascript', '.woff2':'font/woff2' })[path.extname(filename)] || 'application/octet-stream');

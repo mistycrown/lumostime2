@@ -5,6 +5,7 @@
  * @updated 2026-10-23: Verifies dual-font wrapping, explicit paragraphs, calendar entries and single-copy notes.
  * @updated 2026-10-23: Checks facing-page parity, A4 orientation and interleaved cross-month details.
  * @updated 2026-10-23: Requires landscape A4 on all pages and validates shorter landscape contents.
+ * @updated 2026-10-23: Verifies rich overnight content, photo bounds, English headings and in-place node styling.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -12,6 +13,8 @@ import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import { buildJournalModel, shiftJournalDate, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
 import { composeJournalPdf, JOURNAL_PRINT_FEATURES, JournalPdfWriter } from './journalPdfLayout';
+import { writeCheckMatrix } from './journalPdfLayout';
+import { writeJournalCover } from './journalPdfCover';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -23,6 +26,78 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it.each(['a4', 'a5'] as const)('keeps the independent %s cover within bounds and uses the actual authored summary', async (size) => {
+    const source = { ...data, dailyReviews: [{ id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0, answers: [], summary: '这段总结来自用户。' }] };
+    const w = await make(size, { includeCover: true }, source);
+    const calls: { value: string; role: string }[] = [];
+    const text = w.text.bind(w);
+    w.text = (value, x, top, fontSize = w.bodySize, color, role = 'print') => {
+      expect(x).toBeGreaterThanOrEqual(w.pageMargin);
+      expect(x + w.widthOf(value, fontSize, role)).toBeLessThanOrEqual(w.width - w.pageMargin + 0.1);
+      expect(top + fontSize).toBeLessThanOrEqual(w.height - 18);
+      calls.push({ value, role }); text(value, x, top, fontSize, color, role);
+    };
+    writeJournalCover(w); w.finish();
+    expect(calls.find((call) => call.value === '这段总结来自用户。')?.role).toBe('hand');
+    expect(calls.some((call) => call.value.includes('/   JOURNAL'))).toBe(false);
+    expect(calls.some((call) => call.value === '1 / 1')).toBe(false);
+    expect(calls.some((call) => call.value === 'Life Journal')).toBe(true);
+  });
+  it('centers counted check values on their date header and omits the redundant count appendix', async () => {
+    const source = { ...data, dailyReviews: [{ id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0, answers: [], checkItems: [{ id: 'water', content: '喝水', manualMode: 'count' as const, currentCount: 2, targetCount: 3, isCompleted: false }] }] };
+    const w = await make('a4', {}, source);
+    const calls: { text: string; x: number; size: number }[] = [];
+    const text = w.text.bind(w);
+    w.text = (value, x, y, size = w.bodySize, color, role) => { calls.push({ text: value, x, size }); text(value, x, y, size, color, role); };
+    w.startPage('月打卡'); writeCheckMatrix(w, '2026-10', w.model.days);
+    const date = calls.find((call) => call.text === '19' && call.size === 9)!;
+    const value = calls.filter((call) => call.text === '2' && call.size === 9).at(-1)!;
+    expect(date.x + w.widthOf(date.text, date.size) / 2).toBeCloseTo(value.x + w.widthOf(value.text, value.size) / 2);
+    expect(calls.some((call) => call.text === '计数明细')).toBe(false);
+    expect(calls.some((call) => call.text.includes('实心'))).toBe(false);
+  });
+  it.each(['a4', 'a5'] as const)('keeps rich overnight Log content and every photo once within %s columns', async (size) => {
+    const source = { ...data, logs: [{ id: 'rich', activityId: 'a', categoryId: 'c', title: '跨日图文', note: '独有备注 [[阅读]]', startTime: new Date(2026, 9, 19, 23).getTime(), endTime: new Date(2026, 9, 20, 1).getTime(), duration: 7200, progressIncrement: 0, focusScore: 4, moodScore: 5, attributeValues: [{ attributeId: 'missing', value: '保留历史属性' }], reactions: ['赞'], comments: [{ id: 'c', content: '评论原文\n\n评论第二段', createdAt: new Date(2026, 9, 20, 9).getTime() }], images: ['a', 'b', 'c', 'd'] }] };
+    const w = await make(size, { sections: ['daily', 'logs'] }, source);
+    const picture = await w.pdf.embedPng('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==');
+    for (const key of ['a', 'b', 'c', 'd']) w.photos.set(key, picture);
+    const calls: string[] = []; const text = w.text.bind(w); const start = w.startPage.bind(w);
+    let photos = 0;
+    w.startPage = (...args) => {
+      start(...args);
+      const draw = w.page.drawImage.bind(w.page);
+      w.page.drawImage = (image, options = {}) => {
+        expect(options.x).toBeGreaterThanOrEqual(w.pageMargin);
+        expect(options.x! + options.width!).toBeLessThanOrEqual(w.width - w.pageMargin + 0.1);
+        expect(options.y).toBeGreaterThanOrEqual(w.height - w.pageBottom - 0.1);
+        expect(options.width! / options.height!).toBeCloseTo(image.width / image.height);
+        photos++; draw(image, options);
+      };
+    };
+    w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
+    await composeJournalPdf(w);
+    const all = calls.join('');
+    for (const value of ['独有备注', '保留历史属性', '评论原文', '评论第二段', '赞']) expect(all.split(value)).toHaveLength(2);
+    expect(calls).toContain('专注评分'); expect(calls).toContain('4/5');
+    expect(calls).toContain('进度增量'); expect(calls).toContain('0');
+    expect(calls).not.toContain('Connections');
+    expect(calls).toContain('阅读');
+    expect(calls.some((value) => value.includes('[['))).toBe(false);
+    expect(photos).toBe(4);
+  });
+  it('flows a populated day across three compact A4 columns while preserving each full note once', async () => {
+    const source = { ...data, logs: Array.from({ length: 12 }, (_, index) => ({ id: `log-${index}`, categoryId: 'c', activityId: 'a', title: `记录第${index + 1}项`, note: `唯一正文第${index + 1}条。把当天的想法完整保留，跨栏时也不能遗漏。`, startTime: new Date(2026, 9, 19, index).getTime(), endTime: new Date(2026, 9, 19, index + 1).getTime(), duration: 3600 })) };
+    const w = await make('a4', { sections: ['daily', 'logs'] }, source);
+    const calls: { value: string; x: number }[] = []; const text = w.text.bind(w);
+    w.text = (value, x, ...args) => { calls.push({ value, x }); text(value, x, ...args); };
+    await composeJournalPdf(w);
+    const titles = calls.filter((call) => call.value.startsWith('记录第'));
+    expect(titles).toHaveLength(12);
+    expect(new Set(titles.map((call) => Math.round(call.x))).size).toBe(3);
+    expect(w.pageCount).toBeLessThanOrEqual(3);
+    const joined = calls.map((call) => call.value).join('');
+    for (let i = 1; i <= 12; i++) expect(joined.split(`唯一正文第${i}条`).length - 1).toBe(1);
+  });
   it('fits 365 small mood stickers on one annual page and uses compact columns for summaries', async () => {
     const source = { ...data, dailyReviews: Array.from({ length: 365 }, (_, index) => ({ id: `mood-${index}`, date: shiftJournalDate('2026-01-01', index), createdAt: 0, updatedAt: 0, answers: [], moodEmoji: 'image:test', summary: index < 16 ? `第${index + 1}天的小事：记住走在路上的轻松和傍晚的晚风。` : undefined })) };
     const w = await make('a5', { startDate: '2026-01-01', endDate: '2026-12-31', sections: ['yearly'] }, source);
@@ -80,13 +155,13 @@ describe('PDF pagination with bundled Chinese font', () => {
     w.startPage = (...args) => { headings.push(args[0]); start(...args); };
     w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
     await composeJournalPdf(w);
-    expect(headings.filter((title) => title === '时间轴 · 周概览')).toHaveLength(1);
+    expect(headings.filter((title) => title === '时间轴 周概览')).toHaveLength(1);
     for (const date of ['2026-08-31', '2026-09-01', '2026-09-02']) expect(headings.filter((title) => title.startsWith(date))).toHaveLength(1);
     expect(headings.indexOf('2026-08 月计划')).toBeLessThan(headings.findIndex((title) => title.startsWith('2026-08-31')));
     expect(headings.findIndex((title) => title.startsWith('2026-08-31'))).toBeLessThan(headings.indexOf('2026-09 月计划'));
     expect(headings.indexOf('2026-09 月计划')).toBeLessThan(headings.findIndex((title) => title.startsWith('2026-09-01')));
     expect(calls).toContain('跨月日志正文');
-    expect(calls).toContain('时间线 · 日志');
+    expect(calls).toContain('时间线 日志');
     expect(calls).not.toContain('今日打卡');
     expect(calls).not.toContain('今日一句');
   });
@@ -115,7 +190,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     const text = w.text.bind(w); const calls: string[] = [];
     w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
     await composeJournalPdf(w);
-    expect(calls).toContain('月度回顾 · 续');
+    expect(calls).toContain('Monthly Review');
     const joined = calls.join('');
     for (let i = 1; i <= 80; i++) expect(joined.split(`第${i}条回顾`).length - 1).toBe(1);
   });
@@ -185,12 +260,12 @@ describe('PDF pagination with bundled Chinese font', () => {
     const seen: { chapter: string; text: string }[] = [];
     const original = w.text.bind(w);
     w.text = (value, x, y, size, color, role) => {
-      if (value === '时间轴 · 周概览' || value === '时间线 · 日志') chapter = value;
+      if (value === 'Weekly Timeline' || value === '时间线 日志') chapter = value;
       seen.push({ chapter, text: value }); original(value, x, y, size, color, role);
     };
     await composeJournalPdf(w);
-    expect(seen.some((entry) => entry.chapter === '时间轴 · 周概览' && entry.text === '24:00')).toBe(true);
-    expect(seen.find((entry) => entry.text === '完整正文只属于日志')?.chapter).toBe('时间线 · 日志');
+    expect(seen.some((entry) => entry.chapter === 'Weekly Timeline' && entry.text === '24:00')).toBe(true);
+    expect(seen.find((entry) => entry.text === '完整正文只属于日志')?.chapter).toBe('时间线 日志');
   });
   it('honors selected chapters and cancellation, and creates a usable empty book', async () => {
     const w = await make('a4');

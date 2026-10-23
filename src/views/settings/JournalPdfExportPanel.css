@@ -1,0 +1,40 @@
+/**
+ * @file JournalPdfExportPanel.css
+ * @input Official Radix scales and the export panel's semantic controls
+ * @output Flat accessible light/dark controls with 12/14/18px type and half-pixel borders
+ * @updated 2026-10-23: Removes decorative cards, shadows, motion and redundant eyebrow labels.
+ */
+@import '@radix-ui/colors/sage.css';
+@import '@radix-ui/colors/sage-dark.css';
+@import '@radix-ui/colors/jade.css';
+@import '@radix-ui/colors/jade-dark.css';
+@import '@radix-ui/colors/red.css';
+@import '@radix-ui/colors/red-dark.css';
+
+.journal-export { padding: 24px; background: var(--sage-1); color: var(--sage-12); border-top: 0.5px solid var(--sage-6); font-size: 14px; line-height: 1.5; }
+.journal-export h3 { margin: 0 0 24px; font-size: 18px; font-weight: 500; }
+.journal-export fieldset { display: grid; gap: 20px; min-width: 0; }
+.journal-export fieldset:disabled { opacity: 0.6; }
+.journal-export-dates, .journal-export-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.journal-export-dates label { min-width: 0; color: var(--sage-11); font-size: 12px; }
+.journal-export input[type='text'], .journal-export select { min-width: 0; border: 0.5px solid var(--sage-7); border-radius: 4px; color: var(--sage-12); background: var(--sage-2); font-size: 14px; padding: 9px 12px; }
+.journal-export input[type='text'] { display: block; width: 100%; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.journal-export input::placeholder { color: var(--sage-11); }
+.journal-export input:focus-visible, .journal-export select:focus-visible, .journal-export button:focus-visible { outline: 0.5px solid var(--jade-8); outline-offset: 3px; }
+.journal-export button { border: 0; border-radius: 4px; font-size: 12px; padding: 6px 10px; color: var(--sage-12); background: transparent; cursor: pointer; }
+.journal-export button:hover { background: var(--sage-3); }
+.journal-export-shortcuts { display: flex; flex-wrap: wrap; gap: 4px; margin-inline: -10px; }
+.journal-export-section-title, .journal-export-paper { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 0.5px solid var(--sage-6); padding-bottom: 10px; }
+.journal-export-section-title { margin-bottom: 12px; color: var(--sage-11); font-size: 12px; }
+.journal-export-options label { display: flex; align-items: center; gap: 9px; min-height: 28px; cursor: pointer; }
+.journal-export input[type='checkbox'] { appearance: none; display: inline-grid; place-content: center; flex: 0 0 14px; width: 14px; height: 14px; margin: 0; border: 0.5px solid var(--sage-7); border-radius: 2px; background: var(--sage-2); }
+.journal-export input[type='checkbox']:checked { background: var(--jade-9); border-color: var(--jade-9); }
+.journal-export input[type='checkbox']:checked::after { content: ''; display: block; width: 4px; height: 7px; margin-top: -2px; border-right: 0.5px solid var(--sage-1); border-bottom: 0.5px solid var(--sage-1); transform: rotate(45deg); }
+.journal-export-error, .journal-export-progress { margin-top: 16px; font-size: 12px; }
+.journal-export-error { color: var(--red-11); }
+.journal-export-progress { color: var(--sage-11); }
+.journal-export-actions { display: flex; gap: 12px; margin-top: 24px; }
+.journal-export-actions button { flex: 1; padding: 11px 14px; font-size: 14px; background: var(--sage-3); }
+.journal-export-actions button:first-child { background: var(--jade-9); color: var(--jade-1); }
+.journal-export-actions button:first-child:hover { background: var(--jade-10); }
+.journal-export button:disabled { opacity: 0.5; cursor: default; }

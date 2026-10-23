@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-23: `JournalPdfExportPanel.css` uses semantic Radix light/dark scales, flat controls, 0.5px borders and only 12/14/18px text. Decorative cards, motion, duplicate descriptions and middle-dot separators are omitted.
+
 Update 2026-10-23: Journal export offers eight independent sections. 周计划 contains task lists, 时间轴 is the weekly colored calendar overview, and 日志 contains full chronological records and notes. The latter two are selected separately.
 
 Update 2026-10-23: Journal PDF dates use eight-digit numeric text fields with 今天/本周/上周/本月/上月/本年/去年/全部 shortcuts. Current periods include their complete calendar interval. Handwriting stays fixed to WenKai for this version; no custom-font picker is introduced yet.

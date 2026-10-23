@@ -8,20 +8,23 @@
  * @updated 2026-10-23: Uses full month color blocks and separates weekly timeline grids from detailed logs.
  * @updated 2026-10-23: Supports mixed page orientation, facing-page parity, column flow and sticker images.
  * @updated 2026-10-23: Keeps the entire A4 book landscape, including all continuations and contents.
+ * @updated 2026-10-23: Adds compact balanced columns, standalone covers and centered numeric check cells.
+ * @updated 2026-10-23: Keeps four readable print tiers and styled inline nodes, plus measured rich-content column flow.
  */
-import { PDFDocument, PDFFont, PDFImage, PDFPage, rgb } from 'pdf-lib';
-import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, type JournalDay, type JournalModel } from '../utils/journalExport';
+import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString } from 'pdf-lib';
+import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
 import { parseDateKey } from '../utils/todoScheduleUtils';
+import { JOURNAL_STROKE } from '../utils/journalTheme';
+import { JOURNAL_COLORS as C } from './journalPdfTheme';
+import { writeJournalLogDetails } from './journalPdfLogDetails';
+import { journalPageTitle } from '../utils/journalTitles';
+import { journalNoteRuns, wrapJournalNoteRuns, type JournalNoteRun } from '../utils/journalLogContent';
 
 
 export const JOURNAL_FONT_FAMILY = 'LumosJournal';
 // Noto's contextual digit alternates lack Unicode mappings in fontkit's PDF output.
 export const JOURNAL_PRINT_FEATURES = { pnum: false, tnum: false, liga: false, clig: false, locl: false, ccmp: false };
-const INK = rgb(0.19, 0.21, 0.19);
-const MUTED = rgb(0.46, 0.48, 0.45);
-const LINE = rgb(0.84, 0.85, 0.81);
-const ACCENT = rgb(0.31, 0.43, 0.36);
-const PALE = rgb(0.96, 0.97, 0.94);
+const { ink: INK, muted: MUTED, line: LINE, accent: ACCENT, fill: PALE } = C;
 const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
 const segmenter = new Intl.Segmenter('zh', { granularity: 'grapheme' });
 export const journalGraphemes = (value: string): string[] => Array.from(segmenter.segment(value), (entry) => entry.segment);
@@ -45,14 +48,17 @@ export class JournalPdfWriter {
   readonly printedFont: PDFFont;
   private printedCharacters: Set<number>;
   private printedNotes = new Set<string>();
+  private printedLogDetails = new Set<string>();
   private blankPages = new Set<PDFPage>();
-  private columns: { index: number; count: number; top: number; width: number; gap: number } | undefined;
+  private coverPages = new Set<PDFPage>();
+  private columns: { index: number; count: number; top: number; width: number; gap: number; bottom: number } | undefined;
   readonly stickers = new Map<string, PDFImage>();
+  readonly photos = new Map<string, PDFImage>();
 
   constructor(readonly pdf: PDFDocument, readonly font: PDFFont, readonly model: JournalModel, readonly symbols: JournalSymbols = new Map(), printedFont?: PDFFont) {
     [this.width, this.height] = model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.pageMargin = model.options.paperSize === 'a5' ? 28 : 40;
-    this.bodySize = model.options.paperSize === 'a5' ? 9 : 10;
+    this.bodySize = 9;
     this.characters = new Set(font.getCharacterSet());
     this.printedFont = printedFont || font;
     this.printedCharacters = new Set(this.printedFont.getCharacterSet());
@@ -60,14 +66,23 @@ export class JournalPdfWriter {
 
   get margin(): number { return this.pageMargin + (this.columns ? this.columns.index * (this.columns.width + this.columns.gap) : 0); }
   get contentWidth(): number { return this.columns?.width ?? this.width - this.pageMargin * 2; }
-  get bottom(): number { return this.height - this.pageMargin - 22; }
+  get pageBottom(): number { return this.height - this.pageMargin - 22; }
+  get bottom(): number { return this.columns?.bottom ?? this.pageBottom; }
+  get compact(): boolean { return Boolean(this.columns); }
   get pageCount(): number { return this.pdf.getPageCount(); }
+  get standardBodyTop(): number { return this.pageMargin + 64; }
+
+  private printSize(size: number): number {
+    if (size === 1) return 1; // Unit-size measurement for fitting a value without changing its font tier.
+    return size >= 48 ? 64 : size >= 18 ? 24 : size >= 11.5 ? 12 : 9;
+  }
 
   private fontFor(glyph: string, role: JournalTextRole): PDFFont {
     return role === 'print' && Array.from(glyph).every((char) => this.printedCharacters.has(char.codePointAt(0)!)) ? this.printedFont : this.font;
   }
 
   widthOf(value: string, size = this.bodySize, role: JournalTextRole = 'print'): number {
+    size = this.printSize(size);
     const key = `${role}:${size}:${value}`;
     const cached = this.widths.get(key);
     if (cached !== undefined) return cached;
@@ -85,6 +100,7 @@ export class JournalPdfWriter {
   }
 
   text(value: string, x: number, top: number, size = this.bodySize, color = INK, role: JournalTextRole = 'print'): void {
+    size = this.printSize(size);
     value = value.replace(/[\u0000-\u001f\u007f]/g, ' ');
     let cursor = x;
     // Group normal glyphs to keep vector text searchable; only unsupported symbols use small images.
@@ -112,7 +128,7 @@ export class JournalPdfWriter {
   }
 
   line(x: number, top: number, width: number, color = LINE): void {
-    this.page.drawLine({ start: { x, y: this.height - top }, end: { x: x + width, y: this.height - top }, color, thickness: 0.55 });
+    this.page.drawLine({ start: { x, y: this.height - top }, end: { x: x + width, y: this.height - top }, color, thickness: JOURNAL_STROKE });
   }
 
   rect(x: number, top: number, width: number, height: number, fill = PALE): void {
@@ -120,13 +136,19 @@ export class JournalPdfWriter {
   }
 
   verticalLine(x: number, top: number, height: number, color = LINE): void {
-    this.page.drawLine({ start: { x, y: this.height - top }, end: { x, y: this.height - top - height }, color, thickness: 0.4 });
+    this.page.drawLine({ start: { x, y: this.height - top }, end: { x, y: this.height - top - height }, color, thickness: JOURNAL_STROKE });
   }
 
   noteOnce(key: string, content: string | undefined, indent = 0): void {
     if (!content?.trim() || this.printedNotes.has(key)) return;
     this.printedNotes.add(key);
     this.paragraph(content, this.bodySize, INK, indent, 'hand');
+  }
+
+  claimLogDetails(id: string): boolean {
+    if (this.printedLogDetails.has(id)) return false;
+    this.printedLogDetails.add(id);
+    return true;
   }
 
   fitted(value: string, width: number, size: number, role: JournalTextRole = 'print'): string {
@@ -140,22 +162,34 @@ export class JournalPdfWriter {
     return result + '…';
   }
 
-  startPage(title: string, subtitle = '', continued = false): void {
+  private addPage(): void {
     if (this.pageCount >= 1000) throw new Error('手账超过 1000 页，请缩小日期范围或减少章节');
-    if (!continued) { this.title = title; this.subtitle = subtitle; this.continuation = 0; }
-    else this.continuation++;
     this.columns = undefined;
     [this.width, this.height] = this.model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.page = this.pdf.addPage([this.width, this.height]);
-    this.rect(this.width - this.margin - 34, this.margin - 10, 34, 3, ACCENT);
-    this.text('LUMOSTIME   /   JOURNAL', this.margin, this.margin - 8, 7, MUTED);
-    this.text(title + (continued ? ` · 续 ${this.continuation}` : ''), this.margin, this.margin + 18, 21, INK);
-    if (subtitle) this.text(subtitle, this.margin, this.margin + 50, 8, MUTED);
-    this.line(this.margin, this.margin + 71, this.contentWidth);
-    this.y = this.margin + 86;
+  }
+
+  startCoverPage(): void {
+    this.addPage();
+    this.coverPages.add(this.page);
+    this.y = this.pageMargin;
+  }
+
+  startPage(title: string, subtitle = '', continued = false): void {
+    if (!continued) { this.title = title; this.subtitle = subtitle; this.continuation = 0; }
+    else this.continuation++;
+    this.addPage();
+    const lines = this.wrap(journalPageTitle(title), this.contentWidth, 24, 'print');
+    lines.forEach((line, index) => this.text(line, this.margin, this.margin + index * 29, 24, INK));
+    let top = this.margin + lines.length * 29;
+    const context = subtitle + (continued ? `${subtitle ? ' / ' : ''}Continued ${this.continuation}` : '');
+    if (context) { this.text(context, this.margin, top + 2, 9, MUTED); top += 18; }
+    this.line(this.margin, top + 5, this.contentWidth);
+    this.y = top + 16;
   }
 
   ensure(height: number): boolean {
+    if (this.columns && height > this.columns.bottom - this.columns.top) this.columns.bottom = Math.min(this.pageBottom, this.columns.top + height);
     if (this.y + height <= this.bottom) return false;
     if (this.columns) {
       const columns = this.columns;
@@ -168,8 +202,8 @@ export class JournalPdfWriter {
     return true;
   }
 
-  beginColumns(count = 2): void {
-    this.columns = { index: 0, count, top: this.y, width: (this.width - this.pageMargin * 2 - 24 * (count - 1)) / count, gap: 24 };
+  beginColumns(count = 2, height?: number): void {
+    this.columns = { index: 0, count, top: this.y, width: (this.width - this.pageMargin * 2 - 24 * (count - 1)) / count, gap: 24, bottom: Math.min(this.pageBottom, this.y + Math.max(100, height ?? this.pageBottom)) };
   }
 
   resetFlow(): void { this.columns = undefined; }
@@ -202,6 +236,7 @@ export class JournalPdfWriter {
   }
 
   wrap(value: string, width = this.contentWidth, size = this.bodySize, role: JournalTextRole = 'hand'): string[] {
+    size = this.printSize(size);
     const lines: string[] = [];
     for (const paragraph of value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n')) {
       let line = '';
@@ -225,28 +260,57 @@ export class JournalPdfWriter {
   }
 
   paragraph(value: string, size = this.bodySize, color = INK, indent = 0, role: JournalTextRole = 'hand'): void {
-    const leading = size * (role === 'hand' ? 1.85 : 1.65);
+    size = this.printSize(size);
+    const leading = size * (this.compact ? role === 'hand' ? 1.5 : 1.35 : role === 'hand' ? 1.85 : 1.65);
+    const runs = role === 'hand' ? journalNoteRuns(value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ')) : [];
+    if (runs.some((run) => run.node)) {
+      for (const line of wrapJournalNoteRuns(runs, this.contentWidth - indent, (text) => this.widthOf(text, size, role))) {
+        this.ensure(leading);
+        let x = this.margin + indent;
+        const fragments: JournalNoteRun[] = [];
+        for (const token of line) {
+          const last = fragments[fragments.length - 1];
+          if (last && last.node === token.node) last.text += token.text;
+          else fragments.push({ ...token });
+        }
+        for (const fragment of fragments) {
+          const width = this.widthOf(fragment.text, size, role);
+          if (fragment.node) {
+            this.rect(x, this.y + 1, width, size + 2, C.fill);
+            this.line(x, this.y + size + 2, width, C.accent);
+            this.page.node.addAnnot(this.pdf.context.register(this.pdf.context.obj({
+              Type: 'Annot', Subtype: 'Link', Rect: [x, this.height - this.y - size - 2, x + width, this.height - this.y], Border: [0, 0, 0], Contents: PDFHexString.fromText(fragment.node)
+            })));
+          }
+          this.text(fragment.text, x, this.y, size, fragment.node ? C.accent : color, role);
+          x += width;
+        }
+        this.y += leading;
+      }
+      this.y += this.compact ? 3 : 5;
+      return;
+    }
     for (const line of this.wrap(value, this.contentWidth - indent, size, role)) {
       this.ensure(leading);
       this.text(line, this.margin + indent, this.y, size, color, role);
       this.y += leading;
     }
-    this.y += 5;
+    this.y += this.compact ? 3 : 5;
   }
 
   heading(value: string): void {
-    this.ensure(45);
-    this.y += 9;
-    this.paragraph(value, 10, ACCENT, 0, 'print');
+    this.ensure(this.compact ? 32 : 45);
+    this.y += this.compact ? 5 : 9;
+    this.paragraph(value, 12, ACCENT, 0, 'print');
   }
 
-  rule(): void { this.ensure(12); this.line(this.margin, this.y + 2, this.contentWidth); this.y += 13; }
+  rule(): void { this.ensure(this.compact ? 8 : 12); this.line(this.margin, this.y + 2, this.contentWidth); this.y += this.compact ? 8 : 13; }
 
   writingSpace(): void {
     if (this.bottom - this.y < 65) return;
     this.y += 14;
     while (this.y + 18 <= this.bottom) {
-      this.line(this.margin, this.y + 12, this.contentWidth, rgb(0.92, 0.93, 0.9));
+      this.line(this.margin, this.y + 12, this.contentWidth, LINE);
       this.y += 19;
     }
   }
@@ -255,13 +319,13 @@ export class JournalPdfWriter {
     const pages = this.pdf.getPages();
     this.columns = undefined;
     pages.forEach((page, index) => {
-      if (this.blankPages.has(page)) return;
+      if (this.blankPages.has(page) || this.coverPages.has(page)) return;
       this.page = page;
       this.width = page.getWidth(); this.height = page.getHeight();
       this.line(this.margin, this.height - this.margin - 10, this.contentWidth);
-      this.text(`${this.model.options.startDate} — ${this.model.options.endDate}`, this.margin, this.height - this.margin, 7, MUTED);
+      this.text(`${this.model.options.startDate} — ${this.model.options.endDate}`, this.margin, this.height - this.margin, 9, MUTED);
       const number = `${index + 1} / ${pages.length}`;
-      this.text(number, this.width - this.margin - this.widthOf(number, 7), this.height - this.margin, 7, MUTED);
+      this.text(number, this.width - this.margin - this.widthOf(number, 9), this.height - this.margin, 9, MUTED);
     });
   }
 }
@@ -270,13 +334,14 @@ export const dateLabel = (key: string): string => `${key}  周${weekdays[parseDa
 export const rangeLabel = (days: JournalDay[]): string => `${days[0].date} — ${days[days.length - 1].date}`;
 export const stats = (days: JournalDay[]): string => `${formatJournalDuration(days.reduce((sum, day) => sum + day.actualSeconds, 0))}  /  ${new Set(days.flatMap((day) => day.logs.filter((log) => !log.source.isPlanned).map((log) => log.source.id))).size} 段记录`;
 
-export const writePlans = (w: JournalPdfWriter, day: JournalDay, notes = false): void => {
+export const writePlans = (w: JournalPdfWriter, day: JournalDay, notes = false, details = false): void => {
   getJournalDayPlans(day).forEach((entry) => {
-    w.ensure(55);
+    w.ensure(w.compact ? 40 : 55);
     w.text(entry.completed ? '[x]' : '[ ]', w.margin, w.y + 1, 8, ACCENT);
     w.paragraph(entry.title, w.bodySize + 1, INK, 18);
-    w.paragraph(`${entry.label}${entry.completed ? ' · 已完成' : ''}${entry.times.length ? `  ${entry.times.join(' / ')}` : ''}`, 7, MUTED, 18, 'print');
+    w.paragraph(`${entry.label}${entry.completed ? ' 已完成' : ''}${entry.times.length ? `  ${entry.times.join(' / ')}` : ''}`, 7, MUTED, 18, 'print');
     if (notes) entry.notes.forEach((note) => w.noteOnce(note.key, note.text, 18));
+    if (details) entry.logs.forEach((log) => writeJournalLogDetails(w, log));
   });
 };
 
@@ -285,59 +350,17 @@ export const writeLogs = (w: JournalPdfWriter, day: JournalDay, notes = true): v
     w.ensure(45);
     const page = w.page;
     const top = w.y;
+    const left = w.margin;
     w.page.drawCircle({ x: w.margin + 3, y: w.height - top - 4, size: 2, color: ACCENT });
-    w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)} · ${formatJournalDuration(log.seconds)}`, 8, ACCENT, 12, 'print');
+    w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)} ${formatJournalDuration(log.seconds)}`, 8, ACCENT, 12, 'print');
     w.paragraph(log.source.title || log.activity, w.bodySize + 1, INK, 12);
-    w.paragraph(`${log.category} / ${log.activity}${log.source.focusScore ? ` · 专注 ${log.source.focusScore}/5` : ''}${log.source.moodScore ? ` · 心情 ${log.source.moodScore}/5` : ''}`, 7, MUTED, 12, 'print');
-    if (notes) w.noteOnce(`log:${log.source.id}`, log.source.note, 12);
-    if (w.page === page) w.verticalLine(w.margin + 3, top + 8, Math.max(0, w.y - top - 12));
+    w.paragraph(`${log.category} / ${log.activity}`, 9, MUTED, 12, 'hand');
+    if (notes) writeJournalLogDetails(w, log);
+    if (w.page === page && w.margin === left) w.verticalLine(left + 3, top + 8, Math.max(0, w.y - top - 12));
     w.rule();
   });
 };
 
-export const writeCheckMatrix = (w: JournalPdfWriter, month: string, days: JournalDay[]): void => {
-  const items = new Map<string, string>();
-  const keyOf = (item: JournalDay['checks'][number]) => `${item.category || ''}\u0000${item.id || item.content}`;
-  days.forEach((day) => day.checks.forEach((item) => items.set(keyOf(item), `${item.category ? `${item.category} / ` : ''}${item.content}`)));
-  if (!items.size) { w.paragraph('暂无打卡记录', w.bodySize, MUTED); return; }
-  const count = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
-  const labelWidth = w.contentWidth * 0.32;
-  const cell = (w.contentWidth - labelWidth) / count;
-  const header = () => {
-    w.ensure(48);
-    w.text('项目 / 日期', w.margin, w.y, 8, MUTED);
-    for (let i = 1; i <= count; i++) w.text(String(i), w.margin + labelWidth + (i - 1) * cell, w.y, 6, MUTED);
-    w.y += 22;
-  };
-  w.paragraph('实心：完成    空心：未完成    短线：无记录    灰底：范围外', 7, MUTED, 0, 'print');
-  header();
-  for (const [key, label] of items) {
-    const lines = w.wrap(label, labelWidth - 12, 8);
-    // Extremely long item names use a full-width legend and a compact numbered row.
-    const short = lines.length > 6;
-    if (short) w.paragraph(label, 8);
-    const labelLines = short ? [`项目 ${Array.from(items.keys()).indexOf(key) + 1}`] : lines;
-    const rowHeight = Math.max(26, labelLines.length * 13 + 10);
-    if (w.ensure(rowHeight + 8)) header();
-    labelLines.forEach((line, i) => w.text(line, w.margin, w.y + 6 + i * 13, 8, INK, 'hand'));
-    for (let number = 1; number <= count; number++) {
-      const date = `${month}-${String(number).padStart(2, '0')}`;
-      const day = days.find((entry) => entry.date === date);
-      const item = day?.checks.find((entry) => keyOf(entry) === key);
-      const x = w.margin + labelWidth + (number - 1) * cell;
-      if (!day) w.rect(x - 1, w.y, cell, rowHeight, PALE);
-      else if (!item) w.line(x + 1, w.y + 12, Math.max(2, cell - 4));
-      else {
-        w.page.drawCircle({ x: x + cell / 2 - 1, y: w.height - w.y - 12, size: Math.min(2.6, cell / 3), color: item.isCompleted ? ACCENT : undefined, borderColor: ACCENT, borderWidth: 0.6 });
-      }
-    }
-    w.y += rowHeight;
-    w.rule();
-  }
-  // Counts and automatic-check details are kept as text so the matrix does not squeeze numbers into tiny cells.
-  const counted = days.filter((day) => day.checks.some((item) => item.manualMode === 'count'));
-  if (counted.length) w.heading('计数明细');
-  counted.forEach((day) => day.checks.filter((item) => item.manualMode === 'count').forEach((item) => w.paragraph(`${day.date} · ${item.content}  ${journalCheckValue(item)}`, 8)));
-};
+export { writeJournalCheckMatrix as writeCheckMatrix } from './journalPdfChecks';
 
 export { composeJournalBook as composeJournalPdf } from './journalPdfBook';

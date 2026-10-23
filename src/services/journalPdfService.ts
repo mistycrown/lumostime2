@@ -6,6 +6,7 @@
  * @updated 2026-10-23: Embeds the complete TrueType font because fontkit subsets omit WenKai glyph outlines.
  * @updated 2026-10-23: Embeds separate Noto Sans printed labels and WenKai handwritten content.
  * @updated 2026-10-23: Snapshots application calendar colors and embeds original daily sticker assets.
+ * @updated 2026-10-23: Loads original Log photos and custom reactions without silently dropping missing assets.
  */
 import { PDFDocument } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
@@ -15,6 +16,8 @@ import { buildJournalModel, type JournalExportData, type JournalExportOptions } 
 import { composeJournalPdf, JOURNAL_FONT_FAMILY, JOURNAL_PRINT_FEATURES, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
 import { getResolvedTodoScheduleTypeColors, todoScheduleColorService } from './todoScheduleColorService';
 import { embedJournalStickers } from './journalPdfStickers';
+import { embedJournalPhotos } from './journalPdfPhotos';
+import { JOURNAL_HEX } from '../utils/journalTheme';
 
 export type { JournalPdfProgress } from './journalPdfLayout';
 const fontBytes = new Map<string, Promise<ArrayBuffer>>();
@@ -84,7 +87,7 @@ export const createJournalPdf = async (
         canvas.height = 96;
         context.font = `64px "${JOURNAL_FONT_FAMILY}", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
         context.textBaseline = 'alphabetic';
-        context.fillStyle = '#303630';
+        context.fillStyle = JOURNAL_HEX.ink;
         context.fillText(glyph, 0, 70);
         symbols.set(glyph, { image: await pdf.embedPng(canvas.toDataURL('image/png')), width: width / 64 });
       }
@@ -96,10 +99,17 @@ export const createJournalPdf = async (
   pdf.setAuthor('LumosTime');
   pdf.setSubject('个人时间手账');
   const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont);
-  if (options.sections.includes('yearly') || options.sections.includes('daily')) {
+  const logDetails = options.sections.includes('daily') || options.sections.includes('logs');
+  if (options.sections.includes('yearly') || logDetails) {
     onProgress?.({ message: '正在加载每日贴纸', pages: 0 });
-    const stickers = await embedJournalStickers(pdf, model.days.flatMap((day) => day.review?.moodEmoji ? [day.review.moodEmoji] : []), signal);
+    const icons = model.days.flatMap((day) => [day.review?.moodEmoji || '', ...(logDetails ? day.logs.flatMap((log) => log.source.reactions || []) : [])]);
+    const stickers = await embedJournalStickers(pdf, icons, signal);
     stickers.forEach((image, key) => writer.stickers.set(key, image));
+  }
+  if (logDetails) {
+    onProgress?.({ message: '正在加载日志图片', pages: 0 });
+    const photos = await embedJournalPhotos(pdf, model.days.flatMap((day) => day.logs.flatMap((log) => log.source.images || [])), signal);
+    photos.forEach((image, key) => writer.photos.set(key, image));
   }
   await composeJournalPdf(writer, onProgress, signal);
   const output = await pdf.save();

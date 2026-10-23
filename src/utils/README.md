@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-23: `journalStatistics.ts` aggregates six actual-time dimensions while preserving IDs and deduplicating scope attribution. `journalLogContent.ts` resolves all stored attribute values (including archived/deleted choices), scores, progress and workflow answers, and parses inline note-node aliases without creating relation sections. `journalTitles.ts` translates major PDF headings only. `journalTheme.ts` supplies official Radix tokens, four print tiers and half-pixel print rules.
+
 Update 2026-10-23: Journal sections distinguish `timeline` (weekly time-block calendar) and `logs` (full text). `journalTimelineLayout.ts` maps clipped records to local clock minutes and stable overlap-cluster lanes, preserving adjacent intervals at full width and midnight at 24:00.
 
 Update 2026-10-23: Journal export accepts strict eight-digit input and complete current/previous calendar periods (Monday–Sunday, first–last day of month, January–December). Invalid edits never fall back to a stale range. `getJournalDayPlans` merges linked time plans with task occurrences for calendar cells and agenda details.

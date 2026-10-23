@@ -7,6 +7,8 @@
  * @updated 2026-10-23: Strictly parses eight-digit entry and uses full current/previous calendar periods.
  * @updated 2026-10-23: Adds separate log/timeline chapters and retains activity colors for weekly blocks.
  * @updated 2026-10-23: Projects goal progress and shared calendar colors for nested book layouts.
+ * @updated 2026-10-23: Snapshots keyword, scope and todo identities for six actual-time distributions.
+ * @updated 2026-10-23: Resolves historical Log fields and retains planned record metadata alongside deduplicated task plans.
  */
 import type { Category, CheckItem, DailyReview, Goal, Log, MajorGoal, MonthlyReview, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
@@ -16,6 +18,9 @@ import { calculateGoalProgress } from './goalUtils';
 import { calculateMajorGoalProgress } from './majorGoalUtils';
 import { getColorHexForCharts } from './colorAdapterUtils';
 import { DEFAULT_TODO_SCHEDULE_TYPE_COLORS, type TodoScheduleTypeColorKey } from '../services/todoScheduleColorService';
+import { getLogMatchedDetailTimelineKeywords, syncActivityKeywordsWithAttribute } from './detailTimelineKeywordUtils';
+import { getNormalizedScopeIds } from './scopeStatsUtils';
+import { journalLogFields, type JournalField } from './journalLogContent';
 
 export const JOURNAL_SECTIONS = [
   { id: 'yearly', label: '年度回顾与目标' },
@@ -57,7 +62,13 @@ export interface JournalLog {
   activity: string;
   category: string;
   color?: string;
+  categoryColor?: string;
+  keywords?: JournalStatLabel[];
+  scopes?: JournalStatLabel[];
+  todo?: JournalStatLabel & { categoryId: string; category: string; categoryColor?: string };
+  fields?: JournalField[];
 }
+export interface JournalStatLabel { id: string; name: string; color?: string }
 export interface JournalDay {
   date: string;
   logs: JournalLog[];
@@ -160,6 +171,7 @@ export interface JournalCalendarEntry {
   colorKey: string;
   color?: string;
   notes: { key: string; text: string }[];
+  logs: JournalLog[];
 }
 
 export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
@@ -171,16 +183,18 @@ export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
     completed: journalTodoStatus(entry) === '已完成',
     colorKey: entry.todo.categoryId,
     color: undefined as string | undefined,
-    notes: entry.todo.note ? [{ key: `todo:${entry.todo.id}`, text: entry.todo.note }] : []
+    notes: entry.todo.note ? [{ key: `todo:${entry.todo.id}`, text: entry.todo.note }] : [],
+    logs: [] as JournalLog[]
   }));
   day.logs.filter((log) => log.source.isPlanned).forEach((log) => {
     const linked = entries.find((entry) => entry.key === `todo:${log.source.linkedTodoId}`);
     const time = `${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)}`;
     if (linked) {
+      linked.logs.push(log);
       linked.color = log.color;
       if (!linked.times.includes(time)) linked.times.push(time);
       if (log.source.note && !linked.notes.some((note) => note.text === log.source.note)) linked.notes.push({ key: `log:${log.source.id}`, text: log.source.note });
-    } else entries.push({ key: `log:${log.source.id}`, title: log.source.title || log.activity, label: '计划', times: [time], completed: false, colorKey: log.category, color: log.color, notes: log.source.note ? [{ key: `log:${log.source.id}`, text: log.source.note }] : [] });
+    } else entries.push({ key: `log:${log.source.id}`, title: log.source.title || log.activity, label: '计划', times: [time], completed: false, colorKey: log.category, color: log.color, notes: log.source.note ? [{ key: `log:${log.source.id}`, text: log.source.note }] : [], logs: [log] });
   });
   return entries;
 };
@@ -217,17 +231,31 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
   const rangeStart = parseDateKey(options.startDate)!.getTime();
   const rangeEnd = parseDateKey(shiftJournalDate(options.endDate, 1))!.getTime();
   const activities = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, { activity: activity.name, category: category.name, color: getColorHexForCharts(activity.color || category.themeColor || '') }] as const)));
+  const activityDefinitions = new Map(data.categories.flatMap((category) => category.activities.map((activity) => [activity.id, activity] as const)));
+  const categoryMap = new Map(data.categories.map((category) => [category.id, category]));
+  const scopeMap = new Map(data.scopes.map((scope) => [scope.id, scope]));
+  const todoMap = new Map(data.todos.map((todo) => [todo.id, todo]));
+  const todoCategoryMap = new Map(data.todoCategories.map((category) => [category.id, category]));
   // Project each intersecting log only onto touched days; elapsed proportions retain recorded durations.
   data.logs.forEach((log) => {
     if (!Number.isFinite(log.startTime) || !Number.isFinite(log.endTime) || log.endTime <= log.startTime) return;
     let start = Math.max(log.startTime, rangeStart);
     const end = Math.min(log.endTime, rangeEnd);
+    if (start >= end) return;
     const names = activities.get(log.activityId);
+    const activity = activityDefinitions.get(log.activityId);
+    const keywordRecords = syncActivityKeywordsWithAttribute(activity?.keywords || [], activity?.attributes || [], () => '#7c9686');
+    const attribute = activity?.attributes?.find((item) => item.isKeywordSource && !item.isArchived && (item.type === 'single' || item.type === 'multi'));
+    const keywords = getLogMatchedDetailTimelineKeywords(log, keywordRecords, attribute).map((name) => ({ id: `${log.activityId}:${name}`, name, color: keywordRecords.find((item) => item.label === name)?.color }));
+    const scopes = getNormalizedScopeIds(log.scopeIds).map((id) => ({ id, name: scopeMap.get(id)?.name || '已删除领域', color: getColorHexForCharts(scopeMap.get(id)?.themeColor || '') }));
+    const todoItem = log.linkedTodoId ? todoMap.get(log.linkedTodoId) : undefined;
+    const todoCategory = todoItem ? todoCategoryMap.get(todoItem.categoryId) : undefined;
+    const todo = log.linkedTodoId ? { id: log.linkedTodoId, name: todoItem?.title || '已删除待办', categoryId: todoItem?.categoryId || '__missing__', category: todoCategory?.name || '未分类待办', color: getColorHexForCharts(todoCategory?.color || '') } : undefined;
     while (start < end) {
       const key = formatDateKey(new Date(start));
       const next = Math.min(end, parseDateKey(shiftJournalDate(key, 1))!.getTime());
       const seconds = Math.max(0, Number.isFinite(log.duration) ? log.duration : (log.endTime - log.startTime) / 1000) * (next - start) / (log.endTime - log.startTime);
-      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类', color: names?.color });
+      byDate.get(key)?.logs.push({ source: log, start, end: next, seconds, activity: names?.activity || '未分类活动', category: names?.category || '未分类', color: names?.color, categoryColor: getColorHexForCharts(categoryMap.get(log.categoryId)?.themeColor || ''), keywords, scopes, todo, fields: journalLogFields(log, activity) });
       start = next;
     }
   });

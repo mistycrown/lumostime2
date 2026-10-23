@@ -6,46 +6,37 @@
  * @updated 2026-10-23: Adds goal progress, summary stickers, two-column agendas and monthly statistics.
  * @updated 2026-10-23: Uses a compact annual mood matrix and small multi-column summary stickers.
  * @updated 2026-10-23: Sizes contents capacity from the printable height of the selected paper.
+ * @updated 2026-10-23: Uses editorial covers, multi-column body pages and six donut distributions.
  */
-import { rgb } from 'pdf-lib';
+import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { Goal, MajorGoal } from '../types';
 import { formatGoalValue } from '../utils/goalUtils';
-import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, shiftJournalDate, type JournalDay } from '../utils/journalExport';
-import { dateLabel, rangeLabel, stats, writeCheckMatrix, writeLogs, writePlans, type JournalPdfProgress, type JournalPdfWriter } from './journalPdfLayout';
+import { getJournalDayPlans, shiftJournalDate, type JournalDay } from '../utils/journalExport';
+import { dateLabel, rangeLabel, stats, writeCheckMatrix, writePlans, type JournalPdfProgress, type JournalPdfWriter } from './journalPdfLayout';
 import { journalReviewLines, writeJournalCalendar, type JournalReview } from './journalPdfOverview';
-import { journalBlockColor, writeWeeklyTimeline } from './journalPdfTimeline';
+import { writeWeeklyTimeline } from './journalPdfTimeline';
 import { writeAnnualMood } from './journalPdfMood';
+import { writeJournalCover } from './journalPdfCover';
+import { writeJournalDistributions } from './journalPdfStatistics';
+import { writeJournalDay } from './journalPdfDay';
 
-const MUTED = rgb(0.46, 0.48, 0.45);
-const ACCENT = rgb(0.31, 0.43, 0.36);
+const MUTED = C.muted;
+const ACCENT = C.accent;
 const hasReview = (review?: JournalReview): boolean => journalReviewLines(review).length > 0;
 const writeReview = (w: JournalPdfWriter, review: JournalReview, omitSummary = false) => {
+  if (w.model.options.paperSize === 'a4' && !w.compact) w.beginColumns(3);
   journalReviewLines(omitSummary ? { ...review, summary: undefined } : review).forEach((line) => {
     if (line.role === 'print') w.heading(line.text);
     else w.paragraph(line.text);
   });
 };
 
-const writeSummary = (w: JournalPdfWriter, day: JournalDay, dated: boolean): void => {
-  const review = day.review;
-  if (!review?.summary?.trim() && !review?.moodEmoji) return;
-  w.ensure(dated ? 95 : 70);
-  if (dated) w.heading(day.date);
-  const icon = review.moodEmoji;
-  if (icon) w.sticker(icon, w.margin, w.y, 28);
-  const indent = icon ? 38 : 0;
-  const top = w.y;
-  const page = w.page;
-  if (review.summary) w.paragraph(review.summary, w.bodySize + 1, undefined, indent);
-  if (page === w.page) w.y = Math.max(w.y, top + (icon ? 34 : 0));
-  w.rule();
-};
-
 const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[], includeReviews: boolean): void => {
   const model = w.model;
   w.startPage(`${year} 年度回顾`, rangeLabel(days));
   w.paragraph(stats(days), 12, ACCENT, 0, 'print');
-  w.paragraph(`${days.filter((day) => day.actualSeconds > 0).length} 个记录日 · ${days.reduce((sum, day) => sum + day.checks.filter((item) => item.isCompleted).length, 0)} 项日课完成`, 9, MUTED, 0, 'print');
+  w.paragraph(`${days.filter((day) => day.actualSeconds > 0).length} 个记录日 ${days.reduce((sum, day) => sum + day.checks.filter((item) => item.isCompleted).length, 0)} 项日课完成`, 9, MUTED, 0, 'print');
+  if (model.options.paperSize === 'a4') w.beginColumns(3);
   for (const month of model.months.filter((key) => key.startsWith(String(year)))) {
     const monthDays = days.filter((day) => day.date.startsWith(month));
     w.heading(`${Number(month.slice(5))} 月`);
@@ -57,17 +48,18 @@ const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[], includ
   const goals = model.goals.filter((goal) => goal.startDate <= `${year}-12-31` && goal.endDate >= `${year}-01-01`);
   if (goals.length) {
     w.startPage(`${year} 目标与子目标`, `进度截至 ${model.options.endDate}`);
+    if (model.options.paperSize === 'a4') w.beginColumns(3);
     const writeGoal = (goal: Goal | MajorGoal, child = false) => {
       w.ensure(85);
       w.heading(child ? '子目标' : '目标');
       w.paragraph(goal.title, w.bodySize + 2);
       const state = goal.status === 'completed' ? '已完成' : goal.status === 'archived' ? '已归档' : goal.status === 'failed' ? '未达成' : '进行中';
-      w.paragraph(`${goal.startDate} — ${goal.endDate} · ${state}`, 8, MUTED, 0, 'print');
+      w.paragraph(`${goal.startDate} — ${goal.endDate} ${state}`, 8, MUTED, 0, 'print');
       const progress = model.goalProgress[goal.id];
       if (progress) {
         w.ensure(38);
-        w.paragraph(`${formatGoalValue(progress.current, goal.metric)} / ${formatGoalValue(progress.target, goal.metric)} · ${progress.percentage.toFixed(0)}%`, 9, ACCENT, 0, 'print');
-        w.rect(w.margin, w.y, w.contentWidth, 3, rgb(0.92, 0.93, 0.9));
+        w.paragraph(`${formatGoalValue(progress.current, goal.metric)} / ${formatGoalValue(progress.target, goal.metric)} ${progress.percentage.toFixed(0)}%`, 9, ACCENT, 0, 'print');
+        w.rect(w.margin, w.y, w.contentWidth, 3, C.fill);
         w.rect(w.margin, w.y, w.contentWidth * Math.max(0, Math.min(1, progress.percentage / 100)), 3, ACCENT);
         w.y += 12;
       }
@@ -84,25 +76,6 @@ const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[], includ
   writeAnnualMood(w, year, days);
 };
 
-const writeDistribution = (w: JournalPdfWriter, month: string, days: JournalDay[]): void => {
-  const totals = new Map<string, { seconds: number; color?: string }>();
-  days.forEach((day) => day.logs.filter((log) => !log.source.isPlanned).forEach((log) => {
-    const value = totals.get(log.activity) || { seconds: 0, color: log.color };
-    value.seconds += log.seconds; totals.set(log.activity, value);
-  }));
-  if (!totals.size) return;
-  w.startPage(`${month} 时间分布`, `${rangeLabel(days)} · ${stats(days)}`);
-  const total = Array.from(totals.values()).reduce((sum, item) => sum + item.seconds, 0);
-  for (const [name, item] of Array.from(totals).sort((a, b) => b[1].seconds - a[1].seconds)) {
-    w.ensure(65);
-    w.paragraph(name, w.bodySize + 1);
-    w.paragraph(`${formatJournalDuration(item.seconds)} · ${(item.seconds / total * 100).toFixed(1)}%`, 8, MUTED, 0, 'print');
-    w.rect(w.margin, w.y, w.contentWidth, 5, rgb(0.95, 0.96, 0.94));
-    w.rect(w.margin, w.y, w.contentWidth * item.seconds / total, 5, journalBlockColor(name, item.color, 0.4));
-    w.y += 19;
-  }
-};
-
 export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (progress: JournalPdfProgress) => void, signal?: AbortSignal): Promise<void> => {
   const check = async (message: string) => {
     signal?.throwIfAborted();
@@ -114,21 +87,14 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
   const selected = new Set(model.options.sections);
   const reviews = selected.has('reviews');
   const contents: { label: string; page: number }[] = [];
-  if (model.options.includeCover) {
-    w.startPage('我的生活手账', rangeLabel(model.days));
-    w.y = w.height * 0.34;
-    w.paragraph('把日子，留在纸上。', 24, ACCENT, 0, 'print');
-    w.y += 25;
-    w.paragraph(`${model.days.length} 天`, 18, undefined, 0, 'print');
-    w.paragraph(stats(model.days), 10, MUTED, 0, 'print');
-  }
+  if (model.options.includeCover) writeJournalCover(w);
   // Reserve enough contents pages before composing so facing-page parity never shifts afterwards.
   const hasMonthlyContent = model.options.sections.some((section) => section !== 'yearly');
   const labels = model.years.flatMap((year) => [ ...(selected.has('yearly') ? [`${year} 年度回顾与目标`] : []), ...(hasMonthlyContent ? model.months.filter((month) => month.startsWith(String(year))).map((month) => `${month} 月 / 周 / 日`) : []) ]);
-  const rowsPerPage = Math.floor((w.bottom - w.pageMargin - 86) / 38);
+  const rowsPerPage = Math.floor((w.pageBottom - w.standardBodyTop) / 38);
   const contentsPages = Array.from({ length: Math.max(1, Math.ceil(labels.length / rowsPerPage)) }, () => {
     w.startPage('目录', rangeLabel(model.days));
-    return w.page;
+    return { page: w.page, top: w.y };
   });
   const seenWeeks = new Set<string>();
   for (const year of model.years) {
@@ -150,7 +116,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
         const planned = days.filter((day) => getJournalDayPlans(day).length);
         if (planned.length) {
           w.startPage(`${month} 日程明细`, rangeLabel(days));
-          w.beginColumns();
+          w.beginColumns(model.options.paperSize === 'a4' ? 3 : 2);
           planned.forEach((day) => { w.heading(dateLabel(day.date)); writePlans(w, day, true); });
         }
       } else if (hasReview(monthReview)) {
@@ -161,7 +127,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
         w.startPage(`${month} 月打卡`, rangeLabel(days));
         writeCheckMatrix(w, month, days);
       }
-      if (selected.has('monthly') || selected.has('checks')) writeDistribution(w, month, days);
+      if (selected.has('monthly') || selected.has('checks')) writeJournalDistributions(w, month, days);
       for (const week of model.weeks.filter((start) => days.some((day) => day.date >= start && day.date <= shiftJournalDate(start, 6)))) {
         const weekDays = model.days.filter((day) => day.date >= week && day.date <= shiftJournalDate(week, 6));
         const monthWeekDays = days.filter((day) => weekDays.includes(day));
@@ -176,7 +142,8 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
         }
         seenWeeks.add(week);
         if (selected.has('weekly') && monthWeekDays.some((day) => getJournalDayPlans(day).length)) {
-          w.startPage(`周计划${first ? '' : ' · 跨月续'}`, rangeLabel(monthWeekDays));
+          w.startPage(`周计划${first ? '' : ' 跨月续'}`, rangeLabel(monthWeekDays));
+          w.beginColumns(model.options.paperSize === 'a4' ? 3 : 2);
           monthWeekDays.forEach((day) => {
             if (!getJournalDayPlans(day).length) return;
             w.heading(dateLabel(day.date)); writePlans(w, day, !selected.has('monthly') && !selected.has('daily'));
@@ -188,25 +155,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
           const review = reviews && hasReview(day.review);
           if (!detail && !logs && !review) continue;
           await check('正在排版每日详情');
-          w.startPage(dateLabel(day.date), `${detail ? '一日一页' : logs ? '日志' : '日复盘'} · ${formatJournalDuration(day.actualSeconds)}`);
-          if (detail && getJournalDayPlans(day).length) { w.heading('今日计划'); writePlans(w, day, !selected.has('monthly')); }
-          if ((detail || logs) && day.logs.some((log) => !log.source.isPlanned)) { w.heading('时间线 · 日志'); writeLogs(w, day, true); }
-          if (logs && !detail) {
-            const planned = day.logs.filter((log) => log.source.isPlanned);
-            if (planned.length) w.heading('计划时间');
-            planned.forEach((log) => {
-              w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)}`, 8, ACCENT, 0, 'print');
-              w.paragraph(log.source.title || log.activity);
-              if (!selected.has('monthly') && !selected.has('weekly') && !detail) w.noteOnce(`log:${log.source.id}`, log.source.note);
-            });
-          }
-          if (detail && day.checks.length) {
-            w.heading('今日打卡');
-            day.checks.forEach((item) => w.paragraph(`${item.isCompleted ? '[x]' : '[ ]'} ${item.content}  ${journalCheckValue(item)}`));
-          }
-          if (detail && (day.review?.summary?.trim() || day.review?.moodEmoji)) { w.heading('每日一句话'); writeSummary(w, day, false); }
-          if (review) { w.heading('日复盘'); writeReview(w, day.review!, detail); }
-          if (detail) w.writingSpace();
+          writeJournalDay(w, day, selected);
         }
       }
       if (!selected.has('monthly') && w.pageCount > before) contents.push({ label: `${month} 月 / 周 / 日`, page: w.nextContentPage(before) });
@@ -217,11 +166,11 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
     w.paragraph('所选范围暂无记录', 10, MUTED, 0, 'print');
     contents.push({ label: '手账', page: w.pageCount });
   }
-  contentsPages.forEach((page, index) => {
+  contentsPages.forEach(({ page, top }, index) => {
     w.page = page; w.width = page.getWidth(); w.height = page.getHeight();
     // startPage resets two-column text flow; all reserved contents pages use the normal page geometry.
     w.resetFlow();
-    w.y = w.pageMargin + 86;
+    w.y = top;
     contents.slice(index * rowsPerPage, (index + 1) * rowsPerPage).forEach((entry) => {
       w.text(entry.label, w.margin, w.y, 12);
       const number = String(entry.page).padStart(2, '0');
