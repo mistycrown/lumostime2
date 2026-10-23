@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-23: Persists per-card daily duration labels in calendar heatmaps.
  * @updated 2026-10-18: Stores task abandonment as a timestamp mutually exclusive with completion.
  * @updated 2026-10-18: Adds an optional principle group scope for random scene cards.
  * @updated 2026-10-18: Adds opt-in system calendar synchronization for individual todo reminders.
@@ -152,6 +153,7 @@ export interface ActivityStatisticCard {
   range: ActivityStatisticRange;
   metric: ActivityStatisticMetric;
   timelineStyle?: ActivityTimelineStyle;
+  showCalendarValues?: boolean;
   wordCloudSettings?: WordCloudSettings;
   order: number;
 }

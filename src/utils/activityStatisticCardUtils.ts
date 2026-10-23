@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.ts
+ * @updated 2026-10-23: Preserves boolean calendar-duration display preferences across saved cards.
  * @updated 2026-10-09: Preserves and sanitizes per-card word cloud settings through normalization.
  * @updated 2026-10-06: Shares chart-specific ranges and supports record-duration cards.
  * @input Activity attribute definitions and persisted statistic card settings.
@@ -124,6 +125,7 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     range,
     metric: normalizedMetric,
     ...(timelineStyle ? { timelineStyle } : {}),
+    ...(typeof item.showCalendarValues === 'boolean' ? { showCalendarValues: item.showCalendarValues } : {}),
     ...(item.wordCloudSettings ? { wordCloudSettings: normalizeWordCloudSettings(item.wordCloudSettings) } : {}),
     order: Number.isFinite(item.order) ? Number(item.order) : index
   };

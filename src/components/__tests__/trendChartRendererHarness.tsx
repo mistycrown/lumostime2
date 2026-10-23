@@ -1,5 +1,6 @@
 /**
  * @file trendChartRendererHarness.tsx
+ * @updated 2026-10-23: Verifies calendar display modes, independent persistence and below-cell labels.
  * @input Shared custom statistics, synthetic duration/numeric records and native touch input.
  * @output Browser regression checks for date selection, responsive layout and range updates.
  * @pos Test (Custom Statistics Renderer)
@@ -103,6 +104,55 @@ async function run() {
   check(status().includes('7 kg'), 'Stale selection must fall back after range replacement');
   renderNumeric([]); await delay(); check(!slider(), 'Empty data should not render an invalid slider');
   passed.push('numeric units, negative/zero values, single/empty series and data replacement');
+
+  const year = new Date().getFullYear();
+  const januaryFirst = `${year}-01-01`;
+  const calendarLogs = Array.from({ length: new Date().getMonth() + 1 }, (_, month) => {
+    const startTime = new Date(year, month, 1, 9).getTime();
+    return { ...log(0, 5400, `month-${month}`), startTime, endTime: startTime + 5400000 };
+  });
+  calendarLogs.push({ ...calendarLogs[0], id: 'extra-january', duration: 900 });
+  const longDayStart = new Date(year, 0, 2, 8).getTime();
+  calendarLogs.push({ ...calendarLogs[0], id: 'long-day', startTime: longDayStart, endTime: longDayStart + 38700000, duration: 38700 });
+  for (const source of ['categoryDuration', 'tagDuration', 'recordDuration'] as const) {
+    let saved: Activity = {
+      id: `calendar-${source}`, name: '阅读', icon: 'Book', color: '#52796f', attributes: [],
+      statisticCards: ['first', 'second'].map((id, order) => ({ id, source: { type: source }, chartType: 'numberCalendar', range: 'year', metric: 'value', order }))
+    };
+    const renderCalendar = () => root.render(<ActivityAttributeStatistics key={saved.id} activity={saved} logs={calendarLogs} allowedSourceTypes={[source]} onChange={next => { saved = next; }} />);
+    const groups = () => [...host.querySelectorAll('[aria-label="日历显示模式"]')];
+    const mode = async (index: number, label: string) => {
+      const button = [...groups()[index].querySelectorAll('button')].find(item => item.textContent === label)!;
+      button.click(); await delay();
+      check(button.getAttribute('aria-pressed') === 'true', `Mode ${label} should be selected`);
+    };
+    renderCalendar(); await delay(); await delay();
+    check(groups().length === 2, 'Each duration calendar needs its own mode switch');
+    check(!host.querySelector('[data-calendar-duration]'), 'Legacy cards should default to color-only mode');
+    await mode(0, '时长');
+    const firstSection = groups()[0].closest('section')!;
+    const januaryCell = firstSection.querySelector(`[data-calendar-date="${januaryFirst}"]`)!;
+    const label = januaryCell.querySelector<HTMLElement>('[data-calendar-duration]')!;
+    check(label.textContent === '1:45', 'Daily calendar labels should sum records with minute precision');
+    const swatch = januaryCell.firstElementChild!;
+    check(label.getBoundingClientRect().top >= swatch.getBoundingClientRect().bottom, 'Duration label must sit below its color cell');
+    check(!groups()[1].closest('section')!.querySelector('[data-calendar-duration]'), 'Mode switches must not affect sibling cards');
+    check(saved.statisticCards![0].showCalendarValues === true, 'Display preference must reach persistence callback');
+    await mode(0, '色块');
+    check(!host.querySelector('[data-calendar-duration]'), 'Color mode should remove labels');
+    await mode(0, '时长');
+    root.render(null); await delay(); renderCalendar(); await delay(); await delay();
+    check(host.querySelector('[data-calendar-duration]'), 'Persisted duration mode should survive remount');
+    check(document.documentElement.scrollWidth <= window.innerWidth, 'Calendar captions must not cause horizontal overflow');
+    if (source === 'categoryDuration') {
+      await capture('calendar-values-mobile');
+      await capture('calendar-values-narrow');
+      check([...host.querySelectorAll<HTMLElement>('[data-calendar-duration]')].every(item => item.scrollWidth <= item.clientWidth), 'Narrow calendars should keep full duration labels visible');
+    }
+    passed.push(`${source}: calendar modes, totals, independent preferences and persistence`);
+  }
+
+  await capture('calendar-values-desktop');
 
   renderNumeric(Array.from({ length: 30 }, (_, index) => ({ key: dateKey(day(index - 29)), value: (index % 6) * 12 })));
   await delay();

@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.test.ts
+ * @updated 2026-10-23: Verifies calendar display mode persistence and malformed preference handling.
  * @updated 2026-10-09: Covers per-cloud word settings round-trips and legacy configurations.
  * @updated 2026-10-06: Covers persisted all-time capability rules and record-duration sources.
  * @input Activity statistic card configurations.
@@ -20,6 +21,12 @@ const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
 });
 
 describe('activity statistic cards', () => {
+  it('round-trips calendar label preferences and ignores non-boolean values', () => {
+    const card: ActivityStatisticCard = { id: 'calendar', source: { type: 'categoryDuration' }, chartType: 'numberCalendar', range: 'year', metric: 'count', showCalendarValues: true, order: 0 };
+    expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify([card]))))[0].showCalendarValues).toBe(true);
+    expect(normalizeStatisticCards(activity([{ ...card, showCalendarValues: false }]))[0].showCalendarValues).toBe(false);
+    expect(normalizeStatisticCards(activity([{ ...card, showCalendarValues: 'true' } as unknown as ActivityStatisticCard]))[0].showCalendarValues).toBeUndefined();
+  });
   it('preserves independently saved word rules for attribute and note clouds', () => {
     const cards: ActivityStatisticCard[] = [
       { id: 'text', source: { type: 'attribute', attributeId: 'memo' }, chartType: 'textCloud', range: 'all', metric: 'count', order: 0,

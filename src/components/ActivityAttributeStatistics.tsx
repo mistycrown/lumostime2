@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-23: Adds a persisted color/duration switch and compact daily labels below calendar heatmap cells.
  * @updated 2026-10-23: Shares interactive daily trends across custom category, tag, scope and numeric cards; includes the complete selected range.
  * @updated 2026-10-10: Protects node names and aliases alongside manual dictionary words.
  * @updated 2026-10-09: Reactively protects personal words in every text cloud.
@@ -99,6 +100,17 @@ export const formatHoursMinutes = (seconds: number) => {
   return `${hours}h ${minutes}m`;
 };
 
+/** Compact daily duration for narrow calendar columns; h:mm retains minute precision. */
+export const formatCalendarDuration = (seconds: number) => {
+  if (seconds <= 0) return '—';
+  if (seconds < 60) return '<1m';
+  const totalMinutes = Math.floor(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}:${String(minutes).padStart(2, '0')}`;
+};
+
 const getLocalDateKey = (timestamp: number) => {
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -175,6 +187,8 @@ interface ActivityAttributeStatisticsProps {
   title?: string;
   wordCloudSettings?: WordCloudSettings;
   wordCloudSettingsAction?: React.ReactNode;
+  showCalendarValues?: boolean;
+  onCalendarValuesChange?: (show: boolean) => void;
 }
 
 interface TrendPoint {
@@ -229,7 +243,7 @@ const AttributeSection: React.FC<{
   </section>
 );
 
-const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false, wordCloudSettings, wordCloudSettingsAction }) => {
+const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsProps> = ({ activity, logs, hideToolbar = false, fixedMode, chartVariant, rangeLabel, paletteId, fixedRange, hideSectionBorder = false, wordCloudSettings, wordCloudSettingsAction, showCalendarValues = false, onCalendarValuesChange }) => {
   const personalWords = useTextDictionary();
   const [selectedRange, setSelectedRange] = useState<RangeKey>('30d');
   const range = fixedRange || selectedRange;
@@ -393,6 +407,24 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                 }));
                 const calendarMax = Math.max(...dailyValues.values(), 1);
                 const calendarMonths = [...new Set(calendarDays.map((day) => day.slice(0, 7)))];
+                const showDurationLabels = showCalendarValues && isDurationNumber;
+                const monthColumns = range === 'month' ? 'grid-cols-1'
+                  : showDurationLabels ? 'grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
+                const calendarValuesAction = isDurationNumber && onCalendarValuesChange && range !== '7d' ? (
+                  <div role="group" aria-label="日历显示模式" className="inline-flex items-center gap-0.5 rounded-full border border-stone-200 p-0.5">
+                    {[{ label: '色块', show: false }, { label: '时长', show: true }].map(option => (
+                      <button
+                        key={option.label}
+                        type="button"
+                        aria-pressed={showCalendarValues === option.show}
+                        title={option.show ? '显示每日时长（小时:分钟）' : '仅显示色块'}
+                        onClick={() => onCalendarValuesChange(option.show)}
+                        className={`rounded-full px-2 py-1 text-[10px] transition-colors ${showCalendarValues === option.show ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
+                      >{option.label}</button>
+                    ))}
+                  </div>
+                ) : undefined;
                 if (range === '7d') {
                   const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
                   return (
@@ -413,16 +445,33 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   );
                 }
                 return (
-                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`} headerAction={calendarValuesAction}>
                     <div className="mt-5 py-1">
-                      <div className={`grid gap-x-3 gap-y-3 ${range === 'month' ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'}`}>
+                      <div className={`grid gap-x-3 gap-y-3 ${monthColumns}`}>
                         {calendarMonths.map((monthKey) => {
                           const [year, month] = monthKey.split('-').map(Number);
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
                           const daysInMonth = new Date(year, month, 0).getDate();
                           const cellCount = Math.ceil((leadingBlanks + daysInMonth) / 7) * 7;
                           const monthColor = chartPalette.colors[calendarMonths.indexOf(monthKey) % chartPalette.colors.length] || statisticAccent;
-                          return <div key={monthKey}><div className="mb-1 text-[10px] text-stone-500">{month} 月</div><div className={range === 'month' ? 'grid grid-cols-[repeat(14,minmax(0,1fr))] gap-1' : 'grid grid-cols-7 gap-0.5'}>{Array.from({ length: range === 'month' ? daysInMonth : cellCount }, (_, cellIndex) => { const dayOfMonth = range === 'month' ? cellIndex + 1 : cellIndex - leadingBlanks + 1; if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />; const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`; const value = dailyValues.get(day) || 0; const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false; return <span key={day} aria-label={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`} className="flex aspect-square items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }} title={`${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit || ''}`}>{showDayMarker ? dayOfMonth : null}</span>; })}</div></div>;
+                          return <div key={monthKey}>
+                            <div className="mb-1 text-[10px] text-stone-500">{month} 月</div>
+                            <div className={`grid ${range === 'month' ? `${showDurationLabels ? 'grid-cols-7 sm:grid-cols-[repeat(14,minmax(0,1fr))]' : 'grid-cols-[repeat(14,minmax(0,1fr))]'} gap-x-1` : 'grid-cols-7 gap-x-0.5'} ${showDurationLabels ? 'gap-y-1.5' : range === 'month' ? 'gap-y-1' : 'gap-y-0.5'}`}>
+                              {Array.from({ length: range === 'month' ? daysInMonth : cellCount }, (_, cellIndex) => {
+                                const dayOfMonth = range === 'month' ? cellIndex + 1 : cellIndex - leadingBlanks + 1;
+                                if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />;
+                                const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`;
+                                const value = dailyValues.get(day) || 0;
+                                const compactValue = formatCalendarDuration(value);
+                                const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false;
+                                const valueLabel = `${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`;
+                                return <span key={day} aria-label={valueLabel} title={valueLabel} className="flex min-w-0 flex-col" data-calendar-date={day}>
+                                  <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }}>{showDayMarker ? dayOfMonth : null}</span>
+                                  {showDurationLabels && <span className={`mt-0.5 truncate text-center font-mono leading-tight tracking-[-0.04em] tabular-nums ${compactValue.length > 4 ? 'text-[7px]' : 'text-[8px]'} sm:text-[8px] ${value > 0 ? 'text-stone-600' : 'text-stone-300'}`} data-calendar-duration="" aria-hidden="true">{compactValue}</span>}
+                                </span>;
+                              })}
+                            </div>
+                          </div>;
                         })}
                       </div>
                     </div>
@@ -1036,7 +1085,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         return <section key={card.id} className="py-7 first:pt-2"><div className="mb-3 flex items-center justify-between gap-3"><div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{getStatisticCardLabel(card, attributes)}</h2><div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">TIME RHYTHM / {card.timelineStyle === 'histogram' ? '24 HOUR BARS' : '12 PETALS'}</div></div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span></div><PetalTimelineChart logs={logs} range={rhythmRange} palette={chartPalette} timelineStyle={card.timelineStyle || 'petal'} /></section>;
       }
        const tagLogs = createTagDurationLogs(cardLogs, durationAttribute.id);
-       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar hideSectionBorder chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} onChange={undefined} /></section>;
+       return <section key={card.id} className="py-7 first:pt-2"><LegacyActivityAttributeStatistics activity={{ ...activity, attributes: [durationAttribute] }} logs={tagLogs} hideToolbar hideSectionBorder chartVariant={card.chartType} rangeLabel={rangeLabel} fixedRange={card.range} paletteId={paletteId} wordCloudSettings={card.wordCloudSettings} showCalendarValues={card.showCalendarValues} onCalendarValuesChange={show => updateCard(card.id, { showCalendarValues: show })} onChange={undefined} /></section>;
     }
     if (card.source.type === 'note') {
       const noteAttribute: ActivityAttributeDefinition = { id: '__note__', name: '备注', type: 'text', order: 0, createdAt: 0, updatedAt: 0 };

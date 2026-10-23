@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.test.tsx
+ * @updated 2026-10-23: Covers minute-precise compact daily calendar duration labels.
  * @updated 2026-10-06: Verifies all-time rhythm includes historical records and matches heatmap allocation.
  * @input Text attribute values.
  * @output Regression coverage for text-term extraction used by attribute statistics.
@@ -7,7 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '../types';
-import { filterLogsForAttribute, filterLogsByRange, formatHoursMinutes, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
+import { filterLogsForAttribute, filterLogsByRange, formatCalendarDuration, formatHoursMinutes, getCalendarDaysForRange, getCardAttributeStatisticSlices, getDateKeysForRange, getTextTerms } from './ActivityAttributeStatistics';
 import { aggregateHourBuckets } from './stats/PetalTimelineChart';
 import { aggregateWeekHourDurations } from '../utils/hourlyDurationUtils';
 import { getChartTypesForSource, normalizeStatisticCards } from '../utils/activityStatisticCardUtils';
@@ -43,6 +44,17 @@ describe('formatHoursMinutes', () => {
     expect(formatHoursMinutes(24 * 60)).toBe('24m');
     expect(formatHoursMinutes(5 * 60 * 60)).toBe('5h');
     expect(formatHoursMinutes(31 * 60 * 60 + 47 * 60)).toBe('31h 47m');
+  });
+});
+
+describe('formatCalendarDuration', () => {
+  it('keeps daily labels compact without rounding away minutes', () => {
+    expect(formatCalendarDuration(0)).toBe('—');
+    expect(formatCalendarDuration(30)).toBe('<1m');
+    expect(formatCalendarDuration(45 * 60)).toBe('45m');
+    expect(formatCalendarDuration(2 * 3600)).toBe('2h');
+    expect(formatCalendarDuration(3600 + 5 * 60)).toBe('1:05');
+    expect(formatCalendarDuration(24 * 3600 + 59 * 60)).toBe('24:59');
   });
 });
 

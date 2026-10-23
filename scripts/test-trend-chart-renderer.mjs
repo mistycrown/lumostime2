@@ -1,5 +1,6 @@
 /**
  * @file test-trend-chart-renderer.mjs
+ * @updated 2026-10-23: Captures calendar-duration modes alongside interactive trend checks.
  * @input Custom-statistics renderer fixture and built application CSS.
  * @output Native tap regression checks and mobile/desktop screenshots.
  * @pos Test Runner
@@ -53,6 +54,8 @@ app.whenReady().then(async () => {
     const capture = await win.webContents.executeJavaScript('window.__trendCapture');
     if (capture) {
       if (capture.endsWith('-desktop')) win.setSize(1100, 900);
+      if (capture.endsWith('-mobile')) win.setSize(390, 844);
+      if (capture.endsWith('-narrow')) win.setSize(320, 844);
       await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
       win.webContents.invalidate();
       await new Promise(resolve => setTimeout(resolve, 100));
