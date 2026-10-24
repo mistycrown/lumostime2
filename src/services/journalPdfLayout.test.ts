@@ -9,6 +9,7 @@
  * @updated 2026-10-23: Checks A4/A5 integrated statistics, original colors, twelve-month calendars and guidance hierarchy.
  * @updated 2026-10-24: Keeps template questions and answers separate from AI narrative in daily layouts, including single-source days.
  * @updated 2026-10-24: Saves and reopens books with over 1000 daily pages and verifies A5 spreads beyond that boundary.
+ * @updated 2026-10-24: Verifies styled Markdown and long lists stay searchable and within A4/A5 column bounds.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -25,6 +26,7 @@ import { journalDemoData } from '../../scripts/fixtures/journal-demo';
 import { writeWeeklyTimeline } from './journalPdfTimeline';
 import { writeJournalCalendar } from './journalPdfOverview';
 import type { DailyReview } from '../types';
+import { writeJournalMarkdown } from './journalPdfMarkdown';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -36,6 +38,34 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it.each(['a4', 'a5'] as const)('renders searchable styled Markdown inside %s columns and across pages', async (paper) => {
+    const w = await make(paper);
+    w.startPage('叙事'); w.beginColumns(paper === 'a4' ? 3 : 2);
+    const calls: { value: string; size: number; bold?: boolean; italic?: boolean }[] = [];
+    const text = w.text.bind(w); let checks = 0; const checkbox = w.checkbox.bind(w);
+    w.text = (value, x, top, size = 9, color, role, style) => {
+      expect(x).toBeGreaterThanOrEqual(w.margin - 0.1);
+      expect(x + w.widthOf(value, size, role)).toBeLessThanOrEqual(w.margin + w.contentWidth + 0.1);
+      calls.push({ value, size, ...style }); text(value, x, top, size, color, role, style);
+    };
+    w.checkbox = (...args) => { checks++; checkbox(...args); };
+    const source = '# 一级标题\n\n## 二级标题\n\n### 三级标题\n\n正文 **加粗内容**和*斜体内容*。\n\n- 普通列表\n  - 嵌套列表\n\n4. 有序列表\n\n- [x] 已做\n- [ ] 未做\n\n> 引用内容\n\n[文档](https://example.com)\n\n```txt\n代码内容\n```\n\n' + Array.from({ length: 130 }, (_, index) => `- 第${index}段 **完整保留**：这是需要自动换行并跨栏跨页的叙事内容。`).join('\n');
+    writeJournalMarkdown(w, source);
+    expect(calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: '一级标题', size: 12, bold: true }),
+      expect.objectContaining({ value: '三级标题', size: 9, bold: true }),
+      expect.objectContaining({ value: '加粗内容', bold: true }),
+      expect.objectContaining({ value: '斜体内容', italic: true }),
+      expect.objectContaining({ value: '4.' })
+    ]));
+    expect(calls.some((call) => /\*\*|^#{1,6} |\[x\]|\[ \]/.test(call.value))).toBe(false);
+    expect(calls.map((call) => call.value).join('')).toContain('第129段 完整保留');
+    expect(checks).toBe(2);
+    expect(w.pageCount).toBeGreaterThan(1);
+    expect(w.pdf.getPages().some((page) => page.node.Annots()?.size())).toBe(true);
+    w.finish();
+    expect((await PDFDocument.load(await w.pdf.save())).getPageCount()).toBe(w.pageCount);
+  });
   it('exports and reopens a complete 1100-day journal without truncating at 1000 pages', async () => {
     const startDate = '2023-01-01';
     const endDate = shiftJournalDate(startDate, 1099);

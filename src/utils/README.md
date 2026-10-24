@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-24: `journalMarkdown.ts` parses narrative CommonMark/GFM through the same remark stack as the reading view. It keeps heading/list/quote structure and inline styles, resolves reference links, and wraps styled Chinese/emoji graphemes without dropping content.
+
 Update 2026-10-23: Journal projection includes direct Collection memberships and review templates, preserves user-saved colors and inherits activity colors for uncolored legacy keywords. Template-only colors remain Radix. No synthetic color palette is generated during export.
 
 Update 2026-10-24: `journalStatistics.ts` aggregates actual time into nested category/activity and todo-category/task groups plus scopes, preserving source IDs and deduplicating multi-scope attribution. Keyword statistics are excluded. `todoScheduleLabels.ts` shares the application's month-detail badge definitions with PDF agendas. `journalLogContent.ts` resolves all stored attributes, scores, progress and workflow answers and parses inline note-node aliases. `journalTitles.ts` handles year, month and date-prefixed English headings. Template rules remain half-pixel; compact weekly block labels use 7.5pt.

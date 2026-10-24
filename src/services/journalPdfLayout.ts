@@ -14,8 +14,9 @@
  * @updated 2026-10-24: Keeps accents local to each export and falls back for missing selected-font glyphs.
  * @updated 2026-10-24: Reuses application text badges, places per-Log reactions inline and continues rails through every column/page.
  * @updated 2026-10-24: Removes the arbitrary 1000-page cutoff for content and A5 spread alignment pages.
+ * @updated 2026-10-24: Adds single-pass searchable bold/italic text without changing the selected fonts.
  */
-import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString } from 'pdf-lib';
+import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString, degrees, pushGraphicsState, popGraphicsState, setLineWidth, setTextRenderingMode, TextRenderingMode, setStrokingRgbColor } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 import { JOURNAL_STROKE } from '../utils/journalTheme';
@@ -37,6 +38,7 @@ export const journalGraphemes = (value: string): string[] => Array.from(segmente
 export interface JournalSymbol { image: PDFImage; width: number }
 export type JournalSymbols = Map<string, JournalSymbol>;
 export type JournalTextRole = 'print' | 'hand';
+export interface JournalTextStyle { bold?: boolean; italic?: boolean }
 export interface JournalPdfProgress { message: string; pages: number }
 
 export class JournalPdfWriter {
@@ -118,7 +120,7 @@ export class JournalPdfWriter {
     return width;
   }
 
-  text(value: string, x: number, top: number, size = this.bodySize, color = INK, role: JournalTextRole = 'print'): void {
+  text(value: string, x: number, top: number, size = this.bodySize, color = INK, role: JournalTextRole = 'print', style: JournalTextStyle = {}): void {
     if (color === C.accent) color = this.accentColor;
     size = this.printSize(size);
     value = value.replace(/[\u0000-\u001f\u007f]/g, ' ');
@@ -128,7 +130,9 @@ export class JournalPdfWriter {
     let runFont = role === 'print' ? this.printedFont : this.font;
     const flush = () => {
       if (!run) return;
-      this.page.drawText(run, { x: cursor, y: this.height - top - size, size, font: runFont, color });
+      if (style.bold) this.page.pushOperators(pushGraphicsState(), setTextRenderingMode(TextRenderingMode.FillAndOutline), setLineWidth(size * 0.025), setStrokingRgbColor(color.red, color.green, color.blue));
+      this.page.drawText(run, { x: cursor, y: this.height - top - size, size, font: runFont, color, ySkew: degrees(style.italic ? 12 : 0) });
+      if (style.bold) this.page.pushOperators(popGraphicsState());
       cursor += this.widthOf(run, size, role);
       run = '';
     };

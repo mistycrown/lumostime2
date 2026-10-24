@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-24: Daily AI narrative Markdown uses the application's remark/GFM parser and a measured PDF renderer. Six heading levels, bold/italic/strikethrough, nested ordered/unordered/task lists, quotes, code and links retain their structure across columns/pages. Wide tables become readable labeled field rows. Selected fonts remain in use and text stays searchable.
+
 Update 2026-10-24: Journal content and A5 alignment pages no longer have an arbitrary 1000-page cutoff. Regression tests save and reopen a complete 1100-day book and verify month/week facing-page alignment beyond page 1000.
 
 Update 2026-10-24: Daily PDF pages render template groups, questions and user answers under `引导`, and AI narrative/newspaper content under a separate peer `叙事` heading. Empty headings are omitted; narrative-only dates remain included. Manual one-line summaries stay under `总结`.

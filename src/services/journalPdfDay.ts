@@ -8,12 +8,14 @@
  * @updated 2026-10-23: Uses Routine/Summary labels and 24/12/9pt guidance headings for section, group and question.
  * @updated 2026-10-24: Aligns checkboxes with their item text, removes duplicate completion words and reduces guidance headings.
  * @updated 2026-10-24: Renders template questions/answers under guidance and AI content under a separate peer narrative heading.
+ * @updated 2026-10-24: Measures and renders narrative Markdown with styled blocks and inline emphasis.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, journalHasPart, type JournalDay, type JournalSection } from '../utils/journalExport';
 import { dateLabel, writeLogs, writePlans, type JournalPdfWriter } from './journalPdfLayout';
 import { journalReviewLines } from './journalPdfOverview';
 import { writeJournalLogDetails, writeJournalLogTitle } from './journalPdfLogDetails';
+import { estimateJournalMarkdown, writeJournalMarkdown } from './journalPdfMarkdown';
 
 const MUTED = C.muted;
 const ACCENT = C.accent;
@@ -47,7 +49,8 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
   });
   if (has('dayChecks') && day.checks.length) estimate += 25 + day.checks.reduce((sum, item) => sum + paraHeight(item.content + ' ' + journalCheckValue(item)), 0);
   if (includeSummary && (day.review?.summary || day.review?.moodEmoji)) estimate += 70 + paraHeight(day.review?.summary, w.bodySize + 1, 38);
-  [...reviewLines, ...narrativeLines].forEach((line) => { estimate += line.role === 'print' ? 25 : paraHeight(line.text); });
+  reviewLines.forEach((line) => { estimate += line.role === 'print' ? 25 : paraHeight(line.text); });
+  narrativeLines.forEach((line) => { estimate += line.role === 'print' ? 25 : estimateJournalMarkdown(w, line.text); });
   if (narrativeLines.length) estimate += 45;
   if (logs && !detail) day.logs.filter((log) => log.source.isPlanned).forEach((log) => { estimate += 35 + paraHeight(log.source.title || log.activity) + paraHeight(log.source.note); });
   w.beginColumns(count, Math.ceil(estimate / count) + 45);
@@ -109,7 +112,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     w.heading('叙事');
     narrativeLines.forEach((line) => {
       if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
-      else w.paragraph(line.text);
+      else writeJournalMarkdown(w, line.text);
     });
   }
 };

@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Includes rich photo logs, historical attribute fields, comments, reactions and inline node aliases.
  * @updated 2026-10-23: Exercises saved review groups and Collection membership in rich Log exports.
  * @updated 2026-10-24: Includes both answered guidance plus AI narrative and a narrative-only daily review.
+ * @updated 2026-10-24: Exercises Markdown heading levels, inline emphasis, nested/task lists, quotes, code, tables and links.
  */
 import type { JournalExportData } from '../../src/utils/journalExport';
 import type { DailyReview, Log, TodoItem, ReviewTemplateSnapshot } from '../../src/types';
@@ -79,10 +80,29 @@ const guidanceGroups: ReviewTemplateSnapshot[] = [
   { id: 'memories', title: '值得记住', order: 0, questions: [{ id: 'memory', question: '今天有哪些值得记住的小事？', type: 'text' }] },
   { id: 'tomorrow', title: '留给明天', order: 1, questions: [{ id: 'tomorrow', question: '明天想为自己留出什么时间？', type: 'text' }] }
 ];
+const narrativeMarkdown = [
+  '# 八月的第三天',
+  '阅读和散步串起了日常的节奏。窗边的明信片，让平凡的一天多了一份可以珍藏的温柔。',
+  '## 值得留住的片刻',
+  '今天最珍贵的是**专心阅读的时光**，还有*晚风经过窗边*的安静。',
+  '### 生活的小事',
+  '- 把读过的书放回书架\n  - 留下一张手写的书签\n- 给朋友写一封信',
+  '1. 先留出自己的时间\n2. 再慢慢安排明天',
+  '- [x] 记下今天的收获\n- [ ] 明天继续阅读',
+  '> 不必让每个小时都填满，留白也是生活的一部分。',
+  '#### 一点调整',
+  '把~~需要赶完的任务~~改成可以持续的节奏。',
+  '##### 留给明天',
+  '用`阅读 30 分钟`作为一个小小的开始。',
+  '###### 随手记',
+  '[阅读资料](https://example.com/reading)',
+  '| 项目 | 记录 |\n| --- | --- |\n| 阅读 | 三十页 |\n| 散步 | 半小时 |',
+  '```text\n把日子慢慢写下来。\n```'
+].join('\n\n');
 const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24, 26, 28, 30, 31].map((day, index) => ({
   id: `review-${day}`, date: key(day), createdAt: stamp(day), updatedAt: stamp(day, 22),
   summary: notes[index + 5],
-  narrative: day === 3 ? '八月的第三天，阅读和散步串起了日常的节奏。窗边的明信片，让平凡的一天多了一份可以珍藏的温柔。' : day === 4 ? '这一天只有叙事，没有填写引导问题。晚风经过窗边，留下了安静的片刻。' : undefined,
+  narrative: day === 3 ? narrativeMarkdown : day === 4 ? '这一天只有叙事，没有填写引导问题。晚风经过窗边，留下了安静的片刻。' : undefined,
   moodEmoji: index % 3 === 0 ? `image:/sticker/water3/${String(index + 1).padStart(2, '0')}.webp` : index % 2 ? '☀️' : '🌿',
   checkItems: [
     { id: 'water', category: '照顾自己', content: '喝够三杯水', manualMode: 'count', currentCount: index === 0 ? 2 : 3, targetCount: 3, isCompleted: index !== 0 },

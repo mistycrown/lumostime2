@@ -12,6 +12,7 @@
 @updated 2026-10-24: Verifies a daily-page-only export keeps every daily section and excludes other page groups.
 @updated 2026-10-24: Confirms guidance and AI narrative use separate peer headings without empty guidance on narrative-only days.
 @updated 2026-10-24: Checks all 1100 dates/summaries, final page numbering and A4/A5 geometry in large-book downloads.
+@updated 2026-10-24: Checks rendered narrative heading levels, single-copy bold text, list content and working Markdown links.
 """
 from pathlib import Path
 from datetime import date, timedelta
@@ -36,6 +37,18 @@ def inspect_daily_review_sections(document):
     assert '\n叙事\n' in narrative_only and '\n引导\n' not in narrative_only, 'Narrative-only day has missing narrative or empty guidance'
     headings = [span for page in days['2026-08-03'] for block in page.get_text('dict')['blocks'] for line in block.get('lines', []) for span in line['spans'] if span['text'] in ['引导', '叙事']]
     assert len(headings) == 2 and all(abs(span['size'] - 12) < 0.01 for span in headings), 'Guidance and narrative are not peer headings'
+    visible = rich.replace('\n', '')
+    assert visible.count('专心阅读的时光') == 1, 'Bold narrative text was lost or duplicated'
+    for value in ['留下一张手写的书签', '记下今天的收获', '明天继续阅读', '三十页', '半小时', '把日子慢慢写下来。']:
+        assert value in visible, f'Markdown content missing: {value}'
+    assert '**' not in rich and '```' not in rich and '[x]' not in rich, 'Narrative Markdown markers were printed literally'
+    spans = [span for page in days['2026-08-03'] for block in page.get_text('dict')['blocks'] for line in block.get('lines', []) for span in line['spans']]
+    for title, size in [('八月的第三天', 12), ('值得留住的片刻', 12), ('生活的小事', 9), ('一点调整', 9), ('留给明天', 9), ('随手记', 9)]:
+        assert any(span['text'] == title and abs(span['size'] - size) < 0.01 for span in spans), f'Markdown heading not styled: {title}'
+    stroked = ''.join(''.join(chr(char[0]) for char in trace['chars']) for page in days['2026-08-03'] for trace in page.get_texttrace() if trace['type'] == 1)
+    assert '专心阅读的时光' in stroked, 'Bold text has no stroke emphasis'
+    assert all(abs(trace['dir'][1]) < 0.001 for page in days['2026-08-03'] for trace in page.get_texttrace()), 'Italic text rotated its baseline instead of shearing the glyphs'
+    assert any(link.get('uri') == 'https://example.com/reading' for page in days['2026-08-03'] for link in page.get_links()), 'Markdown link lost its destination'
 
 
 def inspect_mood_year(source):
