@@ -10,6 +10,7 @@
 @updated 2026-10-23: Checks English headings, four readable type tiers, half-pixel rules and complete rich Logs.
 @updated 2026-10-24: Checks branded covers, shared badge names, nested year/month/week statistics and a single spread axis.
 @updated 2026-10-24: Verifies a daily-page-only export keeps every daily section and excludes other page groups.
+@updated 2026-10-24: Confirms guidance and AI narrative use separate peer headings without empty guidance on narrative-only days.
 """
 from pathlib import Path
 import json
@@ -18,6 +19,21 @@ import sys
 
 import fitz
 from PIL import Image, ImageDraw, ImageFont
+
+
+def inspect_daily_review_sections(document):
+    days = {
+        date: [page for page in document if next(iter(page.get_text().splitlines()), '').startswith(date)]
+        for date in ['2026-08-03', '2026-08-04']
+    }
+    rich = '\n'.join(page.get_text() for page in days['2026-08-03'])
+    narrative_only = '\n'.join(page.get_text() for page in days['2026-08-04'])
+    assert '\n引导\n' in rich and '\n叙事\n' in rich, 'Daily guidance and AI narrative are not separate headings'
+    assert rich.index('\n引导\n') < rich.index('\n叙事\n'), 'Narrative is not after the complete guidance section'
+    assert '八月的第三天' in rich.replace('\n', ''), 'AI narrative was lost'
+    assert '\n叙事\n' in narrative_only and '\n引导\n' not in narrative_only, 'Narrative-only day has missing narrative or empty guidance'
+    headings = [span for page in days['2026-08-03'] for block in page.get_text('dict')['blocks'] for line in block.get('lines', []) for span in line['spans'] if span['text'] in ['引导', '叙事']]
+    assert len(headings) == 2 and all(abs(span['size'] - 12) < 0.01 for span in headings), 'Guidance and narrative are not peer headings'
 
 
 def inspect_mood_year(source):
@@ -45,6 +61,7 @@ def inspect(filename):
         return inspect_mood_year(source)
     if source.stem == 'journal-daily-only':
         document = fitz.open(source)
+        inspect_daily_review_sections(document)
         text = ''.join(page.get_text() for page in document).replace('\n', '')
         for value in ['今日计划', '时间线 日志', '日课', '总结', '引导', '#学习与创作', '@产品方案初稿', '%学习成长', '阅读页数', '32 页', '评论']:
             assert value in text, f'Daily page group lost content: {value}'
@@ -54,6 +71,7 @@ def inspect(filename):
         assert text.count('把摘录和照片一起留在这里。') == 1, 'Daily group lost or duplicated rich Log comments'
         return {'file': str(source), 'pages': len(document), 'daily_group': 'complete'}
     document = fitz.open(source)
+    inspect_daily_review_sections(document)
     text = '\n'.join(page.get_text() for page in document)
     body = '\n'.join(page.get_text() for page in document if 'Weekly Timeline' not in next(iter(page.get_text().splitlines()), ''))
     continuous = text.replace('\n', '')

@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Includes original image stickers, linked actual traces and parent/child goal progress.
  * @updated 2026-10-23: Includes rich photo logs, historical attribute fields, comments, reactions and inline node aliases.
  * @updated 2026-10-23: Exercises saved review groups and Collection membership in rich Log exports.
+ * @updated 2026-10-24: Includes both answered guidance plus AI narrative and a narrative-only daily review.
  */
 import type { JournalExportData } from '../../src/utils/journalExport';
 import type { DailyReview, Log, TodoItem, ReviewTemplateSnapshot } from '../../src/types';
@@ -81,6 +82,7 @@ const guidanceGroups: ReviewTemplateSnapshot[] = [
 const dailyReviews: DailyReview[] = [3, 4, 5, 7, 10, 12, 14, 17, 18, 19, 21, 24, 26, 28, 30, 31].map((day, index) => ({
   id: `review-${day}`, date: key(day), createdAt: stamp(day), updatedAt: stamp(day, 22),
   summary: notes[index + 5],
+  narrative: day === 3 ? '八月的第三天，阅读和散步串起了日常的节奏。窗边的明信片，让平凡的一天多了一份可以珍藏的温柔。' : day === 4 ? '这一天只有叙事，没有填写引导问题。晚风经过窗边，留下了安静的片刻。' : undefined,
   moodEmoji: index % 3 === 0 ? `image:/sticker/water3/${String(index + 1).padStart(2, '0')}.webp` : index % 2 ? '☀️' : '🌿',
   checkItems: [
     { id: 'water', category: '照顾自己', content: '喝够三杯水', manualMode: 'count', currentCount: index === 0 ? 2 : 3, targetCount: 3, isCompleted: index !== 0 },

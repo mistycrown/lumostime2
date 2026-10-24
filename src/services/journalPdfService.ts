@@ -10,6 +10,7 @@
  * @updated 2026-10-23: Uses a vector Collection marker without depending on an unavailable font glyph.
  * @updated 2026-10-24: Embeds independently selected fonts with safe transformed-WOFF2 outlines and Chinese fallback.
  * @updated 2026-10-24: Loads mood stickers only for selected mood/summary content; reaction image references are excluded.
+ * @updated 2026-10-24: Preserves legacy review-only summary stickers when guidance and narrative are separated.
  */
 import { PDFDocument } from 'pdf-lib';
 import { Capacitor } from '@capacitor/core';
@@ -98,7 +99,7 @@ export const createJournalPdf = async (
   pdf.setSubject('个人时间手账');
   const writer = new JournalPdfWriter(pdf, font, model, symbols, printedFont, fallback);
   const logDetails = (['dayLogs', 'dayPlans', 'monthAgenda', 'weekPlans'] as const).some((part) => journalHasPart(options, part));
-  if ((['mood', 'oneLine', 'daySummary'] as const).some((part) => journalHasPart(options, part))) {
+  if ((['mood', 'oneLine', 'daySummary'] as const).some((part) => journalHasPart(options, part)) || (!options.parts && options.sections.includes('reviews'))) {
     onProgress?.({ message: '正在加载每日贴纸', pages: 0 });
     const icons = model.days.map((day) => day.review?.moodEmoji || '');
     const stickers = await embedJournalStickers(pdf, icons, signal);

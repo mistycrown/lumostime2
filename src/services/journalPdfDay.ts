@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Includes complete actual/planned Log metadata and keeps check labels distinct from authored text.
  * @updated 2026-10-23: Uses Routine/Summary labels and 24/12/9pt guidance headings for section, group and question.
  * @updated 2026-10-24: Aligns checkboxes with their item text, removes duplicate completion words and reduces guidance headings.
+ * @updated 2026-10-24: Renders template questions/answers under guidance and AI content under a separate peer narrative heading.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, journalHasPart, type JournalDay, type JournalSection } from '../utils/journalExport';
@@ -22,7 +23,10 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
   const has = (part: Parameters<typeof journalHasPart>[1]) => journalHasPart(w.model.options, part);
   const logs = has('dayLogs');
   const review = has('dayReview') && day.review;
-  w.startPage(dateLabel(day.date), `${detail ? '一日一页' : logs ? '日志' : '引导'} ${formatJournalDuration(day.actualSeconds)}`);
+  const includeSummary = has('daySummary') || Boolean(review && !w.model.options.parts);
+  const reviewLines = review ? journalReviewLines(review, w.model.reviewTemplates, 'guidance') : [];
+  const narrativeLines = review ? journalReviewLines(review, w.model.reviewTemplates, 'narrative') : [];
+  w.startPage(dateLabel(day.date), `${detail ? '一日一页' : logs ? '日志' : reviewLines.length ? '引导' : narrativeLines.length ? '叙事' : '总结'} ${formatJournalDuration(day.actualSeconds)}`);
   const count = w.model.options.paperSize === 'a4' ? 3 : 2;
   w.beginColumns(count);
   const paraHeight = (value: string | undefined, size = 10, indent = 0) => value ? w.wrap(value, w.contentWidth - indent, size, 'hand').length * size * 1.5 + 3 : 0;
@@ -42,9 +46,9 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     estimate += [log.scopes?.length, log.collections?.length, log.todo, log.source.reactions?.length].filter(Boolean).length * 20;
   });
   if (has('dayChecks') && day.checks.length) estimate += 25 + day.checks.reduce((sum, item) => sum + paraHeight(item.content + ' ' + journalCheckValue(item)), 0);
-  if (has('daySummary') && (day.review?.summary || day.review?.moodEmoji)) estimate += 70 + paraHeight(day.review?.summary, w.bodySize + 1, 38);
-  const reviewLines = review ? journalReviewLines(has('daySummary') || w.model.options.parts ? { ...review, summary: undefined } : review, w.model.reviewTemplates) : [];
-  reviewLines.forEach((line) => { estimate += line.role === 'print' ? 25 : paraHeight(line.text); });
+  if (includeSummary && (day.review?.summary || day.review?.moodEmoji)) estimate += 70 + paraHeight(day.review?.summary, w.bodySize + 1, 38);
+  [...reviewLines, ...narrativeLines].forEach((line) => { estimate += line.role === 'print' ? 25 : paraHeight(line.text); });
+  if (narrativeLines.length) estimate += 45;
   if (logs && !detail) day.logs.filter((log) => log.source.isPlanned).forEach((log) => { estimate += 35 + paraHeight(log.source.title || log.activity) + paraHeight(log.source.note); });
   w.beginColumns(count, Math.ceil(estimate / count) + 45);
   if (plans.length) { w.heading('今日计划'); writePlans(w, day, !has('monthAgenda'), true); }
@@ -77,7 +81,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
       w.y += 3;
     });
   }
-  if (has('daySummary') && (day.review?.summary?.trim() || day.review?.moodEmoji)) {
+  if (includeSummary && (day.review?.summary?.trim() || day.review?.moodEmoji)) {
     w.heading('总结');
     w.ensure(25);
     const page = w.page;
@@ -96,6 +100,15 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     reviewLines.forEach((line) => {
       if (line.level === 'group') { w.ensure(45); w.y += 9; w.paragraph(line.text, 9, C.ink, 0, 'print'); }
       else if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
+      else w.paragraph(line.text);
+    });
+  }
+  if (narrativeLines.length) {
+    w.ensure(75);
+    w.y += 8;
+    w.heading('叙事');
+    narrativeLines.forEach((line) => {
+      if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
       else w.paragraph(line.text);
     });
   }

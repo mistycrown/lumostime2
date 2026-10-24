@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Requires landscape A4 on all pages and validates shorter landscape contents.
  * @updated 2026-10-23: Verifies rich overnight content, photo bounds, English headings and in-place node styling.
  * @updated 2026-10-23: Checks A4/A5 integrated statistics, original colors, twelve-month calendars and guidance hierarchy.
+ * @updated 2026-10-24: Keeps template questions and answers separate from AI narrative in daily layouts, including single-source days.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +22,7 @@ import { writeJournalDistributions } from './journalPdfStatistics';
 import { journalDataColor } from './journalPdfTheme';
 import { journalDemoData } from '../../scripts/fixtures/journal-demo';
 import { writeWeeklyTimeline } from './journalPdfTimeline';
+import type { DailyReview } from '../types';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -32,6 +34,40 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it('renders daily guidance and AI narrative as separate peer sections on A4 and A5', async () => {
+    const review: DailyReview = {
+      id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0,
+      summary: '用户的一句话总结', narrative: 'AI叙事正文，保留完整内容。',
+      answers: [{ questionId: 'q', question: '今天想记住什么？', answer: '用户自己的回答。' }],
+      templateSnapshot: [{ id: 't', title: '值得记住', questions: [{ id: 'q', question: '今天想记住什么？', type: 'text' }] }]
+    };
+    for (const paper of ['a4', 'a5'] as const) {
+      const w = await make(paper, { sections: ['daily', 'reviews'], parts: ['daySummary', 'dayReview'] }, { ...data, dailyReviews: [review] });
+      const sections = new Map<string, string[]>();
+      let active = '';
+      const heading = w.heading.bind(w); const paragraph = w.paragraph.bind(w);
+      w.heading = (value) => { active = value; sections.set(value, []); heading(value); };
+      w.paragraph = (value, ...args) => { sections.get(active)?.push(value); paragraph(value, ...args); };
+      await composeJournalPdf(w);
+      expect(sections.get('总结')).toEqual(['总结', '用户的一句话总结']);
+      expect(sections.get('引导')).toEqual(['引导', '值得记住', '今天想记住什么？', '用户自己的回答。']);
+      expect(sections.get('叙事')).toEqual(['叙事', 'AI叙事正文，保留完整内容。']);
+      expect([...sections.keys()]).toEqual(['总结', '引导', '叙事']);
+    }
+  });
+  it('omits empty guidance/narrative headings and still exports narrative-only days', async () => {
+    for (const narrativeOnly of [true, false]) {
+      const source = { ...data, dailyReviews: [{ id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0,
+        answers: narrativeOnly ? [] : [{ questionId: 'q', question: '今天怎么样？', answer: '用户回答' }],
+        narrative: narrativeOnly ? '只有AI叙事的这一天。' : '  '
+      }] };
+      const w = await make('a5', { sections: ['reviews'], parts: ['dayReview'] }, source);
+      const headings: string[] = []; const heading = w.heading.bind(w);
+      w.heading = (value) => { headings.push(value); heading(value); };
+      await composeJournalPdf(w);
+      expect(headings).toEqual([narrativeOnly ? '叙事' : '引导']);
+    }
+  });
   it('uses application badge names and keeps each Log reaction beside its own title', async () => {
     const source = { ...data,
       todos: [{ id: 't', title: '排期事件', categoryId: 'c', scheduledDate: '2026-10-19', deadlineDate: '2026-10-19', isCompleted: false }],

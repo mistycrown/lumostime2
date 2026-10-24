@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Uses Radix fills, readable 9pt calendar entries and half-pixel grid rules.
  * @updated 2026-10-23: Retains historical review groups and preserves the user schedule/category color settings.
  * @updated 2026-10-24: Spaces review groups, questions and answers and supports the shared timeline axis geometry.
+ * @updated 2026-10-24: Separates template guidance from AI narrative content for daily section rendering.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { DailyReview, MonthlyReview, WeeklyReview, ReviewTemplate } from '../types';
@@ -23,7 +24,7 @@ const MUTED = C.muted;
 export type JournalReview = DailyReview | WeeklyReview | MonthlyReview;
 export interface ReviewLine { text: string; role: JournalTextRole; level?: 'group' | 'question' }
 
-export const journalReviewLines = (review?: JournalReview, templates: ReviewTemplate[] = []): ReviewLine[] => {
+export const journalReviewLines = (review?: JournalReview, templates: ReviewTemplate[] = [], content: 'all' | 'guidance' | 'narrative' = 'all'): ReviewLine[] => {
   if (!review) return [];
   const lines: ReviewLine[] = [];
   const add = (label: string, value?: string) => {
@@ -31,11 +32,13 @@ export const journalReviewLines = (review?: JournalReview, templates: ReviewTemp
     if (label) lines.push({ text: label, role: 'print' });
     lines.push({ text: value, role: 'hand' });
   };
-  if ('cite' in review) add('引言', review.cite);
-  add('date' in review ? '总结' : '摘要', review.summary);
+  if (content === 'all') {
+    if ('cite' in review) add('引言', review.cite);
+    add('date' in review ? '总结' : '摘要', review.summary);
+  }
   const definitions = [...(review.templateSnapshot || []), ...templates];
   const groups = new Map<string, { title: string; order: number; answers: typeof review.answers }>();
-  review.answers.filter((answer) => answer.answer.trim()).forEach((answer) => {
+  (content === 'narrative' ? [] : review.answers).filter((answer) => answer.answer.trim()).forEach((answer) => {
     const template = definitions.find((item) => item.questions.some((question) => question.id === answer.questionId));
     const id = template?.id || '__ungrouped__';
     const group = groups.get(id) || { title: template?.title || '未分组问题', order: template ? template.order ?? definitions.indexOf(template) : Number.MAX_SAFE_INTEGER, answers: [] };
@@ -48,8 +51,8 @@ export const journalReviewLines = (review?: JournalReview, templates: ReviewTemp
       lines.push({ text: answer.answer, role: 'hand' });
     });
   });
-  add('叙事', review.narrative);
-  const news = review.aiNewspaper;
+  if (content !== 'guidance') add(content === 'all' ? '叙事' : '', review.narrative);
+  const news = content !== 'guidance' ? review.aiNewspaper : undefined;
   if (news) {
     add(news.title || '回顾', news.overallComment);
     if ('keyInsights' in news) news.keyInsights?.forEach((value) => add('洞察', value));
