@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-24: Journal PDF export matches adjacent settings cards with monochrome checkboxes and unchanged shared dropdown styling. Thirteen switches select rendered page groups: month/week side reviews follow their overview pages, and daily plans, full logs, routines, summary/sticker and guidance follow one daily-page switch. Unlocked appearance defaults to the theme color and offers the shared built-in/custom color palette plus independent print/content font dropdowns.
+
 Update 2026-10-23: Data Management passes Collections, membership entries and review templates into PDF projection; this keeps symbolic Log associations and the section/group/question guidance hierarchy complete.
 
 Update 2026-10-23: `JournalPdfExportPanel.css` uses semantic Radix light/dark scales, flat controls, 0.5px borders and only 12/14/18px text. Decorative cards, motion, duplicate descriptions and middle-dot separators are omitted.

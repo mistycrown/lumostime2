@@ -9,6 +9,7 @@
 @updated 2026-10-23: Checks independent covers, direct check counts, compact columns and six donut dimensions.
 @updated 2026-10-23: Checks English headings, four readable type tiers, half-pixel rules and complete rich Logs.
 @updated 2026-10-24: Checks branded covers, shared badge names, nested year/month/week statistics and a single spread axis.
+@updated 2026-10-24: Verifies a daily-page-only export keeps every daily section and excludes other page groups.
 """
 from pathlib import Path
 import json
@@ -42,6 +43,16 @@ def inspect(filename):
     source = Path(filename)
     if source.stem.startswith('journal-mood-year-'):
         return inspect_mood_year(source)
+    if source.stem == 'journal-daily-only':
+        document = fitz.open(source)
+        text = ''.join(page.get_text() for page in document).replace('\n', '')
+        for value in ['今日计划', '时间线 日志', '日课', '总结', '引导', '#学习与创作', '@产品方案初稿', '%学习成长', '阅读页数', '32 页', '评论']:
+            assert value in text, f'Daily page group lost content: {value}'
+        for value in ['Monthly Planner', 'Weekly Planner', 'Weekly Timeline', 'Time Distribution', 'Habit Tracker', 'Mood Overview', 'One Line a Day', 'Goals']:
+            assert value not in text, f'Unselected page group leaked: {value}'
+        assert sum(len(page.get_image_info()) for page in document) > 0, 'Daily group lost photos and stickers'
+        assert text.count('把摘录和照片一起留在这里。') == 1, 'Daily group lost or duplicated rich Log comments'
+        return {'file': str(source), 'pages': len(document), 'daily_group': 'complete'}
     document = fitz.open(source)
     text = '\n'.join(page.get_text() for page in document)
     body = '\n'.join(page.get_text() for page in document if 'Weekly Timeline' not in next(iter(page.get_text().splitlines()), ''))

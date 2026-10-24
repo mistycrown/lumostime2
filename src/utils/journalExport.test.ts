@@ -5,15 +5,34 @@
  * @pos Tests (Journal PDF)
  * @updated 2026-10-23: Covers midnight, recurrence, automatic/manual checks and partial reviews.
  * @updated 2026-10-23: Verifies parent/child progress cutoffs and skips unanswered daily templates.
+ * @updated 2026-10-24: Verifies complete page switches retain all embedded content without duplicate or hidden parts.
  */
 import { describe, expect, it } from 'vitest';
-import { buildJournalModel, getJournalDataRange, getJournalDayPlans, getJournalQuickRange, parseJournalDateInput, journalCheckValue, journalTodoStatus, validateJournalOptions, type JournalExportData, type JournalExportOptions } from './journalExport';
+import { JOURNAL_PAGE_GROUPS, JOURNAL_PART_GROUPS, journalPartsForPages, journalSectionsForParts, buildJournalModel, getJournalDataRange, getJournalDayPlans, getJournalQuickRange, parseJournalDateInput, journalCheckValue, journalTodoStatus, validateJournalOptions, type JournalExportData, type JournalExportOptions } from './journalExport';
 import type { DailyReview, Log, TodoItem } from '../types';
 
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-25', sections: ['monthly', 'timeline'], paperSize: 'a4', includeCover: true, includeEmptyDays: false };
 const data = (patch: Partial<JournalExportData> = {}): JournalExportData => ({ logs: [], categories: [{ id: 'work', name: '工作', activities: [{ id: 'reading', name: '阅读' }] } as never], scopes: [], todos: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [], ...patch });
 const log = (start: string, end: string, patch: Partial<Log> = {}): Log => ({ id: 'log', activityId: 'reading', categoryId: 'work', startTime: new Date(start).getTime(), endTime: new Date(end).getTime(), duration: (new Date(end).getTime() - new Date(start).getTime()) / 1000, ...patch });
 const review = (date: string, patch: Partial<DailyReview> = {}): DailyReview => ({ id: date, date, createdAt: 0, updatedAt: 0, answers: [], ...patch });
+
+describe('journal page selection', () => {
+  it('keeps reviews with their overview pages and exports every element of a daily page together', () => {
+    expect(journalPartsForPages(['monthCalendar'])).toEqual(['monthCalendar', 'monthReview']);
+    expect(journalPartsForPages(['weekTimeline'])).toEqual(['weekTimeline', 'weekReview']);
+    const daily = journalPartsForPages(['daily']);
+    expect(daily).toEqual(['dayPlans', 'dayLogs', 'dayChecks', 'daySummary', 'dayReview']);
+    expect(journalSectionsForParts(daily)).toEqual(['daily', 'logs', 'reviews']);
+  });
+  it('covers all renderer content exactly once and leaves no hidden data selected after clearing', () => {
+    const pages = JOURNAL_PAGE_GROUPS.flatMap((group) => group.items.map((item) => item.id));
+    const parts = journalPartsForPages(pages);
+    expect(new Set(parts).size).toBe(parts.length);
+    expect([...parts].sort()).toEqual(JOURNAL_PART_GROUPS.flatMap((group) => group.items.map((item) => item.id)).sort());
+    expect(journalPartsForPages([])).toEqual([]);
+    expect(journalSectionsForParts(journalPartsForPages([]))).toEqual([]);
+  });
+});
 
 describe('journal date validation', () => {
   it('accepts exactly eight real date digits and never reuses stale valid input', () => {

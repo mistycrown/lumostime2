@@ -4,6 +4,7 @@
  * @output Default/custom selector with per-type color picker rows
  * @pos Component (Settings)
  * @updated 2026-10-14: Includes Plan in the shared schedule-type color editor.
+ * @updated 2026-10-24: Reuses the shared built-in/custom circular color palette.
  * @description Reuses the built-in palette and persisted custom color group so Todo schedule views can customize Arrange / Due / Repeat / Done / Trace colors from one shared UI block.
  * @updated 2026-05-11: Added the shared schedule-type color settings block used by the Todo month and bento display popups.
  *
@@ -11,8 +12,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { COLOR_OPTIONS } from '../constants';
-import { useCustomColors } from '../hooks/useCustomColors';
+import { ColorPalettePicker } from './ColorPalettePicker';
 import { normalizeCustomColorHex } from '../services/customColorGroupService';
 import {
   getTodoScheduleTypePreviewColors,
@@ -20,7 +20,6 @@ import {
   type TodoScheduleTypeColorSettings as TodoScheduleTypeColorSettingsValue,
   TODO_SCHEDULE_TYPE_COLOR_ITEMS
 } from '../services/todoScheduleColorService';
-import { isStoredColorSelected } from '../utils/colorUtils';
 
 interface TodoScheduleTypeColorSettingsProps {
   settings: TodoScheduleTypeColorSettingsValue;
@@ -31,7 +30,6 @@ export const TodoScheduleTypeColorSettings: React.FC<TodoScheduleTypeColorSettin
   settings,
   onChange
 }) => {
-  const customColors = useCustomColors();
   const [expandedKey, setExpandedKey] = useState<TodoScheduleTypeColorKey | null>(null);
   const previewColors = useMemo(
     () => getTodoScheduleTypePreviewColors(settings),
@@ -133,36 +131,7 @@ export const TodoScheduleTypeColorSettings: React.FC<TodoScheduleTypeColorSettin
 
                   {isExpanded && (
                     <div className="border-t border-stone-200/80 bg-white/70 px-3 py-3">
-                      <div className="grid grid-cols-6 gap-2">
-                        {COLOR_OPTIONS.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => handleColorChange(item.key, option.hex)}
-                            title={option.label}
-                            className={`h-8 w-8 rounded-full transition-all hover:scale-110 ${
-                              isStoredColorSelected(currentColor, option.hex)
-                                ? `ring-2 ${option.ring} ring-offset-2`
-                                : ''
-                            } ${option.picker}`}
-                          />
-                        ))}
-
-                        {customColors.map((customColor) => (
-                          <button
-                            key={customColor.id}
-                            type="button"
-                            onClick={() => handleColorChange(item.key, customColor.color)}
-                            title={customColor.color}
-                            className={`h-8 w-8 rounded-full border border-stone-300 transition-all hover:scale-110 ${
-                              isStoredColorSelected(currentColor, customColor.color)
-                                ? 'ring-2 ring-stone-400 ring-offset-2'
-                                : ''
-                            }`}
-                            style={{ backgroundColor: customColor.color }}
-                          />
-                        ))}
-                      </div>
+                      <ColorPalettePicker value={currentColor} onChange={(color) => handleColorChange(item.key, color)} />
                     </div>
                   )}
                 </div>

@@ -12,6 +12,7 @@
  * @updated 2026-10-23: Projects Collection membership and current review templates, preserving authored colors without palette remapping.
  * @updated 2026-10-24: Maps nineteen independent parts to backward-compatible chapters and accepts per-export appearance.
  * @updated 2026-10-24: Exposes original calendar badges and merges dated events with linked planned blocks.
+ * @updated 2026-10-24: Groups settings switches by rendered page, keeping embedded reviews and daily content together.
  */
 import type { Category, CheckItem, DailyReview, DataCollection, DataCollectionEntry, Goal, Log, MajorGoal, MonthlyReview, ReviewTemplate, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
@@ -44,6 +45,35 @@ export const JOURNAL_PART_GROUPS = [
   { label: '每日', items: [ { id: 'dayPlans', label: '日计划', section: 'daily' }, { id: 'dayLogs', label: '日志图文', section: 'logs' }, { id: 'dayChecks', label: '日课', section: 'daily' }, { id: 'daySummary', label: '总结与贴纸', section: 'daily' }, { id: 'dayReview', label: '引导', section: 'reviews' } ] }
 ] as const;
 export type JournalPart = typeof JOURNAL_PART_GROUPS[number]['items'][number]['id'];
+// Settings select complete page layouts; renderer parts remain compatible with existing callers.
+export const JOURNAL_PAGE_GROUPS = [
+  { label: '年度', items: [
+    { id: 'annualReview', label: '年度回顾', parts: ['annualReview'] },
+    { id: 'goals', label: '年度目标', parts: ['goals'] },
+    { id: 'mood', label: '心情年历', parts: ['mood'] },
+    { id: 'oneLine', label: '每日一句话', parts: ['oneLine'] },
+    { id: 'yearStatistics', label: '年度时间分布', parts: ['yearStatistics'] }
+  ] },
+  { label: '每月', items: [
+    { id: 'monthCalendar', label: '月历与回顾', parts: ['monthCalendar', 'monthReview'] },
+    { id: 'monthAgenda', label: '日程明细', parts: ['monthAgenda'] },
+    { id: 'monthChecks', label: '月度日课', parts: ['monthChecks'] },
+    { id: 'monthStatistics', label: '月度时间分布', parts: ['monthStatistics'] }
+  ] },
+  { label: '每周', items: [
+    { id: 'weekPlans', label: '周计划', parts: ['weekPlans'] },
+    { id: 'weekTimeline', label: '周时间轴与回顾', parts: ['weekTimeline', 'weekReview'] },
+    { id: 'weekStatistics', label: '每周时间分布', parts: ['weekStatistics'] }
+  ] },
+  { label: '每日', items: [
+    { id: 'daily', label: '一日一页', parts: ['dayPlans', 'dayLogs', 'dayChecks', 'daySummary', 'dayReview'] }
+  ] }
+] as const satisfies readonly { label: string; items: readonly { id: string; label: string; parts: readonly JournalPart[] }[] }[];
+export type JournalPageId = typeof JOURNAL_PAGE_GROUPS[number]['items'][number]['id'];
+export const journalPartsForPages = (pages: readonly JournalPageId[]): JournalPart[] => JOURNAL_PAGE_GROUPS
+  .flatMap<typeof JOURNAL_PAGE_GROUPS[number]['items'][number]>((group) => group.items)
+  .filter((item) => pages.includes(item.id))
+  .flatMap<JournalPart>((item) => [...item.parts]);
 const JOURNAL_PARTS = JOURNAL_PART_GROUPS.flatMap<typeof JOURNAL_PART_GROUPS[number]['items'][number]>((group) => group.items);
 export type JournalCoverStyle = 'minimal' | 'classic' | 'abstract';
 export const journalSectionsForParts = (parts: JournalPart[]): JournalSection[] => [...new Set(JOURNAL_PARTS.filter((item) => parts.includes(item.id)).map((item) => item.section))];

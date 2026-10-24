@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Serves original sticker assets and checks recoverable missing-sticker failures.
  * @updated 2026-10-23: Checks original photo failures and loads current panel CSS for realistic mobile previews.
  * @updated 2026-10-23: Exports both full-year A4 calendar and A5 matrix mood examples.
+ * @updated 2026-10-24: Checks page switches, shared palettes/dropdowns and monochrome settings in light/dark modes; supports --ui-only.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -19,13 +20,14 @@ const workspace = process.cwd();
 const require = createRequire(path.join(workspace, 'package.json'));
 const { build } = require('esbuild');
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-journal-'));
+const uiOnly = process.argv.includes('--ui-only');
 await build({
   stdin: { resolveDir: workspace, loader: 'tsx', contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { JournalPdfExportPanel } from './src/views/settings/JournalPdfExportPanel';
 import { createJournalPdf } from './src/services/journalPdfService';
-import { JOURNAL_PART_GROUPS } from './src/utils/journalExport';
+import { customColorGroupService } from './src/services/customColorGroupService';
 import { RedemptionService } from './src/services/redemptionService';
 import { customFontStorageService } from './src/services/customFontStorageService';
 import { getJournalQuickRange } from './src/utils/journalExport';
@@ -53,6 +55,57 @@ HTMLAnchorElement.prototype.click = async function() {
  window.__exports.push({ name: this.download, base64 });
 };
 const data = journalDemoData;
+async function verifyAppearance(uploadedFont = false) {
+ RedemptionService.prototype.isVerified=async()=>({isVerified:true});
+ document.documentElement.style.setProperty('--accent-color','#8844aa');
+ customColorGroupService.setColors([{id:'journal-custom',color:'#526B5D',createdAt:0},{id:'journal-alpha',color:'#00000080',createdAt:0}]);
+ root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel key="unlocked" data={data} onToast={(type,message)=>{toast={type,message};}} /></main>);
+ await until(()=>document.querySelector('[aria-label="PDF 内容字体"]'),'Unlocked font controls did not mount');
+ const contentFont=()=>document.querySelector('[aria-label="PDF 内容字体"]');
+ contentFont().click(); await until(()=>document.querySelector('[role=option]'),'Font dropdown did not open');
+ check(getComputedStyle(contentFont()).borderRadius==='12px','Paper/font select lost shared rounded-xl style');
+ check(getComputedStyle(document.querySelector('[role=listbox]')).borderRadius==='12px','Dropdown style is overridden');
+ const selectedFont=uploadedFont?'custom-export-test':'lxgw-neo-zhisong';
+ await until(()=>document.querySelector('[data-select-value="'+selectedFont+'"]'),'Requested font absent from selector');
+ document.querySelector('[data-select-value="'+selectedFont+'"]').click(); await wait();
+ check(contentFont().textContent.includes(uploadedFont?'导出测试字体':'霞鹜'),'Content font selection did not persist');
+ check(document.querySelector('[aria-label="PDF 排版字体"]').textContent.includes('默认黑体'),'Content font changed layout font');
+ const color=()=>document.querySelector('[aria-label="PDF 主题色"]');
+ check(color().textContent==='主题色' && getComputedStyle(color().querySelector('span span')).backgroundColor==='rgb(136, 68, 170)','Theme color was not inherited');
+ check(!document.querySelector('input[type=color]'),'Native color input remains');
+ color().click(); await wait();
+ document.querySelector('[aria-label="Blue"]').click(); await wait();
+ check(color().textContent==='#3B82F6','Built-in palette selection failed');
+ color().click(); await wait();
+ document.querySelector('[aria-label="#526B5D"]').click(); await wait();
+ check(color().textContent==='#526B5D' && !document.querySelector('[aria-label="颜色选择"]'),'Custom color selection failed or did not close');
+ color().click(); await wait();
+ document.querySelector('[aria-label="#00000080"]').click(); await wait();
+ check(color().textContent==='#7F7F7F' && !document.querySelector('[role=alert]'),'Transparent custom color is invalid for PDF');
+ color().click(); await wait(); button('主题色').click(); await wait();
+ check(color().textContent==='主题色','Cannot restore theme color');
+ const monochrome=()=>{
+  for(const input of document.querySelectorAll('input[type=checkbox]')){
+   const rgb=getComputedStyle(input).backgroundColor.match(/\\d+/g).slice(0,3).map(Number);
+   check(Math.max(...rgb)-Math.min(...rgb)<=1,'Checkbox is not monochrome: '+rgb);
+  }
+ };
+ monochrome();
+ await capture('journal-mobile-unlocked');
+ color().click(); await wait(); await capture('journal-mobile-palette');
+ check(document.documentElement.scrollWidth<=innerWidth,'Unlocked mobile palette overflows');
+ color().click(); await wait();
+ await capture('journal-desktop');
+ document.querySelector('[aria-label="PDF 纸张"]').click(); await wait(); await capture('journal-dropdown');
+ document.querySelector('[data-select-value="a5"]').click(); await wait();
+ check(document.querySelector('[aria-label="PDF 纸张"]').textContent.includes('A5'),'Shared paper select failed');
+ color().click(); await wait(); await capture('journal-palette'); color().click(); await wait();
+ document.documentElement.dataset.themeMode='dark'; document.documentElement.dataset.customAppearanceEnabled='false'; await wait(); monochrome();
+ check(getComputedStyle(document.querySelector('.journal-export input[type=checkbox]:checked')).backgroundColor==='rgb(238, 238, 238)','Dark mode checkbox did not adapt to the app theme attribute');
+ await capture('journal-dark');
+ check(document.documentElement.scrollWidth<=innerWidth,'Unlocked desktop panel overflows');
+ passed.push('Shared paper/font dropdowns, theme reset, built-in/custom/alpha colors, independent fonts and monochrome checkboxes in light/dark mode');
+}
 async function run() {
  root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel data={data} onToast={(type,message)=>{toast={type,message};}} /></main>);
  await until(()=>button('导出手账 PDF'),'Panel did not mount');
@@ -72,11 +125,14 @@ async function run() {
  check(button('导出手账 PDF').disabled && document.querySelector('[role=alert]'),'Reversed dates allowed');
  await setInput('[aria-label="PDF 起始日期"]','20260801');
  await setInput('[aria-label="PDF 结束日期"]','20260831');
- label('日计划').click(); await wait();
+ check(document.querySelectorAll('.journal-export-part-group input[type=checkbox]').length===13,'Export switches are not grouped by page');
+ check(!label('日计划') && !label('日志图文') && !label('月复盘') && !label('周复盘'),'Data-source switches remain');
+ label('一日一页').click(); await wait();
  button('全选').click(); await wait();
- check([...document.querySelectorAll('input[type=checkbox]')].slice(0,JOURNAL_PART_GROUPS.flatMap(group=>group.items).length).every(input=>input.checked),'Select all omitted chapters');
+ check([...document.querySelectorAll('.journal-export-part-group input[type=checkbox]')].every(input=>input.checked),'Select all omitted pages');
  await capture('journal-mobile');
  check(document.documentElement.scrollWidth <= innerWidth,'Mobile form overflows horizontally');
+ if (${JSON.stringify(uiOnly)}) { await verifyAppearance(); window.__result={passed}; return; }
  // Simulate a font resource failure before any successful export.
  const originalFetch=window.fetch.bind(window);
  window.fetch=(url,...args)=>String(url).includes('LXGWWenKai')?Promise.reject(new Error('模拟字体读取失败')):originalFetch(url,...args);
@@ -84,7 +140,7 @@ async function run() {
  await until(()=>toast?.type==='error' && button('导出手账 PDF') && !button('导出手账 PDF').disabled,'Export failure did not recover controls');
  check(window.__exports.length===0,'Failed export downloaded a partial file');
  window.fetch=originalFetch;
- passed.push('Strict date validation, all eight sections, mobile bounds and font-failure recovery');
+ passed.push('Strict date validation, page-group selection, mobile bounds and font-failure recovery');
  toast=null; button('导出手账 PDF').click();
  await until(()=>button('取消'),'Cancel control did not appear'); button('取消').click();
  await until(()=>toast?.type==='info' && button('导出手账 PDF'),'Cancellation did not restore controls');
@@ -94,7 +150,7 @@ async function run() {
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===1&&toast?.type==='success';},'A4 export failed');
  check(window.__exports[0].name.endsWith('_20260801_20260831.pdf'),'Download filename does not match selected dates');
  window.__exports[0].name='journal-a4.pdf';
- passed.push('All eight chapters export a real A4 PDF with Chinese, emoji, time grids, separate logs and checks');
+ passed.push('All page groups export a real A4 PDF with Chinese, emoji, time grids, full logs and routines');
  document.querySelector('[aria-label="PDF 纸张"]').click(); await wait(); document.querySelector('[data-select-value="a5"]').click(); await wait();
  toast=null; button('导出手账 PDF').click();
  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===2&&toast?.type==='success';},'A5 export failed');
@@ -127,7 +183,12 @@ async function run() {
  window.__exports.push({name:'journal-mood-year-a4.pdf',base64:moodA4Base64});
  passed.push('A full 365-day compact annual mood-sticker example exports on A5');
  button('清空').click(); await wait(); check(button('导出手账 PDF').disabled,'Empty section selection allowed');
- label('日志图文').click(); await wait();
+ label('一日一页').click(); await wait();
+ const dailyExportIndex=window.__exports.length;
+ toast=null; button('导出手账 PDF').click();
+ await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===dailyExportIndex+1&&toast?.type==='success';},'Daily page group export failed');
+ window.__exports[dailyExportIndex].name='journal-daily-only.pdf';
+ passed.push('A single daily-page switch exports plans, full Log content, routines, summary/sticker and guidance together');
  // Direct byte export isolates selected-section behavior and empty date handling.
  const one=await createJournalPdf({...data,logs:[],todos:[],dailyReviews:[],goals:[],weeklyReviews:[]},{startDate:'2026-08-03',endDate:'2026-08-03',sections:['logs'],paperSize:'a5',includeCover:false,includeEmptyDays:true});
  check(one.pageCount===2,'Empty timeline should contain contents and a printable date');
@@ -149,21 +210,8 @@ async function run() {
  const blob=await(await fetch('/fonts/ZhuqueFangsong-Regular.woff2')).blob();
  await customFontStorageService.saveFont({id:'custom-export-test',displayName:'导出测试字体',familyName:'JournalCustomTest',fileName:'custom.woff2',format:'woff2',size:blob.size,createdAt:0,updatedAt:0,blob});
  await storePdf('font-uploaded.pdf',await createJournalPdf(sample,{...sampleOptions,printedFontId:'custom-export-test',contentFontId:'custom-export-test'}));
- RedemptionService.prototype.isVerified=async()=>({isVerified:true});
- document.documentElement.style.setProperty('--accent-color','#8844aa');
- root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel key="unlocked" data={data} onToast={(type,message)=>{toast={type,message};}} /></main>);
- await until(()=>document.querySelector('[aria-label="PDF 内容字体"]'),'Unlocked font controls did not mount');
- document.querySelector('[aria-label="PDF 内容字体"]').click(); await until(()=>[...document.querySelectorAll('[role=option]')].some(item=>item.textContent==='导出测试字体'),'Uploaded font absent from selector');
- document.querySelector('[data-select-value="custom-export-test"]').click(); await wait();
- check(document.querySelector('[aria-label="PDF 内容字体"]').textContent.includes('导出测试字体'),'Content font selection did not persist');
- check(document.querySelector('[aria-label="PDF 排版字体"]').textContent.includes('默认黑体'),'Content font changed layout font');
- check(document.querySelector('[aria-label="PDF 自定义主题色"]').value==='#8844aa','Theme color was not inherited');
- label('跟随主题').click(); await wait();
- await setInput('[aria-label="PDF 自定义主题色"]','#526b5d');
- check(document.querySelector('[aria-label="PDF 自定义主题色"]').value==='#526b5d','Custom color input failed');
+ await verifyAppearance(true);
  passed.push('All six cover layouts, six built-in fonts, an uploaded WOFF2 font, entitlement visibility and independent font/color controls');
- await capture('journal-desktop');
- document.documentElement.classList.add('dark'); await capture('journal-dark');
  window.__result={passed};
 }
 run().catch(error=>window.__result={error:String(error.stack||error),passed});
