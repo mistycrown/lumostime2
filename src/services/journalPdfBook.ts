@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Sizes contents capacity from the printable height of the selected paper.
  * @updated 2026-10-23: Uses concise covers, grouped reviews, multi-column body pages and integrated bar distributions.
  * @updated 2026-10-24: Honors independent annual/month/week/day part selections while retaining nested ordering.
+ * @updated 2026-10-24: Adds independently selectable annual and weekly time distributions beside the existing monthly statistics.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { Goal, MajorGoal } from '../types';
@@ -106,6 +107,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
       await check('正在排版年度内容');
       contents.push({ label: `${year} 年度`, page: w.pageCount + 1 });
       writeYear(w, year, yearDays);
+      if (has('yearStatistics')) writeJournalDistributions(w, String(year), yearDays);
     }
     for (const month of model.months.filter((key) => key.startsWith(String(year)))) {
       await check(`正在排版 ${month}`);
@@ -146,6 +148,7 @@ export const composeJournalBook = async (w: JournalPdfWriter, onProgress?: (prog
           writeReview(w, weekReview!);
         }
         seenWeeks.add(week);
+        if (first && has('weekStatistics')) writeJournalDistributions(w, week, weekDays);
         if (has('weekPlans') && monthWeekDays.some((day) => getJournalDayPlans(day).length)) {
           w.startPage(`周计划${first ? '' : ' 跨月续'}`, rangeLabel(monthWeekDays));
           w.beginColumns(model.options.paperSize === 'a4' ? 3 : 2);

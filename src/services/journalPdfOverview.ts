@@ -7,6 +7,7 @@
  * @updated 2026-10-23: Uses the book's paper orientation for overview and continuation pages.
  * @updated 2026-10-23: Uses Radix fills, readable 9pt calendar entries and half-pixel grid rules.
  * @updated 2026-10-23: Retains historical review groups and preserves the user schedule/category color settings.
+ * @updated 2026-10-24: Spaces review groups, questions and answers and supports the shared timeline axis geometry.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { DailyReview, MonthlyReview, WeeklyReview, ReviewTemplate } from '../types';
@@ -57,7 +58,7 @@ export const journalReviewLines = (review?: JournalReview, templates: ReviewTemp
   return lines;
 };
 
-export interface OverviewPanel { start: number; count: number; x: number; top: number; width: number; height: number; column: number }
+export interface OverviewPanel { start: number; count: number; x: number; top: number; width: number; height: number; column: number; reviewX?: number; reviewWidth?: number }
 
 /** The same eight logical columns are partitioned 4+4 on A5 and kept together on A4. */
 export const writeJournalOverview = (
@@ -73,18 +74,18 @@ export const writeJournalOverview = (
     const panel: OverviewPanel = { start: side * 4, count, x: w.margin, top: w.y, width: w.contentWidth, height: w.bottom - w.y - 10, column: w.contentWidth / count };
     draw(panel);
     if (panel.start + count === 8) {
-      const x = panel.x + (7 - panel.start) * panel.column + 9;
-      const width = panel.column - 18;
+      const x = panel.reviewX ?? panel.x + (7 - panel.start) * panel.column + 9;
+      const width = panel.reviewWidth ?? panel.column - 18;
       let y = panel.top;
       w.text(reviewLabel, x, y, 9, MUTED);
       y += 25;
       let block = 0;
       const lines = journalReviewLines(review, w.model.reviewTemplates).flatMap((line) => line.text.replace(/\r\n?/g, '\n').split('\n').flatMap((paragraph) => {
         const id = block++;
-        return w.wrap(paragraph, width, 9, line.role).map((text) => ({ text, role: line.role, block: id }));
+        return w.wrap(paragraph, width, 9, line.role).map((text, index) => ({ ...line, text, block: id, gap: index ? 0 : line.level === 'group' ? 12 : line.level === 'question' ? 8 : line.role === 'hand' ? 3 : 6 }));
       }));
       for (let i = 0; i < lines.length; i++) {
-        if (y + 12 > panel.top + panel.height - 15) {
+        if (y + lines[i].gap + 12 > panel.top + panel.height - 15) {
           for (const rest of lines.slice(i)) {
             const previous = remaining[remaining.length - 1] as (ReviewLine & { block: number }) | undefined;
             if (previous?.block === rest.block) previous.text += rest.text;
@@ -93,6 +94,7 @@ export const writeJournalOverview = (
           break;
         }
         const line = lines[i];
+        y += line.gap;
         w.text(line.text, x, y, 9, line.role === 'print' ? MUTED : INK, line.role);
         y += 13.5;
       }
@@ -101,7 +103,10 @@ export const writeJournalOverview = (
   }
   if (remaining.length) {
     w.startPage(`${reviewLabel} 续`, subtitle);
-    remaining.forEach((line) => w.paragraph(line.text, w.bodySize, line.role === 'print' ? MUTED : INK, 0, line.role));
+    remaining.forEach((line) => {
+      w.ensure(35); w.y += line.level === 'group' ? 12 : line.level === 'question' ? 8 : 3;
+      w.paragraph(line.text, w.bodySize, line.role === 'print' ? MUTED : INK, 0, line.role);
+    });
   }
 };
 

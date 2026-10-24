@@ -20,6 +20,7 @@ import { writeAnnualMood } from './journalPdfMood';
 import { writeJournalDistributions } from './journalPdfStatistics';
 import { journalDataColor } from './journalPdfTheme';
 import { journalDemoData } from '../../scripts/fixtures/journal-demo';
+import { writeWeeklyTimeline } from './journalPdfTimeline';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -31,6 +32,58 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it('uses application badge names and keeps each Log reaction beside its own title', async () => {
+    const source = { ...data,
+      todos: [{ id: 't', title: '排期事件', categoryId: 'c', scheduledDate: '2026-10-19', deadlineDate: '2026-10-19', isCompleted: false }],
+      logs: [{ id: 'a', categoryId: 'c', activityId: 'a', title: '日志甲', reactions: ['赞', 'image:missing-sticker'], startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 10).getTime(), duration: 3600 }, { id: 'b', categoryId: 'c', activityId: 'a', title: '日志乙', reactions: ['好'], startTime: new Date(2026, 9, 19, 11).getTime(), endTime: new Date(2026, 9, 19, 12).getTime(), duration: 3600 }]
+    };
+    const w = await make('a5', { sections: ['daily', 'logs'] }, source);
+    const calls: string[] = []; const text = w.text.bind(w);
+    w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
+    await composeJournalPdf(w);
+    expect(calls).toEqual(expect.arrayContaining(['DUE', '日志甲 赞', '日志乙 好']));
+    expect(calls.some((value) => /Reaction|Complete|^Do$|missing-sticker/.test(value))).toBe(false);
+  });
+  it('keeps a continuation rail beside every column of one long Log', async () => {
+    const source = { ...data, logs: [{ id: 'long', categoryId: 'c', activityId: 'a', title: '长篇日志', note: '跨栏原文保留。'.repeat(900), startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 10).getTime(), duration: 3600 }] };
+    const w = await make('a5', { sections: ['logs'] }, source);
+    const rails = new Set<string>(); const notes = new Set<string>();
+    const start = w.startPage.bind(w); const text = w.text.bind(w);
+    w.startPage = (...args) => {
+      start(...args); const page = w.page; const draw = page.drawLine.bind(page);
+      page.drawLine = (options) => {
+        if (options?.start && options.end && options.start.x === options.end.x) rails.add(`${w.pdf.getPages().indexOf(page)}:${Math.round(options.start.x)}`);
+        draw(options);
+      };
+    };
+    w.text = (value, x, ...args) => { if (value.includes('跨栏原文')) notes.add(`${w.pdf.getPages().indexOf(w.page)}:${Math.round(x - 9)}`); text(value, x, ...args); };
+    await composeJournalPdf(w);
+    expect(notes.size).toBeGreaterThan(2);
+    notes.forEach((key) => expect(rails.has(key)).toBe(true));
+  });
+  it('prints the hour axis only on the left A5 timeline and uses activity titles with short notes', async () => {
+    const source = { ...data, categories: [{ id: 'c', name: '分类', icon: '', themeColor: '#123456', activities: [{ id: 'a', name: '阅读', icon: '', color: '#123456' }] }], logs: [{ id: 'a', categoryId: 'c', activityId: 'a', title: '不应出现在概览的自定义标题', note: '短备注'.repeat(80), startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 13).getTime(), duration: 14400 }] };
+    const w = await make('a5', { startDate: '2026-10-19', endDate: '2026-10-25' }, source);
+    const calls: { page: number; text: string; size: number }[] = []; const text = w.text.bind(w);
+    w.text = (value, x, y, size = 9, ...args) => { calls.push({ page: w.pageCount, text: value, size }); text(value, x, y, size, ...args); };
+    writeWeeklyTimeline(w, '2026-10-19', w.model.days);
+    expect(calls.filter((call) => call.text === '00:00')).toHaveLength(1);
+    expect(calls.filter((call) => call.text === '24:00')).toHaveLength(1);
+    expect(calls.filter((call) => call.text === '阅读')).toHaveLength(1);
+    expect(calls.find((call) => call.text === '阅读')?.size).toBe(7.5);
+    expect(calls.some((call) => call.text.includes('不应出现'))).toBe(false);
+    expect(calls.some((call) => call.text.endsWith('…'))).toBe(true);
+  });
+  it('adds independently selectable yearly and weekly Time Distribution pages', async () => {
+    const parts = ['yearStatistics', 'weekStatistics'] as const;
+    const w = await make('a4', { startDate: '2026-08-01', endDate: '2026-08-31', parts: [...parts], sections: journalSectionsForParts([...parts]) }, journalDemoData);
+    const titles: string[] = []; const start = w.startPage.bind(w);
+    w.startPage = (value, ...args) => { titles.push(value); start(value, ...args); };
+    await composeJournalPdf(w);
+    expect(titles).toContain('2026 时间分布');
+    expect(titles).toContain('2026-08-03 时间分布');
+    expect(titles.some((title) => title === '2026-08 时间分布' || title.includes('周计划'))).toBe(false);
+  });
   it.each(['minimal', 'classic', 'abstract'] as const)('adapts the supplied %s cover to both orientations', async (coverStyle) => {
     for (const size of ['a4', 'a5'] as const) {
       const w = await make(size, { includeCover: true, coverStyle, accentColor: '#8844aa' });
@@ -73,7 +126,8 @@ describe('PDF pagination with bundled Chinese font', () => {
     writeJournalDistributions(w, '2026-08', w.model.days);
     expect(w.pageCount).toBe(1);
     expect(labels).not.toContain('2026-08 Statistics');
-    for (const label of ['一级标签', '二级标签', '关键字', '领域', '待办分类', '待办']) expect(labels).toContain(label);
+    for (const label of ['标签', '领域', '待办']) expect(labels).toContain(label);
+    expect(labels).not.toContain('关键字');
     expect(labels.join('')).toContain('给妈妈寄明信片');
   });
   it('renders A4 annual moods as twelve calendars and places every sticker on its original date', async () => {
@@ -106,10 +160,10 @@ describe('PDF pagination with bundled Chinese font', () => {
     w.text = (value, x, y, size = w.bodySize, ...args) => { calls.push({ value, size }); text(value, x, y, size, ...args); };
     await composeJournalPdf(w);
     expect(calls.filter((call) => call.value === 'Surf')).toHaveLength(1);
-    expect(calls.map((call) => call.value)).toEqual(expect.arrayContaining(['#运动', '%健康', '@海边练习', '◬海边日常', 'Arrange']));
+    expect(calls.map((call) => call.value)).toEqual(expect.arrayContaining(['#运动', '%健康', '@海边练习', '◬海边日常', 'ARR', 'TRA']));
     expect(calls.some((call) => /\[[ x]\]|领域|关联待办|关键字|排期 已完成/.test(call.value))).toBe(false);
-    expect(calls.find((call) => call.value === '引导')?.size).toBe(24);
-    expect(calls.find((call) => call.value === '日常发现')?.size).toBe(12);
+    expect(calls.find((call) => call.value === '引导')?.size).toBe(12);
+    expect(calls.find((call) => call.value === '日常发现')?.size).toBe(9);
     expect(calls.find((call) => call.value === '想记住什么？')?.size).toBe(9);
   });
   it.each(['a4', 'a5'] as const)('keeps the independent %s cover within bounds without quoting a daily summary', async (size) => {
@@ -337,7 +391,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     expect(calls.filter((value) => value === '唯一计划备注')).toHaveLength(1);
     expect(calls).toContain('第二段正文');
     expect(calls.some((value) => value.includes('提交课程'))).toBe(true);
-    expect(calls).toContain('Do');
+    expect(calls).toContain('DUE');
   });
   it('keeps weekly colored time grids separate from detailed log notes', async () => {
     const source: JournalExportData = { ...data, logs: [{ id: 'a', activityId: 'a', categoryId: 'c', title: '阅读记录', note: '完整正文只属于日志', startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 12).getTime(), duration: 10800 }] };
@@ -351,7 +405,7 @@ describe('PDF pagination with bundled Chinese font', () => {
     };
     await composeJournalPdf(w);
     expect(seen.some((entry) => entry.chapter === 'Weekly Timeline' && entry.text === '24:00')).toBe(true);
-    expect(seen.find((entry) => entry.text === '完整正文只属于日志')?.chapter).toBe('时间线 日志');
+    expect(seen.some((entry) => entry.chapter === '时间线 日志' && entry.text === '完整正文只属于日志')).toBe(true);
   });
   it('honors selected chapters and cancellation, and creates a usable empty book', async () => {
     const w = await make('a4');

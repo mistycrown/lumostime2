@@ -10,7 +10,8 @@
  * @updated 2026-10-23: Snapshots keyword, scope and todo identities for six actual-time distributions.
  * @updated 2026-10-23: Resolves historical Log fields and retains planned record metadata alongside deduplicated task plans.
  * @updated 2026-10-23: Projects Collection membership and current review templates, preserving authored colors without palette remapping.
- * @updated 2026-10-24: Maps seventeen independent parts to backward-compatible chapters and accepts per-export appearance.
+ * @updated 2026-10-24: Maps nineteen independent parts to backward-compatible chapters and accepts per-export appearance.
+ * @updated 2026-10-24: Exposes original calendar badges and merges dated events with linked planned blocks.
  */
 import type { Category, CheckItem, DailyReview, DataCollection, DataCollectionEntry, Goal, Log, MajorGoal, MonthlyReview, ReviewTemplate, Scope, TodoCategory, TodoItem, WeeklyReview } from '../types';
 import { buildTodoDateEntryMap, formatDateKey, getStartOfWeek, parseDateKey, type TodoDateEntry } from './todoScheduleUtils';
@@ -23,6 +24,7 @@ import { DEFAULT_TODO_SCHEDULE_TYPE_COLORS, type TodoScheduleTypeColorKey } from
 import { getLogMatchedDetailTimelineKeywords, syncActivityKeywordsWithAttribute } from './detailTimelineKeywordUtils';
 import { getNormalizedScopeIds } from './scopeStatsUtils';
 import { journalLogFields, type JournalField } from './journalLogContent';
+import { TODO_SCHEDULE_BADGES } from './todoScheduleLabels';
 
 export const JOURNAL_SECTIONS = [
   { id: 'yearly', label: '年度回顾与目标' },
@@ -36,9 +38,9 @@ export const JOURNAL_SECTIONS = [
 ] as const;
 export type JournalSection = typeof JOURNAL_SECTIONS[number]['id'];
 export const JOURNAL_PART_GROUPS = [
-  { label: '年度', items: [ { id: 'annualReview', label: '年度回顾', section: 'yearly' }, { id: 'goals', label: '目标与子目标', section: 'yearly' }, { id: 'mood', label: '心情年历', section: 'yearly' }, { id: 'oneLine', label: '每日一句话', section: 'yearly' } ] },
+  { label: '年度', items: [ { id: 'annualReview', label: '年度回顾', section: 'yearly' }, { id: 'goals', label: '目标与子目标', section: 'yearly' }, { id: 'mood', label: '心情年历', section: 'yearly' }, { id: 'yearStatistics', label: '时间分布与统计', section: 'yearly' }, { id: 'oneLine', label: '每日一句话', section: 'yearly' } ] },
   { label: '每月', items: [ { id: 'monthCalendar', label: '月历', section: 'monthly' }, { id: 'monthAgenda', label: '日程明细', section: 'monthly' }, { id: 'monthReview', label: '月复盘', section: 'reviews' }, { id: 'monthChecks', label: '月打卡', section: 'checks' }, { id: 'monthStatistics', label: '时间分布与统计', section: 'checks' } ] },
-  { label: '每周', items: [ { id: 'weekPlans', label: '周计划', section: 'weekly' }, { id: 'weekTimeline', label: '周时间轴', section: 'timeline' }, { id: 'weekReview', label: '周复盘', section: 'reviews' } ] },
+  { label: '每周', items: [ { id: 'weekPlans', label: '周计划', section: 'weekly' }, { id: 'weekTimeline', label: '周时间轴', section: 'timeline' }, { id: 'weekStatistics', label: '时间分布与统计', section: 'weekly' }, { id: 'weekReview', label: '周复盘', section: 'reviews' } ] },
   { label: '每日', items: [ { id: 'dayPlans', label: '日计划', section: 'daily' }, { id: 'dayLogs', label: '日志图文', section: 'logs' }, { id: 'dayChecks', label: '日课', section: 'daily' }, { id: 'daySummary', label: '总结与贴纸', section: 'daily' }, { id: 'dayReview', label: '引导', section: 'reviews' } ] }
 ] as const;
 export type JournalPart = typeof JOURNAL_PART_GROUPS[number]['items'][number]['id'];
@@ -202,6 +204,7 @@ export interface JournalCalendarEntry {
   color?: string;
   notes: { key: string; text: string }[];
   logs: JournalLog[];
+  badges?: { key: string; label: string; color: string }[];
 }
 
 export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
@@ -214,7 +217,8 @@ export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
     colorKey: entry.todo.categoryId,
     color: undefined as string | undefined,
     notes: entry.todo.note ? [{ key: `todo:${entry.todo.id}`, text: entry.todo.note }] : [],
-    logs: [] as JournalLog[]
+    logs: [] as JournalLog[],
+    badges: TODO_SCHEDULE_BADGES.filter((badge) => entry.badges[badge.key])
   }));
   day.logs.filter((log) => log.source.isPlanned).forEach((log) => {
     const linked = entries.find((entry) => entry.key === `todo:${log.source.linkedTodoId}`);
@@ -224,7 +228,7 @@ export const getJournalDayPlans = (day: JournalDay): JournalCalendarEntry[] => {
       linked.color = log.color;
       if (!linked.times.includes(time)) linked.times.push(time);
       if (log.source.note && !linked.notes.some((note) => note.text === log.source.note)) linked.notes.push({ key: `log:${log.source.id}`, text: log.source.note });
-    } else entries.push({ key: `log:${log.source.id}`, title: log.source.title || log.activity, label: '计划', times: [time], completed: false, colorKey: log.category, color: log.color, notes: log.source.note ? [{ key: `log:${log.source.id}`, text: log.source.note }] : [], logs: [log] });
+    } else entries.push({ key: `log:${log.source.id}`, title: log.source.title || log.activity, label: '计划', times: [time], completed: false, colorKey: log.category, color: log.color, notes: log.source.note ? [{ key: `log:${log.source.id}`, text: log.source.note }] : [], logs: [log], badges: TODO_SCHEDULE_BADGES.filter((badge) => badge.key === 'planned') });
   });
   return entries;
 };

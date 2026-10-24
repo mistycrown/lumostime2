@@ -8,6 +8,7 @@
 @updated 2026-10-23: Requires every A4 page to be landscape and every A5 page to be portrait.
 @updated 2026-10-23: Checks independent covers, direct check counts, compact columns and six donut dimensions.
 @updated 2026-10-23: Checks English headings, four readable type tiers, half-pixel rules and complete rich Logs.
+@updated 2026-10-24: Checks branded covers, shared badge names, nested year/month/week statistics and a single spread axis.
 """
 from pathlib import Path
 import json
@@ -43,16 +44,17 @@ def inspect(filename):
         return inspect_mood_year(source)
     document = fitz.open(source)
     text = '\n'.join(page.get_text() for page in document)
+    body = '\n'.join(page.get_text() for page in document if 'Weekly Timeline' not in next(iter(page.get_text().splitlines()), ''))
     continuous = text.replace('\n', '')
     assert 'Contents' in text and 'Goals' in text, 'Missing contents/annual data'
     for title in ['Monthly Planner', 'Weekly Planner', '一日一页', 'Weekly Timeline', '日志', 'Habit Tracker', '引导', '每周回顾', 'Time Distribution', 'One Line a Day']:
         assert title in text, f'Missing chapter: {title}'
-    assert text.count('把这页书的余味留给明天。') == 1, 'Full log note repeated across chapters or lost'
-    assert text.count('关灯前，把它抄在了纸上。') == 1, 'Overnight log note duplicated on the second date'
-    assert text.count('周五前发给设计组讨论。') == 1, 'Plan note repeated at schedule/deadline or across chapters'
+    assert body.count('把这页书的余味留给明天。') == 1, 'Full log note repeated across chapters or lost'
+    assert body.count('关灯前，把它抄在了纸上。') == 1, 'Overnight log note duplicated on the second date'
+    assert body.count('周五前发给设计组讨论。') == 1, 'Plan note repeated at schedule/deadline or across chapters'
     assert '2/3' in text, 'Counted check missing'
     assert '计数明细' not in text, 'Counted checks still have a redundant appendix'
-    for value in ['阅读页数', '32 页', '小说 / 随笔', '摘录感受', '进度增量', '@产品方案初稿', '%学习成长', '#学习与创作', '夏日阅读', '专注评分', '心情评分', 'Reaction', '评论', '旧书', '夏日散步']:
+    for value in ['阅读页数', '32 页', '小说 / 随笔', '摘录感受', '进度增量', '@产品方案初稿', '%学习成长', '#学习与创作', '夏日阅读', '专注评分', '心情评分', '评论', '旧书', '夏日散步']:
         assert value in continuous, f'Missing rich Log field: {value}'
     assert continuous.count('下次读书会可以从这一章开始。') == 1, 'Comment lost or duplicated'
     assert continuous.count('把摘录和照片一起留在这里。') == 1, 'Comment paragraphs lost or duplicated'
@@ -125,7 +127,8 @@ def inspect(filename):
             pixmap.save(output / 'daily-detail.png')
         if titles[-1]['title'].startswith('2026-08-03') and '一日一页' in page.get_text():
             pixmap.save(output / f'rich-log-{index + 1}.png')
-    assert all(span['size'] >= 8.99 and any(abs(span['size'] - size) < 0.01 for size in [9, 12, 24, 64]) for span in spans), 'Unexpected print font size'
+    assert all(any(abs(span['size'] - size) < 0.01 for size in [7.5, 9, 12, 24, 64]) for span in spans), 'Unexpected print font size'
+    assert all(span['size'] >= 8.99 or 'Weekly Timeline' in titles[span['page'] - 1]['title'] for span in spans), 'Compact type escaped weekly blocks'
     assert not issues, json.dumps(issues, ensure_ascii=False)
     assert calendar_pages and ('产品' in ''.join(calendar_pages) or '方案' in ''.join(calendar_pages)), 'Month grid contains no readable schedules'
     assert '月度回顾' in ''.join(calendar_pages) and '日子很长' in ''.join(calendar_pages), 'Month review/cite missing from eighth column'
@@ -141,7 +144,10 @@ def inspect(filename):
         # A paragraph starting in the next column already has a physical flow break.
         margin = 28 if 'a5' in source.stem else 40
         assert paragraph['bbox'][0] > margin + 25 or paragraph['page'] > 2, 'Paragraph separation was lost'
-    assert timeline_pages and all('00:00' in page.get_text() and '24:00' in page.get_text() for page in timeline_pages), 'Timeline is not a 24-hour grid'
+    assert timeline_pages
+    for page in timeline_pages:
+        right = '右页' in page.get_text()
+        assert ('00:00' in page.get_text()) != right and ('24:00' in page.get_text()) != right, 'Hour axis repeated on right page or missing on left'
     populated = [page for page in timeline_pages if '2026-08-10 — 2026-08-16' in page.get_text()]
     assert 'MON' in ''.join(page.get_text() for page in populated) and 'SUN' in ''.join(page.get_text() for page in populated), 'Seven-day overview incomplete'
     assert sum(len([drawing for drawing in page.get_drawings() if drawing.get('fill')]) for page in populated) > 40, 'Populated timeline lacks colored activity blocks'
@@ -149,10 +155,14 @@ def inspect(filename):
     assert 'Weekly Timeline' not in document[paragraph['page'] - 1].get_text().splitlines()[0], 'Log body in weekly overview'
     statistics = [page for page, title in zip(document, titles) if 'Time Distribution' in title['title']]
     stat_text = ''.join(page.get_text() for page in statistics)
-    for label in ['一级标签', '二级标签', '关键字', '领域', '待办分类', '待办', '关联时长']:
+    for label in ['标签', '领域', '待办', '关联时长']:
         assert label in stat_text, f'Missing distribution dimension: {label}'
+    assert '关键字' not in stat_text and '二级标签' not in stat_text, 'Statistics are not nested or still contain keywords'
     assert sum(len([drawing for drawing in page.get_drawings() if drawing.get('fill')]) for page in statistics) > 20, 'Bar charts are missing'
-    assert len(statistics) == 1, 'Sample statistics should fit a single integrated page'
+    assert any(title['title'] == '2026 Time Distribution' for title in titles), 'Annual statistics missing'
+    assert any(title['title'].startswith('2026-08-03') and 'Time Distribution' in title['title'] for title in titles), 'Weekly statistics missing'
+    assert all('Do\n' not in page.get_text() and 'Complete\n' not in page.get_text() and 'Reaction' not in page.get_text() for page in document), 'Old badges/reaction headings remain'
+    assert 'LumosTime' in document[0].get_text(), 'Cover wordmark missing'
     def has_color(pages, color):
         return any(drawing.get('fill') and all(abs(drawing['fill'][i] - color[i]) < 0.002 for i in range(3)) for page in pages for drawing in page.get_drawings())
     assert has_color(statistics, (0x52 / 255, 0x6b / 255, 0x5d / 255)), 'Statistics did not retain the user category color'

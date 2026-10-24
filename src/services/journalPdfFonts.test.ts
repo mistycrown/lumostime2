@@ -24,7 +24,7 @@ describe('compressed journal fonts', () => {
     expect(fontStreams).toHaveLength(1);
     const embedded = fontkit.create(fontStreams[0]);
     // The subset has no standalone cmap, so inspect its remapped glyph IDs directly.
-    expect(Array.from({ length: embedded.numGlyphs }, (_, id) => embedded.getGlyph(id).path.commands.length).filter(Boolean).length).toBeGreaterThan(10);
+    expect(Array.from({ length: embedded.numGlyphs }, (_, id) => embedded.getGlyph(id).path.toSVG().length).filter(Boolean).length).toBeGreaterThan(10);
     const original = fontkit.create(source);
     const text = '2026Life春山与秋水';
     const glyphIds = font.encodeText(text).asString().match(/.{4}/g)!.map((hex) => parseInt(hex, 16));

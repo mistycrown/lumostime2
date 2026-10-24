@@ -1,5 +1,6 @@
 /**
  * @file TodoMonthView.tsx
+ * @updated 2026-10-24: Shares existing detail badge labels and tones with journal PDF agendas.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Todo items, logs, a reference date, and an optional todo-open callback
  * @output Reference-style rolling month schedule UI backed by real daily todo data
@@ -19,6 +20,7 @@
  * @updated 2026-09-12: Added explicit min-size constraints and contained touch scrolling to prevent Android WebView viewport-edge clipping.
  * @updated 2026-09-12: Moved the month filter section above the cell-height settings in the month-view settings popup.
  */
+import { getTodoScheduleBadgeLabel, TODO_SCHEDULE_BADGES } from '../utils/todoScheduleLabels';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, ChevronLeft, ChevronRight, CircleAlert, Diff, Flag, Pencil, Plus, Repeat2, SlidersHorizontal, Trash2, TrendingUp } from 'lucide-react';
@@ -209,35 +211,9 @@ const getMonthEntryLeadingIcon = (entry: TodoDateEntry): React.ReactNode => {
   return <ChevronRight size={12} className={iconClassName} />;
 };
 
-const MONTH_VIEW_ENTRY_TAGS: Array<{
-  key: keyof TodoDateEntry['badges'];
-  label: string;
-  color: string;
-  clickable: boolean;
-}> = [
-    { key: 'deadline', label: 'Due', color: '#8f6f6b', clickable: true },
-    { key: 'scheduled', label: 'Arrange', color: '#7c8b97', clickable: true },
-    { key: 'recurring', label: 'Repeat', color: '#8b8f79', clickable: true },
-    { key: 'maybe', label: 'Maybe', color: '#a58863', clickable: true },
-    { key: 'planned', label: 'Plan', color: '#8377a1', clickable: true },
-    { key: 'completed', label: 'Done', color: '#7f8c84', clickable: true },
-    { key: 'inProgress', label: 'Trace', color: '#8b8096', clickable: true }
-  ];
+const MONTH_VIEW_ENTRY_TAGS = TODO_SCHEDULE_BADGES;
 
-const getMonthEntryTagLabel = (
-  tag: typeof MONTH_VIEW_ENTRY_TAGS[number],
-  activeTagCount: number
-): string => {
-  if (activeTagCount <= 1) {
-    return tag.label;
-  }
-
-  if (tag.key === 'deadline' || tag.key === 'completed' || tag.key === 'planned') {
-    return tag.label;
-  }
-
-  return tag.label.slice(0, 3);
-};
+const getMonthEntryTagLabel = getTodoScheduleBadgeLabel;
 
 const getMonthEntryToneClassName = (primaryKind: TodoDateEntry['primaryKind']): string => {
   if (

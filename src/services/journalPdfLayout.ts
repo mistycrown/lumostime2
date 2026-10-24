@@ -12,16 +12,18 @@
  * @updated 2026-10-23: Keeps four readable print tiers and styled inline nodes, plus measured rich-content column flow.
  * @updated 2026-10-23: Renders real aligned checkboxes and inline schedule badges instead of Markdown markers.
  * @updated 2026-10-24: Keeps accents local to each export and falls back for missing selected-font glyphs.
+ * @updated 2026-10-24: Reuses application text badges, places per-Log reactions inline and continues rails through every column/page.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
 import { parseDateKey } from '../utils/todoScheduleUtils';
 import { JOURNAL_STROKE } from '../utils/journalTheme';
 import { JOURNAL_COLORS as C, journalPdfColor } from './journalPdfTheme';
-import { writeJournalLogDetails } from './journalPdfLogDetails';
+import { journalLogReactions, writeJournalLogDetails, writeJournalLogTitle } from './journalPdfLogDetails';
 import { journalPageTitle } from '../utils/journalTitles';
 import { journalNoteRuns, wrapJournalNoteRuns, type JournalNoteRun } from '../utils/journalLogContent';
 import { journalDataColor } from './journalPdfTheme';
+import { getTodoScheduleBadgeLabel } from '../utils/todoScheduleLabels';
 
 
 export const JOURNAL_FONT_FAMILY = 'LumosJournal';
@@ -54,6 +56,9 @@ export class JournalPdfWriter {
   private fallbackCharacters: Set<number>;
   private printedNotes = new Set<string>();
   private printedLogDetails = new Set<string>();
+  private printedLogReactions = new Set<string>();
+  private smallType?: number;
+  private logRail?: { page: PDFPage; x: number; top: number };
   private blankPages = new Set<PDFPage>();
   private coverPages = new Set<PDFPage>();
   private columns: { index: number; count: number; top: number; width: number; gap: number; bottom: number } | undefined;
@@ -81,6 +86,7 @@ export class JournalPdfWriter {
 
   private printSize(size: number): number {
     if (size === 1) return 1; // Unit-size measurement for fitting a value without changing its font tier.
+    if (this.smallType) return this.smallType;
     return size >= 48 ? 64 : size >= 18 ? 24 : size >= 11.5 ? 12 : 9;
   }
 
@@ -186,6 +192,31 @@ export class JournalPdfWriter {
     return true;
   }
 
+  claimLogReactions(id: string): boolean {
+    if (this.printedLogReactions.has(id)) return false;
+    this.printedLogReactions.add(id);
+    return true;
+  }
+
+  withSmallType(size: number, draw: () => void): void {
+    const previous = this.smallType;
+    this.smallType = size;
+    try { draw(); } finally { this.smallType = previous; }
+  }
+
+  private flushLogRail(bottom: number): void {
+    const rail = this.logRail;
+    if (!rail || bottom <= rail.top) return;
+    const height = rail.page.getHeight();
+    rail.page.drawLine({ start: { x: rail.x, y: height - rail.top }, end: { x: rail.x, y: height - bottom }, color: LINE, thickness: JOURNAL_STROKE });
+  }
+
+  withLogRail(draw: () => void): void {
+    this.logRail = { page: this.page, x: this.margin + 3, top: this.y + 8 };
+    try { draw(); }
+    finally { this.flushLogRail(this.y - 4); this.logRail = undefined; }
+  }
+
   fitted(value: string, width: number, size: number, role: JournalTextRole = 'print'): string {
     const first = value.replace(/\r\n?/g, '\n').split('\n')[0];
     if (this.widthOf(first, size, role) <= width && first === value) return value;
@@ -226,14 +257,21 @@ export class JournalPdfWriter {
   ensure(height: number): boolean {
     if (this.columns && height > this.columns.bottom - this.columns.top) this.columns.bottom = Math.min(this.pageBottom, this.columns.top + height);
     if (this.y + height <= this.bottom) return false;
+    this.flushLogRail(Math.min(this.y, this.bottom));
     if (this.columns) {
       const columns = this.columns;
-      if (columns.index < columns.count - 1) { columns.index++; this.y = columns.top; return true; }
+      if (columns.index < columns.count - 1) {
+        columns.index++; this.y = columns.top;
+        if (this.logRail) this.logRail = { page: this.page, x: this.margin + 3, top: this.y };
+        return true;
+      }
       this.startPage(this.title, this.subtitle, true);
       this.beginColumns(columns.count);
+      if (this.logRail) this.logRail = { page: this.page, x: this.margin + 3, top: this.y };
       return true;
     }
     this.startPage(this.title, this.subtitle, true);
+    if (this.logRail) this.logRail = { page: this.page, x: this.margin + 3, top: this.y };
     return true;
   }
 
@@ -372,35 +410,49 @@ export const stats = (days: JournalDay[]): string => `${formatJournalDuration(da
 export const writePlans = (w: JournalPdfWriter, day: JournalDay, notes = false, details = false): void => {
   getJournalDayPlans(day).forEach((entry) => {
     w.ensure(32);
-    const badge = entry.completed ? 'Complete' : ({ '截止': 'Do', '重复': 'Repeat', '待定': 'Maybe', '排期': 'Arrange', '计划': 'Plan', '已放弃': 'Abandon' }[entry.label] || entry.label);
-    const badgeWidth = w.widthOf(badge, 9) + 10;
-    const kind = entry.completed ? 'completed' : ({ '截止': 'deadline', '重复': 'recurring', '待定': 'maybe', '排期': 'scheduled', '计划': 'planned', '已放弃': 'maybe' }[entry.label] || 'scheduled');
-    const color = entry.color || (w.model.calendarStyle.colorMode === 'category' ? w.model.calendarStyle.categoryColors[entry.colorKey] : (w.model.calendarStyle.colors as Record<string, string>)[kind]);
+    const badges = (entry.badges || []).map((badge) => ({ ...badge, label: getTodoScheduleBadgeLabel(badge, entry.badges!.length).toUpperCase() }));
+    const badgeWidth = badges.reduce((sum, badge) => sum + w.widthOf(badge.label, 9) + 8, 0);
     const first = w.y;
-    w.checkbox(w.margin, first + 1, entry.completed);
-    w.rect(w.margin + w.contentWidth - badgeWidth, first - 1, badgeWidth, 14, journalDataColor('', color, 0.7));
-    w.text(badge, w.margin + w.contentWidth - badgeWidth + 5, first + 1, 9, INK);
-    w.wrap(entry.title, w.contentWidth - 18 - badgeWidth - 8, 9, 'hand').forEach((line) => {
+    w.checkbox(w.margin, first + 2.25, entry.completed);
+    const inline = badgeWidth < w.contentWidth * 0.45;
+    let badgeX = inline ? w.margin + w.contentWidth - badgeWidth : w.margin + 18;
+    const drawBadges = (top: number) => {
+      let row = top;
+      badges.forEach((badge) => {
+        const width = w.widthOf(badge.label, 9);
+        if (badgeX + width > w.margin + w.contentWidth) {
+          w.y = row + 13.5; w.ensure(13.5); row = w.y; badgeX = w.margin + 18;
+        }
+        w.text(badge.label, badgeX, row, 9, journalDataColor('', badge.color));
+        badgeX += width + 8;
+      });
+      return row;
+    };
+    if (inline) drawBadges(first);
+    const single = entry.logs.length === 1 && (entry.logs[0].source.title || entry.logs[0].activity) === entry.title ? entry.logs[0] : undefined;
+    const reactions = details && single && w.claimLogReactions(single.source.id) ? journalLogReactions(single) : [];
+    const title = entry.title + (reactions.length ? ` ${reactions.join(' ')}` : '');
+    w.wrap(title, w.contentWidth - 18 - (inline ? badgeWidth + 8 : 0), 9, 'hand').forEach((line) => {
       w.ensure(13.5); w.text(line, w.margin + 18, w.y, 9, INK, 'hand'); w.y += 13.5;
     });
     w.y += 3;
+    if (!inline) { w.ensure(13.5); w.y = drawBadges(w.y) + 16.5; }
     if (entry.times.length) w.paragraph(entry.times.join(' / '), 9, MUTED, 18, 'print');
     if (notes) entry.notes.forEach((note) => w.noteOnce(note.key, note.text, 18));
-    if (details) entry.logs.forEach((log) => writeJournalLogDetails(w, log));
+    if (details) entry.logs.forEach((log) => writeJournalLogDetails(w, log, !single));
   });
 };
 
 export const writeLogs = (w: JournalPdfWriter, day: JournalDay, notes = true): void => {
   day.logs.filter((log) => !log.source.isPlanned).forEach((log) => {
     w.ensure(45);
-    const page = w.page;
     const top = w.y;
-    const left = w.margin;
     w.page.drawCircle({ x: w.margin + 3, y: w.height - top - 4, size: 2, color: w.accentColor });
-    w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)} ${formatJournalDuration(log.seconds)}`, 8, ACCENT, 12, 'print');
-    w.paragraph(log.source.title || log.activity, w.bodySize + 1, INK, 12);
-    if (notes) writeJournalLogDetails(w, log);
-    if (w.page === page && w.margin === left) w.verticalLine(left + 3, top + 8, Math.max(0, w.y - top - 12));
+    w.withLogRail(() => {
+      w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)} ${formatJournalDuration(log.seconds)}`, 9, ACCENT, 12, 'print');
+      writeJournalLogTitle(w, log);
+      if (notes) writeJournalLogDetails(w, log);
+    });
     w.rule();
   });
 };

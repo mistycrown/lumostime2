@@ -4,6 +4,7 @@
  * @output Concise English display titles without decorative eyebrows
  * @pos Utility (Journal typography)
  * @updated 2026-10-23: Keeps field labels and authored content Chinese while translating major headings.
+ * @updated 2026-10-24: Translates date-prefixed weekly distribution headings as well as year/month headings.
  */
 const headings: Record<string, string> = {
   '目录': 'Contents', '年度回顾': 'Year in Review', '目标与子目标': 'Goals',
@@ -16,7 +17,7 @@ const headings: Record<string, string> = {
 export const journalPageTitle = (title: string): string => {
   const day = title.match(/^(\d{4}-\d{2}-\d{2})\s+周([日一二三四五六])$/);
   if (day) return `${day[1]} ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']['日一二三四五六'.indexOf(day[2])]}`;
-  const prefix = title.match(/^(\d{4}(?:-\d{2})?) (.+)$/);
+  const prefix = title.match(/^(\d{4}(?:-\d{2}){0,2}) (.+)$/);
   const label = prefix ? prefix[2] : title;
   const normalized = label.replace(' 跨月续', '');
   return (prefix ? prefix[1] + ' ' : '') + (headings[normalized] || label);

@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-24: `TodoMonthView.tsx` reads its unchanged detail badge order, labels and tones from `todoScheduleLabels.ts`, shared with journal PDF agendas.
+
 Update 2026-10-23: Duration calendar cards offer a top-right color/duration mode switch persisted per card. Duration mode keeps the color grid and adds small, undimmed h:mm/minute labels below each date; empty dates use a dash. Shared category, tag and scope/filter duration calendars use the same control.
 
 Update 2026-10-23: Custom trend charts suppress the browser focus outline while keeping the selected-point marker, date readout and keyboard navigation. The renderer harness captures the mobile chart while focused.

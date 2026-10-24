@@ -4,6 +4,7 @@
  * @output Aligned completion circles, incomplete dashes and direct counts without a heavy grid
  * @pos Service (Journal monthly checks)
  * @updated 2026-10-23: Keeps dates and values centered at 9pt without a separate count appendix.
+ * @updated 2026-10-24: Removes the redundant completion/count legend while preserving date-aligned circles, dashes and numbers.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { JOURNAL_STROKE } from '../utils/journalTheme';
@@ -21,12 +22,6 @@ export const writeJournalCheckMatrix = (w: JournalPdfWriter, month: string, days
   const labelWidth = w.contentWidth * 0.32;
   const maxValue = Math.max(w.widthOf('31', 9), ...days.flatMap((day) => day.checks.filter((item) => item.manualMode === 'count').map((item) => w.widthOf(String(getCheckItemCountState(item).current), 9))));
   const perBand = Math.max(1, Math.min(w.model.options.paperSize === 'a5' ? 16 : count, Math.floor((w.contentWidth - labelWidth) / (maxValue + 2))));
-  w.page.drawCircle({ x: w.margin + 3, y: w.height - w.y - 5, size: 2.5, borderColor: w.accentColor, borderWidth: JOURNAL_STROKE });
-  w.text('完成', w.margin + 12, w.y, 9, C.muted);
-  w.line(w.margin + 46, w.y + 5, 6, C.muted);
-  w.text('未完成', w.margin + 58, w.y, 9, C.muted);
-  w.text('数字 次数', w.margin + 103, w.y, 9, C.muted);
-  w.y += 26;
   for (let start = 1; start <= count; start += perBand) {
     const end = Math.min(count, start + perBand - 1);
     const length = end - start + 1;

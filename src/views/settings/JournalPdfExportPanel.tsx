@@ -7,7 +7,7 @@
  * @updated 2026-10-23: Replaces date pickers with eight-digit entry and adds complete current/previous periods.
  * @updated 2026-10-23: Defaults to daily detail and labels the whole-book A4 landscape orientation.
  * @updated 2026-10-23: Uses flat Radix controls with half-pixel borders and concise labels.
- * @updated 2026-10-24: Adds verified theme/two-font controls, seventeen independent parts and the shared dropdown.
+ * @updated 2026-10-24: Adds verified theme/two-font controls, nineteen independent parts and the shared dropdown.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import './JournalPdfExportPanel.css';

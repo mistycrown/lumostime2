@@ -5,6 +5,7 @@
  * @pos Service (Journal cover)
  * @updated 2026-10-23: Keeps covers to the title, date range and actual totals, without automatic quotes.
  * @updated 2026-10-24: Adapts three supplied HTML vector covers and randomly freezes one style per export.
+ * @updated 2026-10-24: Restores the LumosTime wordmark on all three cover designs.
  */
 import { concatTransformationMatrix, popGraphicsState, pushGraphicsState } from 'pdf-lib';
 import { JOURNAL_COLORS as C, journalDataColor } from './journalPdfTheme';
@@ -82,4 +83,5 @@ export const writeJournalCover = (w: JournalPdfWriter): void => {
     w.text(value, center - w.widthOf(value, size) / 2, top, size, C.ink);
     w.text(label, center - w.widthOf(label, 9) / 2, top + 22, 9, C.muted);
   });
+  place('LumosTime', w.height - 60, 12, C.ink);
 };

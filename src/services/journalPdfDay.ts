@@ -6,12 +6,13 @@
  * @updated 2026-10-23: Measures authored paragraphs before choosing compact flow height.
  * @updated 2026-10-23: Includes complete actual/planned Log metadata and keeps check labels distinct from authored text.
  * @updated 2026-10-23: Uses Routine/Summary labels and 24/12/9pt guidance headings for section, group and question.
+ * @updated 2026-10-24: Aligns checkboxes with their item text, removes duplicate completion words and reduces guidance headings.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, journalHasPart, type JournalDay, type JournalSection } from '../utils/journalExport';
 import { dateLabel, writeLogs, writePlans, type JournalPdfWriter } from './journalPdfLayout';
 import { journalReviewLines } from './journalPdfOverview';
-import { writeJournalLogDetails } from './journalPdfLogDetails';
+import { writeJournalLogDetails, writeJournalLogTitle } from './journalPdfLogDetails';
 
 const MUTED = C.muted;
 const ACCENT = C.accent;
@@ -53,21 +54,22 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     if (planned.length) w.heading('计划时间');
     planned.forEach((log) => {
       w.paragraph(`${formatJournalTime(log.start, day.date)}–${formatJournalTime(log.end, day.date)}`, 8, ACCENT, 0, 'print');
-      w.paragraph(log.source.title || log.activity);
+      writeJournalLogTitle(w, log);
       writeJournalLogDetails(w, log);
     });
   }
   if (has('dayChecks') && day.checks.length) {
     w.heading('日课');
     day.checks.forEach((item) => {
-      const status = journalCheckValue(item);
+      const status = item.manualMode === 'count' ? journalCheckValue(item) : '';
       const statusWidth = w.widthOf(status, 9);
       const lines = w.wrap(item.content, w.contentWidth - statusWidth - 22, 9, 'hand');
+      w.ensure(Math.min(lines.length * 13.5 + 3, 90));
       lines.forEach((line, index) => {
         w.ensure(13.5);
         if (!index) {
-          w.checkbox(w.margin, w.y + 1, item.isCompleted);
-          w.text(status, w.margin + w.contentWidth - statusWidth, w.y, 9, MUTED);
+          w.checkbox(w.margin, w.y + (lines.length <= 6 ? (lines.length - 1) * 6.75 : 0) + 2.25, item.isCompleted);
+          if (status) w.text(status, w.margin + w.contentWidth - statusWidth, w.y, 9, MUTED);
         }
         w.text(line, w.margin + 14, w.y, 9, C.ink, 'hand');
         w.y += 13.5;
@@ -90,9 +92,9 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
   if (reviewLines.length) {
     w.ensure(75);
     w.y += 8;
-    w.paragraph('引导', 24, C.ink, 0, 'print');
+    w.heading('引导');
     reviewLines.forEach((line) => {
-      if (line.level === 'group') w.heading(line.text);
+      if (line.level === 'group') { w.ensure(45); w.y += 9; w.paragraph(line.text, 9, C.ink, 0, 'print'); }
       else if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
       else w.paragraph(line.text);
     });

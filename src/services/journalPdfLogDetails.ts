@@ -4,13 +4,22 @@
  * @output Flowing metadata, notes, uncropped photo grids, reactions and timestamped comments
  * @pos Service (Journal log details)
  * @updated 2026-10-23: Retains rich Log content once across midnight and chapter repetition.
+ * @updated 2026-10-24: Keeps each Log reaction beside its own title and excludes sticker reactions.
  */
 import type { JournalLog } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 
-export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog): void => {
+export const journalLogReactions = (log: JournalLog): string[] => (log.source.reactions || []).filter((value) => !value.startsWith('image:') && !value.startsWith('ui:'));
+
+export const writeJournalLogTitle = (w: JournalPdfWriter, log: JournalLog): void => {
+  const reactions = w.claimLogReactions(log.source.id) ? journalLogReactions(log) : [];
+  w.paragraph(`${log.source.title || log.activity}${reactions.length ? ` ${reactions.join(' ')}` : ''}`, 9, C.ink, 12, 'hand');
+};
+
+export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog, includeTitle = false): void => {
   if (!w.claimLogDetails(log.source.id)) return;
+  if (includeTitle) writeJournalLogTitle(w, log);
   const field = (label: string, value: string) => {
     const labelWidth = w.widthOf(label, 9) + 8;
     if (labelWidth > (w.contentWidth - 12) * 0.45) {
@@ -57,27 +66,6 @@ export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog): vo
       });
       w.y += height + 8;
     }
-  }
-  if (log.source.reactions?.length) {
-    w.ensure(40);
-    w.paragraph('Reaction', 9, C.muted, 12, 'print');
-    let offset = 12;
-    log.source.reactions.forEach((reaction) => {
-      const image = reaction.startsWith('image:') || reaction.startsWith('ui:');
-      const width = image ? 18 : w.widthOf(reaction, 9) + 6;
-      if (!image && width > w.contentWidth - 12) {
-        if (offset > 12) w.y += 24;
-        w.paragraph(reaction, 9, C.ink, 12, 'hand');
-        offset = 12;
-        return;
-      }
-      if (offset + width > w.contentWidth) { w.y += 24; offset = 12; }
-      w.ensure(24);
-      if (image) w.sticker(reaction, w.margin + offset, w.y, 18);
-      else w.text(reaction, w.margin + offset, w.y, 9, C.ink, 'hand');
-      offset += width + 6;
-    });
-    w.y += 24;
   }
   if (log.source.comments?.length) {
     w.ensure(40);

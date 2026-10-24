@@ -2,7 +2,7 @@
 
 Update 2026-10-23: Journal projection includes direct Collection memberships and review templates, preserves user-saved colors and inherits activity colors for uncolored legacy keywords. Template-only colors remain Radix. No synthetic color palette is generated during export.
 
-Update 2026-10-23: `journalStatistics.ts` aggregates six actual-time dimensions while preserving IDs and deduplicating scope attribution. `journalLogContent.ts` resolves all stored attribute values (including archived/deleted choices), scores, progress and workflow answers, and parses inline note-node aliases without creating relation sections. `journalTitles.ts` translates major PDF headings only. `journalTheme.ts` supplies official Radix tokens, four print tiers and half-pixel print rules.
+Update 2026-10-24: `journalStatistics.ts` aggregates actual time into nested category/activity and todo-category/task groups plus scopes, preserving source IDs and deduplicating multi-scope attribution. Keyword statistics are excluded. `todoScheduleLabels.ts` shares the application's month-detail badge definitions with PDF agendas. `journalLogContent.ts` resolves all stored attributes, scores, progress and workflow answers and parses inline note-node aliases. `journalTitles.ts` handles year, month and date-prefixed English headings. Template rules remain half-pixel; compact weekly block labels use 7.5pt.
 
 Update 2026-10-23: Journal sections distinguish `timeline` (weekly time-block calendar) and `logs` (full text). `journalTimelineLayout.ts` maps clipped records to local clock minutes and stable overlap-cluster lanes, preserving adjacent intervals at full width and midnight at 24:00.
 
@@ -185,4 +185,4 @@ Update 2026-08-09: `detailTimelineGrouping.ts` centralizes detail timeline date 
 
 - Update 2026-10-14: `todoScheduleUtils.ts` separates planned blocks from actual logs, derives Plan dates for list/week/month schedules, and tests Plan precedence and Trace lanes.
 
-- Update 2026-10-24: `journalExport.ts` defines seventeen independently selectable parts in four period groups, maps them to compatible book chapters and carries per-export accent/font/cover options.
+- Update 2026-10-24: `journalExport.ts` defines nineteen independently selectable parts in four period groups, including annual and weekly statistics, maps them to compatible book chapters and carries per-export accent/font/cover options.

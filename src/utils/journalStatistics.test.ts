@@ -1,10 +1,10 @@
 /**
  * @file journalStatistics.test.ts
  * @input Cross-midnight logs, duplicate labels, repeated scopes and Plan records
- * @output Regression checks for all six journal time attribution dimensions
+ * @output Regression checks for nested tag/task statistics and multi-scope attribution
  * @pos Tests (Journal statistics)
  * @updated 2026-10-23: Verifies clipping, identity, full multi-attribution and source immutability.
- * @updated 2026-10-23: Requires explicit keyword colors and inherited activity colors instead of generated palette colors.
+ * @updated 2026-10-24: Requires parent-child identity preservation and excludes unsupported keyword aggregation.
  */
 import { describe, expect, it } from 'vitest';
 import { buildJournalModel, type JournalExportData } from './journalExport';
@@ -27,20 +27,17 @@ describe('journal time distributions', () => {
     const original = JSON.stringify(data);
     const model = buildJournalModel(data, { startDate: '2026-10-20', endDate: '2026-10-20', sections: ['monthly'], paperSize: 'a4', includeCover: false, includeEmptyDays: false });
     const groups = new Map(buildJournalDistributions(model.days).map((group) => [group.id, group]));
-    expect(groups.size).toBe(6);
+    expect(groups.size).toBe(3);
     expect(groups.get('categories')!.total).toBe(7200);
-    expect(groups.get('activities')!.items).toHaveLength(2);
-    expect(groups.get('activities')!.items.every((item) => item.name === '阅读' && item.seconds === 3600)).toBe(true);
-    expect(groups.get('keywords')!.total).toBe(7200);
-    expect(groups.get('keywords')!.items).toHaveLength(2);
-    expect(groups.get('keywords')!.items.find((item) => item.name === '阅读')?.color).toBe('#123456');
-    expect(groups.get('keywords')!.items.find((item) => item.name === '课程')?.color).toBe('#557755');
+    expect(groups.get('categories')!.items).toHaveLength(2);
+    expect(groups.get('categories')!.items.every((item) => item.children?.[0].name === '阅读' && item.children[0].seconds === 3600)).toBe(true);
+    expect(groups.has('keywords')).toBe(false);
     expect(groups.get('scopes')!.total).toBe(10800);
     expect(groups.get('scopes')!.items.find((item) => item.id === 's')!.seconds).toBe(3600);
     expect(groups.get('scopes')!.attributed).toBe(true);
-    expect(groups.get('todos')!.items).toHaveLength(2);
-    expect(groups.get('todos')!.total).toBe(7200);
     expect(groups.get('todoCategories')!.items).toHaveLength(2);
+    expect(groups.get('todoCategories')!.total).toBe(7200);
+    expect(groups.get('todoCategories')!.items.every((item) => item.children?.[0].name === '同名任务')).toBe(true);
     expect(JSON.stringify(data)).toBe(original);
   });
 });
