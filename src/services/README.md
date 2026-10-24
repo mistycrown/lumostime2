@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-24: Native journal saves encode at most 96 KiB of PDF bytes per call (128 KiB Base64), append sequentially to a unique partial file, then publish the completed file. Bridge calls have a 30-second timeout and partial-file cleanup; selected fonts are retained. The UI distinguishes PDF serialization from native saving and displays byte-based save progress. Regressions cover a 96-page uploaded-font PDF and late bridge responses.
+
 Update 2026-10-24: Daily AI narrative Markdown uses the application's remark/GFM parser and a measured PDF renderer. Six heading levels, bold/italic/strikethrough, nested ordered/unordered/task lists, quotes, code and links retain their structure across columns/pages. Wide tables become readable labeled field rows. Selected fonts remain in use and text stays searchable.
 
 Update 2026-10-24: Journal content and A5 alignment pages no longer have an arbitrary 1000-page cutoff. Regression tests save and reopen a complete 1100-day book and verify month/week facing-page alignment beyond page 1000.

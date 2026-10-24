@@ -11,10 +11,11 @@
  * @updated 2026-10-24: Embeds independently selected fonts with safe transformed-WOFF2 outlines and Chinese fallback.
  * @updated 2026-10-24: Loads mood stickers only for selected mood/summary content; reaction image references are excluded.
  * @updated 2026-10-24: Preserves legacy review-only summary stickers when guidance and narrative are separated.
+ * @updated 2026-10-24: Saves native PDFs in bounded binary chunks with byte progress instead of one large Base64 bridge message.
  */
 import { PDFDocument } from 'pdf-lib';
 import { Capacitor } from '@capacitor/core';
-import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Directory } from '@capacitor/filesystem';
 import { buildJournalModel, journalHasPart, type JournalExportData, type JournalExportOptions } from '../utils/journalExport';
 import { composeJournalPdf, JOURNAL_FONT_FAMILY, journalGraphemes, JournalPdfWriter, type JournalPdfProgress, type JournalSymbols } from './journalPdfLayout';
 import { getResolvedTodoScheduleTypeColors, todoScheduleColorService } from './todoScheduleColorService';
@@ -22,6 +23,7 @@ import { embedJournalStickers } from './journalPdfStickers';
 import { embedJournalPhotos } from './journalPdfPhotos';
 import { JOURNAL_HEX } from '../utils/journalTheme';
 import { loadJournalFont, embedJournalFont, journalFontkit } from './journalPdfFonts';
+import { writeJournalNativeFile } from './journalNativeFile';
 
 export type { JournalPdfProgress } from './journalPdfLayout';
 
@@ -111,6 +113,9 @@ export const createJournalPdf = async (
     photos.forEach((image, key) => writer.photos.set(key, image));
   }
   await composeJournalPdf(writer, onProgress, signal);
+  onProgress?.({ message: '正在生成 PDF 文件', pages: pdf.getPageCount() });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  signal?.throwIfAborted();
   const output = await pdf.save();
   signal?.throwIfAborted();
   return { bytes: output, pageCount: pdf.getPageCount() };
@@ -129,14 +134,8 @@ export const exportJournalPdf = async (
   if (Capacitor.isNativePlatform()) {
     const isAndroid = Capacitor.getPlatform() === 'android';
     const path = isAndroid ? `Download/LumosTime/${filename}` : `LumosTime/${filename}`;
-    const base64 = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result).split(',')[1]);
-      reader.onerror = () => reject(new Error('PDF 文件读取失败'));
-      reader.readAsDataURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
-    });
-    signal?.throwIfAborted();
-    await Filesystem.writeFile({ path, data: base64, directory: isAndroid ? Directory.ExternalStorage : Directory.Documents, recursive: true });
+    await writeJournalNativeFile(bytes, path, isAndroid ? Directory.ExternalStorage : Directory.Documents,
+      (writtenBytes, totalBytes) => onProgress?.({ message: '正在保存 PDF', pages: pageCount, writtenBytes, totalBytes }), signal);
     return { filename, pageCount, savedPath: path };
   }
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));

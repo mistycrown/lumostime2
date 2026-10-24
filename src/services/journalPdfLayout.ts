@@ -15,6 +15,7 @@
  * @updated 2026-10-24: Reuses application text badges, places per-Log reactions inline and continues rails through every column/page.
  * @updated 2026-10-24: Removes the arbitrary 1000-page cutoff for content and A5 spread alignment pages.
  * @updated 2026-10-24: Adds single-pass searchable bold/italic text without changing the selected fonts.
+ * @updated 2026-10-24: Carries native byte-write progress separately from the rendered page count.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString, degrees, pushGraphicsState, popGraphicsState, setLineWidth, setTextRenderingMode, TextRenderingMode, setStrokingRgbColor } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
@@ -39,7 +40,7 @@ export interface JournalSymbol { image: PDFImage; width: number }
 export type JournalSymbols = Map<string, JournalSymbol>;
 export type JournalTextRole = 'print' | 'hand';
 export interface JournalTextStyle { bold?: boolean; italic?: boolean }
-export interface JournalPdfProgress { message: string; pages: number }
+export interface JournalPdfProgress { message: string; pages: number; writtenBytes?: number; totalBytes?: number }
 
 export class JournalPdfWriter {
   readonly accentColor;

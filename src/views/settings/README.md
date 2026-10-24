@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-24: Journal export shows native save percentage separately from the rendered page count so large/custom-font PDFs do not appear stuck at their final page while writing to Android storage.
+
 Update 2026-10-24: Journal PDF export matches adjacent settings cards with monochrome checkboxes and unchanged shared dropdown styling. Thirteen switches select rendered page groups: month/week side reviews follow their overview pages, and daily plans, full logs, routines, summary/sticker and guidance follow one daily-page switch. Unlocked appearance defaults to the theme color and offers the shared built-in/custom color palette plus independent print/content font dropdowns.
 
 Update 2026-10-23: Data Management passes Collections, membership entries and review templates into PDF projection; this keeps symbolic Log associations and the section/group/question guidance hierarchy complete.

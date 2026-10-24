@@ -9,6 +9,7 @@
  * @updated 2026-10-23: Exports both full-year A4 calendar and A5 matrix mood examples.
  * @updated 2026-10-24: Checks page switches, shared palettes/dropdowns and monochrome settings in light/dark modes; supports --ui-only.
  * @updated 2026-10-24: Adds --large-book to export complete 1100-day A4/A5 journals through the actual settings panel.
+ * @updated 2026-10-24: Adds --native-save to exercise the Android chunk bridge and progress UI with a 96-page uploaded-font PDF.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -23,7 +24,28 @@ const { build } = require('esbuild');
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-journal-'));
 const uiOnly = process.argv.includes('--ui-only');
 const largeBook = process.argv.includes('--large-book');
+const nativeSave = process.argv.includes('--native-save');
 await build({
+  plugins: nativeSave ? [{ name: 'native-journal-filesystem', setup(builder) {
+    builder.onResolve({ filter: /^@capacitor\/filesystem$/ }, () => ({ path: 'filesystem', namespace: 'journal-native' }));
+    builder.onLoad({ filter: /.*/, namespace: 'journal-native' }, () => ({ loader: 'js', contents: `
+      export const Directory={ExternalStorage:'EXTERNAL',Documents:'DOCUMENTS'};
+      const files=new Map();
+      window.__nativeJournal={files,calls:0,maxPayload:0};
+      const receive=async({path,data},append)=>{
+        if(data.length>128*1024)throw new Error('Error invoking postMessage: Java exception was raised during method invocation');
+        window.__nativeJournal.calls++;window.__nativeJournal.maxPayload=Math.max(window.__nativeJournal.maxPayload,data.length);
+        await new Promise(resolve=>setTimeout(resolve,2));
+        if(append)files.get(path).push(data);else files.set(path,[data]);
+        return {uri:path};
+      };
+      export const Filesystem={
+        writeFile:options=>receive(options,false),appendFile:options=>receive(options,true),
+        deleteFile:async({path})=>{files.delete(path);},
+        rename:async({from,to})=>{const chunks=files.get(from);files.set(to,chunks);files.delete(from);window.__exports.push({name:'journal-native-custom.pdf',base64:chunks.join('')});}
+      };
+    ` }));
+  } }] : [],
   stdin: { resolveDir: workspace, loader: 'tsx', contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -32,6 +54,7 @@ import { createJournalPdf } from './src/services/journalPdfService';
 import { customColorGroupService } from './src/services/customColorGroupService';
 import { RedemptionService } from './src/services/redemptionService';
 import { customFontStorageService } from './src/services/customFontStorageService';
+import { Capacitor } from '@capacitor/core';
 import { getJournalQuickRange, shiftJournalDate } from './src/utils/journalExport';
 import { journalDemoData } from './scripts/fixtures/journal-demo';
 const root = createRoot(document.getElementById('root'));
@@ -116,6 +139,35 @@ async function run() {
  check(!document.querySelector('input[type=date]'),'Native date picker remains');
  check(!document.querySelector('[aria-label="PDF 内容字体"]'),'Locked users see custom font controls');
  check(!document.querySelector('select'),'Native paper select remains');
+ if (${JSON.stringify(nativeSave)}) {
+  const blob=await(await fetch('/fonts/LXGWWenKaiLite-Journal.ttf')).blob();
+  await customFontStorageService.saveFont({id:'native-custom',displayName:'Android 自定义字体',familyName:'NativeCustomJournal',fileName:'custom.ttf',format:'ttf',size:blob.size,createdAt:0,updatedAt:0,blob});
+  RedemptionService.prototype.isVerified=async()=>({isVerified:true});
+  Capacitor.isNativePlatform=()=>true;Capacitor.getPlatform=()=>'android';
+  const startDate='2026-01-01',endDate=shiftJournalDate(startDate,94);
+  const source={...data,logs:[],todos:[],weeklyReviews:[],monthlyReviews:[],goals:[],majorGoals:[],dailyReviews:Array.from({length:95},(_,index)=>({id:'native-'+index,date:shiftJournalDate(startDate,index),createdAt:0,updatedAt:0,answers:[],summary:'第'+(index+1)+'天，使用自定义字体。'}))};
+  root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel key="native-save" data={source} onToast={(type,message)=>{toast={type,message};}} /></main>);
+  await until(()=>document.querySelector('[aria-label="PDF 内容字体"]'),'Custom font controls did not mount');
+  document.querySelector('[aria-label="PDF 内容字体"]').click();await until(()=>document.querySelector('[data-select-value="native-custom"]'),'Uploaded native font absent');
+  document.querySelector('[data-select-value="native-custom"]').click();await wait();
+  await setInput('[aria-label="PDF 起始日期"]',startDate.replace(/-/g,''));await setInput('[aria-label="PDF 结束日期"]',endDate.replace(/-/g,''));
+  button('清空').click();await wait();label('一日一页').click();label('封面').click();await wait();
+  document.querySelector('[aria-label="PDF 纸张"]').click();await wait();document.querySelector('[data-select-value="a5"]').click();await wait();
+  const percentages=[];
+  const observer=new MutationObserver(()=>{const status=document.querySelector('[role=status]')?.textContent;const match=status?.match(/正在保存 PDF (\\d+)%/);if(match)percentages.push(Number(match[1]));});
+  observer.observe(document.getElementById('root'),{subtree:true,childList:true,characterData:true});
+  toast=null;button('导出手账 PDF').click();
+  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return percentages.some(value=>value>5&&value<90);},'Saving progress did not reach the UI');
+  document.querySelector('[role=status]').scrollIntoView({block:'center'});await capture('journal-native-saving');
+  await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return toast?.type==='success'&&window.__exports.length===1;},'Native custom-font export did not finish');
+  observer.disconnect();
+  check(toast.message.includes('96 页'),'Native PDF was truncated');
+  check(window.__nativeJournal.calls>10&&window.__nativeJournal.maxPayload<=128*1024,'Native PDF was sent as an oversized bridge message');
+  check(window.__nativeJournal.files.size===1,'Partial native PDF was left behind');
+  check(!button('导出手账 PDF').disabled&&!document.querySelector('[role=status]'),'Export controls did not recover');
+  passed.push('96-page uploaded TrueType font export completes through bounded Android bridge writes with visible percentage progress');
+  window.__result={passed};return;
+ }
  if (${JSON.stringify(largeBook)}) {
   const startDate='2023-01-01', endDate=shiftJournalDate(startDate,1099);
   const largeData={...data,logs:[],todos:[],weeklyReviews:[],monthlyReviews:[],goals:[],majorGoals:[],dailyReviews:Array.from({length:1100},(_,index)=>({id:'large-'+index,date:shiftJournalDate(startDate,index),createdAt:0,updatedAt:0,answers:[],summary:'第'+(index+1)+'天的手账记录。'}))};

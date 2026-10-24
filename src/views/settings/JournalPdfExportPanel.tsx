@@ -9,6 +9,7 @@
  * @updated 2026-10-23: Uses flat Radix controls with half-pixel borders and concise labels.
  * @updated 2026-10-24: Adds verified theme/two-font controls, nineteen independent parts and the shared dropdown.
  * @updated 2026-10-24: Uses page-level selection, neutral settings controls and the shared color palette without overriding dropdown styles.
+ * @updated 2026-10-24: Displays native write progress separately from the rendered PDF page count.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import './JournalPdfExportPanel.css';
@@ -140,7 +141,7 @@ export const JournalPdfExportPanel: React.FC<JournalPdfExportPanelProps> = ({ da
         <div className="journal-export-options"><label><input type="checkbox" checked={options.includeCover} onChange={(event) => update({ includeCover: event.target.checked })} />封面</label><label><input type="checkbox" checked={options.includeEmptyDays} onChange={(event) => update({ includeEmptyDays: event.target.checked })} />保留空白日期</label></div>
       </fieldset>
       {error && <p role="alert" className="journal-export-error">{error}</p>}
-      {progress && <div role="status" aria-live="polite" className="journal-export-progress">{progress.message}{progress.pages > 0 ? `  ${progress.pages} 页` : ''}</div>}
+      {progress && <div role="status" aria-live="polite" className="journal-export-progress">{progress.message}{progress.totalBytes ? ` ${Math.floor((progress.writtenBytes || 0) / progress.totalBytes * 100)}%` : ''}{progress.pages > 0 ? `  ${progress.pages} 页` : ''}</div>}
       <div className="journal-export-actions"><button type="button" onClick={handleExport} disabled={isExporting || Boolean(error)}>{isExporting ? '导出中…' : '导出手账 PDF'}</button>{isExporting && <button type="button" disabled={isCancelling || progress?.message === '正在保存 PDF'} onClick={() => { setIsCancelling(true); controller.current?.abort(); }}>{isCancelling ? '取消中…' : '取消'}</button>}</div>
     </section>
   );

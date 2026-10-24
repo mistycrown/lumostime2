@@ -13,6 +13,7 @@
 @updated 2026-10-24: Confirms guidance and AI narrative use separate peer headings without empty guidance on narrative-only days.
 @updated 2026-10-24: Checks all 1100 dates/summaries, final page numbering and A4/A5 geometry in large-book downloads.
 @updated 2026-10-24: Checks rendered narrative heading levels, single-copy bold text, list content and working Markdown links.
+@updated 2026-10-24: Reopens the 96-page simulated native save and checks the uploaded font and every daily summary.
 """
 from pathlib import Path
 from datetime import date, timedelta
@@ -72,6 +73,18 @@ def inspect_mood_year(source):
 
 def inspect(filename):
     source = Path(filename)
+    if source.stem == 'journal-native-custom':
+        document = fitz.open(source)
+        assert len(document) == 96, 'Native chunk save lost PDF pages'
+        for index, page in enumerate(list(document)[1:], start=1):
+            assert f'第{index}天，使用自定义字体。' in page.get_text().replace('\n', ''), f'Native save lost daily content: {index}'
+        assert any('wenkai' in font[3].lower() for page in document for font in page.get_fonts()), 'Uploaded font was replaced'
+        assert '96 / 96' in document[-1].get_text(), 'Native save lost its final footer'
+        output = source.parent / source.stem
+        output.mkdir(exist_ok=True)
+        for index in [1, 95]:
+            document[index].get_pixmap(matrix=fitz.Matrix(1.4, 1.4), alpha=False).save(output / f'page-{index + 1}.png')
+        return {'file': str(source), 'pages': len(document), 'daily_summaries': 95, 'uploaded_font': 'preserved'}
     if source.stem.startswith('journal-large-'):
         document = fitz.open(source)
         assert len(document) > 1100, 'Large journal was truncated'
