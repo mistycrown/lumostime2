@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Checks original photo failures and loads current panel CSS for realistic mobile previews.
  * @updated 2026-10-23: Exports both full-year A4 calendar and A5 matrix mood examples.
  * @updated 2026-10-24: Checks page switches, shared palettes/dropdowns and monochrome settings in light/dark modes; supports --ui-only.
+ * @updated 2026-10-24: Adds --large-book to export complete 1100-day A4/A5 journals through the actual settings panel.
  */
 import { createRequire } from 'node:module';
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
@@ -21,6 +22,7 @@ const require = createRequire(path.join(workspace, 'package.json'));
 const { build } = require('esbuild');
 const directory = await mkdtemp(path.join(tmpdir(), 'lumostime-journal-'));
 const uiOnly = process.argv.includes('--ui-only');
+const largeBook = process.argv.includes('--large-book');
 await build({
   stdin: { resolveDir: workspace, loader: 'tsx', contents: `
 import React from 'react';
@@ -30,7 +32,7 @@ import { createJournalPdf } from './src/services/journalPdfService';
 import { customColorGroupService } from './src/services/customColorGroupService';
 import { RedemptionService } from './src/services/redemptionService';
 import { customFontStorageService } from './src/services/customFontStorageService';
-import { getJournalQuickRange } from './src/utils/journalExport';
+import { getJournalQuickRange, shiftJournalDate } from './src/utils/journalExport';
 import { journalDemoData } from './scripts/fixtures/journal-demo';
 const root = createRoot(document.getElementById('root'));
 const passed = [];
@@ -114,6 +116,26 @@ async function run() {
  check(!document.querySelector('input[type=date]'),'Native date picker remains');
  check(!document.querySelector('[aria-label="PDF 内容字体"]'),'Locked users see custom font controls');
  check(!document.querySelector('select'),'Native paper select remains');
+ if (${JSON.stringify(largeBook)}) {
+  const startDate='2023-01-01', endDate=shiftJournalDate(startDate,1099);
+  const largeData={...data,logs:[],todos:[],weeklyReviews:[],monthlyReviews:[],goals:[],majorGoals:[],dailyReviews:Array.from({length:1100},(_,index)=>({id:'large-'+index,date:shiftJournalDate(startDate,index),createdAt:0,updatedAt:0,answers:[],summary:'第'+(index+1)+'天的手账记录。'}))};
+  root.render(<main className="max-w-xl mx-auto p-3"><JournalPdfExportPanel key="large" data={largeData} onToast={(type,message)=>{toast={type,message};}} /></main>);
+  await wait();
+  await setInput('[aria-label="PDF 起始日期"]',startDate.replace(/-/g,''));
+  await setInput('[aria-label="PDF 结束日期"]',endDate.replace(/-/g,''));
+  button('清空').click(); await wait(); label('一日一页').click(); await wait();
+  for(const paper of ['a4','a5']) {
+   if(paper==='a5'){document.querySelector('[aria-label="PDF 纸张"]').click(); await wait(); document.querySelector('[data-select-value="a5"]').click(); await wait();}
+   const previous=window.__exports.length;
+   toast=null; button('导出手账 PDF').click();
+   await until(()=>{if(toast?.type==='error')throw new Error(toast.message);return window.__exports.length===previous+1&&toast?.type==='success';},'Large '+paper+' journal export failed');
+   const count=Number(toast.message.match(/共 (\\d+) 页/)?.[1]);
+   check(count>1100,'Large journal was truncated: '+count);
+   window.__exports[previous].name='journal-large-'+paper+'.pdf';
+   passed.push('Actual '+paper+' download contains all 1100 daily pages plus cover/contents: '+count+' pages');
+  }
+  window.__result={passed}; return;
+ }
  for(const [preset,title] of [['week','本周'],['lastWeek','上周'],['month','本月'],['lastMonth','上月'],['year','本年'],['lastYear','去年']]){
   button(title).click(); await wait(); const expected=getJournalQuickRange(data,preset);
   check(document.querySelector('[aria-label="PDF 起始日期"]').value===expected.startDate.replace(/-/g,'') && document.querySelector('[aria-label="PDF 结束日期"]').value===expected.endDate.replace(/-/g,''),'Incorrect period shortcut: '+title);

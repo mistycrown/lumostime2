@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-24: Journal content and A5 alignment pages no longer have an arbitrary 1000-page cutoff. Regression tests save and reopen a complete 1100-day book and verify month/week facing-page alignment beyond page 1000.
+
 Update 2026-10-24: Daily PDF pages render template groups, questions and user answers under `引导`, and AI narrative/newspaper content under a separate peer `叙事` heading. Empty headings are omitted; narrative-only dates remain included. Manual one-line summaries stay under `总结`.
 
 Update 2026-10-24: Covers include the LumosTime wordmark. Agendas reuse the application's text-only Due/Arrange/Repeat/Maybe/Plan/Done/Trace badges. Year/month/week distributions share three groups: categories with their activities, scopes, and todo categories with their tasks; keyword statistics are removed. A5 weekly spreads share a single left-side hour axis, pale grids, compact 7.5pt activity/short-note labels and no legend. Review blocks have explicit spacing. Each Log's emoji reactions follow its own title, sticker reactions are excluded, and rails follow every column/page of rich content. Daily checks omit redundant completion text and guidance uses a smaller heading.

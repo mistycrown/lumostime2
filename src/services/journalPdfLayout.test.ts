@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Verifies rich overnight content, photo bounds, English headings and in-place node styling.
  * @updated 2026-10-23: Checks A4/A5 integrated statistics, original colors, twelve-month calendars and guidance hierarchy.
  * @updated 2026-10-24: Keeps template questions and answers separate from AI narrative in daily layouts, including single-source days.
+ * @updated 2026-10-24: Saves and reopens books with over 1000 daily pages and verifies A5 spreads beyond that boundary.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -22,6 +23,7 @@ import { writeJournalDistributions } from './journalPdfStatistics';
 import { journalDataColor } from './journalPdfTheme';
 import { journalDemoData } from '../../scripts/fixtures/journal-demo';
 import { writeWeeklyTimeline } from './journalPdfTimeline';
+import { writeJournalCalendar } from './journalPdfOverview';
 import type { DailyReview } from '../types';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
@@ -34,6 +36,41 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it('exports and reopens a complete 1100-day journal without truncating at 1000 pages', async () => {
+    const startDate = '2023-01-01';
+    const endDate = shiftJournalDate(startDate, 1099);
+    const source = { ...data, dailyReviews: Array.from({ length: 1100 }, (_, index) => ({
+      id: `large-${index}`, date: shiftJournalDate(startDate, index), createdAt: 0, updatedAt: 0,
+      answers: [], summary: `第${index + 1}天的手账记录。`
+    })) };
+    const w = await make('a4', { startDate, endDate, sections: ['daily'], parts: ['daySummary'] }, source);
+    const headings: string[] = []; const heading = w.startPage.bind(w);
+    const footers: string[] = []; const text = w.text.bind(w);
+    w.startPage = (title, ...args) => { headings.push(title); heading(title, ...args); };
+    w.text = (value, ...args) => { if (/^\d+ \/ \d+$/.test(value)) footers.push(value); text(value, ...args); };
+    await composeJournalPdf(w);
+    expect(headings.filter((title) => /^\d{4}-\d{2}-\d{2}/.test(title))).toHaveLength(1100);
+    expect(headings.at(-1)).toContain(endDate);
+    expect(w.pageCount).toBeGreaterThan(1100);
+    expect(footers).toContain(`${w.pageCount} / ${w.pageCount}`);
+    const reloaded = await PDFDocument.load(await w.pdf.save());
+    expect(reloaded.getPageCount()).toBe(w.pageCount);
+    expect(reloaded.getPages().at(-1)!.getWidth()).toBeCloseTo(841.89);
+  }, 60000);
+  it('aligns and saves A5 month/week spreads after page 1000 without dropping blank alignment pages', async () => {
+    const w = await make('a5', { sections: ['monthly', 'timeline'] });
+    for (let index = 0; index < 1000; index++) w.pdf.addPage([419.53, 595.28]);
+    const spreads: { title: string; page: number }[] = [];
+    const start = w.startPage.bind(w);
+    w.startPage = (title, ...args) => { start(title, ...args); spreads.push({ title, page: w.pageCount }); };
+    writeWeeklyTimeline(w, '2026-10-19', w.model.days);
+    writeJournalCalendar(w, '2026-10', w.model.days);
+    w.finish();
+    expect(spreads.map((page) => page.page)).toEqual([1002, 1003, 1004, 1005]);
+    const reloaded = await PDFDocument.load(await w.pdf.save());
+    expect(reloaded.getPageCount()).toBe(1005);
+    expect(reloaded.getPages()[1000].node.Contents()).toBeUndefined();
+  }, 60000);
   it('renders daily guidance and AI narrative as separate peer sections on A4 and A5', async () => {
     const review: DailyReview = {
       id: 'r', date: '2026-10-19', createdAt: 0, updatedAt: 0,

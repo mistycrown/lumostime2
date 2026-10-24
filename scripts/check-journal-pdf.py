@@ -11,8 +11,10 @@
 @updated 2026-10-24: Checks branded covers, shared badge names, nested year/month/week statistics and a single spread axis.
 @updated 2026-10-24: Verifies a daily-page-only export keeps every daily section and excludes other page groups.
 @updated 2026-10-24: Confirms guidance and AI narrative use separate peer headings without empty guidance on narrative-only days.
+@updated 2026-10-24: Checks all 1100 dates/summaries, final page numbering and A4/A5 geometry in large-book downloads.
 """
 from pathlib import Path
+from datetime import date, timedelta
 import json
 import re
 import sys
@@ -57,6 +59,26 @@ def inspect_mood_year(source):
 
 def inspect(filename):
     source = Path(filename)
+    if source.stem.startswith('journal-large-'):
+        document = fitz.open(source)
+        assert len(document) > 1100, 'Large journal was truncated'
+        daily_pages = []
+        for index, page in enumerate(document):
+            lines = page.get_text().splitlines()
+            match = re.match(r'^(\d{4}-\d{2}-\d{2}) ', lines[0] if lines else '')
+            if match:
+                daily_pages.append((index, match.group(1)))
+                expected = f'第{len(daily_pages)}天的手账记录。'
+                assert expected in page.get_text().replace('\n', ''), f'Missing daily summary: {expected}'
+            assert abs(page.rect.width - (419.53 if source.stem.endswith('a5') else 841.89)) < 0.1, f'Wrong page width: {index + 1}'
+            assert abs(page.rect.height - 595.28) < 0.1, f'Wrong page height: {index + 1}'
+        assert [key for _, key in daily_pages] == [(date(2023, 1, 1) + timedelta(days=index)).isoformat() for index in range(1100)], 'Missing or duplicated dates in large journal'
+        assert f'{len(document)} / {len(document)}' in document[-1].get_text(), 'Final page number is incomplete'
+        output = source.parent / source.stem
+        output.mkdir(exist_ok=True)
+        for index in [daily_pages[0][0], 1000, len(document) - 1]:
+            document[index].get_pixmap(matrix=fitz.Matrix(1.4, 1.4), alpha=False).save(output / f'page-{index + 1}.png')
+        return {'file': str(source), 'pages': len(document), 'daily_pages': len(daily_pages), 'last_date': daily_pages[-1][1]}
     if source.stem.startswith('journal-mood-year-'):
         return inspect_mood_year(source)
     if source.stem == 'journal-daily-only':

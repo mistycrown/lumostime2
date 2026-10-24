@@ -13,6 +13,7 @@
  * @updated 2026-10-23: Renders real aligned checkboxes and inline schedule badges instead of Markdown markers.
  * @updated 2026-10-24: Keeps accents local to each export and falls back for missing selected-font glyphs.
  * @updated 2026-10-24: Reuses application text badges, places per-Log reactions inline and continues rails through every column/page.
+ * @updated 2026-10-24: Removes the arbitrary 1000-page cutoff for content and A5 spread alignment pages.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
@@ -229,7 +230,6 @@ export class JournalPdfWriter {
   }
 
   private addPage(): void {
-    if (this.pageCount >= 1000) throw new Error('手账超过 1000 页，请缩小日期范围或减少章节');
     this.columns = undefined;
     [this.width, this.height] = this.model.options.paperSize === 'a5' ? [419.53, 595.28] : [841.89, 595.28];
     this.page = this.pdf.addPage([this.width, this.height]);
@@ -291,7 +291,6 @@ export class JournalPdfWriter {
   /** Even physical pages are left-hand pages in a bound book. */
   alignSpread(): void {
     if (this.model.options.paperSize === 'a5' && this.pageCount % 2 === 0) {
-      if (this.pageCount >= 999) throw new Error('手账超过 1000 页，请缩小日期范围');
       const page = this.pdf.addPage([419.53, 595.28]);
       this.blankPages.add(page);
     }
