@@ -1,5 +1,6 @@
 /**
  * @file check-cross-day-statistics-smoke.mjs
+ * @updated 2026-10-25: Verifies bounded SVG glyphs and title-row icons for cross-day/tag/category calendars.
  * @updated 2026-10-25: Checks independent overviews, sequence colors, narrow clock labels and cropped timeline axes.
  * @input Installed Chrome, verified Microsoft YaHei font and production CSS.
  * @output Isolated desktop/mobile browser assertions and screenshots in node_modules/.cache/cross-day-statistics-smoke.
@@ -100,6 +101,9 @@ try {
       }
     }
     await evaluate('window.__crossDayHarness.prepare("crossDayCalendar", "start", "year", true)'); await capture(`${device}-year-clock-values`, true);
+    for (const source of ['tagDuration', 'categoryDuration']) {
+      await evaluate(`window.__crossDayHarness.prepareDurationCalendar('${source}')`); await capture(`${device}-${source}-calendar`, true);
+    }
     await evaluate('window.__crossDayHarness.prepare("crossDayTimeline", "duration", "30d")'); await capture(`${device}-scrolling-timeline`);
     await evaluate('window.__crossDayHarness.prepareDashboard()'); await capture(`${device}-dashboard`, true);
     if (mobile) {

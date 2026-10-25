@@ -1,5 +1,6 @@
 /**
  * @file crossDayStatisticsRendererHarness.tsx
+ * @updated 2026-10-25: Checks actual SVG glyph bounds and inline icon toggles across cross-day and duration calendars.
  * @updated 2026-10-25: Covers standalone overview, palette sequence, complete fitted clock labels and occupied axes.
  * @input Real statistic cards/editor and deterministic split overnight fixtures.
  * @output Browser assertions and screenshot-ready desktop/mobile charts.
@@ -58,6 +59,25 @@ const fits = () => {
   check(document.documentElement.scrollWidth <= window.innerWidth + 1, 'Horizontal viewport overflow');
   check(!document.body.textContent?.includes('�'), 'Broken UTF-8 text');
   check(document.fonts.check('16px VerifiedChinese', '睡眠开始时间持续时长起床跨天活动'), 'Verified Chinese font not loaded');
+};
+const calendarGlyphsFit = () => {
+  const labels = [...host.querySelectorAll<HTMLElement>('[data-calendar-value], [data-calendar-duration]')];
+  for (const label of labels) {
+    const text = label.querySelector<SVGTextElement>('text');
+    check(text, 'Calendar label does not use bounded glyph rendering');
+    const glyph = text!.getBoundingClientRect();
+    const cell = (label.closest('[data-calendar-date]') || label.parentElement)!.getBoundingClientRect();
+    check(glyph.left >= cell.left + 0.2 && glyph.right <= cell.right - 0.2,
+      `Calendar glyphs extend into neighboring dates: ${label.textContent} glyph=${glyph.left.toFixed(2)}..${glyph.right.toFixed(2)} cell=${cell.left.toFixed(2)}..${cell.right.toFixed(2)} width=${window.innerWidth}`);
+  }
+};
+const calendarIconIsInline = () => {
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="切换日历数值显示"]')!;
+  const row = button?.closest('[data-statistics-title-row]');
+  const heading = row?.querySelector('h2');
+  check(button && heading && button.textContent === '' && row?.querySelectorAll('button').length === 1, 'Calendar does not use a single title-row icon');
+  const a = button.getBoundingClientRect(); const b = heading!.getBoundingClientRect();
+  check(Math.abs(a.top + a.height / 2 - b.top - b.height / 2) < 2, 'Calendar icon wraps below its title');
 };
 
 async function run() {
@@ -123,8 +143,9 @@ async function run() {
   const columns = getComputedStyle(host.querySelector('[data-cross-day-months]')!).gridTemplateColumns.split(' ').length;
   check(columns >= 2 && host.querySelector('[data-cross-day-calendar]')!.getBoundingClientRect().height < 1100, 'Year calendar did not match compact duration calendars');
   check(!host.querySelector('[data-calendar-value]'), 'Calendar does not default to color blocks');
-  await click('时长'); check(saved.statisticCards?.[0].showCalendarValues === true && host.querySelector('[data-calendar-value]'), 'Calendar value mode was not saved');
-  await click('色块');
+  calendarIconIsInline();
+  await click('切换日历数值显示'); check(saved.statisticCards?.[0].showCalendarValues === true && host.querySelector('[data-calendar-value]'), 'Calendar value mode was not saved');
+  await click('切换日历数值显示');
   await edit(); await click('全部', dialog('编辑所选卡片')); await close();
   displayLogs = history; await render(null); await render(<Probe />);
   check(host.querySelector('[aria-label="统计年份"]')?.textContent?.includes(String(currentYear)), 'All-time calendar did not start at latest year');
@@ -151,15 +172,26 @@ async function run() {
   await prepare('crossDayCalendar', 'start', 'year', true);
   const clockLabels = [...host.querySelectorAll<HTMLElement>('[data-calendar-value]')].filter(node => node.textContent !== '—');
   check(clockLabels.length > 30 && clockLabels.every(node => /^\d{2}:\d{2}$/.test(node.textContent || '') && node.scrollWidth <= node.clientWidth + 1), 'Annual calendar clock text is clipped');
+  calendarGlyphsFit(); calendarIconIsInline();
+  const originalWidth = host.style.maxWidth;
+  host.style.maxWidth = '300px'; document.documentElement.style.webkitTextSizeAdjust = '180%'; await delay();
+  calendarGlyphsFit();
+  document.documentElement.style.webkitTextSizeAdjust = ''; host.style.maxWidth = originalWidth; await delay();
   const calendarColors = new Set([...host.querySelectorAll<HTMLElement>('[data-calendar-date]')].filter(node => !node.getAttribute('aria-label')?.includes('无记录')).map(node => (node.firstElementChild as HTMLElement).style.backgroundColor));
   check(calendarColors.size > 2, 'Annual calendar ignores palette sequence');
   await prepare('crossDayTimeline', 'duration', 'year');
   check(new Set([...host.querySelectorAll('[data-cross-day-interval]')].map(node => node.getAttribute('fill'))).size > 2, 'Annual timeline ignores palette sequence');
+  for (const source of ['tagDuration', 'categoryDuration'] as const) {
+    await prepareDurationCalendar(source); calendarGlyphsFit(); calendarIconIsInline();
+    await click('切换日历数值显示'); check(!host.querySelector('[data-calendar-duration]'), 'Duration calendar icon did not hide values');
+    await click('切换日历数值显示'); check(host.querySelector('[data-calendar-duration]'), 'Duration calendar icon did not restore values');
+    await render(null); await render(<Probe />); calendarGlyphsFit(); calendarIconIsInline();
+  }
   await prepareDashboard();
   check(host.querySelectorAll('[data-cross-day-overview]').length === 1 && [...host.querySelectorAll('section')].filter(node => node.textContent?.includes('已记录天数')).length === 1, 'Multiple chart cards repeat the overview');
   fits();
   await render(null);
-  return ['Four-digit boundary entry rejects partial/invalid times', 'Overview is an independent persisted table', 'Palette sequence applies to calendars and intervals', 'Annual HH:MM labels fit their cells', 'Only trends select daily details', 'Occupied axes keep night gaps and use thin scrollbars', 'Year/all-time paging and saved display modes work', 'Restricted and legacy statistics remain valid', 'Chinese font and viewport layout verified'];
+  return ['Four-digit boundary entry rejects partial/invalid times', 'Overview is an independent persisted table', 'Palette sequence applies to calendars and intervals', 'Actual calendar glyphs stay within cells under narrow widths and enlarged text', 'Cross-day/tag/category calendars share one inline icon toggle', 'Only trends select daily details', 'Occupied axes and year paging work', 'Restricted and legacy statistics remain valid', 'Chinese font and viewport layout verified'];
 }
 
 async function prepare(chartType: ActivityStatisticCardType, metric: CrossDayMetric = 'duration', range?: ActivityStatisticRange, showValues = false) {
@@ -187,4 +219,11 @@ async function prepareDashboard() {
   await render(null); await render(<Probe />); fits();
 }
 
-Object.assign(window, { __crossDayHarness: { run, prepare, prepareDashboard, edit } });
+async function prepareDurationCalendar(source: 'tagDuration' | 'categoryDuration') {
+  await prepare('crossDayCalendar', 'duration', 'year', true);
+  saved = { ...saved, statisticCards: [{ ...saved.statisticCards![0], source: { type: source }, chartType: 'numberCalendar' }] };
+  localStorage.setItem('cross-day-smoke', JSON.stringify(saved));
+  await render(null); await render(<Probe />); fits();
+}
+
+Object.assign(window, { __crossDayHarness: { run, prepare, prepareDashboard, prepareDurationCalendar, edit } });

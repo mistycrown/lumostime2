@@ -1,5 +1,6 @@
 /**
  * @file trendChartRendererHarness.tsx
+ * @updated 2026-10-25: Verifies single-icon calendar mode actions remain on the title row.
  * @updated 2026-10-23: Verifies calendar display modes, independent persistence and below-cell labels.
  * @input Shared custom statistics, synthetic duration/numeric records and native touch input.
  * @output Browser regression checks for date selection, responsive layout and range updates.
@@ -120,11 +121,12 @@ async function run() {
       statisticCards: ['first', 'second'].map((id, order) => ({ id, source: { type: source }, chartType: 'numberCalendar', range: 'year', metric: 'value', order }))
     };
     const renderCalendar = () => root.render(<ActivityAttributeStatistics key={saved.id} activity={saved} logs={calendarLogs} allowedSourceTypes={[source]} onChange={next => { saved = next; }} />);
-    const groups = () => [...host.querySelectorAll('[aria-label="日历显示模式"]')];
+    const groups = () => [...host.querySelectorAll<HTMLButtonElement>('[aria-label="切换日历数值显示"]')];
     const mode = async (index: number, label: string) => {
-      const button = [...groups()[index].querySelectorAll('button')].find(item => item.textContent === label)!;
-      button.click(); await delay();
-      check(button.getAttribute('aria-pressed') === 'true', `Mode ${label} should be selected`);
+      const button = groups()[index];
+      if ((button.getAttribute('aria-pressed') === 'true') !== (label === '时长')) button.click(); await delay();
+      check((button.getAttribute('aria-pressed') === 'true') === (label === '时长'), `Mode ${label} should be selected`);
+      check(button.closest('[data-statistics-title-row]')?.querySelector('h2') && !button.textContent, 'Calendar toggle must be an inline icon');
     };
     renderCalendar(); await delay(); await delay();
     check(groups().length === 2, 'Each duration calendar needs its own mode switch');

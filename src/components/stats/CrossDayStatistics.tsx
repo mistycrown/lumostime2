@@ -1,5 +1,6 @@
 /**
  * @file CrossDayStatistics.tsx
+ * @updated 2026-10-25: Places one calendar display icon beside the chart title instead of a separate text-control row.
  * @updated 2026-10-25: Separates overview tables from charts and applies metric colors from the shared sequence.
  * @input Complete tag history, cross-day card settings and the shared palette.
  * @output Clock/duration trends, gap-aware overnight intervals and metric calendars.
@@ -17,6 +18,7 @@ import {
 import { InteractiveTrendChart } from './InteractiveTrendChart';
 import { CrossDayCalendar, CrossDayTimeline, crossDayDetails } from './CrossDayCharts';
 import { CrossDayOverview } from './CrossDayOverview';
+import { CalendarDisplayToggle } from './CalendarDisplayToggle';
 
 interface CrossDayStatisticsProps {
   card: ActivityStatisticCard;
@@ -57,7 +59,9 @@ export const CrossDayStatistics: React.FC<CrossDayStatisticsProps> = ({ card, lo
 
   return <section className="py-7 first:pt-2" aria-label={`${title}统计`}>
     <div className="mb-5 flex items-center justify-between gap-3">
-      <div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{title}</h2>
+      <div className="min-w-0"><div className="flex min-w-0 items-center gap-2" data-statistics-title-row=""><h2 className="min-w-0 truncate text-[15px] font-semibold text-[#3d332a]">{title}</h2>
+        {card.chartType === 'crossDayCalendar' && !weekly && onCalendarValuesChange && <CalendarDisplayToggle showValues={Boolean(card.showCalendarValues)} kind={metric === 'duration' ? 'duration' : 'clock'} onChange={onCalendarValuesChange} />}
+        </div>
         <div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{overview ? 'OVERNIGHT / 数据概览' : timeline ? 'OVERNIGHT / 时段图' : card.chartType === 'crossDayCalendar' ? 'OVERNIGHT / 指标日历' : 'OVERNIGHT / 趋势折线图'}</div>
       </div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span>
     </div>
@@ -68,17 +72,11 @@ export const CrossDayStatistics: React.FC<CrossDayStatisticsProps> = ({ card, lo
         accent={metricColor} formatValue={format} area={metric === 'duration'} valueDomain={domain}
         referenceValue={mean} formatDetails={key => crossDayDetails(stats.get(key))} initialSelectedKey={selectedKey} />
         : <>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            {pageYears ? <div className="flex items-center gap-1" aria-label="统计年份">
+          {pageYears && <div className="mb-4 flex items-center gap-1" aria-label="统计年份">
               <button type="button" aria-label="上一年" disabled={yearIndex === 0} onClick={() => setYearSelection(years[yearIndex - 1])} className="p-1.5 text-stone-500 disabled:opacity-25"><ChevronLeft size={15} /></button>
               <span className="font-mono text-xs text-[#8f7f70]">{displayYear} 年</span>
               <button type="button" aria-label="下一年" disabled={yearIndex === years.length - 1} onClick={() => setYearSelection(years[yearIndex + 1])} className="p-1.5 text-stone-500 disabled:opacity-25"><ChevronRight size={15} /></button>
-            </div> : <span />}
-            {!timeline && !weekly && onCalendarValuesChange && <div role="group" aria-label="跨天日历显示模式" className="inline-flex items-center gap-0.5 rounded-full border border-stone-200 p-0.5">
-              {[{ label: '色块', show: false }, { label: metric === 'duration' ? '时长' : '时刻', show: true }].map(option => <button key={option.label} type="button" aria-pressed={Boolean(card.showCalendarValues) === option.show} onClick={() => onCalendarValuesChange(option.show)}
-                className={`rounded-full px-2 py-1 text-[10px] transition-colors ${Boolean(card.showCalendarValues) === option.show ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}>{option.label}</button>)}
             </div>}
-          </div>
           {timeline ? <CrossDayTimeline keys={chartKeys} stats={stats} boundary={boundary} palette={palette} compact={card.range === 'year' || card.range === 'all'} />
             : <CrossDayCalendar keys={chartKeys} stats={stats} metric={metric} palette={palette} weekly={weekly} singleMonth={card.range === 'month'} showValues={!weekly && Boolean(card.showCalendarValues)} scale={[Math.min(...values), Math.max(...values)]} />}
         </>}

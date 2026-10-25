@@ -1,5 +1,6 @@
 /**
  * @file CrossDayCharts.tsx
+ * @updated 2026-10-25: Shares explicitly bounded numeric labels with tag/category calendars instead of CSS font sizing.
  * @updated 2026-10-25: Applies period color sequences, adapts daily value text and zooms to occupied clock bounds.
  * @input Display dates, overnight intervals, metric scale and shared palette.
  * @output Non-interactive compact calendars and monthly interval small multiples.
@@ -11,6 +12,7 @@ import type { CrossDayMetric } from '../../types';
 import type { ChartPalette } from '../../utils/chartPalette';
 import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, formatCrossDayDuration, getCrossDayClockPosition, getCrossDayTimelineAxis, getCrossDayValue, type CrossDayStat } from '../../utils/crossDayStatsUtils';
 import './CrossDayCharts.css';
+import { CalendarValueLabel } from './CalendarValueLabel';
 
 interface ChartProps {
   keys: string[];
@@ -42,10 +44,10 @@ export const CrossDayCalendar: React.FC<ChartProps & {
     const color = palette.colors[colorIndex % palette.colors.length] || palette.accent;
     return <span key={key} aria-label={`${key} ${CROSS_DAY_METRIC_LABELS[metric]} ${label}`}
       title={`${key} · ${label}${night ? ` · ${crossDayDetails(night)}` : ''}`} data-calendar-date={key}
-      className={`flex min-w-0 flex-col ${keySet.has(key) ? '' : 'opacity-25'}`} style={{ containerType: 'inline-size' }}>
+      className={`flex min-w-0 flex-col ${keySet.has(key) ? '' : 'opacity-25'}`}>
       <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]"
         style={{ backgroundColor: value === null ? '#f5f5f4' : color, color: value === null ? '#a8a29e' : '#ffffff', opacity: value === null ? 1 : 0.3 + ratio * 0.7 }}>{marker ?? null}</span>
-      {showValues && <span className={`cross-day-calendar-value mt-0.5 text-center font-mono tabular-nums ${value === null ? 'text-stone-300' : 'text-stone-600'}`} data-calendar-value="">{value === null ? '—' : compact(value)}</span>}
+      {showValues && <CalendarValueLabel value={value === null ? '—' : compact(value)} empty={value === null} />}
     </span>;
   };
   if (weekly) return <div className="grid grid-cols-7 gap-2" data-cross-day-calendar="weekly">{keys.map(key => {
@@ -53,12 +55,12 @@ export const CrossDayCalendar: React.FC<ChartProps & {
     const value = stats.has(key) ? getCrossDayValue(stats.get(key)!, metric) : null;
     return <div key={key} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{['日', '一', '二', '三', '四', '五', '六'][new Date(year, month - 1, day).getDay()]}</div>
       <div className="mb-2 mt-0.5 font-mono text-[10px] text-stone-600">{shortDate(key)}</div>{cell(key)}
-      <div className="mt-1 truncate font-mono text-[9px] text-stone-500">{value === null ? '—' : compact(value)}</div>
+      <CalendarValueLabel value={value === null ? '—' : compact(value)} empty={value === null} />
     </div>;
   })}</div>;
   const columns = singleMonth ? 'grid-cols-1' : showValues ? 'grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4' : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
   return <div data-cross-day-calendar="compact">
-    <div className={`grid gap-x-3 gap-y-3 ${columns}`} data-cross-day-months="">{months.map(month => {
+    <div className={`grid gap-x-3 gap-y-3 ${columns}`} data-cross-day-months="" style={showValues && !singleMonth ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))' } : undefined}>{months.map(month => {
       const [year, monthNumber] = month.split('-').map(Number);
       const leading = new Date(year, monthNumber - 1, 1).getDay();
       const dayCount = new Date(year, monthNumber, 0).getDate();

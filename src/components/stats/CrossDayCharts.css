@@ -1,17 +1,9 @@
 /*
  * @file CrossDayCharts.css
- * @input Overnight timeline scrolling areas and calendar cell containers.
- * @output Thin scoped scrollbars and width-adaptive complete calendar values.
- * @updated 2026-10-25: Fits HH:MM below narrow yearly cells and keeps timeline scrollbars unobtrusive.
+ * @input Overnight timeline scrolling areas.
+ * @output Thin scoped scrollbars.
+ * @updated 2026-10-25: Moves calendar value fitting into the shared bounded SVG renderer for WebView compatibility.
  */
-.cross-day-calendar-value {
-  font-size: 8px;
-  font-size: min(8px, 30cqw);
-  line-height: 1.2;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
-}
-
 .cross-day-timeline-scroll {
   scrollbar-width: thin;
   scrollbar-color: #c7beb2 transparent;

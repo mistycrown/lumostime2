@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-25: Shares bounded calendar value labels and a title-row display icon across duration sources.
  * @updated 2026-10-25: Offers an independent cross-day overview table with all three metrics.
  * @updated 2026-10-25: Adds tag-only cross-day activity sources, clock metrics and day-boundary controls.
  * @updated 2026-10-25: Uses validated HHMM digit entry and persisted compact calendar display modes.
@@ -60,6 +61,8 @@ import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 import { PetalTimelineChart, type RhythmRange } from './stats/PetalTimelineChart';
 import { InteractiveTrendChart } from './stats/InteractiveTrendChart';
 import { CrossDayStatistics } from './stats/CrossDayStatistics';
+import { CalendarDisplayToggle } from './stats/CalendarDisplayToggle';
+import { CalendarValueLabel } from './stats/CalendarValueLabel';
 import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, normalizeDayBoundary, parseCrossDayTimeInput } from '../utils/crossDayStatsUtils';
 
 export { getTextTerms } from '../utils/textSegmentation';
@@ -234,12 +237,13 @@ const AttributeSection: React.FC<{
   rangeLabel?: string;
   hideTopBorder?: boolean;
   headerAction?: React.ReactNode;
+  titleAction?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ title, typeLabel, count, rangeLabel, hideTopBorder = false, headerAction, children }) => (
+}> = ({ title, typeLabel, count, rangeLabel, hideTopBorder = false, headerAction, titleAction, children }) => (
   <section className={`${hideTopBorder ? '' : 'border-t border-stone-300'} pt-6`}>
     <div className="mb-4 flex items-baseline justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>
+        <div className="flex min-w-0 items-center gap-2" data-statistics-title-row=""><h2 className="min-w-0 truncate text-base font-semibold tracking-tight text-stone-800">{title}</h2>{titleAction}</div>
         <span className="text-[10px] uppercase tracking-[0.16em] text-stone-400">{typeLabel}{rangeLabel ? <span className="ml-2 normal-case tracking-normal text-stone-400">· {rangeLabel}</span> : null}</span>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-1"><span className="text-xs text-stone-400">{count}</span>{headerAction}</div>
@@ -417,18 +421,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   : showDurationLabels ? 'grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
                     : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4';
                 const calendarValuesAction = isDurationNumber && onCalendarValuesChange && range !== '7d' ? (
-                  <div role="group" aria-label="日历显示模式" className="inline-flex items-center gap-0.5 rounded-full border border-stone-200 p-0.5">
-                    {[{ label: '色块', show: false }, { label: '时长', show: true }].map(option => (
-                      <button
-                        key={option.label}
-                        type="button"
-                        aria-pressed={showCalendarValues === option.show}
-                        title={option.show ? '显示每日时长（小时:分钟）' : '仅显示色块'}
-                        onClick={() => onCalendarValuesChange(option.show)}
-                        className={`rounded-full px-2 py-1 text-[10px] transition-colors ${showCalendarValues === option.show ? 'bg-stone-100 text-stone-800' : 'text-stone-400 hover:text-stone-600'}`}
-                      >{option.label}</button>
-                    ))}
-                  </div>
+                  <CalendarDisplayToggle showValues={showCalendarValues} onChange={onCalendarValuesChange} />
                 ) : undefined;
                 if (range === '7d') {
                   const weekdayLabels = ['日', '一', '二', '三', '四', '五', '六'];
@@ -450,9 +443,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   );
                 }
                 return (
-                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`} headerAction={calendarValuesAction}>
+                  <AttributeSection key={attribute.id} hideTopBorder={hideSectionBorder} title={attribute.name} typeLabel={`NUMBER / ${attribute.unit || '全年日历'}`} rangeLabel={rangeLabel || getRangeLabel(range)} count={`${numbers.length} 条已填写`} titleAction={calendarValuesAction}>
                     <div className="mt-5 py-1">
-                      <div className={`grid gap-x-3 gap-y-3 ${monthColumns}`}>
+                      <div className={`grid gap-x-3 gap-y-3 ${monthColumns}`} style={showDurationLabels && range !== 'month' ? { gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))' } : undefined}>
                         {calendarMonths.map((monthKey) => {
                           const [year, month] = monthKey.split('-').map(Number);
                           const leadingBlanks = new Date(year, month - 1, 1).getDay();
@@ -472,7 +465,7 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                                 const valueLabel = `${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`;
                                 return <span key={day} aria-label={valueLabel} title={valueLabel} className="flex min-w-0 flex-col" data-calendar-date={day}>
                                   <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }}>{showDayMarker ? dayOfMonth : null}</span>
-                                  {showDurationLabels && <span className={`mt-0.5 truncate text-center font-mono leading-tight tracking-[-0.04em] tabular-nums ${compactValue.length > 4 ? 'text-[7px]' : 'text-[8px]'} sm:text-[8px] ${value > 0 ? 'text-stone-600' : 'text-stone-300'}`} data-calendar-duration="" aria-hidden="true">{compactValue}</span>}
+                                  {showDurationLabels && <CalendarValueLabel value={compactValue} empty={value <= 0} attribute="duration" />}
                                 </span>;
                               })}
                             </div>
