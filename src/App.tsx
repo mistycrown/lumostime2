@@ -48,7 +48,7 @@
  * @updated 2026-04-25: Added AI assistant widget shortcut handling so Android widget shortcut slots can open the shared AI chat window.
  * @updated 2026-04-26: Added Android assistant notification navigation consumption so tapping a background AI alert reopens the shared chat at the exact target message.
  * @updated 2026-07-31: Added a temporary active Chronicle layout state so tapping the active Timeline nav item toggles layouts without changing the settings default.
- * @updated 2026-08-11: Shows shareable Sentry error IDs for startup, local-data hydration, and imported-file failures.
+ * @updated 2026-10-25: Opens shared copyable report receipts for startup, hydration and imported-file failures.
  * @updated 2026-08-26: Added Routine configuration state and sequential session orchestration.
  * @updated 2026-09-22: Included Memoir filters and persisted user preferences in export/sync payloads.
  *
@@ -1632,6 +1632,7 @@ const App: React.FC = () => {
 };
 
 const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { addToast } = useToast();
   const { isReady: isDataReady } = useData();
   const { isReady: isReviewReady } = useReview();
   const { isReady: isCategoryScopeReady } = useCategoryScope();
@@ -1649,6 +1650,11 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
   const [criticalDataError, setCriticalDataError] = useState<CriticalDataErrorDetail | null>(
     getLatestCriticalDataError
   );
+
+  useEffect(() => {
+    const eventId = criticalDataError?.sentryEventId ?? startupTimeoutEventId;
+    if (eventId) addToast('error', withErrorReference(criticalDataError?.message || '加载本地数据超时', eventId));
+  }, [addToast, criticalDataError, startupTimeoutEventId]);
 
   useEffect(() => {
     const handleStartupTimeout = (event: Event) => {
@@ -1714,18 +1720,13 @@ const AppBootstrapGate: React.FC<{ children: React.ReactNode }> = ({ children })
         <div className="min-h-screen bg-[#fafaf9] flex flex-col items-center justify-center gap-5 px-6 text-center font-serif">
           <div className="text-base text-stone-700">{errorMessage}</div>
           {sentryEventId ? (
-            <div className="flex max-w-full flex-col items-center gap-2 text-xs text-stone-500">
-              <code className="max-w-full break-all border border-stone-200 bg-white px-3 py-2 text-stone-700">
-                错误编号：{sentryEventId}
-              </code>
-              <button
-                type="button"
-                className="text-sm text-stone-700 underline"
-                onClick={() => void navigator.clipboard?.writeText(sentryEventId)}
-              >
-                复制错误编号
-              </button>
-            </div>
+            <button
+              type="button"
+              className="text-sm text-stone-700 underline"
+              onClick={() => addToast('error', withErrorReference(errorMessage, sentryEventId))}
+            >
+              查看错误报告
+            </button>
           ) : (
             <div className="text-xs text-stone-500">诊断上报未启用</div>
           )}

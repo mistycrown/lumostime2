@@ -1,6 +1,6 @@
 /**
  * @file errorReporting.ts
- * @updated 2026-10-05: Adds searchable pseudonymous user IDs and waits for manual report delivery.
+ * @updated 2026-10-25: Shares delivery-checked receipts, console context and retry handling across automatic and manual reports.
  * @input Optional Vite Sentry DSN and sanitized diagnostic contexts
  * @output Remote crash and startup diagnostic events when monitoring is configured
  * @pos Shared diagnostics service
@@ -32,6 +32,17 @@ export interface CriticalDataErrorDetail {
 }
 
 let reportingEnabled = false;
+type ReportDelivery = 'pending' | 'sent' | 'failed';
+interface ErrorReportRecord {
+  userId: string;
+  status: ReportDelivery;
+  retry: () => string;
+  listeners: Set<() => void>;
+}
+const errorReports = new Map<string, ErrorReportRecord>();
+const exceptionReferences = new WeakMap<object, string>();
+const MAX_ERROR_REPORTS = 100;
+const REPORT_TAG = 'lumos_report';
 let latestCriticalDataError: CriticalDataErrorDetail | null = null;
 const recentConsoleEntries: RecentConsoleEntry[] = [];
 const MAX_RECENT_CONSOLE_ENTRIES = 30;
@@ -104,25 +115,93 @@ export const initializeErrorReporting = (): boolean => {
     return false;
   }
 
-  Sentry.init({
+  const client = Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
     release: getRelease(),
     sendDefaultPii: false,
     tracesSampleRate: 0,
+    // A displayed receipt must survive SDK deduplication. Sentry still groups
+    // repeated occurrences into the same issue; automatic events keep Dedupe.
+    integrations: (defaults) => defaults.map((integration) => {
+      if (integration.name !== 'Dedupe' || !integration.processEvent) return integration;
+      const processEvent = integration.processEvent;
+      return {
+        ...integration,
+        processEvent(event, hint, currentClient) {
+          return event.tags?.[REPORT_TAG] === 'true'
+            ? event
+            : processEvent.call(integration, event, hint, currentClient);
+        }
+      };
+    }),
     beforeSend(event) {
       const identity = getDiagnosticIdentity();
-      event.user = { id: identity.id };
-      event.tags = { ...event.tags, user_id: identity.id, user_type: identity.type };
+      const userId = event.tags?.[REPORT_TAG] === 'true' && typeof event.user?.id === 'string'
+        ? event.user.id
+        : identity.id;
+      event.user = { id: userId, username: userId };
+      event.tags = { ...event.tags, user_id: userId, user_type: event.tags?.[REPORT_TAG] === 'true' ? event.tags.user_type : identity.type };
       delete event.request;
       return event;
     }
+  });
+  client?.on('afterSendEvent', (event, response) => {
+    const record = event.event_id ? errorReports.get(event.event_id) : undefined;
+    if (!record) return;
+    const statusCode = response?.statusCode;
+    record.status = statusCode !== undefined && statusCode >= 200 && statusCode < 300 ? 'sent' : 'failed';
+    record.listeners.forEach((listener) => listener());
   });
 
   reportingEnabled = true;
   // Restore the cached ID for older installations that only saved a redemption code.
   void new RedemptionService().isVerified().catch(() => {});
   return true;
+};
+
+const captureReport = (
+  capture: () => string,
+  context: DiagnosticContext,
+  level?: DiagnosticLevel
+): string => {
+  const identity = getDiagnosticIdentity();
+  const eventId = Sentry.withScope((scope) => {
+    scope.setUser({ id: identity.id });
+    scope.setTag(REPORT_TAG, 'true');
+    scope.setTag('user_id', identity.id);
+    scope.setTag('user_type', identity.type);
+    if (level) scope.setLevel(level);
+    scope.setContext('diagnostic', context);
+    scope.setContext('recent_console_errors', {
+      count: recentConsoleEntries.length,
+      entries: JSON.stringify(recentConsoleEntries).slice(0, MAX_REPORT_LENGTH)
+    });
+    return capture();
+  });
+  errorReports.set(eventId, {
+    userId: identity.id,
+    status: 'pending',
+    retry: () => captureReport(capture, context, level),
+    listeners: new Set()
+  });
+  if (errorReports.size > MAX_ERROR_REPORTS) {
+    const oldestId = errorReports.keys().next().value!;
+    const oldest = errorReports.get(oldestId)!;
+    oldest.status = 'failed';
+    oldest.listeners.forEach((listener) => listener());
+    errorReports.delete(oldestId);
+  }
+  return eventId;
+};
+
+// Report a snapshot so an Error previously captured by a global handler (or a
+// failed attempt) cannot produce a fresh ID that the SDK silently discards.
+const snapshotException = (error: unknown): unknown => {
+  if (!(error instanceof Error)) return error && typeof error === 'object' ? { ...error } : error;
+  const snapshot = Object.assign(new Error(error.message), error, { name: error.name, stack: error.stack });
+  if ('cause' in error) Object.defineProperty(snapshot, 'cause', { value: error.cause, configurable: true });
+  return snapshot;
 };
 
 export const reportDiagnostic = (
@@ -134,11 +213,7 @@ export const reportDiagnostic = (
     return null;
   }
 
-  return Sentry.withScope((scope) => {
-    scope.setLevel(level);
-    scope.setContext('diagnostic', context);
-    return Sentry.captureMessage(message);
-  });
+  return captureReport(() => Sentry.captureMessage(message), context, level);
 };
 
 export const reportException = (error: unknown, context: DiagnosticContext = {}): string | null => {
@@ -146,10 +221,55 @@ export const reportException = (error: unknown, context: DiagnosticContext = {})
     return null;
   }
 
-  return Sentry.withScope((scope) => {
-    scope.setContext('diagnostic', context);
-    return Sentry.captureException(error);
+  if (error && typeof error === 'object') {
+    const previousId = exceptionReferences.get(error);
+    if (previousId && errorReports.get(previousId)?.status !== 'failed' && errorReports.has(previousId)) return previousId;
+  }
+  const eventId = captureReport(() => Sentry.captureException(snapshotException(error)), context);
+  if (error && typeof error === 'object') exceptionReferences.set(error, eventId);
+  return eventId;
+};
+
+export const getErrorReportUserId = (eventId: string): string => (
+  errorReports.get(eventId)?.userId ?? getDiagnosticIdentity().id
+);
+
+export const waitForErrorReport = async (eventId: string): Promise<RecentConsoleReportResult> => {
+  if (!reportingEnabled) return { status: 'disabled' };
+  const record = errorReports.get(eventId);
+  if (!record) return { status: 'failed' };
+  const result = (): RecentConsoleReportResult => record.status === 'sent'
+    ? { status: 'sent', eventId, userId: record.userId }
+    : { status: 'failed' };
+  if (record.status !== 'pending') return result();
+  return new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      record.listeners.delete(finish);
+      resolve(result());
+    };
+    const fail = () => {
+      if (record.status === 'pending') record.status = 'failed';
+      finish();
+    };
+    const timer = setTimeout(fail, 5_000);
+    record.listeners.add(finish);
+    // Queue drainage alone does not prove delivery: filters and HTTP failures
+    // can still flush successfully. Only afterSendEvent with a 2xx confirms it.
+    void Sentry.flush(5_000).then((flushed) => { if (!flushed) fail(); }, fail);
   });
+};
+
+export const retryErrorReport = async (eventId: string): Promise<RecentConsoleReportResult> => {
+  if (!reportingEnabled) return { status: 'disabled' };
+  const record = errorReports.get(eventId);
+  if (!record) return reportRecentConsoleErrors();
+  try {
+    await new RedemptionService().isVerified();
+    return await waitForErrorReport(record.retry());
+  } catch {
+    return { status: 'failed' };
+  }
 };
 
 export const withErrorReference = (message: string, sentryEventId: string | null): string => (
@@ -187,15 +307,8 @@ export const reportRecentConsoleErrors = async (): Promise<RecentConsoleReportRe
   if (recentConsoleEntries.length === 0) return { status: 'empty' };
   try {
     await new RedemptionService().isVerified();
-    const identity = getDiagnosticIdentity();
-    const serializedEntries = JSON.stringify(recentConsoleEntries).slice(0, MAX_REPORT_LENGTH);
-    const eventId = Sentry.withScope((scope) => {
-      scope.setLevel('error');
-      scope.setContext('recent_console_errors', { count: recentConsoleEntries.length, entries: serializedEntries });
-      return Sentry.captureMessage('User submitted recent console errors');
-    });
-    if (!eventId || !await Sentry.flush(5_000)) return { status: 'failed' };
-    return { status: 'sent', eventId, userId: identity.id };
+    const eventId = captureReport(() => Sentry.captureMessage('User submitted recent console errors'), {}, 'error');
+    return await waitForErrorReport(eventId);
   } catch {
     return { status: 'failed' };
   }

@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-25: `ErrorReportModal` connects automatic errors to `FeedbackReportModal`, retaining the error message and copyable user/event IDs, with delivery status and retry support.
+
 Update 2026-10-24: `ColorPalettePicker` shares the existing circular built-in colors and reactive custom color group between schedule color settings and journal PDF export.
 
 Update 2026-10-24: `TodoMonthView.tsx` reads its unchanged detail badge order, labels and tones from `todoScheduleLabels.ts`, shared with journal PDF agendas.

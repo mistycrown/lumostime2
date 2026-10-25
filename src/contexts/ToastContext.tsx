@@ -4,6 +4,7 @@
  * @output Toast display operations, Toast removal
  * @pos Context (UI Feedback)
  * @description Toast 消息上下文 - 管理全局的 Toast 消息显示
+ * @updated 2026-10-25: Routes reported errors to persistent, copyable feedback receipts.
  * 
  * 核心功能：
  * - Toast 消息队列管理
@@ -22,6 +23,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { ToastContainer, ToastMessage, ToastType } from '../components/Toast';
+import { ErrorReportModal } from '../components/ErrorReportModal';
 
 interface ToastContextType {
     addToast: (type: ToastType, message: string, action?: { label: string, onClick: () => void }) => void;
@@ -40,8 +42,17 @@ export const useToast = () => {
 
 export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [toasts, setToasts] = useState<ToastMessage[]>([]);
+    const [errorReports, setErrorReports] = useState<{ eventId: string; message: string }[]>([]);
 
     const addToast = useCallback((type: ToastType, message: string, action?: { label: string, onClick: () => void }) => {
+        const reference = type === 'error' ? message.match(/\n错误编号：([a-f\d]{32})$/i) : null;
+        if (reference) {
+            const eventId = reference[1];
+            setErrorReports((current) => current.some((report) => report.eventId === eventId)
+                ? current
+                : [...current, { eventId, message: message.slice(0, reference.index) }]);
+            return;
+        }
         const id = Math.random().toString(36).substr(2, 9);
         setToasts(prev => [...prev, { id, type, message, action }]);
     }, []);
@@ -54,6 +65,11 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         <ToastContext.Provider value={{ addToast, removeToast }}>
             {children}
             <ToastContainer toasts={toasts} onRemove={removeToast} />
+            {errorReports[0] && <ErrorReportModal
+                key={errorReports[0].eventId}
+                {...errorReports[0]}
+                onClose={() => setErrorReports((current) => current.slice(1))}
+            />}
         </ToastContext.Provider>
     );
 };

@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-10-25: `ToastContext` queues errors with report references in persistent feedback dialogs, suppressing duplicate open receipts for the same event ID.
+
 Update 2026-10-18: `DataContext.setTodos` normalizes completion/abandonment exclusivity on hydration and updates before snapshots are persisted or passed to reminder reconciliation. Missing `abandonedAt` preserves compatibility with existing data.
 
 Update 2026-10-17: `DataContext` serializes todo saves and only submits local-reminder snapshots after persistence succeeds. Sync reads wait for local writes and reject stale state so rapid edits/cancellations cannot be overwritten by self-broadcasts. Scheduling failures are reported separately from storage errors.
