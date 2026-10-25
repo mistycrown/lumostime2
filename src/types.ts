@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-25: Adds cross-day statistic sources, chart types, metrics and local day boundaries.
  * @updated 2026-10-23: Persists per-card daily duration labels in calendar heatmaps.
  * @updated 2026-10-18: Stores task abandonment as a timestamp mutually exclusive with completion.
  * @updated 2026-10-18: Adds an optional principle group scope for random scene cards.
@@ -108,7 +109,8 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
-export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'choiceStacked' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap' | 'tagDurationPetalTimeline';
+export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'choiceStacked' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap' | 'tagDurationPetalTimeline' | 'crossDayTrend' | 'crossDayTimeline' | 'crossDayCalendar';
+export type CrossDayMetric = 'start' | 'duration' | 'end';
 export type ActivityTimelineStyle = 'petal' | 'histogram';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'week' | 'month' | 'year';
 export type ActivityStatisticMetric = 'value' | 'count' | 'duration' | 'average' | 'sum';
@@ -139,6 +141,7 @@ export type ActivityStatisticCardSource =
   | { type: 'tagDuration' }
   | { type: 'categoryDuration' }
   | { type: 'recordDuration' }
+  | { type: 'crossDay' }
   | { type: 'categoryActivity' };
 
 export interface WordCloudSettings {
@@ -152,6 +155,8 @@ export interface ActivityStatisticCard {
   chartType: ActivityStatisticCardType;
   range: ActivityStatisticRange;
   metric: ActivityStatisticMetric;
+  crossDayMetric?: CrossDayMetric;
+  dayBoundaryMinutes?: number;
   timelineStyle?: ActivityTimelineStyle;
   showCalendarValues?: boolean;
   wordCloudSettings?: WordCloudSettings;

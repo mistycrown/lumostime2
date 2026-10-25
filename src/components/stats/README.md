@@ -1,5 +1,11 @@
 # Statistics components
 
+`CrossDayStatistics.tsx` is the tag detail cross-day activity renderer. It receives complete tag history, assigns local noon-to-noon windows to their ending date (with a configurable boundary), and presents start/duration/end metrics as trends, interval rows or calendars. It filters by the assigned date after aggregation, excludes missing dates from averages and compares equal-length local calendar periods. Interval rows preserve wake gaps and expose full start/end timestamps on selection.
+
+`InteractiveTrendChart.tsx` also supports null-valued missing dates, optional clock-axis domains, average reference lines, initial date selection and selected-night details. Existing numeric callers retain their zero baseline and keyboard navigation.
+
+Run `npm run build` then `node scripts/check-cross-day-statistics-smoke.mjs` to check real editor persistence, source restrictions, desktop/mobile layout, native browser touch selection and Chinese-font captures.
+
 `PieChartView.tsx` displays category/activity, todo and scope duration distributions.
 
 `StatsView` enables log details by default for every pie range; callers can explicitly opt out with `enableLogDetails={false}`. Category, activity, todo-category, individual-todo and scope rows open their matching records. The entire summary row and its progress bar share the same action; yearly todo statistics also expose individual tasks.

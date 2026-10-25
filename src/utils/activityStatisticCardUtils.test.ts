@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.test.ts
+ * @updated 2026-10-25: Covers independent cross-day metrics, ranges and boundary normalization.
  * @updated 2026-10-23: Verifies calendar display mode persistence and malformed preference handling.
  * @updated 2026-10-09: Covers per-cloud word settings round-trips and legacy configurations.
  * @updated 2026-10-06: Covers persisted all-time capability rules and record-duration sources.
@@ -21,6 +22,19 @@ const activity = (statisticCards?: Activity['statisticCards']): Activity => ({
 });
 
 describe('activity statistic cards', () => {
+  it('round-trips cross-day metrics and bounds without changing legacy sources', () => {
+    const cards: ActivityStatisticCard[] = ['start', 'duration', 'end'].map((crossDayMetric, order) => ({
+      id: crossDayMetric, source: { type: 'crossDay' }, chartType: 'crossDayTrend', range: 'week', metric: 'count',
+      crossDayMetric: crossDayMetric as 'start' | 'duration' | 'end', dayBoundaryMinutes: 600, order
+    }));
+    expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify(cards))))).toEqual(cards);
+    expect(getChartTypesForSource({ type: 'crossDay' }, [])).toEqual(['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar']);
+    const malformed = { ...cards[0], crossDayMetric: 'invalid', dayBoundaryMinutes: '12:00' } as unknown as ActivityStatisticCard;
+    expect(normalizeStatisticCards(activity([malformed]))[0]).toMatchObject({ crossDayMetric: 'duration', dayBoundaryMinutes: 720 });
+    expect(normalizeStatisticCards(activity([{ ...cards[0], dayBoundaryMinutes: 2000 }]))[0].dayBoundaryMinutes).toBe(1439);
+    expect(normalizeStatisticCards(activity([{ ...cards[0], dayBoundaryMinutes: -1 }]))[0].dayBoundaryMinutes).toBe(0);
+    expect(normalizeStatisticCards(activity([{ ...cards[0], source: { type: 'tagDuration' } }]))).toEqual([]);
+  });
   it('round-trips calendar label preferences and ignores non-boolean values', () => {
     const card: ActivityStatisticCard = { id: 'calendar', source: { type: 'categoryDuration' }, chartType: 'numberCalendar', range: 'year', metric: 'count', showCalendarValues: true, order: 0 };
     expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify([card]))))[0].showCalendarValues).toBe(true);

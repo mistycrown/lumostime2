@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-25: Adds tag-only cross-day activity sources, clock metrics and day-boundary controls.
  * @updated 2026-10-23: Adds a persisted color/duration switch and compact daily labels below calendar heatmap cells.
  * @updated 2026-10-23: Shares interactive daily trends across custom category, tag, scope and numeric cards; includes the complete selected range.
  * @updated 2026-10-10: Protects node names and aliases alongside manual dictionary words.
@@ -56,6 +57,8 @@ import { useChartPaletteSequences } from '../hooks/useChartPaletteSequences';
 import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 import { PetalTimelineChart, type RhythmRange } from './stats/PetalTimelineChart';
 import { InteractiveTrendChart } from './stats/InteractiveTrendChart';
+import { CrossDayStatistics } from './stats/CrossDayStatistics';
+import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, normalizeDayBoundary } from '../utils/crossDayStatsUtils';
 
 export { getTextTerms } from '../utils/textSegmentation';
 
@@ -566,9 +569,13 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
+  crossDayTrend: '趋势折线图', crossDayTimeline: '时段图', crossDayCalendar: '指标日历',
   textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationPetalTimeline: '时序图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
+  crossDayTrend: LineChart,
+  crossDayTimeline: Clock3,
+  crossDayCalendar: CalendarDays,
   textCloud: Type,
   numberArea: LineChart,
   numberHistogram: BarChart3,
@@ -956,6 +963,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       ...(allowedSourceTypes?.includes('categoryDuration') ? [{ key: 'categoryDuration', source: { type: 'categoryDuration' } as ActivityStatisticCardSource, label: '分类时长' }] : []),
       ...(allowedSourceTypes?.includes('recordDuration') ? [{ key: 'recordDuration', source: { type: 'recordDuration' } as ActivityStatisticCardSource, label: '记录时长' }] : []),
       { key: 'note', source: { type: 'note' } as ActivityStatisticCardSource, label: '备注' },
+      ...(!allowedSourceTypes || allowedSourceTypes.includes('crossDay') ? [{ key: 'crossDay', source: { type: 'crossDay' } as ActivityStatisticCardSource, label: '跨天活动' }] : []),
       ...(allowedSourceTypes?.includes('tagDuration') || !allowedSourceTypes ? [{ key: 'tagDuration', source: { type: 'tagDuration' } as ActivityStatisticCardSource, label: '标签时长' }] : []),
       ...(allowedSourceTypes?.includes('categoryActivity') ? [{ key: 'categoryActivity', source: { type: 'categoryActivity' } as ActivityStatisticCardSource, label: '二级标签' }] : [])
     ];
@@ -1048,6 +1056,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
       ? selectedCard.range : getDefaultStatisticRange(nextType);
     updateSelectedCard({
       source: next.source,
+      ...(next.source.type === 'crossDay' ? { crossDayMetric: selectedCard.crossDayMetric || 'duration', dayBoundaryMinutes: normalizeDayBoundary(selectedCard.dayBoundaryMinutes) } : {}),
       chartType: nextType || 'textCloud',
       ...(nextType === 'tagDurationPetalTimeline' ? { timelineStyle: selectedCard.timelineStyle || 'petal' } : {}),
       range: nextRange,
@@ -1066,6 +1075,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     ? <button type="button" aria-label={`词云设置：${getStatisticCardLabel(card, attributes)}`} onClick={() => setWordSettingsCardId(card.id)} className="inline-flex items-center gap-1 text-xs text-[#8f7f70] hover:text-[#77523d]"><Settings2 size={13} />词云设置</button> : undefined;
 
   const renderCard = (card: ActivityStatisticCard) => {
+    if (card.source.type === 'crossDay') return <CrossDayStatistics key={card.id} card={card} logs={logs} palette={chartPalette} rangeLabel={getRangeLabel(card.range)} />;
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
     if (isDurationStatisticSource(card.source)) {
@@ -1191,6 +1201,19 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
         <div className="max-h-[88vh] w-full max-w-xl overflow-y-auto rounded-t-2xl border border-[#d8cabb] bg-[#fcfaf6] p-5 shadow-2xl sm:rounded-2xl" role="dialog" aria-modal="true" aria-label="编辑所选卡片">
           <div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div>
           <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
+          {selectedCard.source.type === 'crossDay' && <div className="mt-4 space-y-4">
+            {selectedCard.chartType !== 'crossDayTimeline' && <div>
+              <p className="mb-2 text-xs text-[#766657]">统计指标</p>
+              <div className="flex flex-wrap gap-1.5">{(['start', 'duration', 'end'] as const).map(metric => <button key={metric} type="button"
+                onClick={() => updateSelectedCard({ crossDayMetric: metric })}
+                className={`rounded-md border px-3 py-1.5 text-xs ${(selectedCard.crossDayMetric || 'duration') === metric ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{CROSS_DAY_METRIC_LABELS[metric]}</button>)}</div>
+            </div>}
+            <label className="flex items-center justify-between gap-3 text-xs text-[#766657]">日期分界时间
+              <input type="time" aria-label="日期分界时间" step="60" value={formatCrossDayClock(normalizeDayBoundary(selectedCard.dayBoundaryMinutes))}
+                onChange={event => { if (!event.target.value) return; const [hours, minutes] = event.target.value.split(':').map(Number); updateSelectedCard({ dayBoundaryMinutes: hours * 60 + minutes }); }}
+                className="rounded-md border border-[#e0d6ca] bg-transparent px-3 py-2 font-mono text-[#77523d]" />
+            </label>
+          </div>}
           <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>
           <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">时间范围</p><div className="flex flex-wrap gap-1.5">{selectedRangeOptions.map((option) => <button key={option.key} type="button" onClick={() => updateSelectedCard({ range: option.key })} className={`rounded-md border px-2.5 py-1.5 text-xs ${selectedCard.range === option.key ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{option.label}</button>)}</div></div>
           {selectedCard.chartType === 'textCloud' && <div className="mt-5 border-t border-[#e0d6ca] pt-4"><WordCloudSettingsEditor key={`${selectedCard.id}-${sourceToKey(selectedCard.source)}-${selectedCard.range}`} settings={selectedCard.wordCloudSettings} values={getWordCloudValues(selectedCard)} onChange={(wordCloudSettings) => updateSelectedCard({ wordCloudSettings })} /></div>}

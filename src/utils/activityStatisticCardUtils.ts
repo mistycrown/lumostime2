@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.ts
+ * @updated 2026-10-25: Normalizes cross-day cards and their independent clock metrics and boundaries.
  * @updated 2026-10-23: Preserves boolean calendar-duration display preferences across saved cards.
  * @updated 2026-10-09: Preserves and sanitizes per-card word cloud settings through normalization.
  * @updated 2026-10-06: Shares chart-specific ranges and supports record-duration cards.
@@ -24,10 +25,11 @@ import {
   ActivityStatisticRange
 } from '../types';
 import { normalizeWordCloudSettings } from './textSegmentation';
+import { CROSS_DAY_METRIC_LABELS, normalizeDayBoundary } from './crossDayStatsUtils';
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'week', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline', 'crossDayTrend', 'crossDayTimeline', 'crossDayCalendar'];
 const TIMELINE_STYLES: ActivityTimelineStyle[] = ['petal', 'histogram'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
@@ -37,6 +39,7 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 };
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
+  if (source.type === 'crossDay') return ['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar'];
   if (source.type === 'note') return ['textCloud'];
   if (isDurationStatisticSource(source)) return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
   if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked'];
@@ -54,6 +57,7 @@ export const isDurationStatisticSource = (source: ActivityStatisticCardSource): 
 
 /** Keep editor choices and persisted range validation on the same capability rules. */
 export const getStatisticRangesForCard = (chartType: ActivityStatisticCardType): ActivityStatisticRange[] => {
+  if (chartType.startsWith('crossDay')) return ['7d', '30d', 'week', 'month', 'year'];
   if (chartType === 'tagDurationBoxplot') return ['year'];
   if (chartType === 'tagDurationWeekHourHeatmap') return ['all', 'month', 'year'];
   if (chartType === 'tagDurationPetalTimeline') return ['week', 'month', 'year', 'all'];
@@ -75,6 +79,7 @@ const isCardSource = (value: unknown): value is ActivityStatisticCardSource => {
     || source.type === 'tagDuration'
     || source.type === 'categoryDuration'
     || source.type === 'recordDuration'
+    || source.type === 'crossDay'
     || source.type === 'categoryActivity'
     || (source.type === 'attribute' && typeof source.attributeId === 'string' && source.attributeId.length > 0);
 };
@@ -124,6 +129,10 @@ const normalizeCard = (raw: unknown, index: number, attributes: ActivityAttribut
     chartType,
     range,
     metric: normalizedMetric,
+    ...(source.type === 'crossDay' ? {
+      crossDayMetric: item.crossDayMetric === 'start' || item.crossDayMetric === 'end' ? item.crossDayMetric : 'duration' as const,
+      dayBoundaryMinutes: normalizeDayBoundary(item.dayBoundaryMinutes)
+    } : {}),
     ...(timelineStyle ? { timelineStyle } : {}),
     ...(typeof item.showCalendarValues === 'boolean' ? { showCalendarValues: item.showCalendarValues } : {}),
     ...(item.wordCloudSettings ? { wordCloudSettings: normalizeWordCloudSettings(item.wordCloudSettings) } : {}),
@@ -164,6 +173,8 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
       ? '标签时长'
       : card.source.type === 'categoryDuration'
         ? '分类时长'
+        : card.source.type === 'crossDay'
+          ? `跨天活动${card.chartType === 'crossDayTimeline' ? '' : ` · ${CROSS_DAY_METRIC_LABELS[card.crossDayMetric || 'duration']}`}`
         : card.source.type === 'recordDuration'
           ? '记录时长'
           : card.source.type === 'categoryActivity'
@@ -175,6 +186,9 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     numberHistogram: '数值分布',
     numberCalendar: '数值日历',
     numberKpi: '数值概览',
+    crossDayTrend: '趋势折线图',
+    crossDayTimeline: '时段图',
+    crossDayCalendar: '指标日历',
     choiceBar: '选项分布',
     choiceDonut: '选项环形图',
     choiceHeatmap: '选项热力图',
