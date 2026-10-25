@@ -4,6 +4,7 @@
  * @output Overnight interval unions, extended clock values and local date keys.
  * @pos Utility (Statistics)
  * @updated 2026-10-25: Adds gap-aware cross-day statistics assigned to the window's ending date.
+ * @updated 2026-10-25: Validates four-digit clock input and supports all-time local date ranges.
  */
 import type { ActivityStatisticRange, CrossDayMetric, Log } from '../types';
 
@@ -34,6 +35,9 @@ export const formatCrossDayClock = (minutes: number): string => {
   const clock = ((Math.round(minutes) % 1440) + 1440) % 1440;
   return `${String(Math.floor(clock / 60)).padStart(2, '0')}:${String(clock % 60).padStart(2, '0')}`;
 };
+export const parseCrossDayTimeInput = (value: string): number | null => (
+  /^([01]\d|2[0-3])[0-5]\d$/.test(value) ? Number(value.slice(0, 2)) * 60 + Number(value.slice(2)) : null
+);
 export const formatCrossDayDuration = (seconds: number): string => {
   const minutes = Math.max(0, Math.round(seconds / 60));
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
@@ -92,10 +96,13 @@ export const buildCrossDayStats = (logs: Log[], boundaryMinutes = 720, now = new
   return result;
 };
 
-export const getCrossDayDateKeys = (range: ActivityStatisticRange, now = new Date()): string[] => {
+export const getCrossDayDateKeys = (range: ActivityStatisticRange, now = new Date(), firstDateKey?: string): string[] => {
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const start = new Date(end);
-  if (range === 'year') start.setMonth(0, 1);
+  if (range === 'all') {
+    const first = firstDateKey && /^\d{4}-\d{2}-\d{2}$/.test(firstDateKey) ? parseLocalDate(firstDateKey) : end;
+    start.setTime(Math.min(first.getTime(), end.getTime()));
+  } else if (range === 'year') start.setMonth(0, 1);
   else if (range === 'month') start.setDate(1);
   else if (range === 'week') start.setDate(start.getDate() - (start.getDay() + 6) % 7);
   else start.setDate(start.getDate() - (range === '7d' ? 6 : 29));

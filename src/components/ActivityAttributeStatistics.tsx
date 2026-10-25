@@ -1,6 +1,7 @@
 /**
  * @file ActivityAttributeStatistics.tsx
  * @updated 2026-10-25: Adds tag-only cross-day activity sources, clock metrics and day-boundary controls.
+ * @updated 2026-10-25: Uses validated HHMM digit entry and persisted compact calendar display modes.
  * @updated 2026-10-23: Adds a persisted color/duration switch and compact daily labels below calendar heatmap cells.
  * @updated 2026-10-23: Shares interactive daily trends across custom category, tag, scope and numeric cards; includes the complete selected range.
  * @updated 2026-10-10: Protects node names and aliases alongside manual dictionary words.
@@ -58,7 +59,7 @@ import { useSponsorshipUnlocked } from '../hooks/useSponsorshipUnlocked';
 import { PetalTimelineChart, type RhythmRange } from './stats/PetalTimelineChart';
 import { InteractiveTrendChart } from './stats/InteractiveTrendChart';
 import { CrossDayStatistics } from './stats/CrossDayStatistics';
-import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, normalizeDayBoundary } from '../utils/crossDayStatsUtils';
+import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, normalizeDayBoundary, parseCrossDayTimeInput } from '../utils/crossDayStatsUtils';
 
 export { getTextTerms } from '../utils/textSegmentation';
 
@@ -1017,6 +1018,8 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
   const sourceChoices = availableSourceChoices;
   const sourceToKey = (value: ActivityStatisticCardSource) => value.type === 'attribute' ? `attribute:${value.attributeId}` : value.type;
   const selectedCard = cards.find((card) => card.id === selectedCardId) || null;
+  const [boundaryInput, setBoundaryInput] = useState('1200');
+  React.useEffect(() => { setBoundaryInput(formatCrossDayClock(normalizeDayBoundary(selectedCard?.dayBoundaryMinutes)).replace(':', '')); }, [selectedCard?.id, selectedCard?.dayBoundaryMinutes]);
   const wordSettingsCard = cards.find((card) => card.id === wordSettingsCardId) || null;
   const selectedTypes = selectedCard ? getChartTypesForSource(selectedCard.source, attributes) : [];
   const selectedRangeOptions = selectedCard
@@ -1075,7 +1078,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
     ? <button type="button" aria-label={`词云设置：${getStatisticCardLabel(card, attributes)}`} onClick={() => setWordSettingsCardId(card.id)} className="inline-flex items-center gap-1 text-xs text-[#8f7f70] hover:text-[#77523d]"><Settings2 size={13} />词云设置</button> : undefined;
 
   const renderCard = (card: ActivityStatisticCard) => {
-    if (card.source.type === 'crossDay') return <CrossDayStatistics key={card.id} card={card} logs={logs} palette={chartPalette} rangeLabel={getRangeLabel(card.range)} />;
+    if (card.source.type === 'crossDay') return <CrossDayStatistics key={card.id} card={card} logs={logs} palette={chartPalette} rangeLabel={getRangeLabel(card.range)} onCalendarValuesChange={show => updateCard(card.id, { showCalendarValues: show })} />;
     const cardLogs = filterLogsByRange(logs, card.range);
     const rangeLabel = getRangeLabel(card.range);
     if (isDurationStatisticSource(card.source)) {
@@ -1209,9 +1212,12 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
                 className={`rounded-md border px-3 py-1.5 text-xs ${(selectedCard.crossDayMetric || 'duration') === metric ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70]'}`}>{CROSS_DAY_METRIC_LABELS[metric]}</button>)}</div>
             </div>}
             <label className="flex items-center justify-between gap-3 text-xs text-[#766657]">日期分界时间
-              <input type="time" aria-label="日期分界时间" step="60" value={formatCrossDayClock(normalizeDayBoundary(selectedCard.dayBoundaryMinutes))}
-                onChange={event => { if (!event.target.value) return; const [hours, minutes] = event.target.value.split(':').map(Number); updateSelectedCard({ dayBoundaryMinutes: hours * 60 + minutes }); }}
-                className="rounded-md border border-[#e0d6ca] bg-transparent px-3 py-2 font-mono text-[#77523d]" />
+              <input type="text" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" placeholder="HHMM" aria-label="日期分界时间" value={boundaryInput}
+                aria-invalid={boundaryInput.length === 4 && parseCrossDayTimeInput(boundaryInput) === null}
+                onChange={event => { const value = event.target.value.replace(/[^0-9]/g, '').slice(0, 4); setBoundaryInput(value); const minutes = parseCrossDayTimeInput(value); if (minutes !== null) updateSelectedCard({ dayBoundaryMinutes: minutes }); }}
+                onFocus={event => event.target.select()}
+                onBlur={() => setBoundaryInput(formatCrossDayClock(normalizeDayBoundary(selectedCard.dayBoundaryMinutes)).replace(':', ''))}
+                className="w-20 rounded-md border border-[#e0d6ca] bg-transparent px-3 py-2 text-center font-mono tracking-widest text-[#77523d]" />
             </label>
           </div>}
           <div className="mt-4"><p className="mb-2 text-xs text-[#766657]">图表类型</p><div className="grid grid-cols-2 gap-2">{selectedTypes.map((type) => { const Icon = CARD_TYPE_ICONS[type]; return <button key={type} type="button" onClick={() => changeExistingType(type)} className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${selectedCard.chartType === type ? 'border-[#b16d4c] bg-[#f1e1d5] font-medium text-[#8f4f32]' : 'border-[#e0d6ca] text-[#8f7f70] hover:border-[#c9b6a4]'}`}><Icon size={14} /><span>{CARD_TYPE_LABELS[type]}</span></button>; })}</div></div>

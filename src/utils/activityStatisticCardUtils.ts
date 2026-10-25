@@ -1,6 +1,7 @@
 /**
  * @file activityStatisticCardUtils.ts
  * @updated 2026-10-25: Normalizes cross-day cards and their independent clock metrics and boundaries.
+ * @updated 2026-10-25: Preserves all-time cross-day ranges for year-paged charts.
  * @updated 2026-10-23: Preserves boolean calendar-duration display preferences across saved cards.
  * @updated 2026-10-09: Preserves and sanitizes per-card word cloud settings through normalization.
  * @updated 2026-10-06: Shares chart-specific ranges and supports record-duration cards.
@@ -57,7 +58,7 @@ export const isDurationStatisticSource = (source: ActivityStatisticCardSource): 
 
 /** Keep editor choices and persisted range validation on the same capability rules. */
 export const getStatisticRangesForCard = (chartType: ActivityStatisticCardType): ActivityStatisticRange[] => {
-  if (chartType.startsWith('crossDay')) return ['7d', '30d', 'week', 'month', 'year'];
+  if (chartType.startsWith('crossDay')) return ['7d', '30d', 'week', 'month', 'year', 'all'];
   if (chartType === 'tagDurationBoxplot') return ['year'];
   if (chartType === 'tagDurationWeekHourHeatmap') return ['all', 'month', 'year'];
   if (chartType === 'tagDurationPetalTimeline') return ['week', 'month', 'year', 'all'];

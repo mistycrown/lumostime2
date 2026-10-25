@@ -1,6 +1,8 @@
 # Statistics components
 
-`CrossDayStatistics.tsx` is the tag detail cross-day activity renderer. It receives complete tag history, assigns local noon-to-noon windows to their ending date (with a configurable boundary), and presents start/duration/end metrics as trends, interval rows or calendars. It filters by the assigned date after aggregation, excludes missing dates from averages and compares equal-length local calendar periods. Interval rows preserve wake gaps and expose full start/end timestamps on selection.
+`CrossDayStatistics.tsx` is the tag detail cross-day activity renderer. It receives complete tag history, assigns local noon-to-noon windows to their ending date (with a configurable HHMM digit input), and presents start/duration/end metrics as trends, interval rows or calendars. It filters by the assigned date after aggregation, excludes missing dates from averages and compares equal-length local calendar periods. Only trends select daily details. All-time calendars/timelines page one year at a time; their overview statistics still describe the full selected range.
+
+`CrossDayCharts.tsx` renders static charts. Calendar spacing, square cells, sparse date markers, responsive 2/3/4 month columns and optional numeric labels follow the existing tag/category duration calendars. Annual interval charts use monthly small multiples; shorter ranges retain gap-aware daily rows. Neither chart has daily buttons or a selection readout.
 
 `InteractiveTrendChart.tsx` also supports null-valued missing dates, optional clock-axis domains, average reference lines, initial date selection and selected-night details. Existing numeric callers retain their zero baseline and keyboard navigation.
 

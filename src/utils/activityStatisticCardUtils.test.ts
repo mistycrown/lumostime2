@@ -1,6 +1,7 @@
 /**
  * @file activityStatisticCardUtils.test.ts
  * @updated 2026-10-25: Covers independent cross-day metrics, ranges and boundary normalization.
+ * @updated 2026-10-25: Verifies all-time cross-day card persistence.
  * @updated 2026-10-23: Verifies calendar display mode persistence and malformed preference handling.
  * @updated 2026-10-09: Covers per-cloud word settings round-trips and legacy configurations.
  * @updated 2026-10-06: Covers persisted all-time capability rules and record-duration sources.
@@ -28,6 +29,7 @@ describe('activity statistic cards', () => {
       crossDayMetric: crossDayMetric as 'start' | 'duration' | 'end', dayBoundaryMinutes: 600, order
     }));
     expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify(cards))))).toEqual(cards);
+    expect(normalizeStatisticCards(activity(cards.map(card => ({ ...card, range: 'all' }))))).toEqual(cards.map(card => ({ ...card, range: 'all' })));
     expect(getChartTypesForSource({ type: 'crossDay' }, [])).toEqual(['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar']);
     const malformed = { ...cards[0], crossDayMetric: 'invalid', dayBoundaryMinutes: '12:00' } as unknown as ActivityStatisticCard;
     expect(normalizeStatisticCards(activity([malformed]))[0]).toMatchObject({ crossDayMetric: 'duration', dayBoundaryMinutes: 720 });

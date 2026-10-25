@@ -4,10 +4,11 @@
  * @output Regression coverage for local overnight aggregation and clock metrics.
  * @pos Test (Statistics)
  * @updated 2026-10-25: Covers complete nights, missing days and calendar boundaries.
+ * @updated 2026-10-25: Covers four-digit time validation and multi-year all-time ranges.
  */
 import { describe, expect, it } from 'vitest';
 import type { Log } from '../types';
-import { buildCrossDayStats, formatCrossDayClock, getCrossDayDateKeys, getCrossDayValue } from './crossDayStatsUtils';
+import { buildCrossDayStats, formatCrossDayClock, getCrossDayDateKeys, getCrossDayValue, parseCrossDayTimeInput } from './crossDayStatsUtils';
 
 const log = (start: string, end: string, overrides: Partial<Log> = {}): Log => ({
   id: start + end, activityId: 'sleep', categoryId: 'rest', startTime: new Date(start).getTime(),
@@ -16,6 +17,20 @@ const log = (start: string, end: string, overrides: Partial<Log> = {}): Log => (
 const now = new Date('2026-10-25T15:00:00');
 
 describe('cross-day activity aggregation', () => {
+  it('accepts only complete valid four-digit times', () => {
+    expect(parseCrossDayTimeInput('0000')).toBe(0);
+    expect(parseCrossDayTimeInput('1200')).toBe(720);
+    expect(parseCrossDayTimeInput('2359')).toBe(1439);
+    for (const value of ['', '12', '120', '2400', '1260', '12:00', '１２３４', '12345']) expect(parseCrossDayTimeInput(value)).toBeNull();
+  });
+  it('keeps all-time dates across years and bounds empty/future histories to today', () => {
+    const keys = getCrossDayDateKeys('all', now, '2024-12-31');
+    expect(keys[0]).toBe('2024-12-31');
+    expect(keys.at(-1)).toBe('2026-10-25');
+    expect(keys).toContain('2025-01-01');
+    expect(getCrossDayDateKeys('all', now)).toEqual(['2026-10-25']);
+    expect(getCrossDayDateKeys('all', now, '2027-01-01')).toEqual(['2026-10-25']);
+  });
   it('joins midnight splits and assigns the complete night to the following date', () => {
     const stats = buildCrossDayStats([
       log('2026-10-24T23:30:00', '2026-10-24T23:59:59.999'),

@@ -1,6 +1,6 @@
 # 图片优化脚本使用说明
 
-2026-10-25：`node scripts/check-cross-day-statistics-smoke.mjs` 在隔离的无头 Chrome 中验证标签统计的跨天来源、开始/时长/结束三个指标、可配置日期分界、周月年范围、三种图表及保存后重开。覆盖午夜拆分、缺记录、中断、既有数值折线回归和手机原生触屏选点。先执行 `npm run build`；显式加载微软雅黑，桌面与手机图表、编辑器截图和结果保存在 `node_modules/.cache/cross-day-statistics-smoke`。
+2026-10-25：`node scripts/check-cross-day-statistics-smoke.mjs` 在隔离的无头 Chrome 中验证标签统计的跨天来源、三个指标、四位数字日期分界、周月年/全部范围、三种图表及保存后重开。覆盖非法/未完整输入、午夜拆分、缺记录、中断、紧凑年历、年度时段小图、全部范围按年翻页、仅折线保留点选、既有数值折线回归和手机原生触屏选点。先执行 `npm run build`；显式加载微软雅黑，桌面与手机的普通/年度/全部图表、编辑器截图和结果保存在 `node_modules/.cache/cross-day-statistics-smoke`。
 
 2026-10-24：手账渲染检查年度、月度、周度 Time Distribution，标签/待办的父子分组、无关键字统计、应用内排期标签、左页单一时间轴、7.5pt 概览摘录、原始用户配色及完整图文。原有年度心情年历、双字体、A4/A5 方向、Collection、引导分组和单行贴纸检查保留。主检查命令可同时传入 A4、A5 主册及两个年度心情示例。
 

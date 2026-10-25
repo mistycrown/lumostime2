@@ -4,10 +4,11 @@
  * @output Browser assertions and screenshot-ready desktop/mobile charts.
  * @pos Test (Cross-day Statistics Renderer)
  * @updated 2026-10-25: Exercises source selection, three metrics/charts, gaps and persisted settings.
+ * @updated 2026-10-25: Verifies digit-only time editing, static compact year charts and all-time year paging.
  */
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Activity, ActivityStatisticCardType, CrossDayMetric, Log } from '../../types';
+import type { Activity, ActivityStatisticCardType, ActivityStatisticRange, CrossDayMetric, Log } from '../../types';
 import { ActivityAttributeStatistics } from '../ActivityAttributeStatistics';
 import { InteractiveTrendChart } from '../stats/InteractiveTrendChart';
 import { localDateKey } from '../../utils/crossDayStatsUtils';
@@ -30,9 +31,12 @@ const logs = [
 ];
 const initial: Activity = { id: 'sleep', name: '睡觉', icon: '月', color: '#658176', statisticCards: [] };
 let saved: Activity = initial;
+let displayLogs = logs;
+const currentYear = new Date().getFullYear();
+const history = [...logs, ...[1, 2].map(offset => record(new Date(currentYear - offset, 5, 14, 23), new Date(currentYear - offset, 5, 15, 7)))];
 const Probe = ({ restricted = false }: { restricted?: boolean }) => {
   const [activity, setActivity] = useState<Activity>(() => JSON.parse(localStorage.getItem('cross-day-smoke') || JSON.stringify(saved)));
-  return <ActivityAttributeStatistics activity={activity} logs={logs} allowedSourceTypes={restricted ? ['recordDuration', 'note'] : undefined}
+  return <ActivityAttributeStatistics activity={activity} logs={displayLogs} allowedSourceTypes={restricted ? ['recordDuration', 'note'] : undefined}
     onChange={next => { saved = next; localStorage.setItem('cross-day-smoke', JSON.stringify(next)); setActivity(next); }} />;
 };
 const render = async (node: React.ReactNode) => { root.render(node); await delay(); };
@@ -45,6 +49,7 @@ const edit = async () => { await click('管理'); await click(`编辑${getStatis
 const close = async () => { await click('关闭', dialog('编辑所选卡片')); await click('关闭', dialog('管理统计卡片')); };
 const setBoundary = async (value: string) => {
   const input = document.querySelector<HTMLInputElement>('[aria-label="日期分界时间"]')!;
+  input.focus();
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true })); await delay();
 };
@@ -56,13 +61,18 @@ const fits = () => {
 
 async function run() {
   await document.fonts.load('16px VerifiedChinese', '睡眠开始时间持续时长起床跨天活动');
-  localStorage.removeItem('cross-day-smoke'); saved = initial;
+  localStorage.removeItem('cross-day-smoke'); saved = initial; displayLogs = logs;
   await render(null); await render(<Probe />);
   await click('管理'); await click('新增卡片'); await click('编辑备注 · 词云', dialog('管理统计卡片'));
   await click('备注', dialog('编辑所选卡片')); await click('跨天活动');
   check(saved.statisticCards?.[0].source.type === 'crossDay', 'Source selection not persisted');
   await click('近 7 天', dialog('编辑所选卡片'));
   check(saved.statisticCards?.[0].dayBoundaryMinutes === 720, 'Wrong default boundary');
+  const boundary = document.querySelector<HTMLInputElement>('[aria-label="日期分界时间"]')!;
+  check(boundary.type === 'text' && boundary.inputMode === 'numeric' && boundary.maxLength === 4 && boundary.value === '1200', 'Boundary is not a four-digit text input');
+  await setBoundary('10'); check(saved.statisticCards?.[0].dayBoundaryMinutes === 720, 'Partial time changed persisted boundary');
+  await setBoundary('2460'); check(saved.statisticCards?.[0].dayBoundaryMinutes === 720 && boundary.getAttribute('aria-invalid') === 'true', 'Invalid time changed persisted boundary');
+  boundary.blur(); await delay(); check(boundary.value === '1200', 'Invalid time was not restored on blur');
   await close();
   check(host.textContent?.includes('7h 30m') && host.textContent?.includes('3 / 7'), 'Night union/average or missing-date count is wrong');
   const trend = host.querySelector<SVGSVGElement>('[role="slider"]')!;
@@ -72,7 +82,7 @@ async function run() {
   trend.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); await delay();
   check(host.querySelector('[role="status"]')?.textContent?.includes('8h 00m'), 'Keyboard did not select complete night');
 
-  await edit(); await click('开始时间', dialog('编辑所选卡片')); await setBoundary('10:00'); await click('本周', dialog('编辑所选卡片'));
+  await edit(); await click('开始时间', dialog('编辑所选卡片')); await setBoundary('1000'); await click('本周', dialog('编辑所选卡片'));
   check(saved.statisticCards?.[0].dayBoundaryMinutes === 600, 'Boundary not saved');
   await close(); await render(null); await render(<Probe />);
   check(saved.statisticCards?.[0].crossDayMetric === 'start' && saved.statisticCards[0].range === 'week', 'Metric/range lost after remount');
@@ -84,16 +94,33 @@ async function run() {
   await edit(); await click('时段图', dialog('编辑所选卡片'));
   check(!dialog('编辑所选卡片').textContent?.includes('统计指标'), 'Timeline exposes an unused metric selector');
   await close();
-  const interrupted = Array.from(host.querySelectorAll('button')).find(button => button.getAttribute('aria-label')?.startsWith(localDateKey(date(4))))!;
+  const interrupted = host.querySelector(`[data-cross-day-timeline] [aria-label^="${localDateKey(date(4))}"]`)!;
   check(interrupted, 'Missing timeline night');
-  check(interrupted.querySelectorAll('.h-3').length === 2, 'Timeline removed the wake gap');
-  interrupted.click(); await delay();
-  check(host.querySelector('[role="status"]')?.textContent?.includes('7h 00m'), 'Selected timeline duration counted wake time');
+  check(interrupted.querySelectorAll('[data-cross-day-interval]').length === 2 && interrupted.textContent?.includes('7h 00m'), 'Timeline removed wake gap or counted wake time');
+  check(!host.querySelector('[data-cross-day-timeline] button') && !host.querySelector('[role="status"]'), 'Timeline still selects daily details');
+  await edit(); await click('本年', dialog('编辑所选卡片')); await close();
+  check(host.querySelector('[data-cross-day-timeline="compact"]') && host.querySelectorAll('[data-cross-day-month]').length <= 12, 'Year timeline did not use monthly small multiples');
+  check(host.querySelector('[data-cross-day-timeline]')!.getBoundingClientRect().height < 1100, 'Year timeline is too tall');
 
   await edit(); await click('指标日历', dialog('编辑所选卡片')); await click('持续时长', dialog('编辑所选卡片')); await click('本年', dialog('编辑所选卡片')); await close();
-  const missing = host.querySelector<HTMLButtonElement>(`[aria-label="${localDateKey(date(2))} 持续时长 无记录"]`)!;
-  check(missing, 'Calendar omitted missing date'); missing.click(); await delay();
-  check(host.querySelector('[role="status"]')?.textContent?.includes('无记录'), 'Calendar missing-day readout is wrong');
+  const missing = host.querySelector(`[aria-label="${localDateKey(date(2))} 持续时长 无记录"]`)!;
+  check(missing && missing.tagName === 'SPAN', 'Calendar missing date is not static');
+  check(!host.querySelector('[data-cross-day-calendar] button') && !host.querySelector('[role="status"]'), 'Calendar still selects daily details');
+  const columns = getComputedStyle(host.querySelector('[data-cross-day-months]')!).gridTemplateColumns.split(' ').length;
+  check(columns >= 2 && host.querySelector('[data-cross-day-calendar]')!.getBoundingClientRect().height < 1100, 'Year calendar did not match compact duration calendars');
+  check(!host.querySelector('[data-calendar-value]'), 'Calendar does not default to color blocks');
+  await click('时长'); check(saved.statisticCards?.[0].showCalendarValues === true && host.querySelector('[data-calendar-value]'), 'Calendar value mode was not saved');
+  await click('色块');
+  await edit(); await click('全部', dialog('编辑所选卡片')); await close();
+  displayLogs = history; await render(null); await render(<Probe />);
+  check(host.querySelector('[aria-label="统计年份"]')?.textContent?.includes(String(currentYear)), 'All-time calendar did not start at latest year');
+  await click('上一年');
+  check([...host.querySelectorAll('[data-cross-day-month]')].every(node => node.getAttribute('data-cross-day-month')?.startsWith(`${currentYear - 1}-`)), 'All-time calendar stacked years instead of paging');
+  await click('上一年'); check(host.querySelector<HTMLButtonElement>('[aria-label="上一年"]')?.disabled, 'Year paging passed earliest history');
+  await click('下一年');
+  await edit(); await click('时段图', dialog('编辑所选卡片')); await close();
+  check(saved.statisticCards?.[0].range === 'all' && host.querySelector('[data-cross-day-timeline="compact"]'), 'All-time interval chart lost range or compact mode');
+  check(new Set([...host.querySelectorAll('[data-cross-day-month]')].map(node => node.getAttribute('data-cross-day-month')?.slice(0, 4))).size === 1, 'All-time interval chart rendered multiple years');
   fits();
 
   await render(null); await render(<Probe restricted />); await click('管理'); await click('新增卡片');
@@ -108,11 +135,21 @@ async function run() {
   check(host.querySelector('[role="status"]')?.textContent?.includes('无记录') && !host.querySelector('circle'), 'Empty trend drew false zero points');
   check(!/NaN|Infinity/.test(host.innerHTML), 'Empty trend has invalid coordinates');
   await render(null);
-  return ['Source, metrics, three charts and ranges work', 'Missing nights, clock means and wake gaps are correct', 'Boundary/metric/range survive persistence', 'Restricted statistics keep their sources', 'Legacy signed-number and empty trends remain valid', 'Chinese font and viewport layout verified'];
+  return ['Four-digit boundary entry rejects partial/invalid times', 'Source, metrics, charts and persistence work', 'Only trends select daily details', 'Year charts are compact and all-time charts page by year', 'Calendar color/value preference persists', 'Wake gaps and missing days remain correct', 'Restricted and legacy statistics remain valid', 'Chinese font and viewport layout verified'];
 }
 
-async function prepare(chartType: ActivityStatisticCardType, metric: CrossDayMetric = 'duration') {
-  saved = { ...initial, statisticCards: [{ id: 'night', source: { type: 'crossDay' }, chartType, range: chartType === 'crossDayCalendar' ? 'month' : '7d', metric: 'count', crossDayMetric: metric, dayBoundaryMinutes: 720, order: 0 }] };
+async function prepare(chartType: ActivityStatisticCardType, metric: CrossDayMetric = 'duration', range?: ActivityStatisticRange) {
+  displayLogs = logs;
+  if (range === 'year' || range === 'all') {
+    displayLogs = range === 'all' ? history.slice(logs.length) : [];
+    for (let day = new Date(currentYear, 0, 1), index = 0; day <= date(1); day.setDate(day.getDate() + 1), index++) {
+      if (index % 9 === 0) continue;
+      const start = new Date(day); start.setDate(start.getDate() - 1); start.setHours(22, 30 + index % 7 * 17, 0, 0);
+      const end = new Date(day); end.setHours(7, index % 5 * 13, 0, 0);
+      displayLogs.push(record(start, end));
+    }
+  }
+  saved = { ...initial, statisticCards: [{ id: 'night', source: { type: 'crossDay' }, chartType, range: range || (chartType === 'crossDayCalendar' ? 'month' : '7d'), metric: 'count', crossDayMetric: metric, dayBoundaryMinutes: 720, order: 0 }] };
   localStorage.setItem('cross-day-smoke', JSON.stringify(saved));
   await render(null); await render(<Probe />); fits();
 }

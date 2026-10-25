@@ -4,6 +4,7 @@
  * @output Isolated desktop/mobile browser assertions and screenshots in node_modules/.cache/cross-day-statistics-smoke.
  * @pos Development verification script
  * @updated 2026-10-25: Verifies real cross-day card editing, persistence, charts and Chinese rendering.
+ * @updated 2026-10-25: Captures compact annual/all-time charts and checks four-digit boundary editing.
  */
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
@@ -49,8 +50,10 @@ const evaluate = async expression => {
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
   return result.result.value;
 };
-const capture = async name => {
-  const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+const capture = async (name, fullPage = false) => {
+  const layout = fullPage ? await send('Page.getLayoutMetrics') : null;
+  const clip = layout ? { x: 0, y: 0, width: Math.ceil(layout.cssContentSize.width), height: Math.ceil(layout.cssContentSize.height), scale: 1 } : undefined;
+  const result = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: fullPage, ...(clip ? { clip } : {}) });
   await writeFile(path.join(output, `${name}.png`), Buffer.from(result.data, 'base64'));
 };
 try {
@@ -76,6 +79,7 @@ try {
   });
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve, { once: true }); socket.addEventListener('error', reject, { once: true }); });
   await send('Page.enable'); await send('Runtime.enable');
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   const passed = [];
   for (const [device, width, height, mobile] of [['desktop', 1000, 900, false], ['mobile', 390, 844, true]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
@@ -88,6 +92,12 @@ try {
     }
     await evaluate('window.__crossDayHarness.prepare("crossDayTrend", "start")'); await capture(`${device}-clock`);
     await evaluate('window.__crossDayHarness.edit()'); await capture(`${device}-editor`);
+    for (const range of ['year', 'all']) {
+      for (const chart of ['crossDayCalendar', 'crossDayTimeline']) {
+        await evaluate(`window.__crossDayHarness.prepare('${chart}', 'duration', '${range}')`);
+        await capture(`${device}-${range}-${chart}`, true);
+      }
+    }
     if (mobile) {
       await evaluate('window.__crossDayHarness.prepare("crossDayTrend")');
       const point = await evaluate('(() => { const r = document.querySelector("[role=slider]").getBoundingClientRect(); return { x: r.x + r.width * (44 + 268 * 4 / 6) / 320, y: r.y + r.height / 2 }; })()');
