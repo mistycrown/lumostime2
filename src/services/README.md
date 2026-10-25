@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-25: Weekly PDF timelines label planned blocks with their explicit plan title or linked todo title. Untitled plans use their activity name when available, otherwise `计划`; actual logs continue to use activity labels.
+
 Update 2026-10-24: Native journal saves encode at most 96 KiB of PDF bytes per call (128 KiB Base64), append sequentially to a unique partial file, then publish the completed file. Bridge calls have a 30-second timeout and partial-file cleanup; selected fonts are retained. The UI distinguishes PDF serialization from native saving and displays byte-based save progress. Regressions cover a 96-page uploaded-font PDF and late bridge responses.
 
 Update 2026-10-24: Daily AI narrative Markdown uses the application's remark/GFM parser and a measured PDF renderer. Six heading levels, bold/italic/strikethrough, nested ordered/unordered/task lists, quotes, code and links retain their structure across columns/pages. Wide tables become readable labeled field rows. Selected fonts remain in use and text stays searchable.

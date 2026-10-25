@@ -10,6 +10,7 @@
  * @updated 2026-10-24: Keeps template questions and answers separate from AI narrative in daily layouts, including single-source days.
  * @updated 2026-10-24: Saves and reopens books with over 1000 daily pages and verifies A5 spreads beyond that boundary.
  * @updated 2026-10-24: Verifies styled Markdown and long lists stay searchable and within A4/A5 column bounds.
+ * @updated 2026-10-25: Covers unclassified planned blocks, task-title fallback and unchanged actual-log activity labels.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -38,6 +39,30 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it.each(['a4', 'a5'] as const)('labels planned blocks with plan/task names in the %s weekly timeline', async (paper) => {
+    const changes = [
+      { title: '写方案', linkedTodoId: 'other-title' },
+      { title: '  ', linkedTodoId: 'reading-task' },
+      {},
+      { activityId: 'read', categoryId: 'study' },
+      { activityId: 'read', categoryId: 'study', isPlanned: false, title: '实际日志标题' }
+    ];
+    const source = { ...data,
+      categories: [{ id: 'study', name: '学习', icon: '', themeColor: '#526b5d', activities: [{ id: 'read', name: '阅读', icon: '', color: '#526b5d' }] }],
+      todos: [{ id: 'other-title', title: '做报告', categoryId: 'todo', isCompleted: false }, { id: 'reading-task', title: '读新书', categoryId: 'todo', isCompleted: false }],
+      logs: changes.map((patch, index) => ({ id: `plan-title-${index}`, categoryId: '__plan__', activityId: '__plan__', isPlanned: true,
+        startTime: new Date(2026, 9, 19 + index, 9).getTime(), endTime: new Date(2026, 9, 19 + index, 10).getTime(), duration: 3600, ...patch }))
+    };
+    const w = await make(paper, { startDate: '2026-10-19', endDate: '2026-10-25' }, source);
+    const calls: string[] = []; const text = w.text.bind(w);
+    w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
+    writeWeeklyTimeline(w, '2026-10-19', w.model.days);
+    expect(calls).toEqual(expect.arrayContaining(['写方案', '读新书', '计划']));
+    expect(calls.filter((value) => value === '阅读')).toHaveLength(2);
+    expect(calls).not.toContain('未分类活动');
+    expect(calls).not.toContain('实际日志标题');
+    expect(calls).not.toContain('做报告');
+  });
   it.each(['a4', 'a5'] as const)('renders searchable styled Markdown inside %s columns and across pages', async (paper) => {
     const w = await make(paper);
     w.startPage('叙事'); w.beginColumns(paper === 'a4' ? 3 : 2);

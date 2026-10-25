@@ -8,6 +8,7 @@
  * @updated 2026-10-23: Maps activity hues to Radix scales and retains readable 9pt block labels.
  * @updated 2026-10-23: Joins daily columns, rounds each Log block and treats Saturday/Sunday like other days.
  * @updated 2026-10-24: Keeps one hour axis per spread, pale grids, short activity/note labels and no legend.
+ * @updated 2026-10-25: Uses plan/task titles for planned blocks instead of the missing-activity placeholder.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { JournalDay } from '../utils/journalExport';
@@ -64,7 +65,10 @@ export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: Jou
       w.roundedRect(x, y, width, blockHeight, journalBlockColor(log.activity, log.color, log.source.isPlanned ? 0.86 : 0.5));
       if (width < 19 || blockHeight < 10.5) return;
       w.withSmallType(7.5, () => {
-        const title = w.fitted(log.activity, width - 6, 7.5, 'hand');
+        const label = log.source.isPlanned
+          ? log.source.title?.trim() || log.todo?.name?.trim() || (log.activity === '未分类活动' ? '计划' : log.activity)
+          : log.activity;
+        const title = w.fitted(label, width - 6, 7.5, 'hand');
         w.text(title, x + 3, y + 1, 7.5, ink, 'hand');
         const note = journalNoteRuns(log.source.note || '').map((run) => run.text).join('').replace(/\s+/g, ' ').trim();
         const excerpt = Array.from(note).slice(0, 80).join('');
