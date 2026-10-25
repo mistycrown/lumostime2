@@ -598,6 +598,13 @@ const validateResourceCollections = (resources: Record<string, unknown>, apply: 
     );
   }
   const cardBackgroundApply = apply.cardBackground;
+  if (isRecord(cardBackgroundApply) && cardBackgroundApply.none !== undefined && cardBackgroundApply.none !== true) {
+    throw new ThemePackageValidationError(
+      'INVALID_CONFIGURATION',
+      'apply.cardBackground.none 只能为 true',
+      'apply.cardBackground.none'
+    );
+  }
   if (isRecord(cardBackgroundApply) && cardBackgroundApply.opacity !== undefined
     && (typeof cardBackgroundApply.opacity !== 'number' || cardBackgroundApply.opacity < 0 || cardBackgroundApply.opacity > 1)) {
     throw new ThemePackageValidationError(

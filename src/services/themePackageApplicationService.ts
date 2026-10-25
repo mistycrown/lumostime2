@@ -15,6 +15,7 @@
  * @updated 2026-09-29: Applies packaged global floating-button image backgrounds.
  * @updated 2026-09-29: Preserves packaged navigation stretching and applies text-only navigation icons.
  * @updated 2026-09-29: Clears floating-button backgrounds when a package explicitly requests the default state.
+ * @updated 2026-10-21: Clears card backgrounds when a package explicitly requests the default state.
  * @updated 2026-09-29: Applies packaged transparent title-bar preferences.
  * @updated 2026-09-30: Applies packaged labels shown below custom navigation icons.
  * @updated 2026-09-30: Applies packaged custom navigation icon size scales.
@@ -432,6 +433,11 @@ const applyStickers = (record: ImportedThemePackageRecord): void => {
 const applyCardBackground = (record: ImportedThemePackageRecord): void => {
   const config = getConfigObject(record, 'cardBackground');
   if (!config) return;
+  if (config.none === true) {
+    localStorage.removeItem(CARD_BACKGROUND_CURRENT_KEY);
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(CARD_BACKGROUND_CHANGED_EVENT));
+    return;
+  }
 
   const groupId = typeof config.id === 'string' ? config.id : undefined;
   const files = Array.isArray(config.files) ? config.files : [];
