@@ -7,11 +7,13 @@
  * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
  * @updated 2026-10-22: Uses conditional main-backup reads while retaining full verification reads.
  * @updated 2026-10-25: Preserves stored JSON content types so OSS accepts backup and image-manifest reads.
+ * @updated 2026-10-25: Normalizes native text and binary responses to SDK-readable Blobs, including error bodies.
  *
  * 修改历史:
  * - 2026-04-19: Added isolated compatible S3 service so Tencent Cloud COS can remain unchanged while supporting generic S3-compatible storage.
  * - 2026-04-20: Added an Android native transport path by reusing AWS SDK signing and moving only the actual request I/O to Cordova HTTP.
  * - 2026-10-25: Removed JSON response content-type overrides rejected by OSS without changing cache controls or verification.
+ * - 2026-10-25: Wrapped native text responses in Blobs and preserved existing Blob payloads to avoid deserialization failures.
  */
 import {
   DeleteObjectCommand,
@@ -199,9 +201,13 @@ class NativeCompatibleS3RequestHandler {
     });
   }
 
-  private normalizeResponseBody(body: unknown): Blob | string {
+  private normalizeResponseBody(body: unknown): Blob {
     if (body === undefined || body === null || body === '') {
       return new Blob([]);
+    }
+
+    if (body instanceof Blob) {
+      return body;
     }
 
     if (body instanceof Uint8Array) {
@@ -217,7 +223,9 @@ class NativeCompatibleS3RequestHandler {
     }
 
     if (typeof body === 'string') {
-      return body;
+      // Native HTTP failures return XML as text; the SDK's browser collector
+      // requires a Blob or ReadableStream even when parsing an error response.
+      return new Blob([body]);
     }
 
     return new Blob([JSON.stringify(body)]);
