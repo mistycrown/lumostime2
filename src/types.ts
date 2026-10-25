@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-25: Adds a standalone cross-day overview table card.
  * @updated 2026-10-25: Adds cross-day statistic sources, chart types, metrics and local day boundaries.
  * @updated 2026-10-23: Persists per-card daily duration labels in calendar heatmaps.
  * @updated 2026-10-18: Stores task abandonment as a timestamp mutually exclusive with completion.
@@ -109,7 +110,7 @@ export type ActivityAttributeValue =
   | { attributeId: string; optionId: string }
   | { attributeId: string; optionIds: string[] };
 
-export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'choiceStacked' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap' | 'tagDurationPetalTimeline' | 'crossDayTrend' | 'crossDayTimeline' | 'crossDayCalendar';
+export type ActivityStatisticCardType = 'textCloud' | 'numberArea' | 'numberHistogram' | 'numberCalendar' | 'numberKpi' | 'choiceBar' | 'choiceDonut' | 'choiceHeatmap' | 'choiceTreemap' | 'choiceStacked' | 'tagDurationBoxplot' | 'tagDurationWeekHourHeatmap' | 'tagDurationPetalTimeline' | 'crossDayTrend' | 'crossDayTimeline' | 'crossDayCalendar' | 'crossDayOverview';
 export type CrossDayMetric = 'start' | 'duration' | 'end';
 export type ActivityTimelineStyle = 'petal' | 'histogram';
 export type ActivityStatisticRange = 'all' | '7d' | '30d' | 'week' | 'month' | 'year';

@@ -1,5 +1,6 @@
 /**
  * @file crossDayStatsUtils.ts
+ * @updated 2026-10-25: Computes a shared occupied-clock axis that trims unused timeline edges.
  * @input Complete activity history, local day boundary, date range and current time.
  * @output Overnight interval unions, extended clock values and local date keys.
  * @pos Utility (Statistics)
@@ -54,6 +55,23 @@ export const getCrossDayClockPosition = (timestamp: number, key: string): number
 export const getCrossDayValue = (stat: CrossDayStat, metric: CrossDayMetric): number => (
   metric === 'duration' ? stat.duration : getCrossDayClockPosition(metric === 'start' ? stat.start : stat.end, stat.key)
 );
+
+/** Use one linear clock axis across all visible nights, preserving every internal wake gap. */
+export const getCrossDayTimelineAxis = (nights: CrossDayStat[], boundaryMinutes = 720): { start: number; end: number; ticks: number[] } => {
+  const boundary = normalizeDayBoundary(boundaryMinutes);
+  const starts = nights.flatMap(night => night.intervals.map(interval => getCrossDayClockPosition(interval.start, night.key)));
+  const ends = nights.flatMap(night => night.intervals.map(interval => getCrossDayClockPosition(interval.end, night.key)));
+  const start = starts.length ? Math.max(boundary, Math.floor((Math.min(...starts) - 30) / 60) * 60) : boundary;
+  const end = ends.length ? Math.min(boundary + 1440, Math.ceil((Math.max(...ends) + 30) / 60) * 60) : boundary + 1440;
+  const span = Math.max(1, end - start);
+  const step = span > 12 * 60 ? 6 * 60 : span > 8 * 60 ? 3 * 60 : span > 4 * 60 ? 2 * 60 : 60;
+  const ticks = [start];
+  for (let tick = Math.ceil((start + 1) / step) * step; tick < end; tick += step) {
+    if (tick - start >= step / 2 && end - tick >= step / 2) ticks.push(tick);
+  }
+  ticks.push(end);
+  return { start, end, ticks };
+};
 
 /** Split at local boundaries before unioning overlaps; preserve deliberate gaps and midnight precision. */
 export const buildCrossDayStats = (logs: Log[], boundaryMinutes = 720, now = new Date()): Map<string, CrossDayStat> => {

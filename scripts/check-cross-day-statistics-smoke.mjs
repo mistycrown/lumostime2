@@ -1,5 +1,6 @@
 /**
  * @file check-cross-day-statistics-smoke.mjs
+ * @updated 2026-10-25: Checks independent overviews, sequence colors, narrow clock labels and cropped timeline axes.
  * @input Installed Chrome, verified Microsoft YaHei font and production CSS.
  * @output Isolated desktop/mobile browser assertions and screenshots in node_modules/.cache/cross-day-statistics-smoke.
  * @pos Development verification script
@@ -81,13 +82,13 @@ try {
   await send('Page.enable'); await send('Runtime.enable');
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   const passed = [];
-  for (const [device, width, height, mobile] of [['desktop', 1000, 900, false], ['mobile', 390, 844, true]]) {
+  for (const [device, width, height, mobile] of [['desktop', 1000, 900, false], ['wide', 1440, 900, false], ['mobile', 390, 844, true]]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
     await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
     await send('Page.navigate', { url: `http://127.0.0.1:${server.address().port}/cross-day` });
     for (let attempt = 0; attempt < 100; attempt++) { if (await evaluate('Boolean(window.__crossDayHarness)')) break; await delay(); }
     passed.push({ device, checks: await evaluate('window.__crossDayHarness.run()') });
-    for (const chart of ['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar']) {
+    for (const chart of ['crossDayOverview', 'crossDayTrend', 'crossDayTimeline', 'crossDayCalendar']) {
       await evaluate(`window.__crossDayHarness.prepare('${chart}')`); await capture(`${device}-${chart}`);
     }
     await evaluate('window.__crossDayHarness.prepare("crossDayTrend", "start")'); await capture(`${device}-clock`);
@@ -98,6 +99,9 @@ try {
         await capture(`${device}-${range}-${chart}`, true);
       }
     }
+    await evaluate('window.__crossDayHarness.prepare("crossDayCalendar", "start", "year", true)'); await capture(`${device}-year-clock-values`, true);
+    await evaluate('window.__crossDayHarness.prepare("crossDayTimeline", "duration", "30d")'); await capture(`${device}-scrolling-timeline`);
+    await evaluate('window.__crossDayHarness.prepareDashboard()'); await capture(`${device}-dashboard`, true);
     if (mobile) {
       await evaluate('window.__crossDayHarness.prepare("crossDayTrend")');
       const point = await evaluate('(() => { const r = document.querySelector("[role=slider]").getBoundingClientRect(); return { x: r.x + r.width * (44 + 268 * 4 / 6) / 320, y: r.y + r.height / 2 }; })()');

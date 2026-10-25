@@ -1,5 +1,6 @@
 /**
  * @file crossDayStatsUtils.test.ts
+ * @updated 2026-10-25: Verifies occupied clock-axis bounds retain real daytime records and night gaps.
  * @input Split, overlapping, interrupted and cross-period activity logs.
  * @output Regression coverage for local overnight aggregation and clock metrics.
  * @pos Test (Statistics)
@@ -8,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { Log } from '../types';
-import { buildCrossDayStats, formatCrossDayClock, getCrossDayDateKeys, getCrossDayValue, parseCrossDayTimeInput } from './crossDayStatsUtils';
+import { buildCrossDayStats, formatCrossDayClock, getCrossDayDateKeys, getCrossDayTimelineAxis, getCrossDayValue, parseCrossDayTimeInput } from './crossDayStatsUtils';
 
 const log = (start: string, end: string, overrides: Partial<Log> = {}): Log => ({
   id: start + end, activityId: 'sleep', categoryId: 'rest', startTime: new Date(start).getTime(),
@@ -17,6 +18,22 @@ const log = (start: string, end: string, overrides: Partial<Log> = {}): Log => (
 const now = new Date('2026-10-25T15:00:00');
 
 describe('cross-day activity aggregation', () => {
+  it('trims unoccupied timeline edges on a shared axis without collapsing wake gaps', () => {
+    const nights = [...buildCrossDayStats([
+      log('2026-10-23T23:30:00', '2026-10-24T08:00:00'),
+      log('2026-10-24T23:00:00', '2026-10-25T03:00:00'),
+      log('2026-10-25T04:00:00', '2026-10-25T07:00:00')
+    ], 720, now).values()];
+    const axis = getCrossDayTimelineAxis(nights);
+    expect(axis.start).toBe(22 * 60);
+    expect(axis.end).toBe(33 * 60);
+    expect(axis.ticks[0]).toBe(axis.start);
+    expect(axis.ticks.at(-1)).toBe(axis.end);
+    expect(nights[1].intervals).toHaveLength(2);
+    const daytime = [...buildCrossDayStats([log('2026-10-24T13:00:00', '2026-10-24T15:00:00')], 720, now).values()];
+    expect(getCrossDayTimelineAxis([...nights, ...daytime]).start).toBe(12 * 60);
+    expect(getCrossDayTimelineAxis([], 600)).toEqual({ start: 600, end: 2040, ticks: [600, 1080, 1440, 1800, 2040] });
+  });
   it('accepts only complete valid four-digit times', () => {
     expect(parseCrossDayTimeInput('0000')).toBe(0);
     expect(parseCrossDayTimeInput('1200')).toBe(720);

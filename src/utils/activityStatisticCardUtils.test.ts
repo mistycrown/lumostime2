@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.test.ts
+ * @updated 2026-10-25: Covers standalone overview capability and persistence.
  * @updated 2026-10-25: Covers independent cross-day metrics, ranges and boundary normalization.
  * @updated 2026-10-25: Verifies all-time cross-day card persistence.
  * @updated 2026-10-23: Verifies calendar display mode persistence and malformed preference handling.
@@ -30,7 +31,8 @@ describe('activity statistic cards', () => {
     }));
     expect(normalizeStatisticCards(activity(JSON.parse(JSON.stringify(cards))))).toEqual(cards);
     expect(normalizeStatisticCards(activity(cards.map(card => ({ ...card, range: 'all' }))))).toEqual(cards.map(card => ({ ...card, range: 'all' })));
-    expect(getChartTypesForSource({ type: 'crossDay' }, [])).toEqual(['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar']);
+    expect(getChartTypesForSource({ type: 'crossDay' }, [])).toEqual(['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar', 'crossDayOverview']);
+    expect(normalizeStatisticCards(activity([{ ...cards[0], chartType: 'crossDayOverview' }]))[0].chartType).toBe('crossDayOverview');
     const malformed = { ...cards[0], crossDayMetric: 'invalid', dayBoundaryMinutes: '12:00' } as unknown as ActivityStatisticCard;
     expect(normalizeStatisticCards(activity([malformed]))[0]).toMatchObject({ crossDayMetric: 'duration', dayBoundaryMinutes: 720 });
     expect(normalizeStatisticCards(activity([{ ...cards[0], dayBoundaryMinutes: 2000 }]))[0].dayBoundaryMinutes).toBe(1439);

@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-25: Offers an independent cross-day overview table with all three metrics.
  * @updated 2026-10-25: Adds tag-only cross-day activity sources, clock metrics and day-boundary controls.
  * @updated 2026-10-25: Uses validated HHMM digit entry and persisted compact calendar display modes.
  * @updated 2026-10-23: Adds a persisted color/duration switch and compact daily labels below calendar heatmap cells.
@@ -570,13 +571,14 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
 };
 
 const CARD_TYPE_LABELS: Record<ActivityStatisticCardType, string> = {
-  crossDayTrend: '趋势折线图', crossDayTimeline: '时段图', crossDayCalendar: '指标日历',
+  crossDayTrend: '趋势折线图', crossDayTimeline: '时段图', crossDayCalendar: '指标日历', crossDayOverview: '数据概览',
   textCloud: '词云', numberArea: '面积趋势', numberHistogram: '数值分布', numberCalendar: '数值日历', numberKpi: '数值概览', choiceBar: '选项分布', choiceDonut: '选项环形图', choiceHeatmap: '选项热力图', choiceTreemap: '选项矩形图', choiceStacked: '选项堆叠图', tagDurationBoxplot: '时长箱线图', tagDurationWeekHourHeatmap: '星期 × 小时热力图', tagDurationPetalTimeline: '时序图'
 };
 const CARD_TYPE_ICONS: Record<ActivityStatisticCardType, React.ComponentType<{ size?: number }>> = {
   crossDayTrend: LineChart,
   crossDayTimeline: Clock3,
   crossDayCalendar: CalendarDays,
+  crossDayOverview: Table2,
   textCloud: Type,
   numberArea: LineChart,
   numberHistogram: BarChart3,
@@ -1205,7 +1207,7 @@ export const ActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPr
           <div className="mb-5 flex items-center justify-between"><div><h2 className="font-serif text-lg text-[#4a3b30]">编辑所选卡片</h2><span className="text-[10px] text-[#b09e8c]">#{cards.findIndex((card) => card.id === selectedCard.id) + 1}</span></div><button type="button" onClick={() => setEditorOpen(false)} title="关闭" aria-label="关闭" className="p-1.5 text-[#a08f7d]"><X size={17} /></button></div>
           <CustomSelect label="数据来源" value={sourceToKey(selectedCard.source)} options={sourceChoices.map((item) => ({ value: item.key, label: item.label }))} onChange={changeExistingSource} renderDropdownInPortal />
           {selectedCard.source.type === 'crossDay' && <div className="mt-4 space-y-4">
-            {selectedCard.chartType !== 'crossDayTimeline' && <div>
+            {selectedCard.chartType !== 'crossDayTimeline' && selectedCard.chartType !== 'crossDayOverview' && <div>
               <p className="mb-2 text-xs text-[#766657]">统计指标</p>
               <div className="flex flex-wrap gap-1.5">{(['start', 'duration', 'end'] as const).map(metric => <button key={metric} type="button"
                 onClick={() => updateSelectedCard({ crossDayMetric: metric })}

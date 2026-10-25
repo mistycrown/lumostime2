@@ -1,5 +1,6 @@
 /**
  * @file CrossDayCharts.tsx
+ * @updated 2026-10-25: Applies period color sequences, adapts daily value text and zooms to occupied clock bounds.
  * @input Display dates, overnight intervals, metric scale and shared palette.
  * @output Non-interactive compact calendars and monthly interval small multiples.
  * @pos Component (Cross-day Statistics)
@@ -8,7 +9,8 @@
 import React from 'react';
 import type { CrossDayMetric } from '../../types';
 import type { ChartPalette } from '../../utils/chartPalette';
-import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, formatCrossDayDuration, getCrossDayClockPosition, getCrossDayValue, type CrossDayStat } from '../../utils/crossDayStatsUtils';
+import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, formatCrossDayDuration, getCrossDayClockPosition, getCrossDayTimelineAxis, getCrossDayValue, type CrossDayStat } from '../../utils/crossDayStatsUtils';
+import './CrossDayCharts.css';
 
 interface ChartProps {
   keys: string[];
@@ -36,12 +38,14 @@ export const CrossDayCalendar: React.FC<ChartProps & {
     const value = night ? getCrossDayValue(night, metric) : null;
     const label = value === null ? '无记录' : format(value);
     const ratio = value === null ? 0 : maximum === minimum ? 0.6 : (value - minimum) / (maximum - minimum);
+    const colorIndex = weekly ? keys.indexOf(key) : months.indexOf(key.slice(0, 7));
+    const color = palette.colors[colorIndex % palette.colors.length] || palette.accent;
     return <span key={key} aria-label={`${key} ${CROSS_DAY_METRIC_LABELS[metric]} ${label}`}
       title={`${key} · ${label}${night ? ` · ${crossDayDetails(night)}` : ''}`} data-calendar-date={key}
-      className={`flex min-w-0 flex-col ${keySet.has(key) ? '' : 'opacity-25'}`}>
+      className={`flex min-w-0 flex-col ${keySet.has(key) ? '' : 'opacity-25'}`} style={{ containerType: 'inline-size' }}>
       <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]"
-        style={{ backgroundColor: value === null ? '#f5f5f4' : palette.accent, color: value === null ? '#a8a29e' : '#ffffff', opacity: value === null ? 1 : 0.3 + ratio * 0.7 }}>{marker ?? null}</span>
-      {showValues && <span className={`mt-0.5 truncate text-center font-mono text-[8px] leading-tight tracking-[-0.04em] tabular-nums ${value === null ? 'text-stone-300' : 'text-stone-600'}`} data-calendar-value="">{value === null ? '—' : compact(value)}</span>}
+        style={{ backgroundColor: value === null ? '#f5f5f4' : color, color: value === null ? '#a8a29e' : '#ffffff', opacity: value === null ? 1 : 0.3 + ratio * 0.7 }}>{marker ?? null}</span>
+      {showValues && <span className={`cross-day-calendar-value mt-0.5 text-center font-mono tabular-nums ${value === null ? 'text-stone-300' : 'text-stone-600'}`} data-calendar-value="">{value === null ? '—' : compact(value)}</span>}
     </span>;
   };
   if (weekly) return <div className="grid grid-cols-7 gap-2" data-cross-day-calendar="weekly">{keys.map(key => {
@@ -72,26 +76,29 @@ export const CrossDayCalendar: React.FC<ChartProps & {
       </div>;
     })}</div>
     <div className="mt-4 flex items-center justify-end gap-2 font-mono text-[10px] text-[#a08f7d]">
-      <span>{format(minimum)}</span>{[0.3, 0.5, 0.75, 1].map(opacity => <span key={opacity} className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: palette.accent, opacity }} />)}<span>{format(maximum)}</span>
+      <span>{format(minimum)}</span>{[0.3, 0.5, 0.75, 1].map(opacity => <span key={opacity} className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#78716c', opacity }} />)}<span>{format(maximum)}</span>
     </div>
   </div>;
 };
 
 export const CrossDayTimeline: React.FC<ChartProps & { boundary: number; compact: boolean }> = ({ keys, stats, palette, boundary, compact }) => {
+  const axis = getCrossDayTimelineAxis(keys.flatMap(key => stats.has(key) ? [stats.get(key)!] : []), boundary);
+  const fraction = (clock: number) => (clock - axis.start) / Math.max(1, axis.end - axis.start);
   if (compact) {
     const keySet = new Set(keys);
     const months = [...new Set(keys.map(key => key.slice(0, 7)))];
-    return <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-4" data-cross-day-timeline="compact">
-      {months.map(month => {
+    return <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 lg:grid-cols-4" data-cross-day-timeline="compact" data-axis-start={axis.start} data-axis-end={axis.end}>
+      {months.map((month, monthIndex) => {
         const [year, monthNumber] = month.split('-').map(Number);
         const dayCount = new Date(year, monthNumber, 0).getDate();
+        const color = palette.colors[monthIndex % palette.colors.length] || palette.accent;
         return <div key={month} data-cross-day-month={month}>
           <div className="mb-1 text-[10px] text-stone-500">{monthNumber} 月</div>
           <svg viewBox="0 0 180 112" className="w-full" role="img" aria-label={`${year}年${monthNumber}月跨天活动时段`}>
-            {[0, 360, 720, 1080, 1440].map(offset => {
-              const x = 18 + offset / 1440 * 158;
-              return <g key={offset}><line x1={x} x2={x} y1="14" y2="110" stroke={palette.grid} strokeWidth="0.5" strokeDasharray="1 2" />
-                <text x={x} y="8" fontSize="6" fill="#a08f7d" textAnchor={offset === 0 ? 'start' : offset === 1440 ? 'end' : 'middle'}>{formatCrossDayClock(boundary + offset)}</text></g>;
+            {axis.ticks.map((tick, tickIndex) => {
+              const x = 18 + fraction(tick) * 158;
+              return <g key={tick}><line x1={x} x2={x} y1="14" y2="110" stroke={palette.grid} strokeWidth="0.5" strokeDasharray="1 2" />
+                <text x={x} y="8" fontSize="6" fill="#a08f7d" textAnchor={tickIndex === 0 ? 'start' : tickIndex === axis.ticks.length - 1 ? 'end' : 'middle'}>{formatCrossDayClock(tick)}</text></g>;
             })}
             {Array.from({ length: dayCount }, (_, index) => {
               const day = index + 1;
@@ -104,8 +111,8 @@ export const CrossDayTimeline: React.FC<ChartProps & { boundary: number; compact
                 {night?.intervals.map((interval, intervalIndex) => {
                   const start = getCrossDayClockPosition(interval.start, key);
                   const end = getCrossDayClockPosition(interval.end, key);
-                  return <rect key={intervalIndex} data-cross-day-interval="" x={18 + (start - boundary) / 1440 * 158} y={y}
-                    width={Math.max(0.4, (end - start) / 1440 * 158)} height="2" rx="0.5" fill={palette.accent} opacity="0.8"><title>{key} · {crossDayDetails(night)}</title></rect>;
+                  return <rect key={intervalIndex} data-cross-day-interval="" x={18 + fraction(start) * 158} y={y}
+                    width={Math.max(0.4, (fraction(end) - fraction(start)) * 158)} height="2" rx="0.5" fill={color} opacity="0.8"><title>{key} · {crossDayDetails(night)}</title></rect>;
                 })}
               </g>;
             })}
@@ -114,21 +121,22 @@ export const CrossDayTimeline: React.FC<ChartProps & { boundary: number; compact
       })}
     </div>;
   }
-  return <div data-cross-day-timeline="daily">
+  return <div data-cross-day-timeline="daily" data-axis-start={axis.start} data-axis-end={axis.end}>
     <div className="mb-2 flex items-center gap-2 border-b border-[#e0d6ca] pb-2"><span className="w-9 shrink-0" />
-      <div className="flex min-w-0 flex-1 justify-between font-mono text-[9px] text-[#a08f7d]">{[0, 360, 720, 1080, 1440].map(offset => <span key={offset}>{formatCrossDayClock(boundary + offset)}</span>)}</div>
+      <div className="relative h-4 min-w-0 flex-1 font-mono text-[9px] text-[#a08f7d]">{axis.ticks.map((tick, index) => <span key={tick} className="absolute whitespace-nowrap" style={{ left: `${fraction(tick) * 100}%`, transform: `translateX(${index === 0 ? '0' : index === axis.ticks.length - 1 ? '-100%' : '-50%'})` }}>{formatCrossDayClock(tick)}</span>)}</div>
       <span className="w-14 shrink-0 text-right text-[9px] text-[#a08f7d]">时长</span>
     </div>
-    <div className="max-h-[440px] overflow-y-auto overscroll-contain pr-1">{[...keys].reverse().map(key => {
+    <div className="cross-day-timeline-scroll max-h-[440px] overflow-y-auto overscroll-contain pr-1">{[...keys].reverse().map(key => {
       const night = stats.get(key);
+      const color = palette.colors[keys.indexOf(key) % palette.colors.length] || palette.accent;
       return <div key={key} aria-label={`${key} ${crossDayDetails(night) || '无记录'}`} title={`${key} · ${crossDayDetails(night) || '无记录'}`}
         className="flex w-full items-center gap-2 border-b border-[#e0d6ca]/50 py-1.5">
         <span className="w-9 shrink-0 font-mono text-[10px] tabular-nums text-[#8f7f70]">{shortDate(key)}</span>
-        <span className="relative h-6 min-w-0 flex-1">{[0, 25, 50, 75, 100].map(left => <span key={left} className="absolute inset-y-0 border-l border-dashed border-[#e0d6ca]" style={{ left: `${left}%` }} />)}
+        <span className="relative h-6 min-w-0 flex-1">{axis.ticks.map(tick => <span key={tick} className="absolute inset-y-0 border-l border-dashed border-[#e0d6ca]" style={{ left: `${fraction(tick) * 100}%` }} />)}
           {night?.intervals.map((interval, index) => {
             const start = getCrossDayClockPosition(interval.start, key);
             const end = getCrossDayClockPosition(interval.end, key);
-            return <span key={index} data-cross-day-interval="" className="absolute top-1.5 h-3 rounded-sm" style={{ left: `${(start - boundary) / 1440 * 100}%`, width: `${Math.max(0.3, (end - start) / 1440 * 100)}%`, backgroundColor: palette.accent, opacity: 0.75 }} />;
+            return <span key={index} data-cross-day-interval="" className="absolute top-1.5 h-3 rounded-sm" style={{ left: `${fraction(start) * 100}%`, width: `${Math.max(0.3, (fraction(end) - fraction(start)) * 100)}%`, backgroundColor: color, opacity: 0.75 }} />;
           })}
           {!night && <span className="absolute inset-0 flex items-center justify-center text-[10px] text-[#b3a597]">—</span>}
         </span><span className="w-14 shrink-0 text-right font-mono text-[9px] tabular-nums text-[#8f7f70]">{night ? formatCrossDayDuration(night.duration) : '—'}</span>

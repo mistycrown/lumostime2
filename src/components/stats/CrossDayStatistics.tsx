@@ -1,5 +1,6 @@
 /**
  * @file CrossDayStatistics.tsx
+ * @updated 2026-10-25: Separates overview tables from charts and applies metric colors from the shared sequence.
  * @input Complete tag history, cross-day card settings and the shared palette.
  * @output Clock/duration trends, gap-aware overnight intervals and metric calendars.
  * @pos Component (Tag Statistics)
@@ -15,6 +16,7 @@ import {
 } from '../../utils/crossDayStatsUtils';
 import { InteractiveTrendChart } from './InteractiveTrendChart';
 import { CrossDayCalendar, CrossDayTimeline, crossDayDetails } from './CrossDayCharts';
+import { CrossDayOverview } from './CrossDayOverview';
 
 interface CrossDayStatisticsProps {
   card: ActivityStatisticCard;
@@ -36,41 +38,34 @@ export const CrossDayStatistics: React.FC<CrossDayStatisticsProps> = ({ card, lo
   const valuesFor = (dateKeys: string[]) => dateKeys.flatMap(key => stats.has(key) ? [getCrossDayValue(stats.get(key)!, metric)] : []);
   const values = valuesFor(keys);
   const mean = average(values);
-  const previousMean = card.range === 'all' ? null : average(valuesFor(getPreviousCrossDayKeys(keys)));
-  const difference = mean === null || previousMean === null ? null : mean - previousMean;
   const format = metric === 'duration' ? formatCrossDayDuration : formatCrossDayClock;
   const selectedKey = [...keys].reverse().find(key => stats.has(key)) || keys.at(-1)!;
   const [yearSelection, setYearSelection] = useState<string | null>(null);
   const years = [...new Set(keys.map(key => key.slice(0, 4)))];
   const displayYear = yearSelection && years.includes(yearSelection) ? yearSelection : years.at(-1)!;
   const yearIndex = years.indexOf(displayYear);
-  const pageYears = card.range === 'all' && card.chartType !== 'crossDayTrend';
+  const overview = card.chartType === 'crossDayOverview';
+  const pageYears = card.range === 'all' && (card.chartType === 'crossDayCalendar' || card.chartType === 'crossDayTimeline');
   const chartKeys = pageYears ? keys.filter(key => key.startsWith(`${displayYear}-`)) : keys;
   const weekly = card.range === '7d' || card.range === 'week';
   const timeline = card.chartType === 'crossDayTimeline';
-  const title = `跨天活动${timeline ? '' : ` · ${CROSS_DAY_METRIC_LABELS[metric]}`}`;
+  const title = `跨天活动${timeline || overview ? '' : ` · ${CROSS_DAY_METRIC_LABELS[metric]}`}`;
+  const metricColor = palette.colors[(['start', 'duration', 'end'] as CrossDayMetric[]).indexOf(metric)] || palette.accent;
   const domain: [number, number] = metric === 'duration'
     ? [0, Math.max(3600, ...values) * 1.1]
     : [Math.floor(Math.min(...values) / 60) * 60 - 30, Math.ceil(Math.max(...values) / 60) * 60 + 30];
-  const changeLabel = difference === null ? '—' : Math.abs(difference) < (metric === 'duration' ? 60 : 1) ? '持平'
-    : metric === 'duration' ? `${difference > 0 ? '+' : '−'}${formatCrossDayDuration(Math.abs(difference))}`
-      : `${difference > 0 ? '晚' : '早'} ${Math.round(Math.abs(difference))} 分钟`;
 
   return <section className="py-7 first:pt-2" aria-label={`${title}统计`}>
     <div className="mb-5 flex items-center justify-between gap-3">
       <div className="min-w-0"><h2 className="truncate text-[15px] font-semibold text-[#3d332a]">{title}</h2>
-        <div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{timeline ? 'OVERNIGHT / 时段图' : card.chartType === 'crossDayCalendar' ? 'OVERNIGHT / 指标日历' : 'OVERNIGHT / 趋势折线图'}</div>
+        <div className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-[#a08f7d]">{overview ? 'OVERNIGHT / 数据概览' : timeline ? 'OVERNIGHT / 时段图' : card.chartType === 'crossDayCalendar' ? 'OVERNIGHT / 指标日历' : 'OVERNIGHT / 趋势折线图'}</div>
       </div><span className="shrink-0 font-mono text-[10px] text-[#b09e8c]">{rangeLabel}</span>
     </div>
-    <div className="mb-6 grid grid-cols-3 gap-3 border-b border-[#e0d6ca] pb-5">
-      <div><div className="text-[10px] text-[#a08f7d]">平均{CROSS_DAY_METRIC_LABELS[metric]}</div><div className="mt-2 font-mono text-xl tabular-nums" style={{ color: palette.accent }}>{mean === null ? '—' : format(mean)}</div></div>
-      <div><div className="text-[10px] text-[#a08f7d]">较上一周期</div><div className="mt-2 font-mono text-sm leading-7 tabular-nums text-[#766657]">{changeLabel}</div></div>
-      <div><div className="text-[10px] text-[#a08f7d]">已记录天数</div><div className="mt-2 font-mono text-sm leading-7 tabular-nums text-[#766657]">{values.length} / {keys.length}</div></div>
-    </div>
-    {mean === null ? <p className="py-10 text-center text-sm text-[#a08f7d]">暂无跨天活动记录</p>
+    {overview ? <CrossDayOverview keys={keys} previousKeys={card.range === 'all' ? [] : getPreviousCrossDayKeys(keys)} stats={stats} palette={palette} />
+      : mean === null ? <p className="py-10 text-center text-sm text-[#a08f7d]">暂无跨天活动记录</p>
       : card.chartType === 'crossDayTrend' ? <InteractiveTrendChart title={title}
         points={keys.map(key => ({ key, value: stats.has(key) ? getCrossDayValue(stats.get(key)!, metric) : null }))}
-        accent={palette.accent} formatValue={format} area={metric === 'duration'} valueDomain={domain}
+        accent={metricColor} formatValue={format} area={metric === 'duration'} valueDomain={domain}
         referenceValue={mean} formatDetails={key => crossDayDetails(stats.get(key))} initialSelectedKey={selectedKey} />
         : <>
           <div className="mb-4 flex items-center justify-between gap-3">

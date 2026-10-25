@@ -1,5 +1,6 @@
 /**
  * @file activityStatisticCardUtils.ts
+ * @updated 2026-10-25: Exposes a standalone cross-day overview alongside its visual charts.
  * @updated 2026-10-25: Normalizes cross-day cards and their independent clock metrics and boundaries.
  * @updated 2026-10-25: Preserves all-time cross-day ranges for year-paged charts.
  * @updated 2026-10-23: Preserves boolean calendar-duration display preferences across saved cards.
@@ -30,7 +31,7 @@ import { CROSS_DAY_METRIC_LABELS, normalizeDayBoundary } from './crossDayStatsUt
 
 const RANGES: ActivityStatisticRange[] = ['all', '7d', '30d', 'week', 'month', 'year'];
 const METRICS: ActivityStatisticMetric[] = ['value', 'count', 'duration', 'average', 'sum'];
-const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline', 'crossDayTrend', 'crossDayTimeline', 'crossDayCalendar'];
+const CARD_TYPES: ActivityStatisticCardType[] = ['textCloud', 'numberArea', 'numberHistogram', 'numberCalendar', 'numberKpi', 'choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline', 'crossDayTrend', 'crossDayTimeline', 'crossDayCalendar', 'crossDayOverview'];
 const TIMELINE_STYLES: ActivityTimelineStyle[] = ['petal', 'histogram'];
 
 export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): ActivityStatisticCardType => {
@@ -40,7 +41,7 @@ export const getDefaultChartType = (type: ActivityAttributeDefinition['type']): 
 };
 
 export const getChartTypesForSource = (source: ActivityStatisticCardSource, attributes: ActivityAttributeDefinition[]): ActivityStatisticCardType[] => {
-  if (source.type === 'crossDay') return ['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar'];
+  if (source.type === 'crossDay') return ['crossDayTrend', 'crossDayTimeline', 'crossDayCalendar', 'crossDayOverview'];
   if (source.type === 'note') return ['textCloud'];
   if (isDurationStatisticSource(source)) return ['numberArea', 'numberCalendar', 'numberKpi', 'tagDurationBoxplot', 'tagDurationWeekHourHeatmap', 'tagDurationPetalTimeline'];
   if (source.type === 'categoryActivity') return ['choiceBar', 'choiceDonut', 'choiceHeatmap', 'choiceTreemap', 'choiceStacked'];
@@ -175,7 +176,7 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
       : card.source.type === 'categoryDuration'
         ? '分类时长'
         : card.source.type === 'crossDay'
-          ? `跨天活动${card.chartType === 'crossDayTimeline' ? '' : ` · ${CROSS_DAY_METRIC_LABELS[card.crossDayMetric || 'duration']}`}`
+          ? `跨天活动${card.chartType === 'crossDayTimeline' || card.chartType === 'crossDayOverview' ? '' : ` · ${CROSS_DAY_METRIC_LABELS[card.crossDayMetric || 'duration']}`}`
         : card.source.type === 'recordDuration'
           ? '记录时长'
           : card.source.type === 'categoryActivity'
@@ -190,6 +191,7 @@ export const getStatisticCardLabel = (card: ActivityStatisticCard, attributes: A
     crossDayTrend: '趋势折线图',
     crossDayTimeline: '时段图',
     crossDayCalendar: '指标日历',
+    crossDayOverview: '数据概览',
     choiceBar: '选项分布',
     choiceDonut: '选项环形图',
     choiceHeatmap: '选项热力图',
