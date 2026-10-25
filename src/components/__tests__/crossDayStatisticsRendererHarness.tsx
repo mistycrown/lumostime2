@@ -1,5 +1,6 @@
 /**
  * @file crossDayStatisticsRendererHarness.tsx
+ * @updated 2026-10-25: Checks five actual heat shades and their rendered brightness separation across calendar sources.
  * @updated 2026-10-25: Checks actual SVG glyph bounds and inline icon toggles across cross-day and duration calendars.
  * @updated 2026-10-25: Covers standalone overview, palette sequence, complete fitted clock labels and occupied axes.
  * @input Real statistic cards/editor and deterministic split overnight fixtures.
@@ -78,6 +79,28 @@ const calendarIconIsInline = () => {
   check(button && heading && button.textContent === '' && row?.querySelectorAll('button').length === 1, 'Calendar does not use a single title-row icon');
   const a = button.getBoundingClientRect(); const b = heading!.getBoundingClientRect();
   check(Math.abs(a.top + a.height / 2 - b.top - b.height / 2) < 2, 'Calendar icon wraps below its title');
+};
+const calendarHeatContrast = () => {
+  const cells = [...host.querySelectorAll<HTMLElement>('[data-heatmap-level]')];
+  const levelCounts = cells.reduce<Record<string, number>>((counts, cell) => {
+    const level = cell.dataset.heatmapLevel!; counts[level] = (counts[level] || 0) + 1; return counts;
+  }, {});
+  // Calendar-day totals can contain two nights or a gap; unoccupied value bands need no cells.
+  check(levelCounts['0'] && levelCounts['4'] && Object.keys(levelCounts).every(level => /^[0-4]$/.test(level)),
+    `Calendar does not span valid heat levels: ${JSON.stringify(levelCounts)}`);
+  const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+  const brightness = (cell: HTMLElement) => {
+    context.fillStyle = getComputedStyle(cell).backgroundColor;
+    context.fillRect(0, 0, 1, 1);
+    const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+    check(alpha === 255 && getComputedStyle(cell).opacity === '1', 'Heat shading still dims the whole cell');
+    return (red + green + blue) / 3;
+  };
+  const lightest = cells.filter(cell => cell.dataset.heatmapLevel === '0').map(brightness);
+  const darkest = cells.filter(cell => cell.dataset.heatmapLevel === '4').map(brightness);
+  check(Math.min(...lightest) - Math.max(...darkest) > 55, 'Calendar light/dark shades remain too similar');
+  const empty = [...host.querySelectorAll<HTMLElement>('[data-calendar-date] > span:first-child')].find(cell => !cell.hasAttribute('data-heatmap-level'));
+  check(empty && getComputedStyle(empty).backgroundColor === 'rgb(245, 245, 244)', 'Missing calendar dates lost their neutral color');
 };
 
 async function run() {
@@ -172,17 +195,17 @@ async function run() {
   await prepare('crossDayCalendar', 'start', 'year', true);
   const clockLabels = [...host.querySelectorAll<HTMLElement>('[data-calendar-value]')].filter(node => node.textContent !== '—');
   check(clockLabels.length > 30 && clockLabels.every(node => /^\d{2}:\d{2}$/.test(node.textContent || '') && node.scrollWidth <= node.clientWidth + 1), 'Annual calendar clock text is clipped');
-  calendarGlyphsFit(); calendarIconIsInline();
+  calendarGlyphsFit(); calendarIconIsInline(); calendarHeatContrast();
   const originalWidth = host.style.maxWidth;
   host.style.maxWidth = '300px'; document.documentElement.style.webkitTextSizeAdjust = '180%'; await delay();
   calendarGlyphsFit();
   document.documentElement.style.webkitTextSizeAdjust = ''; host.style.maxWidth = originalWidth; await delay();
-  const calendarColors = new Set([...host.querySelectorAll<HTMLElement>('[data-calendar-date]')].filter(node => !node.getAttribute('aria-label')?.includes('无记录')).map(node => (node.firstElementChild as HTMLElement).style.backgroundColor));
+  const calendarColors = new Set([...host.querySelectorAll<HTMLElement>('[data-heatmap-level="2"]')].map(node => node.style.backgroundColor));
   check(calendarColors.size > 2, 'Annual calendar ignores palette sequence');
   await prepare('crossDayTimeline', 'duration', 'year');
   check(new Set([...host.querySelectorAll('[data-cross-day-interval]')].map(node => node.getAttribute('fill'))).size > 2, 'Annual timeline ignores palette sequence');
   for (const source of ['tagDuration', 'categoryDuration'] as const) {
-    await prepareDurationCalendar(source); calendarGlyphsFit(); calendarIconIsInline();
+    await prepareDurationCalendar(source); calendarGlyphsFit(); calendarIconIsInline(); calendarHeatContrast();
     await click('切换日历数值显示'); check(!host.querySelector('[data-calendar-duration]'), 'Duration calendar icon did not hide values');
     await click('切换日历数值显示'); check(host.querySelector('[data-calendar-duration]'), 'Duration calendar icon did not restore values');
     await render(null); await render(<Probe />); calendarGlyphsFit(); calendarIconIsInline();
@@ -191,7 +214,7 @@ async function run() {
   check(host.querySelectorAll('[data-cross-day-overview]').length === 1 && [...host.querySelectorAll('section')].filter(node => node.textContent?.includes('已记录天数')).length === 1, 'Multiple chart cards repeat the overview');
   fits();
   await render(null);
-  return ['Four-digit boundary entry rejects partial/invalid times', 'Overview is an independent persisted table', 'Palette sequence applies to calendars and intervals', 'Actual calendar glyphs stay within cells under narrow widths and enlarged text', 'Cross-day/tag/category calendars share one inline icon toggle', 'Only trends select daily details', 'Occupied axes and year paging work', 'Restricted and legacy statistics remain valid', 'Chinese font and viewport layout verified'];
+  return ['Four-digit boundary entry rejects partial/invalid times', 'Overview is an independent persisted table', 'Palette sequence applies to calendars and intervals', 'Heat shades have clear rendered brightness separation and neutral missing dates', 'Actual calendar glyphs stay within cells under narrow widths and enlarged text', 'Cross-day/tag/category calendars share one inline icon toggle', 'Only trends select daily details', 'Occupied axes and year paging work', 'Restricted and legacy statistics remain valid', 'Chinese font and viewport layout verified'];
 }
 
 async function prepare(chartType: ActivityStatisticCardType, metric: CrossDayMetric = 'duration', range?: ActivityStatisticRange, showValues = false) {

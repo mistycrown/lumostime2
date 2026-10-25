@@ -1,5 +1,6 @@
 /**
  * @file ActivityAttributeStatistics.tsx
+ * @updated 2026-10-25: Shares five contrasting heat levels scaled to recorded calendar values.
  * @updated 2026-10-25: Shares bounded calendar value labels and a title-row display icon across duration sources.
  * @updated 2026-10-25: Offers an independent cross-day overview table with all three metrics.
  * @updated 2026-10-25: Adds tag-only cross-day activity sources, clock metrics and day-boundary controls.
@@ -63,6 +64,7 @@ import { InteractiveTrendChart } from './stats/InteractiveTrendChart';
 import { CrossDayStatistics } from './stats/CrossDayStatistics';
 import { CalendarDisplayToggle } from './stats/CalendarDisplayToggle';
 import { CalendarValueLabel } from './stats/CalendarValueLabel';
+import { getCalendarHeatmapColor, getCalendarHeatmapLevel } from '../utils/calendarHeatmap';
 import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, normalizeDayBoundary, parseCrossDayTimeInput } from '../utils/crossDayStatsUtils';
 
 export { getTextTerms } from '../utils/textSegmentation';
@@ -414,7 +416,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                   const key = getLocalDateKey(log.startTime);
                   dailyValues.set(key, (dailyValues.get(key) || 0) + value.value);
                 }));
-                const calendarMax = Math.max(...dailyValues.values(), 1);
+                const recordedCalendarValues = [...dailyValues.values()].filter(value => value !== 0 && Number.isFinite(value));
+                const calendarMin = recordedCalendarValues.length ? Math.min(...recordedCalendarValues) : 0;
+                const calendarMax = recordedCalendarValues.length ? Math.max(...recordedCalendarValues) : 0;
                 const calendarMonths = [...new Set(calendarDays.map((day) => day.slice(0, 7)))];
                 const showDurationLabels = showCalendarValues && isDurationNumber;
                 const monthColumns = range === 'month' ? 'grid-cols-1'
@@ -433,9 +437,9 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                             const value = dailyValues.get(day) || 0;
                             const [year, month, dayOfMonth] = day.split('-').map(Number);
                             const weekday = weekdayLabels[new Date(year, month - 1, dayOfMonth).getDay()];
-                            const intensity = value ? 0.3 + (value / calendarMax) * 0.7 : 1;
+                            const level = value ? getCalendarHeatmapLevel(value, calendarMin, calendarMax) : null;
                             const valueLabel = value ? `${formatNumericValue(value)}${numericUnit}` : '无记录';
-                            return <div key={day} aria-label={`${getDateLabel(day)} 周${weekday} · ${valueLabel}`} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{weekday}</div><div className="mt-0.5 font-mono text-[10px] text-stone-600">{getDateLabel(day)}</div><div className="mt-2 h-12 rounded-[3px] border border-stone-200" style={{ backgroundColor: value ? statisticAccent : '#f5f5f4', opacity: value ? intensity : 1 }} /><div className="mt-1 truncate font-mono text-[9px] text-stone-500" title={valueLabel}>{value ? formatNumericValue(value) : '—'}</div></div>;
+                            return <div key={day} aria-label={`${getDateLabel(day)} 周${weekday} · ${valueLabel}`} className="min-w-0 text-center"><div className="text-[9px] text-stone-400">周{weekday}</div><div className="mt-0.5 font-mono text-[10px] text-stone-600">{getDateLabel(day)}</div><div className="mt-2 h-12 rounded-[3px] border border-stone-200" data-heatmap-level={level ?? undefined} style={{ backgroundColor: level === null ? '#f5f5f4' : getCalendarHeatmapColor(statisticAccent, level) }} /><div className="mt-1 truncate font-mono text-[9px] text-stone-500" title={valueLabel}>{value ? formatNumericValue(value) : '—'}</div></div>;
                           })}
                         </div>
                       </div>
@@ -460,11 +464,12 @@ const LegacyActivityAttributeStatistics: React.FC<ActivityAttributeStatisticsPro
                                 if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return <span key={`blank-${monthKey}-${cellIndex}`} aria-hidden="true" />;
                                 const day = `${monthKey}-${String(dayOfMonth).padStart(2, '0')}`;
                                 const value = dailyValues.get(day) || 0;
+                                const level = value ? getCalendarHeatmapLevel(value, calendarMin, calendarMax) : null;
                                 const compactValue = formatCalendarDuration(value);
                                 const showDayMarker = range === 'year' || range === '30d' ? [10, 20].includes(dayOfMonth) : range === 'month' ? [5, 10, 15, 25, 30].includes(dayOfMonth) : false;
                                 const valueLabel = `${getDateLabel(day)} · ${formatNumericValue(value)}${numericUnit}`;
                                 return <span key={day} aria-label={valueLabel} title={valueLabel} className="flex min-w-0 flex-col" data-calendar-date={day}>
-                                  <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" style={{ backgroundColor: value ? monthColor : '#f5f5f4', color: value ? '#ffffff' : '#a8a29e', opacity: value ? 0.3 + (value / calendarMax) * 0.7 : 1 }}>{showDayMarker ? dayOfMonth : null}</span>
+                                  <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]" data-heatmap-level={level ?? undefined} style={{ backgroundColor: level === null ? '#f5f5f4' : getCalendarHeatmapColor(monthColor, level), color: level === null ? '#a8a29e' : level < 2 ? '#57534e' : '#ffffff' }}>{showDayMarker ? dayOfMonth : null}</span>
                                   {showDurationLabels && <CalendarValueLabel value={compactValue} empty={value <= 0} attribute="duration" />}
                                 </span>;
                               })}

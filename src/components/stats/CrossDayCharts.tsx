@@ -1,5 +1,6 @@
 /**
  * @file CrossDayCharts.tsx
+ * @updated 2026-10-25: Uses five contrasting heat levels and a matching legend without dimming date markers.
  * @updated 2026-10-25: Shares explicitly bounded numeric labels with tag/category calendars instead of CSS font sizing.
  * @updated 2026-10-25: Applies period color sequences, adapts daily value text and zooms to occupied clock bounds.
  * @input Display dates, overnight intervals, metric scale and shared palette.
@@ -13,6 +14,7 @@ import type { ChartPalette } from '../../utils/chartPalette';
 import { CROSS_DAY_METRIC_LABELS, formatCrossDayClock, formatCrossDayDuration, getCrossDayClockPosition, getCrossDayTimelineAxis, getCrossDayValue, type CrossDayStat } from '../../utils/crossDayStatsUtils';
 import './CrossDayCharts.css';
 import { CalendarValueLabel } from './CalendarValueLabel';
+import { CALENDAR_HEATMAP_LEVELS, getCalendarHeatmapColor, getCalendarHeatmapLevel } from '../../utils/calendarHeatmap';
 
 interface ChartProps {
   keys: string[];
@@ -39,14 +41,15 @@ export const CrossDayCalendar: React.FC<ChartProps & {
     const night = keySet.has(key) ? stats.get(key) : undefined;
     const value = night ? getCrossDayValue(night, metric) : null;
     const label = value === null ? '无记录' : format(value);
-    const ratio = value === null ? 0 : maximum === minimum ? 0.6 : (value - minimum) / (maximum - minimum);
+    const level = value === null ? null : getCalendarHeatmapLevel(value, minimum, maximum);
     const colorIndex = weekly ? keys.indexOf(key) : months.indexOf(key.slice(0, 7));
     const color = palette.colors[colorIndex % palette.colors.length] || palette.accent;
     return <span key={key} aria-label={`${key} ${CROSS_DAY_METRIC_LABELS[metric]} ${label}`}
       title={`${key} · ${label}${night ? ` · ${crossDayDetails(night)}` : ''}`} data-calendar-date={key}
       className={`flex min-w-0 flex-col ${keySet.has(key) ? '' : 'opacity-25'}`}>
       <span className="flex aspect-square w-full items-center justify-center rounded-[2px] border border-stone-200 font-mono text-[8px]"
-        style={{ backgroundColor: value === null ? '#f5f5f4' : color, color: value === null ? '#a8a29e' : '#ffffff', opacity: value === null ? 1 : 0.3 + ratio * 0.7 }}>{marker ?? null}</span>
+        data-heatmap-level={level ?? undefined}
+        style={{ backgroundColor: level === null ? '#f5f5f4' : getCalendarHeatmapColor(color, level), color: level === null ? '#a8a29e' : level < 2 ? '#57534e' : '#ffffff' }}>{marker ?? null}</span>
       {showValues && <CalendarValueLabel value={value === null ? '—' : compact(value)} empty={value === null} />}
     </span>;
   };
@@ -78,7 +81,7 @@ export const CrossDayCalendar: React.FC<ChartProps & {
       </div>;
     })}</div>
     <div className="mt-4 flex items-center justify-end gap-2 font-mono text-[10px] text-[#a08f7d]">
-      <span>{format(minimum)}</span>{[0.3, 0.5, 0.75, 1].map(opacity => <span key={opacity} className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: '#78716c', opacity }} />)}<span>{format(maximum)}</span>
+      <span>{format(minimum)}</span>{CALENDAR_HEATMAP_LEVELS.map(level => <span key={level} className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCalendarHeatmapColor('#78716c', level) }} />)}<span>{format(maximum)}</span>
     </div>
   </div>;
 };

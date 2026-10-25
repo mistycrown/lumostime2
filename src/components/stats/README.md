@@ -1,5 +1,7 @@
 # Statistics components
 
+Calendars share five contrasting heat shades from `calendarHeatmap.ts`: low values are pale, high values are darkened while retaining the selected monthly hue. Cross-day metric calendars and normal tag/category/record duration calendars scale against recorded values across the full selected range, with no per-month rescaling. Empty dates retain the neutral background. Date markers and numeric labels are no longer faded by cell opacity; the cross-day legend uses the same five shades.
+
 `CrossDayStatistics.tsx` is the tag detail cross-day activity renderer. It receives complete tag history, assigns local noon-to-noon windows to their ending date (with a configurable HHMM digit input), and presents start/duration/end metrics as trends, interval rows or calendars. It filters by the assigned date after aggregation and excludes missing dates from averages. Only trends select daily details. All-time calendars/timelines page one year at a time.
 
 `CrossDayOverview.tsx` is an independently selectable `数据概览` card. Its table consolidates start/duration/end averages, minima, maxima and previous-period comparisons, plus recorded-day counts. Visual chart cards do not repeat these summaries. The overview covers the full selected range and compares equal-length local calendar periods; all-time comparisons remain empty.
