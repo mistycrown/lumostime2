@@ -2,6 +2,7 @@
  * @file compatibleS3Service.test.ts
  * @description Regression tests for the compatible S3 service.
  * @updated 2026-10-22: Covers conditional GET, changed versions and upload/config invalidation.
+ * @updated 2026-10-25: Covers OSS JSON reads that reject response content-type overrides.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -244,9 +245,44 @@ describe('CompatibleS3Service', () => {
       Key: 'lumostime_backup.json',
       ResponseCacheControl: 'no-cache, no-store, must-revalidate',
       ResponseContentDisposition: expect.stringContaining('fresh='),
-      ResponseExpires: expect.any(Date),
-      ResponseContentType: 'application/json'
+      ResponseExpires: expect.any(Date)
     }));
+    expect(sendMock.mock.calls[0][0].input).not.toHaveProperty('ResponseContentType');
+  });
+
+  it('reads back uploaded backups and image manifests when OSS rejects content-type overrides', async () => {
+    const service = await configured();
+    const objects = new Map<string, string>();
+    sendMock.mockImplementation(async (command) => {
+      const input = command.input;
+      if (input.ResponseContentType !== undefined) {
+        throw Object.assign(new Error('Can not override response header on content-type'), {
+          name: 'InvalidRequest',
+          $metadata: { httpStatusCode: 400 }
+        });
+      }
+      if (input.Body !== undefined) {
+        objects.set(input.Key, input.Body);
+        return {};
+      }
+      return { Body: objects.get(input.Key), ETag: '"uploaded"' };
+    });
+
+    const backup = { logs: [{ note: 'backup' }], todos: [], categories: [], timestamp: 2 };
+    await service.uploadData(backup);
+    expect(await service.downloadData()).toEqual(backup);
+
+    await service.uploadImageList(['photo.jpg']);
+    expect(await service.downloadImageList()).toEqual(expect.objectContaining({ images: ['photo.jpg'] }));
+
+    const reads = sendMock.mock.calls.map(([command]) => command.input).filter((input) => input.Body === undefined);
+    expect(reads.map((input) => input.Key)).toEqual(['lumostime_backup.json', 'lumostime_images.json']);
+    for (const input of reads) {
+      expect(input).not.toHaveProperty('ResponseContentType');
+      expect(input).not.toHaveProperty('IfNoneMatch');
+      expect(input.ResponseCacheControl).toBe('no-cache, no-store, must-revalidate');
+      expect(input.ResponseContentDisposition).toContain('fresh=');
+    }
   });
 
   it('uploads image bodies as Uint8Array for browser-safe transport', async () => {

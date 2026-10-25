@@ -6,10 +6,12 @@
  * @description Manages generic S3-compatible storage using the AWS S3 client while preserving the existing sync object layout.
  * @updated 2026-09-25: Stores versioned content/theme image groups in the cloud manifest.
  * @updated 2026-10-22: Uses conditional main-backup reads while retaining full verification reads.
+ * @updated 2026-10-25: Preserves stored JSON content types so OSS accepts backup and image-manifest reads.
  *
  * 修改历史:
  * - 2026-04-19: Added isolated compatible S3 service so Tencent Cloud COS can remain unchanged while supporting generic S3-compatible storage.
  * - 2026-04-20: Added an Android native transport path by reusing AWS SDK signing and moving only the actual request I/O to Cordova HTTP.
+ * - 2026-10-25: Removed JSON response content-type overrides rejected by OSS without changing cache controls or verification.
  */
 import {
   DeleteObjectCommand,
@@ -569,8 +571,7 @@ export class CompatibleS3Service {
         ...(etag ? { IfNoneMatch: etag } : {}),
         ResponseCacheControl: 'no-cache, no-store, must-revalidate',
         ResponseContentDisposition: `inline; filename="${filename}"; fresh=${Date.now()}`,
-        ResponseExpires: new Date(0),
-        ResponseContentType: 'application/json'
+        ResponseExpires: new Date(0)
       }));
       return {
         text: await this.normalizeStringBody(response.Body),
@@ -646,8 +647,7 @@ export class CompatibleS3Service {
         Key: 'lumostime_images.json',
         ResponseCacheControl: 'no-cache, no-store, must-revalidate',
         ResponseContentDisposition: `inline; filename="lumostime_images.json"; fresh=${Date.now()}`,
-        ResponseExpires: new Date(0),
-        ResponseContentType: 'application/json'
+        ResponseExpires: new Date(0)
       }));
 
       const content = await this.normalizeStringBody(response.Body);
