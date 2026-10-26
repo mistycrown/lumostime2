@@ -1,5 +1,6 @@
 /**
  * @file aiService.test.ts
+ * @updated 2026-10-26: Covers todo/calendar reminder parsing in ordinary chat and quick-add.
  * @updated 2026-10-09: Verifies node tool parsing and verbatim quick-note node references.
  * @input Mock AI transport responses and assistant request contracts
  * @output Coverage for general and quick-add AI request normalization
@@ -66,6 +67,29 @@ describe('aiService unified turn normalization', () => {
       configurable: true
     });
     vi.restoreAllMocks();
+  });
+
+  it.each(['chat', 'quick'] as const)('preserves todo reminder settings through the %s parser', async (mode) => {
+    const reminders = { scheduledDate: { daysBefore: 1, time: '08:30', calendarSync: true } };
+    const toolCalls = [
+      { toolName: 'create_todo', args: { title: '交报告', categoryId: 'work', linkedActivityId: 'writing',
+        scheduledDate: '2099-12-31', reminders } },
+      { toolName: 'update_todo', args: { todoId: 'todo', patch: { reminders: { deadlineDate: null,
+        scheduledDate: { daysBefore: 0, time: '09:00', calendarSync: false } } } } },
+      { toolName: 'update_todo', args: { todoId: 'todo', patch: { reminders: null } } }
+    ];
+    const fetchSpy = vi.fn().mockResolvedValue(createJsonTextResponse({ choices: [{ message: { content: JSON.stringify({
+      outcome: 'reply', memoryAction: 'no_update', toolCalls
+    }) } }] }));
+    Object.defineProperty(globalThis, 'fetch', { value: fetchSpy, configurable: true });
+    if (mode === 'quick') {
+      const result = await quickAddService.requestQuickAddTodoWithDebug('交报告，提前一天八点半提醒并同步日历');
+      expect(result.toolCall?.args.reminders).toEqual(reminders);
+      expect(JSON.parse(fetchSpy.mock.calls[0][1].body).messages[0].content).toContain('Todo Reminder Permissions');
+    } else {
+      const result = await aiService.requestAssistantUnifiedTurnWithDebug({ mode: 'foreground', systemPrompt: 'system', userPrompt: 'user' });
+      expect(result.output.toolCalls).toMatchObject(toolCalls);
+    }
   });
 
   it.each(['chat', 'quick'] as const)('preserves valid attribute shapes through the %s backfill parser', async (mode) => {

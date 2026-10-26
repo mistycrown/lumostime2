@@ -71,6 +71,8 @@
 
 ## 5. Reminder schema 
 
+前台如果用户的提醒指向已有待办或本轮新建的待办，优先遵循 `foreground-tools.md` 的待办应用提醒规则，返回 todo 工具的 `args.reminders` / `patch.reminders`。这些设置由应用自身和可选的系统日历提醒执行，不进入 AI reminder 队列。只有没有关联待办的独立提醒、助手自身的跟进才返回本节的顶层 `reminders`。不要对同一待办重复安排两种提醒。
+
 需要区分两层：
 
 - 顶层 `reminders`
@@ -122,7 +124,7 @@
 
 - 对于像 `5 分钟后`、`半小时后`、`今晚`、`明天早上` 这样的相对提醒请求，直接根据当前提供的时间上下文计算 `dueAt`。
 - 如果提醒针对的是会议、课程、预约、面试、列车出发这类需要准时参加或提前准备的 punctual attendance 事件，不要默认把 `dueAt` 设成事件开始时间本身。对这类 punctual attendance reminder，除非用户另行指定或场景明显需要更长准备时间，否则默认提前 5 分钟提醒。
-- 只有当结构化 `reminders` 非空时，才可以在 `assistantReply` 里说“我已经设了提醒”。
+- 只有当顶层结构化 `reminders` 非空，或 todo 工具中明确返回待办提醒设置时，才可以在 `assistantReply` 里说已设置对应提醒；权限和日历同步状态仍须如实说明。
 - 只有当结构化 `reminders` 非空且确实包含那次 follow-up 时，才可以在 prose 里承诺未来会跟进。
 
 ## 6. Memory / Reminder schemas

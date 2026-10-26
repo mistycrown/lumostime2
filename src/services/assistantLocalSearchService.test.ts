@@ -1,5 +1,6 @@
 /**
  * @file assistantLocalSearchService.test.ts
+ * @updated 2026-10-26: Verifies reminder settings survive lookup and digest serialization.
  * @input Synthetic local assistant-query requests plus lightweight logs/todos/categories/reviews fixtures
  * @output Regression coverage for foreground local-query matching and digest formatting
  * @pos Test (Assistant Local Query)
@@ -26,6 +27,17 @@ const installLocalStorageMock = () => {
 describe('assistantLocalSearchService', () => {
   beforeEach(() => {
     installLocalStorageMock();
+  });
+
+  it('returns existing reminder settings so later AI turns can edit calendar sync', () => {
+    const reminders = { scheduledDate: { daysBefore: 1, time: '08:30', calendarSync: true } };
+    const result = assistantLocalSearchService.runQuery({ round: 1,
+      request: { mode: 'keyword_search', targets: ['todos'], query: '提交报告' },
+      todos: [{ id: 'report', categoryId: 'work', title: '提交报告', isCompleted: false, scheduledDate: '2099-12-31', reminders }],
+      logs: [], categories: [], todoCategories: [{ id: 'work', name: '工作', icon: 'W' }], scopes: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: []
+    });
+    expect(result.items[0].metadata?.reminders).toEqual(reminders);
+    expect(result.digest).toContain(JSON.stringify(reminders));
   });
 
   it('returns all stored principles without keyword filtering or limit slicing', () => {

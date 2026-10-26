@@ -1,5 +1,6 @@
 /**
  * @file assistantActionExecutor.test.ts
+ * @updated 2026-10-26: Verifies reminder snapshots, partial updates, invalid-write isolation and undo.
  * @updated 2026-10-18: Verifies AI principle edits retain group membership.
  * @input Synthetic local data and assistant tool calls
  * @output Coverage for assistant writeback and rollback
@@ -16,6 +17,7 @@ import {
 } from './assistantActionExecutor';
 import type { AICreatePrincipleToolCall, AICreateSelfBeliefToolCall, AIPlannedLogToolCall, AITodoToolCall } from './aiService';
 import type { AIBackfillToolCall, AIQuickAddNoteToolCall } from './quickAddService';
+import { buildTodoReminderSnapshot } from '../utils/todoReminderUtils';
 
 const installLocalStorageMock = () => {
   const store = new Map<string, string>();
@@ -110,6 +112,58 @@ describe('assistantActionExecutor AI log attributes', () => {
 describe('assistantActionExecutor applyTodoToolCalls', () => {
   beforeEach(() => {
     installLocalStorageMock();
+  });
+
+  it('creates native/calendar reminder snapshots, updates them and restores them on undo', () => {
+    const context = buildBaseContext();
+    const reminders = {
+      scheduledDate: { daysBefore: 0, time: '09:00', calendarSync: true },
+      deadlineDate: { daysBefore: 1, time: '18:00' }
+    };
+    const created = assistantActionExecutor.applyTodoToolCalls(context, [{ toolName: 'create_todo', args: {
+      title: '交报告', categoryId: '__virtual_quick__', kind: 'quick',
+      scheduledDate: '2099-12-30', deadlineDate: '2099-12-31', reminders
+    } }]);
+    expect(created.actions[0]).toMatchObject({ status: 'applied', snapshot: { reminders } });
+    expect(buildTodoReminderSnapshot(created.nextTodos)).toHaveLength(2);
+    expect(buildTodoReminderSnapshot(created.nextTodos)[1]).toMatchObject({ calendarSync: true });
+    const updated = assistantActionExecutor.applyTodoUpdateToolCalls({ ...context, todos: created.nextTodos }, [{
+      toolName: 'update_todo', args: { todoId: created.nextTodos[0].id, patch: {
+        reminders: { scheduledDate: { daysBefore: 1, time: '08:00' }, deadlineDate: null }
+      } }
+    }]);
+    expect(buildTodoReminderSnapshot(updated.nextTodos)).toHaveLength(1);
+    expect(updated.nextTodos[0].reminders).toEqual({ scheduledDate: { daysBefore: 1, time: '08:00', calendarSync: true } });
+    expect(rollbackAppliedChatActions(updated.actions, [], updated.nextTodos).todos).toEqual(created.nextTodos);
+    expect(rollbackAppliedChatActions(created.actions, [], created.nextTodos).todos).toEqual([]);
+  });
+
+  it('rejects an invalid reminder atomically and cleans reminders when dates are removed', () => {
+    const context = buildBaseContext();
+    context.todos = [{ id: 'report', title: '报告', categoryId: 'project-general', isCompleted: false,
+      scheduledDate: '2099-12-30', reminders: { scheduledDate: { daysBefore: 0, time: '09:00' } } }];
+    const invalid = assistantActionExecutor.applyTodoUpdateToolCalls(context, [{ toolName: 'update_todo', args: {
+      todoId: 'report', patch: { title: '不应保存', scheduledDate: null,
+        reminders: { scheduledDate: { daysBefore: 0, time: '09:00' } } }
+    } }]);
+    expect(invalid.actions[0].status).toBe('failed');
+    expect(invalid.nextTodos).toEqual(context.todos);
+    const cleared = assistantActionExecutor.applyTodoUpdateToolCalls(context, [{ toolName: 'update_todo', args: {
+      todoId: 'report', patch: { scheduledDate: null }
+    } }]);
+    expect(cleared.nextTodos[0].reminders).toBeUndefined();
+    expect(buildTodoReminderSnapshot(cleared.nextTodos)).toEqual([]);
+  });
+
+  it('creates nested subtask reminders and reports their calendar preference', () => {
+    const reminders = { scheduledDate: { daysBefore: 0, time: '08:00', calendarSync: true } };
+    const result = assistantActionExecutor.applyTodoToolCalls(buildBaseContext(), [{ toolName: 'create_todo', args: {
+      title: '写作计划', categoryId: 'project-general', linkedActivityId: 'writing',
+      subtasks: [{ title: '提交草稿', scheduledDate: '2099-12-31', reminders }]
+    } }], '创建计划及子任务，提醒提交草稿');
+    expect(result.actions[0]).toMatchObject({ status: 'applied', snapshot: { createdSubtaskReminders: [reminders] } });
+    expect(buildTodoReminderSnapshot(result.nextTodos)).toMatchObject([{ title: '提交草稿', calendarSync: true, time: '08:00' }]);
+    expect(rollbackAppliedChatActions(result.actions, [], result.nextTodos).todos).toEqual([]);
   });
 
   it('creates quick todos inside the reserved 小事 bucket without requiring linked activity', () => {

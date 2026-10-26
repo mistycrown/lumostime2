@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatQuickAddHandlers.ts
+ * @updated 2026-10-26: Checks permissions before reminder writes and displays calendar authorization notices.
  * @input Quick-add command text, active chat session state, and local action adapters
  * @output Quick-add todo, note, and backfill handlers with shared request lifecycle management
  * @pos Component Support (AI Integration)
@@ -22,6 +23,7 @@ import {
   type AIQuickAddNoteToolCall
 } from '../../services/quickAddService';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
+import { getAssistantTodoReminderNotices, getAssistantTodoReminderStatus } from '../../services/assistantTodoReminderService';
 import type { AssistantTurnDictionaryContext } from '../../types/assistant';
 import {
   formatDateKey,
@@ -252,6 +254,8 @@ export const useAIBackfillChatQuickAddHandlers = ({
           return;
         }
   
+        const todoReminderStatus = await getAssistantTodoReminderStatus();
+        if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) return;
         const appliedActions = result.toolCall
           ? applyTodoAndPlannedTimelineLogToolCalls([result.toolCall], description)
           : [];
@@ -260,7 +264,9 @@ export const useAIBackfillChatQuickAddHandlers = ({
           throw new Error('AI 未返回有效的待办工具调用。');
         }
   
-        replacePendingWithResult(sessionId, pendingMessageId, '已添加待办', {
+        replacePendingWithResult(sessionId, pendingMessageId, [
+          '已添加待办', ...getAssistantTodoReminderNotices(appliedActions, todoReminderStatus)
+        ].join('\n\n'), {
           ...(debugMode ? { debugSections: [{ label: '快速添加待办', exchange: result.debug }] } : {}),
           appliedActions,
           retryInput: commandText,

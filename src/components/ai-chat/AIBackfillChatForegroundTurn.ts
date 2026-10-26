@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatForegroundTurn.ts
+ * @updated 2026-10-26: Routes named todo reminders to application tools and reports permission limitations.
  * @input Foreground send text, active session state, and modal orchestration callbacks
  * @output Shared foreground-turn preparation helpers and unified-turn runner for ordinary chat
  * @pos Component Support (AI Integration)
@@ -17,6 +18,8 @@
 import type { AIConversationTurn } from '../../services/aiService';
 import type { AppliedChatAction } from '../../services/assistantActionExecutor';
 import { assistantLocalSearchService } from '../../services/assistantLocalSearchService';
+import { getAssistantTodoReminderNotices, getAssistantTodoReminderStatus } from '../../services/assistantTodoReminderService';
+import { routeAITodoReminders } from '../../utils/aiTodoReminderRouting';
 import type {
   Category,
   DailyReview,
@@ -690,16 +693,20 @@ export const runOrdinaryForegroundTurn = async ({
       return;
     }
 
-    const outputForReply = output.localQueryRequest && localQueryHistory.length >= MAX_LOCAL_QUERY_ROUNDS
+    const resolvedOutput = routeAITodoReminders(output, todos, trimmedText);
+    const outputForReply = resolvedOutput.localQueryRequest && localQueryHistory.length >= MAX_LOCAL_QUERY_ROUNDS
       ? {
-        ...output,
+        ...resolvedOutput,
         localQueryRequest: undefined,
         outcome: 'reply' as const,
         assistantReply: output.assistantReply || '我已经查过本地资料了，但还是没找到足够确定的依据。你可以再补一句更具体的线索。'
       }
-      : output;
+      : resolvedOutput;
 
     const toolCalls = outputForReply.toolCalls || [];
+    const todoReminderStatus = toolCalls.some((call) => ['create_todo', 'update_todo', 'create_subtask'].includes(call.toolName))
+      ? await getAssistantTodoReminderStatus() : null;
+    if (controller.signal.aborted || activeRequestRef.current?.pendingMessageId !== pendingMessageId) return;
     const unifiedAppliedActions = toolCalls.length > 0
       ? applyUnifiedToolCalls(toolCalls, trimmedText, localQueryHistory)
       : [];
@@ -720,7 +727,10 @@ export const runOrdinaryForegroundTurn = async ({
           ? '我记下来了，之后会提醒你。'
           : undefined)
     );
-    const unifiedContent = resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions);
+    const unifiedContent = [
+      resolveForegroundAssistantReply(rawUnifiedContent, trimmedText, unifiedAppliedActions),
+      ...getAssistantTodoReminderNotices(unifiedAppliedActions, todoReminderStatus)
+    ].filter(Boolean).join('\n\n');
     const displayParts = resolveAssistantDisplayParts(unifiedContent);
 
     replacePendingWithResult(sessionId, pendingMessageId, unifiedContent, {

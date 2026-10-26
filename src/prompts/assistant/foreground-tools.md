@@ -201,6 +201,18 @@
 
 - 只更新那些能从已提供 candidates 里清晰匹配到的 todos。
 
+### 待办的应用提醒与系统日历
+
+- 用户针对一个已有待办说“提醒我”“提前提醒”“同步日历”“取消提醒”时，必须使用 `update_todo.args.patch.reminders`，不要创建顶层 AI `reminders`。同轮新建待办的提醒放在 `create_todo.args.reminders`；子任务同样支持 `reminders`。
+- 只有没有关联待办的独立提醒或助手自身的跟进才使用顶层 `reminders`。不能为了独立提醒凭空创建待办，也不能对同一待办同时创建两种提醒。
+- `reminders` 有 `scheduledDate`（安排提醒）与 `deadlineDate`（截止提醒）两个可选键。每个值是 `{ "daysBefore": 0, "time": "09:00", "calendarSync": true }`。`daysBefore` 是来源日期减去提醒日期的日历天数，正数表示提前，负数表示之后；`time` 是当地 `HH:mm`。
+- 例：截止 2026-10-30，要求 2026-10-29 18:00 提醒，返回 `patch.reminders.deadlineDate = { "daysBefore": 1, "time": "18:00" }`。跨月、跨年也按日历天数计算。
+- 默认绑定用户提到的日期类型；未说明时优先已有安排日期，其次截止日期。已有待办两个日期都没有时，可将用户明确给出的提醒日期一并设置为 `scheduledDate`。时间不明确则澄清，不要猜测时间或悄悄更改已有日期。
+- 未提及的提醒字段保持不变；`patch.reminders.scheduledDate = null` 只取消安排提醒；`patch.reminders = null` 取消全部待办提醒。修改时间时不必重复另一个日期提醒。
+- `calendarSync: true` 仅在用户明确要求同步系统日历时提供；`false` 关闭该项日历同步、保留应用提醒。仅修改日历开关时，从候选词典保留这项提醒的 `daysBefore` 和 `time`；已有日历开关在省略时保持不变。
+- 来源日期必须有效，提醒必须在未来；重复待办暂不支持这类日期提醒。取消提醒可以操作已经过去的提醒。
+- 根据 `Todo Reminder Permissions` 先检查权限。未授权时仍可保存用户明确请求的提醒和同步选择，但须说明尚未同步，并提示在系统应用设置开启日历权限。设备不支持或权限状态未知时如实说明。通知未授权时提示开启通知。授权成功也只能说已开启同步、保存后将同步，不能声称已写入日历。
+
 ### 3. create_subtask
 
 - 只在已提供 candidates 中的顶层、非 recurring parent todo 之下创建子任务。
@@ -305,6 +317,10 @@
         "note": "string",
         "scheduledDate": "YYYY-MM-DD",
         "deadlineDate": "YYYY-MM-DD",
+        "reminders": {
+          "scheduledDate": { "daysBefore": 0, "time": "09:00", "calendarSync": true },
+          "deadlineDate": { "daysBefore": 1, "time": "18:00" }
+        },
         "recurrenceRule": {
           "frequency": "daily | weekly | monthly",
           "startDate": "YYYY-MM-DD",
@@ -337,6 +353,10 @@
           "defaultScopeIds": ["scope id"] | null",
           "scheduledDate": "YYYY-MM-DD | null",
           "deadlineDate": "YYYY-MM-DD | null",
+          "reminders": {
+            "scheduledDate": { "daysBefore": 0, "time": "09:00", "calendarSync": false },
+            "deadlineDate": null
+          },
           "recurrenceRule": {
             "frequency": "daily | weekly | monthly",
             "startDate": "YYYY-MM-DD",
@@ -357,7 +377,8 @@
         "title": "string",
         "note": "string",
         "scheduledDate": "YYYY-MM-DD",
-        "deadlineDate": "YYYY-MM-DD"
+        "deadlineDate": "YYYY-MM-DD",
+        "reminders": { "scheduledDate": { "daysBefore": 0, "time": "09:00" } }
       }
     },
     {

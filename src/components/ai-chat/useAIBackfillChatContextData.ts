@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatContextData.ts
+ * @updated 2026-10-26: Includes existing reminder settings in todo update context.
  * @input Current logs, todos, categories, scopes, and todo categories
  * @output Structured read-only context arrays for assistant tool calls
  * @pos Component Support (AI Integration)
@@ -51,6 +52,7 @@ export const useAIBackfillChatContextData = ({
       linkedActivityName: linkedActivity?.name,
       scheduledDate: todo.scheduledDate,
       deadlineDate: todo.deadlineDate,
+      reminders: todo.reminders,
       pin: Boolean(todo.pin)
     };
   }), [categories, todoCategories, todos]);

@@ -1,5 +1,6 @@
 /**
  * @file assistantTurnService.ts
+ * @updated 2026-10-26: Supplies live todo notification/calendar permissions to foreground AI turns.
  * @input Unified assistant-turn input including prompt layers, memory, conversation, state context, and dictionary context
  * @output Structured unified assistant-turn result plus request/response debug exchange
  * @pos Service (Assistant Unified Turn)
@@ -29,6 +30,7 @@ import type { AIDebugExchange, AIRequestOptions } from './aiService';
 import { aiService } from './aiService';
 import { assistantContextBuilder } from './assistantContextBuilder';
 import { assistantPromptService } from './assistantPromptService';
+import { buildAssistantTodoReminderPermissionPrompt, getAssistantTodoReminderStatus } from './assistantTodoReminderService';
 import { formatAssistantDateTimeForDisplay } from '../utils/assistantTime';
 import type {
   AssistantLocalQueryResult,
@@ -268,6 +270,8 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
         }
     );
   const localQueryHistoryPrompt = buildLocalQueryHistoryPrompt(input.localQueryHistory);
+  const todoReminderPermissionPrompt = input.mode === 'foreground'
+    ? buildAssistantTodoReminderPermissionPrompt(await getAssistantTodoReminderStatus()) : undefined;
   return [
     ...(input.promptLayers.userPersonaPrompt ? ['=== User Persona Prompt ===', input.promptLayers.userPersonaPrompt, ''] : []),
     '=== Assistant Base Prompt ===',
@@ -293,6 +297,7 @@ const buildSystemPrompt = async (input: AssistantUnifiedTurnInput): Promise<stri
     ...(Object.keys(volatileStateContext).length > 0
       ? ['', '=== Volatile State Anchors ===', stringifyJson(volatileStateContext)]
       : []),
+    ...(todoReminderPermissionPrompt ? ['', todoReminderPermissionPrompt] : []),
     ...(memoryEnabled ? ['', '=== Memory Snapshot ===', stringifyJson(buildPromptMemorySnapshot(input.memory))] : []),
     ...(input.dreamContext?.trim() ? ['', '=== Dream Context ===', input.dreamContext.trim()] : [])
   ].filter(Boolean).join('\n');

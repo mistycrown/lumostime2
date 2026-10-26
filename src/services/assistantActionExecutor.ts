@@ -1,5 +1,6 @@
 /**
  * @file assistantActionExecutor.ts
+ * @updated 2026-10-26: Executes reversible todo reminder patches with atomic date/time validation.
  * @updated 2026-10-18: Preserves principle group membership during AI writes.
  * @updated 2026-10-09: Executes reversible node writes and links AI notes to dictionary nodes.
  * @input Current logs/todos plus runtime dictionaries, principle-library storage, and assistant tool-call payloads
@@ -27,6 +28,7 @@ import type {
   Scope,
   TodoCategory,
   TodoItem,
+  TodoReminders,
   TodoRecurrenceRule
 } from '../types';
 import type {
@@ -53,6 +55,7 @@ import { updateLocalDataTimestamp } from '../utils/localDataTimestamp';
 import { buildTimelinePlannedLog } from '../utils/todoRecurringPlanUtils';
 import { validateAILogAttributeValues } from '../utils/aiLogAttributeUtils';
 import { applyAINodeUpdate, linkAINoteNodes, type AINodeSnapshot } from '../utils/aiNodeUtils';
+import { applyAITodoReminderPatch } from '../utils/aiTodoReminderUtils';
 import type { AssistantToolCall, AssistantUpsertNodeToolCall } from '../types/assistant';
 
 export interface AppliedUpsertNodeAction {
@@ -122,8 +125,10 @@ export interface AppliedCreateTodoSnapshot {
   note?: string;
   scheduledDate?: string;
   deadlineDate?: string;
+  reminders?: TodoReminders;
   recurrenceRule?: TodoRecurrenceRule;
   createdSubtaskIds?: string[];
+  createdSubtaskReminders?: TodoReminders[];
 }
 
 export interface AppliedCreateTodoAction {
@@ -305,6 +310,8 @@ const hasExplicitSubtaskDateRequest = (text: string): boolean => {
     '哪天',
     '什么时候',
     '时间',
+    '提醒',
+    'remind',
     '日期',
     '今天',
     '明天',
@@ -405,6 +412,8 @@ const createSubtaskTodo = (
     ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
     ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {})
   };
+
+  newTodo.reminders = applyAITodoReminderPatch(newTodo, args.reminders);
 
   return {
     nextTodos: applyTodoSave(currentTodos, newTodo),
@@ -1546,8 +1555,24 @@ export const assistantActionExecutor = {
         ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {})
       };
 
+      try {
+        newTodo.reminders = applyAITodoReminderPatch(newTodo, args.reminders);
+        // Validate children before saving any part of the parent/child bundle.
+        for (const child of args.subtasks || []) {
+          applyAITodoReminderPatch({ ...newTodo, scheduledDate: child.scheduledDate,
+            deadlineDate: child.deadlineDate, recurrenceRule: undefined, reminders: undefined }, child.reminders);
+        }
+      } catch (error) {
+        actions.push({ actionId: buildActionId(), kind: 'create_todo', status: 'failed',
+          errorMessage: error instanceof Error ? error.message : '待办提醒设置失败',
+          snapshot: { title: newTodo.title, categoryId: newTodo.categoryId,
+            categoryName: resolvedTodoCategory.name, defaultScopeIds: [], defaultScopeNames: [] } });
+        return;
+      }
+
       nextTodos = applyTodoSave(nextTodos, newTodo);
       const createdSubtaskIds: string[] = [];
+      const createdSubtaskReminders: TodoReminders[] = [];
       const nestedSubtasks = stripNestedSubtaskDatesIfNotRequested(
         (args.subtasks || []).filter((subtask) => Boolean(subtask.title.trim())),
         sourceText
@@ -1558,6 +1583,7 @@ export const assistantActionExecutor = {
         const subtaskResult = createSubtaskTodo(nextTodos, liveParentTodo, subtaskArgs);
         nextTodos = subtaskResult.nextTodos;
         createdSubtaskIds.push(subtaskResult.newTodo.id);
+        if (subtaskResult.newTodo.reminders) createdSubtaskReminders.push(subtaskResult.newTodo.reminders);
       });
 
       actions.push({
@@ -1579,8 +1605,10 @@ export const assistantActionExecutor = {
           ...(args.note ? { note: args.note } : {}),
           ...(args.scheduledDate ? { scheduledDate: args.scheduledDate } : {}),
           ...(args.deadlineDate ? { deadlineDate: args.deadlineDate } : {}),
+          ...(newTodo.reminders ? { reminders: newTodo.reminders } : {}),
           ...(todoKind !== 'quick' && args.recurrenceRule ? { recurrenceRule: args.recurrenceRule } : {}),
-          ...(createdSubtaskIds.length > 0 ? { createdSubtaskIds } : {})
+          ...(createdSubtaskIds.length > 0 ? { createdSubtaskIds } : {}),
+          ...(createdSubtaskReminders.length ? { createdSubtaskReminders } : {})
         }
       });
     });
@@ -1730,6 +1758,15 @@ export const assistantActionExecutor = {
           : {})
       };
 
+      try {
+        nextTodo.reminders = applyAITodoReminderPatch(nextTodo, patch.reminders);
+      } catch (error) {
+        actions.push({ actionId: buildActionId(), kind: 'update_todo', status: 'failed',
+          errorMessage: error instanceof Error ? error.message : '待办提醒设置失败',
+          snapshot: { todoId: currentTodo.id, previousTodo: currentTodo } });
+        return;
+      }
+
       nextTodos = applyTodoSave(nextTodos, nextTodo);
       actions.push({
         actionId: buildActionId(),
@@ -1782,6 +1819,16 @@ export const assistantActionExecutor = {
       }
 
       const resolvedCategory = context.todoCategories.find((category) => category.id === parentTodo.categoryId);
+      try {
+        applyAITodoReminderPatch({ ...parentTodo, scheduledDate: args.scheduledDate,
+          deadlineDate: args.deadlineDate, reminders: undefined }, args.reminders);
+      } catch (error) {
+        actions.push({ actionId: buildActionId(), kind: 'create_subtask', status: 'failed',
+          errorMessage: error instanceof Error ? error.message : '待办提醒设置失败',
+          snapshot: { title: args.title, categoryId: parentTodo.categoryId,
+            categoryName: resolvedCategory?.name || '', defaultScopeIds: [], defaultScopeNames: [] } });
+        return;
+      }
       const subtaskResult = createSubtaskTodo(nextTodos, parentTodo, args);
       nextTodos = subtaskResult.nextTodos;
       const liveSubtask = nextTodos.find((todo) => todo.id === subtaskResult.newTodo.id) || subtaskResult.newTodo;
@@ -1799,6 +1846,7 @@ export const assistantActionExecutor = {
           ...(liveSubtask.note ? { note: liveSubtask.note } : {}),
           ...(liveSubtask.scheduledDate ? { scheduledDate: liveSubtask.scheduledDate } : {}),
           ...(liveSubtask.deadlineDate ? { deadlineDate: liveSubtask.deadlineDate } : {}),
+          ...(liveSubtask.reminders ? { reminders: liveSubtask.reminders } : {}),
           parentTodoId: parentTodo.id,
           parentTodoTitle: parentTodo.title
         }

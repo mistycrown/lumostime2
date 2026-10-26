@@ -1,5 +1,6 @@
 /**
  * @file AIBackfillChatAppliedActionRenderer.tsx
+ * @updated 2026-10-26: Displays application reminder timestamps and calendar preferences on todo results.
  * @updated 2026-10-09: Renders node description writebacks with open and undo actions.
  * @input Applied assistant actions, live log/todo lookups, theme tokens, and action callbacks
  * @output Reusable renderer for in-chat applied-action result cards
@@ -14,6 +15,7 @@
 import React from 'react';
 import { ArrowUpRight, ListTodo, Pencil, Undo2 } from 'lucide-react';
 import { ActivityAttributeSummary } from '../ActivityAttributeSummary';
+import { formatTodoReminder, TODO_REMINDER_FIELDS, TODO_REMINDER_LABELS } from '../../utils/todoReminderUtils';
 import { useOptionalNodes } from '../../contexts/NodeContext';
 import type { Category, Log, TodoCategory, TodoItem } from '../../types';
 import type {
@@ -472,6 +474,13 @@ const RenderTodoAction: React.FC<AIBackfillChatAppliedActionRendererProps & {
             循环 {action.snapshot.recurrenceRule.frequency}
           </span>
         )}
+        {TODO_REMINDER_FIELDS.map((field) => {
+          const setting = action.snapshot.reminders?.[field];
+          const date = action.snapshot[field];
+          return setting && date ? <span key={field}>
+            {TODO_REMINDER_LABELS[field]} {formatTodoReminder(date, setting)}{setting.calendarSync ? ' · 同步日历' : ''}
+          </span> : null;
+        })}
       </div>
 
       {action.errorMessage && (
@@ -587,6 +596,13 @@ const RenderUpdateTodoAction: React.FC<AIBackfillChatAppliedActionRendererProps 
           {displayTodo.pin && <span className="inline-flex items-center">Pin</span>}
           {displayTodo.scheduledDate && <span className="inline-flex items-center">安排 {displayTodo.scheduledDate}</span>}
           {displayTodo.deadlineDate && <span className="inline-flex items-center">截止 {displayTodo.deadlineDate}</span>}
+          {TODO_REMINDER_FIELDS.map((field) => {
+            const setting = displayTodo.reminders?.[field];
+            const date = displayTodo[field];
+            return setting && date ? <span key={field}>
+              {TODO_REMINDER_LABELS[field]} {formatTodoReminder(date, setting)}{setting.calendarSync ? ' · 同步日历' : ''}
+            </span> : null;
+          })}
           {displayTodo.isCompleted && <span className="inline-flex items-center">已完成</span>}
         </div>
       )}

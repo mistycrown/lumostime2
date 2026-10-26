@@ -1,5 +1,6 @@
 /**
  * @file aiService.ts
+ * @updated 2026-10-26: Preserves validated application todo reminder create/update/cancel payloads.
  * @updated 2026-10-09: Normalizes foreground node-description tool calls.
  * @input AI Configuration (OpenAI/Gemini keys), User Natural Language Input, Context Data (categories, scopes, todos)
  * @output Parsed Time Entries (ParsedTimeEntry[]), structured unified assistant turns, local tool-call payloads, generated narratives (string), and connection status (boolean)
@@ -21,7 +22,7 @@
  * @updated 2026-05-14: Added named AI preset storage with current-preset switching, migration from older single-config/profile keys, and preset CRUD helpers for multi-provider quick switching in settings.
  Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { Scope, TodoKind, TodoRecurrenceRule } from '../types';
+import { Scope, TodoKind, TodoRecurrenceRule, TodoReminders } from '../types';
 import type {
     AssistantLocalQueryRequest,
     AssistantLocalQueryTarget,
@@ -35,6 +36,8 @@ import type {
     AssistantUnifiedTurnOutput,
     AssistantTurnMode
 } from '../types/assistant';
+import type { AssistantTodoReminderPatch } from '../types/assistant';
+import { normalizeAITodoReminderPatch } from '../utils/aiTodoReminderUtils';
 import { buildAssistantReasoningSummary } from '../utils/assistantReasoning';
 import { normalizeAILogAttributeValues } from '../utils/aiLogAttributeUtils';
 export interface AIConfig {
@@ -124,6 +127,7 @@ export interface AITodoNestedSubtaskArgs {
     note?: string;
     scheduledDate?: string;
     deadlineDate?: string;
+    reminders?: TodoReminders;
 }
 
 export interface AITodoCreateArgs {
@@ -138,6 +142,7 @@ export interface AITodoCreateArgs {
     deadlineDate?: string;
     recurrenceRule?: TodoRecurrenceRule;
     subtasks?: AITodoNestedSubtaskArgs[];
+    reminders?: TodoReminders;
     clientRef?: string;
 }
 
@@ -156,6 +161,7 @@ export interface AITodoUpdatePatch {
     defaultScopeIds?: string[] | null;
     scheduledDate?: string | null;
     deadlineDate?: string | null;
+    reminders?: AssistantTodoReminderPatch | null;
     recurrenceRule?: TodoRecurrenceRule | null;
     pin?: boolean;
     isCompleted?: boolean;
@@ -177,6 +183,7 @@ export interface AICreateSubtaskArgs {
     note?: string;
     scheduledDate?: string;
     deadlineDate?: string;
+    reminders?: TodoReminders;
 }
 
 export interface AICreateSubtaskToolCall {
@@ -1454,6 +1461,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
 
                     return [{
                         title,
+                        ...(candidate.reminders !== undefined ? { reminders: normalizeAITodoReminderPatch(candidate.reminders) as TodoReminders } : {}),
                         ...(typeof candidate.note === 'string' && candidate.note.trim() ? { note: candidate.note.trim() } : {}),
                         ...(normalizeOptionalDateString(candidate.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(candidate.scheduledDate)! } : {}),
                         ...(normalizeOptionalDateString(candidate.deadlineDate) ? { deadlineDate: normalizeOptionalDateString(candidate.deadlineDate)! } : {})
@@ -1466,6 +1474,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                     title: typeof args.title === 'string' ? args.title.trim() : '',
                     categoryId: typeof args.categoryId === 'string' ? args.categoryId.trim() : '',
                     kind: normalizedKind,
+                    ...(args.reminders !== undefined ? { reminders: normalizeAITodoReminderPatch(args.reminders) as TodoReminders } : {}),
                     ...(normalizeNullableString(args.linkedCategoryId) ? { linkedCategoryId: normalizeNullableString(args.linkedCategoryId)! } : {}),
                     ...(normalizeNullableString(args.linkedActivityId) ? { linkedActivityId: normalizeNullableString(args.linkedActivityId)! } : {}),
                     ...(Array.isArray(args.defaultScopeIds) ? { defaultScopeIds: args.defaultScopeIds.map((scopeId: unknown) => String(scopeId).trim()).filter(Boolean) } : {}),
@@ -1487,6 +1496,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
             const patch = args.patch || {};
             const normalizedRecurrenceRule = normalizeTodoRecurrenceRule(patch.recurrenceRule);
             const normalizedPatch = {
+                ...(patch.reminders !== undefined ? { reminders: normalizeAITodoReminderPatch(patch.reminders) } : {}),
                 ...(typeof patch.title === 'string' ? { title: patch.title.trim() } : {}),
                 ...(normalizeNullableString(patch.note) !== undefined ? { note: normalizeNullableString(patch.note) } : {}),
                 ...(normalizeTodoKind(patch.kind) ? { kind: normalizeTodoKind(patch.kind)! } : {}),
@@ -1520,6 +1530,7 @@ const normalizeAssistantToolCalls = (value: unknown): AssistantToolCall[] => {
                 toolName: 'create_subtask' as const,
                 args: {
                     parentTodoId: typeof args.parentTodoId === 'string' ? args.parentTodoId.trim() : '',
+                    ...(args.reminders !== undefined ? { reminders: normalizeAITodoReminderPatch(args.reminders) as TodoReminders } : {}),
                     title: typeof args.title === 'string' ? args.title.trim() : '',
                     ...(typeof args.note === 'string' && args.note.trim() ? { note: args.note.trim() } : {}),
                     ...(normalizeOptionalDateString(args.scheduledDate) ? { scheduledDate: normalizeOptionalDateString(args.scheduledDate)! } : {}),

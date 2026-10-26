@@ -1,5 +1,6 @@
 /**
  * @file assistant.ts
+ * @updated 2026-10-26: Defines todo reminder patches independently of assistant reminder drafts.
  * @updated 2026-10-18: Exposes optional abandonment timestamps in todo dictionary context.
  * @updated 2026-10-09: Adds node dictionaries and foreground node-description writeback.
  * @input None
@@ -37,7 +38,10 @@
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
 
-import type { ActivityAttributeDefinition, ActivityAttributeValue, TodoKind, TodoRecurrenceRule } from '../types';
+import type { ActivityAttributeDefinition, ActivityAttributeValue, TodoKind, TodoRecurrenceRule, TodoReminderField, TodoReminderSetting, TodoReminders } from '../types';
+
+// Omitted fields are preserved; null removes one reminder (or all reminders at the patch root).
+export type AssistantTodoReminderPatch = Partial<Record<TodoReminderField, TodoReminderSetting | null>>;
 
 export type AssistantTriggerSource = 'user' | 'agent' | 'system';
 
@@ -410,6 +414,7 @@ export interface AssistantTodoDictionaryItem {
   defaultScopeIds?: string[];
   scheduledDate?: string;
   deadlineDate?: string;
+  reminders?: TodoReminders;
   parentTodoId?: string;
   parentTodoTitle?: string;
   isCompleted?: boolean;
@@ -540,6 +545,7 @@ export interface AssistantCreateTodoSubtaskArgs {
   note?: string;
   scheduledDate?: string;
   deadlineDate?: string;
+  reminders?: TodoReminders;
 }
 
 export interface AssistantCreateTodoToolCall {
@@ -556,6 +562,7 @@ export interface AssistantCreateTodoToolCall {
     deadlineDate?: string;
     recurrenceRule?: TodoRecurrenceRule;
     subtasks?: AssistantCreateTodoSubtaskArgs[];
+    reminders?: TodoReminders;
     clientRef?: string;
   };
 }
@@ -574,6 +581,7 @@ export interface AssistantUpdateTodoToolCall {
       defaultScopeIds?: string[] | null;
       scheduledDate?: string | null;
       deadlineDate?: string | null;
+      reminders?: AssistantTodoReminderPatch | null;
       recurrenceRule?: TodoRecurrenceRule | null;
       pin?: boolean;
       isCompleted?: boolean;
@@ -589,6 +597,7 @@ export interface AssistantCreateSubtaskToolCall {
     note?: string;
     scheduledDate?: string;
     deadlineDate?: string;
+    reminders?: TodoReminders;
   };
 }
 

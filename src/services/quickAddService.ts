@@ -1,5 +1,6 @@
 /**
  * @file quickAddService.ts
+ * @updated 2026-10-26: Adds application reminder fields and live permissions to quick-add todo requests.
  * @updated 2026-10-09: Accepts dictionary node references while keeping note fragments verbatim.
  * @input AI configuration, user quick-add descriptions, and runtime dictionaries
  * @output Structured one-turn quick-add tool calls for todos, backfills, and notes
@@ -12,6 +13,8 @@
 import type { AssistantTurnDictionaryContext } from '../types/assistant';
 import type { ActivityAttributeValue } from '../types';
 import { normalizeAILogAttributeValues } from '../utils/aiLogAttributeUtils';
+import { normalizeAITodoReminderPatch } from '../utils/aiTodoReminderUtils';
+import { buildAssistantTodoReminderPermissionPrompt, getAssistantTodoReminderStatus } from './assistantTodoReminderService';
 import { aiService, type AIRequestOptions, type AITodoToolCall, type AIDebugExchange } from './aiService';
 
 export interface AIBackfillCreateLogArgs {
@@ -174,6 +177,7 @@ const normalizeQuickAddTodoToolCall = (
     args: {
       ...args,
       kind: 'project',
+      ...(args.reminders !== undefined ? { reminders: normalizeAITodoReminderPatch(args.reminders) } : {}),
       ...(scheduledDate ? { scheduledDate } : {}),
       ...(deadlineDate ? { deadlineDate } : {})
     }
@@ -200,6 +204,9 @@ export const quickAddService = {
       'Keep the key information from the user description. Select ids only from the supplied dictionary.',
       'Do not use the reserved quick category; use a normal todo category and linked activity when possible.',
       'If the description contains an explicit note/date/deadline, preserve it in note/scheduledDate/deadlineDate without inventing information.',
+      'For a requested todo reminder, include args.reminders: {"scheduledDate":{"daysBefore":0,"time":"09:00","calendarSync":true}} (or deadlineDate). daysBefore is source date minus reminder date in calendar days; time is local HH:mm. calendarSync is true only when the user explicitly asks to sync system calendar. Omit reminders unless requested. Never create top-level AI reminders for this todo.',
+      'A reminder requires its source date. If the user gives only a reminder datetime for this new todo, use that date as scheduledDate. Do not invent a reminder time.',
+      buildAssistantTodoReminderPermissionPrompt(await getAssistantTodoReminderStatus()),
       JSON.stringify(dictionaryContext)
     ].join('\n');
 

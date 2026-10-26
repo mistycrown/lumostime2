@@ -1,8 +1,16 @@
+/**
+ * @file assistantTurnService.test.ts
+ * @input Unified assistant turn fixtures and mocked prompt/transport adapters
+ * @output Coverage for prompt assembly and permission-aware foreground requests
+ * @pos Service test
+ * @updated 2026-10-26: Checks live calendar status before foreground AI requests.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AssistantUnifiedTurnInput } from '../types/assistant';
 import { assistantTurnService } from './assistantTurnService';
 import { aiService } from './aiService';
 import { assistantPromptService } from './assistantPromptService';
+import { todoReminderService } from './todoReminderService';
 
 vi.mock('./aiService', () => ({
   aiService: {
@@ -91,6 +99,19 @@ describe('assistantTurnService', () => {
         }
       }
     });
+  });
+
+  it('checks live calendar permission before sending a foreground AI request', async () => {
+    const permission = vi.spyOn(todoReminderService, 'getStatus').mockResolvedValue({
+      supported: true, notifications: true, background: true, exact: true,
+      calendar: { supported: true, granted: false }
+    });
+    await assistantTurnService.runUnifiedTurn(createInput());
+    expect(permission).toHaveBeenCalled();
+    const request = vi.mocked(aiService.requestAssistantUnifiedTurnWithDebug).mock.calls[0][0];
+    expect(request.systemPrompt).toContain('Todo Reminder Permissions');
+    expect(request.systemPrompt).toContain('"granted":false');
+    permission.mockRestore();
   });
 
   it('includes memory sections when long-term memory is enabled', async () => {

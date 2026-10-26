@@ -1,5 +1,6 @@
 /**
  * @file assistantLocalSearchService.ts
+ * @updated 2026-10-26: Includes todo reminder settings in query digests for tasks outside the initial dictionary.
  * @input Assistant local-query requests plus local logs, todos, categories, scopes, reviews, principles, and self-beliefs
  * @output Structured local-query hits and compact text digests for foreground assistant retrieval loops
  * @pos Service (Assistant Local Query)
@@ -173,6 +174,7 @@ const buildTodoItem = (todo: TodoItem, context: AssistantLocalSearchContext): As
       todo.isCompleted ? 'done' : 'todo',
       todo.scheduledDate ? `arrange ${todo.scheduledDate}` : '',
       todo.deadlineDate ? `due ${todo.deadlineDate}` : '',
+      todo.reminders ? `reminders ${JSON.stringify(todo.reminders)}` : '',
       linkedCategory?.name ? `#${linkedCategory.name}` : '',
       linkedActivityName ? `#${linkedActivityName}` : '',
       todo.note
@@ -182,6 +184,7 @@ const buildTodoItem = (todo: TodoItem, context: AssistantLocalSearchContext): As
       isCompleted: todo.isCompleted,
       scheduledDate: todo.scheduledDate,
       deadlineDate: todo.deadlineDate,
+      reminders: todo.reminders,
       linkedCategoryName: linkedCategory?.name,
       linkedActivityName: linkedActivityName || undefined,
       note: todo.note

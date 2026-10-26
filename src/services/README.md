@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-26: AI todo tools and quick-add support per-date application reminders, partial edits, explicit cancellation and opt-in system calendar sync. `assistantTodoReminderService.ts` reads native permissions without prompting and reports blocked sync/notifications. Todo dictionaries preserve existing settings; foreground routing converts an unambiguous legacy AI reminder into a todo write while retaining independent assistant reminders. Invalid/past settings fail atomically; undo restores the original reminders. Native scheduling still runs only after the existing todo persistence path succeeds.
+
 Update 2026-10-26: Cloud image consistency repairs use the rebuilt local reference list as the source of truth: upload missing files, delete cloud extras, and rewrite content/theme manifests. False upload or manifest-write results remain failures; reports retain transfer counts, errors, and unresolved local files for retry.
 
 Update 2026-10-25: Weekly PDF timelines label planned blocks with their explicit plan title or linked todo title. Untitled plans use their activity name when available, otherwise `计划`; actual logs continue to use activity labels.

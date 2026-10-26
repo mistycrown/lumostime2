@@ -1,5 +1,6 @@
 ﻿/**
  * @file assistantContextBuilder.ts
+ * @updated 2026-10-26: Exposes application reminder settings in JSON and compact todo dictionaries.
  * @updated 2026-10-18: Excludes abandonment from active summaries and exposes it in todo dictionaries.
  * @updated 2026-10-09: Exposes the full node dictionary in JSON and lossless table contexts.
  * @input App runtime dictionaries, logs, todos, conversation turns, and current session state
@@ -413,6 +414,7 @@ export const assistantContextBuilder = {
       todo.defaultScopeIds,
       todo.scheduledDate,
       todo.deadlineDate,
+      todo.reminders,
       todo.pin,
       todo.isCompleted,
       todo.abandonedAt
@@ -438,7 +440,7 @@ export const assistantContextBuilder = {
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('Nodes', ['id', 'name', 'aliases', 'description', 'categoryId'], (context.nodes || []).map((node) => [node.id, node.name, node.aliases, node.description, node.categoryId])),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
-      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'pin', 'isCompleted', 'abandonedAt'], todoRows),
+      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'reminders', 'pin', 'isCompleted', 'abandonedAt'], todoRows),
       buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
     ].join('\n\n');
   },
@@ -498,6 +500,7 @@ export const assistantContextBuilder = {
         ...(todo.defaultScopeIds?.length ? { defaultScopeIds: todo.defaultScopeIds } : {}),
         ...(todo.scheduledDate ? { scheduledDate: todo.scheduledDate } : {}),
         ...(todo.deadlineDate ? { deadlineDate: todo.deadlineDate } : {}),
+        ...(todo.reminders ? { reminders: todo.reminders } : {}),
         isCompleted: todo.isCompleted,
         ...(todo.abandonedAt ? { abandonedAt: todo.abandonedAt } : {}),
         pin: Boolean(todo.pin)
