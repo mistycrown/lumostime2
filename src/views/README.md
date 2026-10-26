@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-26: `TagDetailView` sends statistic-card and palette changes directly to the activity save callback while updating its local display. Calendar visibility preferences no longer wait for the text-edit debounce, so switching a calendar and immediately leaving preserves either display mode on reentry.
+
 Update 2026-10-26: Settings routes Data Management's local-authoritative cloud image sync action and includes upload/delete counts and per-file repair errors alongside the refreshed consistency report.
 
 Update 2026-10-23: Settings also forwards current review templates to Data Management so older journal reviews can recover their original question groups when a snapshot is absent.

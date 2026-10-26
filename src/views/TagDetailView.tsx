@@ -1,5 +1,6 @@
 /**
  * @file TagDetailView.tsx
+ * @updated 2026-10-26: Saves statistic-card preferences immediately so quick navigation cannot cancel calendar mode changes.
  * @updated 2026-10-03: Requires verified sponsorship for the keyword palette action and modal, including tags with sticker sets.
  * @updated 2026-10-02: Adds linked tag sticker settings, per-keyword selection, and calendar appearance.
  * @updated 2026-09-20: Renames the tag detail attribute analytics tab to statistics to reflect all tag statistic cards.
@@ -864,7 +865,10 @@ export const TagDetailView: React.FC<TagDetailViewProps> = ({ tagId, logs, todos
             );
 
          case 'Statistics':
-            return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} onChange={setActivity} />;
+            return <ActivityAttributeStatistics activity={activity} logs={countableTagLogs} onChange={next => {
+               setActivity(next);
+               onUpdateActivity(next);
+            }} />;
 
          case '关联':
             return (

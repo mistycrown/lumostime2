@@ -1,12 +1,13 @@
 /**
  * @file detailStatisticsRendererMocks.tsx
+ * @updated 2026-10-26: Supplies empty sticker collections for real tag-detail integration checks.
  * @input Detail renderer tests requiring isolated settings and unrelated panels.
  * @output Offline platform and ancillary UI adapters.
  * @pos Test Support
  * @updated 2026-10-06: Keeps real detail views, buffered scope saving, charts, and card editor under test.
  */
 import React from 'react';
-export const useSettings = () => ({ uiIconTheme: 'default' });
+export const useSettings = () => ({ uiIconTheme: 'default', customStickerSets: [], customStickers: [] });
 export const useNavigation = () => ({ isGoalBatchManaging: false, setIsGoalBatchManaging: () => undefined });
 export const useSponsorshipUnlocked = () => true;
 export const useChartPaletteSequences = () => [];

@@ -1,5 +1,6 @@
 /**
  * @file detailStatisticsRendererHarness.tsx
+ * @updated 2026-10-26: Exercises calendar preferences through real tag/category detail pages and immediate reentry.
  * @updated 2026-10-09: Exercises independent word rules, ordered selection, persistence, notes, and conditional clouds.
  * @input Real filter/scope detail views, cards, selection controls, and isolated settings.
  * @output Browser regression results and screenshot checkpoints.
@@ -14,6 +15,7 @@ import { runRegisteredHardwareBackHandler } from '../../utils/hardwareBackHandle
 import { FiltersSettingsView } from '../../views/settings/FiltersSettingsView';
 import { ScopeDetailView } from '../../views/ScopeDetailView';
 import { CategoryDetailView } from '../../views/CategoryDetailView';
+import { TagDetailView } from '../../views/TagDetailView';
 
 declare global {
   interface Window {
@@ -35,8 +37,9 @@ const capture = async (name: string) => {
   for (let i = 0; window.__detailStatisticsCapture && i < 100; i++) await delay();
   check(!window.__detailStatisticsCapture, 'Screenshot was not captured');
 };
-const setInput = async (placeholder: string, value: string) => {
-  const input = document.querySelector<HTMLInputElement>(`input[placeholder="${placeholder}"]`)!;
+const setInput = async (label: string, value: string) => {
+  const field = [...document.querySelectorAll('label')].find(node => node.textContent?.trim() === label);
+  const input = (field?.control || field?.parentElement?.querySelector('input')) as HTMLInputElement;
   check(input, 'Missing input');
   Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
   input.dispatchEvent(new Event('input', { bubbles: true })); await delay();
@@ -74,6 +77,20 @@ const CategoryProbe = () => {
   const [category, setCategory] = useState(savedCategory);
   return <CategoryDetailView categoryId={category.id} categories={[category]} logs={logs} todos={[]} scopes={[]}
     onUpdateCategory={(next) => { savedCategory = next; setCategory(next); }} />;
+};
+let savedTag: Activity = { ...categories[0].activities[0], statisticCards: [
+  { id: 'sleep-calendar', source: { type: 'crossDay' }, chartType: 'crossDayCalendar', range: 'year', metric: 'count', order: 0 },
+  { id: 'duration-calendar', source: { type: 'tagDuration' }, chartType: 'numberCalendar', range: 'year', metric: 'count', order: 1 }
+] };
+const sleepEnd = new Date(); sleepEnd.setDate(sleepEnd.getDate() - 2); sleepEnd.setHours(8, 0, 0, 0);
+const sleepStart = new Date(sleepEnd); sleepStart.setDate(sleepStart.getDate() - 1); sleepStart.setHours(23, 0, 0, 0);
+const tagLogs = [...logs, record('overnight', sleepStart.getTime(), sleepEnd.getTime(), 9 * 3600)];
+const TagProbe = () => {
+  const [activity, setActivity] = useState(savedTag);
+  return <TagDetailView tagId={activity.id} categories={[{ ...categories[0], activities: [activity] }]} logs={tagLogs} todos={[]} scopes={[]}
+    onToggleTodo={() => undefined} onUpdateActivity={next => {
+      savedTag = next; localStorage.setItem('detail-calendar-tag', JSON.stringify(next)); setActivity(next);
+    }} />;
 };
 const openFilter = async () => { const heading = document.querySelector('h4')!; check(heading, 'Missing saved filter'); heading.click(); await delay(); await click('统计'); };
 const editFirst = async () => { await click('管理'); await click('编辑记录时长 · 数值概览', dialog('管理统计卡片')); };
@@ -157,6 +174,26 @@ async function checkWordClouds() {
 
 async function run() {
   await document.fonts.load('16px VerifiedChinese', '领域统计记录时长备注');
+  for (const index of [0, 1]) {
+    for (const showValues of [true, false]) {
+      await render(null); await render(<TagProbe />); await click('统计');
+      const toggles = host.querySelectorAll<HTMLButtonElement>('[aria-label="切换日历数值显示"]');
+      check(toggles.length === 2, 'Real tag detail did not render both calendar types');
+      toggles[index].click(); await delay(20); await render(null);
+      check(savedTag.statisticCards?.[index].showCalendarValues === showValues,
+        'Leaving tag details before the debounce lost the calendar preference');
+      savedTag = JSON.parse(localStorage.getItem('detail-calendar-tag')!);
+      await render(<TagProbe />); await click('统计');
+      const restored = host.querySelectorAll<HTMLButtonElement>('[aria-label="切换日历数值显示"]');
+      check(restored[index].getAttribute('aria-pressed') === String(showValues), 'Tag detail did not restore the saved calendar mode');
+      check(Boolean(restored[index].closest('section')?.querySelector('[data-calendar-value], [data-calendar-duration]')) === showValues,
+        'Restored tag calendar mode does not match the visible numeric values');
+      check(restored[1 - index].getAttribute('aria-pressed') === 'false', 'Calendar preference changed a sibling card');
+      if (index === 0 && showValues) await capture('tag-calendar-preferences');
+    }
+  }
+  passed.push('Real tag details save both calendar modes immediately, restore on reentry and keep cards independent');
+  await render(null);
   await checkWordClouds();
   await render(<FiltersProbe />); await openFilter();
   check(host.textContent?.includes('2 条记录'), 'Statistics included planned/unmatched records');
@@ -187,8 +224,8 @@ async function run() {
   const row = document.querySelector('h4')!.closest('.cursor-pointer')!;
   const actions = Array.from(row.querySelectorAll('button'));
   check(actions.length >= 4, 'Missing filter actions'); actions[2].click(); await delay();
-  await setInput('例如:瑜伽训练', '阅读筛选改名');
-  await setInput('例如:瑜伽 OR 跑步 #运动 %健康 ^🌸', '#阅读 -不存在');
+  await setInput('筛选器名称', '阅读筛选改名');
+  await setInput('筛选表达式', '#阅读 -不存在');
   await click('保存');
   check(savedFilters[0].statisticCards?.[0].range === 'all' && savedFilters[0].statisticPalette === palette && savedFilters[0].icon === '星', 'Expression edit lost card/palette/icon settings');
   await openFilter();
@@ -233,6 +270,16 @@ async function run() {
   await render(null); await render(<CategoryProbe />); await click('统计');
   check(savedCategory.statisticCards?.length === 0 && host.textContent?.includes('0 张卡片'), 'Category empty settings were not preserved');
   passed.push('Existing category defaults and all-time tag distribution work; explicitly empty category cards survive remount');
+  savedCategory = { ...savedCategory, statisticCards: [{ id: 'category-calendar', source: { type: 'categoryDuration' }, chartType: 'numberCalendar', range: 'year', metric: 'count', order: 0 }] };
+  for (const showValues of [true, false]) {
+    await render(null); await render(<CategoryProbe />); await click('统计');
+    host.querySelector<HTMLButtonElement>('[aria-label="切换日历数值显示"]')!.click(); await delay(20); await render(null);
+    check(savedCategory.statisticCards?.[0].showCalendarValues === showValues, 'Category exit lost calendar preference');
+    savedCategory = JSON.parse(JSON.stringify(savedCategory));
+    await render(<CategoryProbe />); await click('统计');
+    check(host.querySelector('[aria-label="切换日历数值显示"]')?.getAttribute('aria-pressed') === String(showValues), 'Category did not restore calendar preference');
+  }
+  passed.push('Real category details restore both calendar display modes after leaving and reopening');
   window.__detailStatisticsResult = { passed };
 }
 run().catch((error) => { window.__detailStatisticsResult = { passed, error: error.stack || String(error) }; });

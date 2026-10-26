@@ -1,5 +1,7 @@
 /**
  * @file test-detail-statistics-renderer.mjs
+ * @updated 2026-10-26: Selects the main production stylesheet explicitly for faithful detail-page smoke captures.
+ * @updated 2026-10-26: Supplies isolated build variables for real tag-detail calendar save/reentry regressions.
  * @updated 2026-10-09: Restores desktop dimensions between mobile screenshot checkpoints.
  * @input Real detail-statistics React harness, production CSS, and installed Electron/esbuild.
  * @output Offline renderer assertions and desktop/mobile screenshots in a disposable temp directory.
@@ -22,12 +24,12 @@ const adapters = ['SettingsContext', 'NavigationContext', 'useSponsorshipUnlocke
 await build({
   entryPoints: [path.join(root, 'src/components/__tests__/detailStatisticsRendererHarness.tsx')],
   bundle: true, platform: 'browser', format: 'iife', outfile: path.join(directory, 'test.js'),
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: { 'process.env.NODE_ENV': '"development"', 'import.meta.env': '{"DEV":false,"MODE":"test","VITE_APP_VERSION":"test"}' },
   plugins: [{ name: 'offline-detail-adapters', setup(builder) {
     builder.onResolve({ filter: /.*/ }, (args) => adapters.includes(path.basename(args.path)) ? { path: mocks } : undefined);
   } }]
 });
-const css = (await readdir(path.join(root, 'dist/assets'))).find((file) => file.endsWith('.css'));
+const css = (await readdir(path.join(root, 'dist/assets'))).find((file) => /^index-.*\.css$/.test(file));
 if (!css) throw new Error('Run npm run build before renderer verification');
 await copyFile(path.join(root, 'dist/assets', css), path.join(directory, 'test.css'));
 await writeFile(path.join(directory, 'index.html'), `<!doctype html><html><meta charset="utf-8"><link rel="stylesheet" href="test.css"><style>@font-face{font-family:VerifiedChinese;src:local('Microsoft YaHei')}body,.font-serif{font-family:VerifiedChinese!important}body{padding:24px;background:#fdfbf7}</style><body><div id="root"></div><script src="test.js"></script></body></html>`, 'utf8');
