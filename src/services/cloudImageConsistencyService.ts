@@ -4,6 +4,7 @@
  * @output Cloud image consistency analysis and optional repair
  * @pos Service (Cloud Image Diagnostics)
  * @description Compares local image references against cloud manifests and real cloud files, and can repair the cloud side using local state as the source of truth.
+ * @updated 2026-10-26: Reports upload/delete counts and treats unsuccessful uploads and manifest writes as incomplete synchronization.
  * @updated 2026-09-25: Reads and repairs grouped content/theme cloud manifests while comparing the same flattened file set.
  * @updated 2026-03-23: Added explicit cloud consistency check/repair flow so daily sync no longer auto-repairs cloud image state, and aligned diagnostics with the local image manifest instead of recalculating from all records.
  */
@@ -210,6 +211,8 @@ class CloudImageConsistencyService {
         report += `- 本地实际文件数：${analysis.localFiles.length}\n`;
         report += `- 云端图片列表数：${analysis.cloudManifest.length}\n`;
         report += `- 云端实际文件数：${analysis.cloudFiles.length}\n\n`;
+        report += `- 待补传云端文件数：${analysis.localManifestMissingCloudFiles.length}\n`;
+        report += `- 待删除云端多余文件数：${analysis.cloudFilesExtraEntries.length}\n\n`;
 
         const sections: Array<[string, string[]]> = [
             ['本地图片列表里有，但本地文件缺失', analysis.localManifestMissingLocalFiles],
@@ -234,7 +237,7 @@ class CloudImageConsistencyService {
 
         const hasIssues = sections.some(([, list]) => list.length > 0);
         report += hasIssues
-            ? '建议：先确保“修复图片列表”已经执行完成，再按本地状态修复云端图片。\n'
+            ? '建议：先确保“修复图片列表”已经执行完成，再执行“按本地同步云端图片”，补传缺失文件并删除云端多余文件。\n'
             : '本地与云端图片状态一致，当前无需修复。\n';
 
         return { report, analysis };
@@ -281,7 +284,10 @@ class CloudImageConsistencyService {
 
             try {
                 const data = await imageService.readImage(filename);
-                await context.service.uploadImage(filename, data as any);
+                const uploadedSuccessfully = await context.service.uploadImage(filename, data);
+                if (!uploadedSuccessfully) {
+                    throw new Error('云端未确认上传成功');
+                }
                 uploaded.push(filename);
                 cloudFileSet.add(filename);
             } catch (error: any) {
@@ -312,19 +318,23 @@ class CloudImageConsistencyService {
         };
 
         try {
-            await context.service.uploadImageList(finalGroups);
+            const manifestUploaded = await context.service.uploadImageList(finalGroups);
+            if (!manifestUploaded) {
+                throw new Error('云端未确认图片列表更新成功');
+            }
         } catch (error: any) {
             errors.push(`更新云端图片列表失败：${error?.message || '未知错误'}`);
         }
 
-        const unresolved = analysis.localManifest.filter((filename) => !cloudFileSet.has(filename));
+        const unresolved = analysis.localManifest.filter((filename) => !cloudFileSet.has(filename) || !localFileSet.has(filename));
         const success = errors.length === 0 && unresolved.length === 0;
+        const summary = `补传 ${uploaded.length} 个，删除 ${deleted.length} 个`;
 
         return {
             success,
             message: success
-                ? `已按本地状态修复${context.label}图片配置`
-                : `已尝试按本地状态修复${context.label}图片配置，仍有 ${errors.length + unresolved.length} 项未完成`,
+                ? `已按本地同步${context.label}图片：${summary}`
+                : `同步${context.label}图片未完成：${summary}，请查看报告`,
             uploaded,
             deleted,
             manifestEntries: finalManifest,

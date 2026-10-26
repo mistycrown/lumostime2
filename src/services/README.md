@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-26: Cloud image consistency repairs use the rebuilt local reference list as the source of truth: upload missing files, delete cloud extras, and rewrite content/theme manifests. False upload or manifest-write results remain failures; reports retain transfer counts, errors, and unresolved local files for retry.
+
 Update 2026-10-25: Weekly PDF timelines label planned blocks with their explicit plan title or linked todo title. Untitled plans use their activity name when available, otherwise `计划`; actual logs continue to use activity labels.
 
 Update 2026-10-24: Native journal saves encode at most 96 KiB of PDF bytes per call (128 KiB Base64), append sequentially to a unique partial file, then publish the completed file. Bridge calls have a 30-second timeout and partial-file cleanup; selected fonts are retained. The UI distinguishes PDF serialization from native saving and displays byte-based save progress. Regressions cover a 96-page uploaded-font PDF and late bridge responses.

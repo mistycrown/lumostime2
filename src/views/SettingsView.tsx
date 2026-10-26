@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-26: Exposes local-authoritative cloud image synchronization with transfer counts and per-file failures.
  * @updated 2026-10-23: Passes goals and major goals to journal PDF export in data management.
  * @updated 2026-10-10: Uses the dictionary-specific BookA icon for personal words.
  * @updated 2026-10-09: Adds personal dictionary management under Content.
@@ -784,7 +785,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
         return report;
     };
 
-    const handleCleanupCloudImages = async (): Promise<{ message: string; report: string }> => {
+    const handleSyncCloudImages = async (): Promise<{ message: string; report: string }> => {
         const repairResult = await cloudImageConsistencyService.repairUsingLocalState(logs, todos);
         const { report } = await cloudImageConsistencyService.generateReport(logs, todos);
 
@@ -792,7 +793,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
 
         return {
             message: repairResult.message,
-            report
+            report: [
+                repairResult.message,
+                ...repairResult.errors,
+                ...(repairResult.unresolved.length > 0 ? [`未完成的图片：\n${repairResult.unresolved.join('\n')}`] : []),
+                '',
+                report
+            ].join('\n')
         };
     };
 
@@ -1003,7 +1010,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
                 onClearData={onClearData}
                 onCleanupCloudBackups={handleCleanupCloudBackups}
                 onCheckCloudImageConsistency={handleCheckCloudImageConsistency}
-                onCleanupCloudImages={handleCleanupCloudImages}
+                onSyncCloudImages={handleSyncCloudImages}
                 reviewTemplates={reviewTemplates}
                 goals={syncData.goals || []}
                 majorGoals={syncData.majorGoals || []}

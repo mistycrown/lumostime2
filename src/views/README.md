@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-26: Settings routes Data Management's local-authoritative cloud image sync action and includes upload/delete counts and per-file repair errors alongside the refreshed consistency report.
+
 Update 2026-10-23: Settings also forwards current review templates to Data Management so older journal reviews can recover their original question groups when a snapshot is absent.
 
 Update 2026-10-23: Settings passes current goals and major goals into Data Management for the configurable journal PDF exporter; existing Excel/JSON export entry points remain available.

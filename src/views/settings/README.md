@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-26: Data Management names cloud image repair “按本地同步云端图片”, with an explicit upload-missing/delete-extra confirmation. Image maintenance and ZIP import controls are mutually disabled during active work.
+
 Update 2026-10-24: Journal export shows native save percentage separately from the rendered page count so large/custom-font PDFs do not appear stuck at their final page while writing to Android storage.
 
 Update 2026-10-24: Journal PDF export matches adjacent settings cards with monochrome checkboxes and unchanged shared dropdown styling. Thirteen switches select rendered page groups: month/week side reviews follow their overview pages, and daily plans, full logs, routines, summary/sticker and guidance follow one daily-page switch. Unlocked appearance defaults to the theme color and offers the shared built-in/custom color palette plus independent print/content font dropdowns.

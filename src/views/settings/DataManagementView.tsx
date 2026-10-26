@@ -1,6 +1,7 @@
 /**
  * @file DataManagementView.tsx
  * @description 数据管理页面 - 备份、导入、导出、清理等
+ * @updated 2026-10-26: Labels cloud image repair as local-authoritative synchronization and serializes image maintenance controls.
  * @updated 2026-10-23: Adds date- and section-selectable journal PDF export alongside Excel.
  * @updated 2026-07-21: Replaced backup and image-list native confirmations with in-app confirmation modals and dark-mode image controls.
  * @updated 2026-03-24: 图片备份支持自定义每包张数的分块导出，降低移动端导出时的内存压力。
@@ -49,7 +50,7 @@ interface DataManagementViewProps {
     reviewTemplates?: ReviewTemplate[];
     onCleanupCloudBackups: () => Promise<void>;
     onCheckCloudImageConsistency: () => Promise<string>;
-    onCleanupCloudImages: () => Promise<{ message: string; report: string }>;
+    onSyncCloudImages: () => Promise<{ message: string; report: string }>;
 }
 
 export const DataManagementView: React.FC<DataManagementViewProps> = ({
@@ -76,7 +77,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     reviewTemplates = [],
     onCleanupCloudBackups,
     onCheckCloudImageConsistency,
-    onCleanupCloudImages
+    onSyncCloudImages
 }) => {
     const isNativePlatform = Capacitor.isNativePlatform();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -91,15 +92,16 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
     const [isCleaningBackups, setIsCleaningBackups] = useState(false);
     const [isBackupCleanupConfirmOpen, setIsBackupCleanupConfirmOpen] = useState(false);
     const [isCheckingCloudImages, setIsCheckingCloudImages] = useState(false);
-    const [isCleaningCloudImages, setIsCleaningCloudImages] = useState(false);
+    const [isSyncingCloudImages, setIsSyncingCloudImages] = useState(false);
     const [cloudConsistencyReport, setCloudConsistencyReport] = useState('');
-    const [isCloudImageCleanupConfirmOpen, setIsCloudImageCleanupConfirmOpen] = useState(false);
+    const [isCloudImageSyncConfirmOpen, setIsCloudImageSyncConfirmOpen] = useState(false);
     const [isExportingImages, setIsExportingImages] = useState(false);
     const [isImportingImages, setIsImportingImages] = useState(false);
     const [imageExportProgress, setImageExportProgress] = useState<ImageExportProgress | null>(null);
     const [imageExportSummary, setImageExportSummary] = useState<ImageExportSummary | null>(null);
     const [imageChunkSizeInput, setImageChunkSizeInput] = useState('');
     const lastImageExportProgressAt = useRef(0);
+    const isImageMaintenanceBusy = isCheckingImages || isCleaningImages || isCheckingCloudImages || isSyncingCloudImages || isImportingImages;
 
     // Excel Export State
     const [excelStartDate, setExcelStartDate] = useState(new Date());
@@ -389,17 +391,17 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
         }
     };
 
-    const handleConfirmCloudImageCleanup = async () => {
-        setIsCloudImageCleanupConfirmOpen(false);
-        setIsCleaningCloudImages(true);
+    const handleConfirmCloudImageSync = async () => {
+        setIsCloudImageSyncConfirmOpen(false);
+        setIsSyncingCloudImages(true);
         try {
-            const result = await onCleanupCloudImages();
+            const result = await onSyncCloudImages();
             setCloudConsistencyReport(result.report);
         } catch (error: any) {
-            console.error('清理云端多余图片失败:', error);
-            onToast('error', `清理失败: ${error.message}`);
+            console.error('同步云端图片失败:', error);
+            onToast('error', `同步失败: ${error.message}`);
         } finally {
-            setIsCleaningCloudImages(false);
+            setIsSyncingCloudImages(false);
         }
     };
 
@@ -593,12 +595,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                     <div className="pt-4 border-t border-stone-100 space-y-3">
                         <p className="text-xs font-bold text-stone-400 uppercase tracking-widest px-1">云端图片一致性</p>
                         <p className="text-sm text-stone-500 leading-relaxed">
-                            以本地图片列表和本地实际图片文件为准，检查云端图片列表与实际文件是否一致，并可清理云端多余图片。
+                            重建图片列表后，以本地列表为准对照云端，补传缺失图片、删除多余图片，并更新云端图片列表。
                         </p>
 
                         <button
                             onClick={handleCheckCloudConsistency}
-                            disabled={isCheckingCloudImages}
+                            disabled={isImageMaintenanceBusy}
                             className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                         >
                             {isCheckingCloudImages ? (
@@ -609,25 +611,25 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                             ) : (
                                 <>
                                     <Search size={18} />
-                                    检查本地和云端数据一致性
+                                    检查本地和云端图片一致性
                                 </>
                             )}
                         </button>
 
                         <button
-                            onClick={() => setIsCloudImageCleanupConfirmOpen(true)}
-                            disabled={isCleaningCloudImages}
+                            onClick={() => setIsCloudImageSyncConfirmOpen(true)}
+                            disabled={isImageMaintenanceBusy}
                             className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                         >
-                            {isCleaningCloudImages ? (
+                            {isSyncingCloudImages ? (
                                 <>
                                     <div className="w-4 h-4 border-2 border-stone-400 border-t-transparent rounded-full animate-spin" />
-                                    清理中...
+                                    同步中...
                                 </>
                             ) : (
                                 <>
-                                    <Trash2 size={18} />
-                                    清除云端多余图片
+                                    <RefreshCw size={18} />
+                                    按本地同步云端图片
                                 </>
                             )}
                         </button>
@@ -798,7 +800,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
                             <button
                                 onClick={() => imageZipInputRef.current?.click()}
-                                disabled={isImportingImages}
+                                disabled={isImageMaintenanceBusy}
                                 className="flex items-center justify-center gap-2 py-3 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                             >
                                 {isImportingImages ? (
@@ -853,7 +855,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                         <div className="grid grid-cols-1 gap-3">
                             <button
                                 onClick={() => setIsFixImageListConfirmOpen(true)}
-                                disabled={isCheckingImages}
+                                disabled={isImageMaintenanceBusy}
                                 className="data-image-action data-image-primary-action flex items-center justify-center gap-2 w-full py-3 bg-blue-500 text-white rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600"
                             >
                                 {isCheckingImages ? (
@@ -871,7 +873,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
                             <button
                                 onClick={handleCheckUnreferencedImages}
-                                disabled={isCheckingImages}
+                                disabled={isImageMaintenanceBusy}
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                             >
                                 {isCheckingImages ? (
@@ -889,7 +891,7 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
 
                             <button
                                 onClick={() => setIsImageCleanupConfirmOpen(true)}
-                                disabled={isCleaningImages}
+                                disabled={isImageMaintenanceBusy}
                                 className="flex items-center justify-center gap-2 w-full py-3 bg-white border border-stone-200 text-stone-800 rounded-xl font-medium active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed hover:bg-stone-50"
                             >
                                 {isCleaningImages ? (
@@ -949,12 +951,12 @@ export const DataManagementView: React.FC<DataManagementViewProps> = ({
                 type="danger"
             />
             <ConfirmModal
-                isOpen={isCloudImageCleanupConfirmOpen}
-                onClose={() => setIsCloudImageCleanupConfirmOpen(false)}
-                onConfirm={handleConfirmCloudImageCleanup}
-                title="确认清理云端多余图片"
+                isOpen={isCloudImageSyncConfirmOpen}
+                onClose={() => setIsCloudImageSyncConfirmOpen(false)}
+                onConfirm={handleConfirmCloudImageSync}
+                title="按本地同步云端图片"
                 description="将以本地图片列表和本地实际图片文件为准，补传云端缺失图片、删除云端多余图片，并重写云端图片列表。此操作不可撤销。"
-                confirmText="继续清理"
+                confirmText="开始同步"
                 cancelText="取消"
                 type="danger"
             />
