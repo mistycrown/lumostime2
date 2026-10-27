@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatRetry.ts
+ * @updated 2026-10-27: Imports the Dream month parser directly so retries cannot omit this dependency.
  * @updated 2026-10-09: Rolls node metadata back atomically with logs before resending.
  * @updated 2026-10-09: Resends from a post-commit effect so the send callback sees restored data.
  * @input Assistant message retry state and rollback callbacks
@@ -9,11 +10,12 @@
  * @updated 2026-09-22: Extracted message retry handling.
  */
 import { useEffect, useRef, useState } from 'react';
+import { parseDreamMonthSelection } from './AIBackfillChatDreamFlow';
 
 interface PendingRetry {
   input: string;
   options: { replaceMessageId: string; retrySourceUserMessageId?: string };
-  selectedMonth?: unknown;
+  selectedMonth?: ReturnType<typeof parseDreamMonthSelection>;
 }
 
 export function useAIBackfillChatRetry(options: Record<string, any>) {
@@ -30,7 +32,6 @@ export function useAIBackfillChatRetry(options: Record<string, any>) {
     logs,
     nodes,
     updateNodeRecords,
-    parseDreamMonthSelection,
     refreshAssistantMemorySnapshot,
     refreshAssistantReminderSnapshot,
     resetAssistantPartRevealState,

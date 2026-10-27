@@ -1,5 +1,6 @@
 /**
  * @file useHardwareBackButton.ts
+ * @updated 2026-10-27: Reads weekly/monthly period setters before clearing review overlays on Android back.
  * @updated 2026-05-13: Reordered overlay back priority so collection-launched log/todo details close before the underlying settings stack unwinds, keeping Android back aligned with on-screen close buttons.
  * @updated 2026-05-12: Routed todo-detail hardware back presses through the shared nested detail-history stack so child-task pages return to their parent detail before leaving the todo surface.
  * @input NavigationContext (all modal/view states including settings submenu hierarchy, search origin state, and custom filter overlay state)
@@ -41,7 +42,9 @@ export const useHardwareBackButton = () => {
         isDailyReviewOpen, isDailyNewspaperOpen, isWeeklyNewspaperOpen, isMonthlyNewspaperOpen, setIsDailyReviewOpen, setCurrentReviewDate, setCurrentDailyReviewInitialTab, setIsDailyNewspaperOpen, setCurrentDailyNewspaperDate, setIsWeeklyNewspaperOpen, setCurrentWeeklyNewspaperStart, setCurrentWeeklyNewspaperEnd, setIsMonthlyNewspaperOpen, setCurrentMonthlyNewspaperStart, setCurrentMonthlyNewspaperEnd,
         isOnThisDayOpen, setIsOnThisDayOpen, setCurrentOnThisDayDate,
         isWeeklyReviewOpen, setIsWeeklyReviewOpen, setCurrentWeeklyReviewInitialTab,
+        setCurrentWeeklyReviewStart, setCurrentWeeklyReviewEnd,
         isMonthlyReviewOpen, setIsMonthlyReviewOpen, setCurrentMonthlyReviewInitialTab,
+        setCurrentMonthlyReviewStart, setCurrentMonthlyReviewEnd,
         isAchievementOpen, setIsAchievementOpen,
         isStatsFullScreen, setIsStatsFullScreen,
         isTodoManaging, setIsTodoManaging,

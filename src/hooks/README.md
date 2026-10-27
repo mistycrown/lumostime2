@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-10-27: `useHardwareBackButton` obtains weekly/monthly review period setters from navigation context, clears dates and the initial tab, and closes the review above Settings without exiting the app.
+
 Update 2026-10-18: `useTodoQuickActions` saves abandonment/restoration against the latest todo record through the shared save pipeline. `useTodoManager` rejects focus starts and optional focus-log completion for abandoned tasks; the existing recurring auto-plan cleanup applies when abandoning a series.
 
 Update 2026-10-18: `useAppInitialization` syncs app-awareness bindings through the persistent master switch. `useAppAwarenessRuntime` ignores new detections and cancels pending workflows while disabled, retaining active activity timers and individual settings. Verify with `node scripts/test-app-awareness.mjs`.

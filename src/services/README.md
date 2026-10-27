@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-27: WebDAV native downloads check and create parent directories before transferring backups, image manifests and images. Existing directories are reused, concurrent creation is accepted only after verification, and real filesystem failures stop the download.
+
 Update 2026-10-26: AI todo tools and quick-add support per-date application reminders, partial edits, explicit cancellation and opt-in system calendar sync. `assistantTodoReminderService.ts` reads native permissions without prompting and reports blocked sync/notifications. Todo dictionaries preserve existing settings; foreground routing converts an unambiguous legacy AI reminder into a todo write while retaining independent assistant reminders. Invalid/past settings fail atomically; undo restores the original reminders. Native scheduling still runs only after the existing todo persistence path succeeds.
 
 Update 2026-10-26: Cloud image consistency repairs use the rebuilt local reference list as the source of truth: upload missing files, delete cloud extras, and rewrite content/theme manifests. False upload or manifest-write results remain failures; reports retain transfer counts, errors, and unresolved local files for retry.

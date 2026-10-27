@@ -1,5 +1,6 @@
 /**
  * @file webdavService.ts
+ * @updated 2026-10-27: Ensures native download parent directories exist without hiding filesystem failures.
  * @input WebDAV Server Credentials, Local Data
  * @output Remote Storage Operations (Upload/Download)
  * @pos Service (Data Synchronization)
@@ -62,7 +63,29 @@ export class WebDAVService {
     }
 
     private downloadNativeFile(options: Parameters<typeof Filesystem.downloadFile>[0]) {
-        return this.requestQueue.run(() => Filesystem.downloadFile(options));
+        return this.requestQueue.run(async () => {
+            const parentPath = options.path.slice(0, Math.max(0, options.path.lastIndexOf('/')));
+            if (parentPath) {
+                const directory = { path: parentPath, directory: options.directory };
+                const directoryExists = async (): Promise<boolean> => {
+                    try {
+                        return (await Filesystem.stat(directory)).type === 'directory';
+                    } catch {
+                        return false;
+                    }
+                };
+
+                if (!await directoryExists()) {
+                    try {
+                        await Filesystem.mkdir({ ...directory, recursive: true });
+                    } catch (error) {
+                        // Another download may have created it after our stat call.
+                        if (!await directoryExists()) throw error;
+                    }
+                }
+            }
+            return Filesystem.downloadFile(options);
+        });
     }
 
     private buildNativeTempPath(filename: string): string {

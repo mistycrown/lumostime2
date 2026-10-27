@@ -1,5 +1,6 @@
 /**
  * @file webdavService.test.ts
+ * @updated 2026-10-27: Covers missing/existing download directories, creation races and real filesystem failures.
  * @input Native HTTP/filesystem adapters and a local WebDAV server rejecting invalid paths
  * @output Regression coverage for canonical backup/image paths, UTF-8 uploads, and fresh reads
  * @pos Test (Cloud Sync)
@@ -17,6 +18,8 @@ const adapters = vi.hoisted(() => ({
   sendRequest: vi.fn(),
   setDataSerializer: vi.fn(),
   downloadFile: vi.fn(),
+  stat: vi.fn(),
+  mkdir: vi.fn(),
   readFile: vi.fn(),
   deleteFile: vi.fn()
 }));
@@ -28,6 +31,8 @@ vi.mock('@awesome-cordova-plugins/http', () => ({
 vi.mock('@capacitor/filesystem', () => ({
   Filesystem: {
     downloadFile: adapters.downloadFile,
+    stat: adapters.stat,
+    mkdir: adapters.mkdir,
     readFile: adapters.readFile,
     deleteFile: adapters.deleteFile
   },
@@ -117,6 +122,8 @@ beforeEach(() => {
     return { status: 201 };
   });
   adapters.downloadFile.mockResolvedValue({ path: 'temp/download.json' });
+  adapters.stat.mockResolvedValue({ type: 'directory' });
+  adapters.mkdir.mockResolvedValue(undefined);
   adapters.readFile.mockResolvedValue({ data: JSON.stringify(backup) });
   adapters.deleteFile.mockResolvedValue(undefined);
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -140,6 +147,56 @@ const configure = (url: string) => {
 };
 
 describe('native WebDAV paths', () => {
+  it.each(['backup', 'manifest', 'image'])('creates a missing parent before a native %s download', async (kind) => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    const service = configure('https://dav.jianguoyun.com/dav/Lumostime');
+    const directories = new Set<string>();
+    adapters.stat.mockImplementation(async ({ path }) => {
+      if (!directories.has(path)) throw new Error('ENOENT');
+      return { type: 'directory' };
+    });
+    adapters.mkdir.mockImplementation(async ({ path }) => { directories.add(path); });
+    adapters.downloadFile.mockImplementation(async ({ path }) => {
+      if (!directories.has(path.slice(0, path.lastIndexOf('/')))) throw new Error('ENOENT');
+      return { path };
+    });
+    adapters.readFile.mockResolvedValue({ data: JSON.stringify({ images: ['photo.webp'], timestamp: 123 }) });
+
+    if (kind === 'backup') await service.downloadData('backups/safety.json');
+    else if (kind === 'manifest') await service.downloadImageList();
+    else await service.downloadImage('photo.webp');
+
+    expect(adapters.mkdir).toHaveBeenCalledWith({
+      path: kind === 'image' ? 'images' : 'temp', directory: 'DATA', recursive: true
+    });
+    expect(adapters.mkdir.mock.invocationCallOrder[0]).toBeLessThan(adapters.downloadFile.mock.invocationCallOrder[0]);
+  });
+
+  it('reuses an existing download directory without calling mkdir', async () => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    await configure('https://example.test/dav').downloadData('backups/safety.json');
+    expect(adapters.stat).toHaveBeenCalledWith({ path: 'temp', directory: 'DATA' });
+    expect(adapters.mkdir).not.toHaveBeenCalled();
+  });
+
+  it('accepts concurrent directory creation only after verifying the directory', async () => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    adapters.stat.mockRejectedValueOnce(new Error('ENOENT')).mockResolvedValue({ type: 'directory' });
+    adapters.mkdir.mockRejectedValueOnce(new Error('already exists'));
+    await expect(configure('https://example.test/dav').downloadData('backups/safety.json')).resolves.toEqual(backup);
+    expect(adapters.stat).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['missing', 'file'])('does not download when directory creation fails and the path is %s', async (kind) => {
+    adapters.isNativePlatform.mockReturnValue(true);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    if (kind === 'missing') adapters.stat.mockRejectedValue(new Error('ENOENT'));
+    else adapters.stat.mockResolvedValue({ type: 'file' });
+    adapters.mkdir.mockRejectedValue(new Error('permission denied'));
+    await expect(configure('https://example.test/dav').downloadData('backups/safety.json')).rejects.toThrow('permission denied');
+    expect(adapters.downloadFile).not.toHaveBeenCalled();
+  });
+
   it('blocks native backup reads after a manifest PUT resolves with status 503', async () => {
     adapters.isNativePlatform.mockReturnValue(true);
     const service = configure('https://dav.jianguoyun.com/dav/Lumostime');
