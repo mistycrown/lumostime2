@@ -1,5 +1,6 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-27: Passes plan persistence into date quick actions for all todo schedule views.
  * @updated 2026-10-18: Shows abandonment with a date icon and orders closed tasks by their completion/abandonment date.
  * @updated 2026-10-18: Wires date-reminder editing into quick-action cards.
  * @updated 2026-10-16: Groups completed recurring occurrences by day and retains dates in quick actions.
@@ -102,6 +103,7 @@ interface TodoViewProps {
   onStartFocus: (todo: TodoItem) => void;
   onDuplicateTodo: (todo: TodoItem, options: TodoDuplicateOptions) => void;
   onSaveTodo: (todo: TodoItem) => void;
+  onSavePlan?: (log: Log) => void;
   onDeleteTodo: (id: string) => void;
   autoLinkRules?: AutoLinkRule[];
 }
@@ -1068,7 +1070,7 @@ const WeekTodoLineItem: React.FC<{
   );
 };
 
-export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onDeleteTodo, autoLinkRules = [] }) => {
+export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, activityCategories, scopes, onToggleTodo, onEditTodo, onAddTodo, onStartFocus, onDuplicateTodo, onSaveTodo, onSavePlan, onDeleteTodo, autoLinkRules = [] }) => {
   const showCalendarLunar = useCalendarLunarDisplay();
   const calendarNumberStyle = useCalendarNumberStyle();
   const normalizedTodoCategories = useMemo(() => ensureQuickTodoCategory(categories), [categories]);
@@ -2300,6 +2302,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
       todoCategories={standardTodoCategories}
       onMoveDate={handleQuickActionMove}
       onSelectDate={handleQuickActionSelectDate}
+      onSavePlan={onSavePlan}
       onClearDate={handleQuickActionClearDate}
       onOpenDetail={handleQuickActionOpenDetail}
       onComplete={handleQuickActionComplete}

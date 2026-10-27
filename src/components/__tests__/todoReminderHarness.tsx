@@ -1,5 +1,6 @@
 /**
  * @file todoReminderHarness.tsx
+ * @updated 2026-10-27: Verifies date follow-up actions, persisted linked plans, validation and nested dismissal in details and quick sheets.
  * @input Real todo detail, reminder/date dialogs, DataProvider and isolated storage
  * @output Interaction, persistence, lifecycle and responsive screenshot checkpoints
  * @pos Renderer test harness; only system permissions and unrelated visual blocks are simulated
@@ -25,7 +26,7 @@ import { buildTodoReminderSnapshot } from '../../utils/todoReminderUtils';
 import { runRegisteredHardwareBackHandler } from '../../utils/hardwareBackHandlerStack';
 import { todoReminderService } from '../../services/todoReminderService';
 import { useTodoReminderNavigation } from '../../hooks/useTodoReminderNavigation';
-import type { TodoItem } from '../../types';
+import type { Log, TodoItem } from '../../types';
 
 declare global {
   interface Window {
@@ -93,6 +94,7 @@ function Screen() {
   const [epoch, setEpoch] = useState(0);
   const [mode, setMode] = useState<'detail' | 'quick'>('detail');
   const save = (saved: TodoItem) => data.setTodos((previous) => previous.map((todo) => todo.id === saved.id ? normalizeTodoScheduleFields(saved) : todo));
+  const savePlan = (log: Log) => data.setLogs((previous) => [...previous, log]);
   const actions = useTodoQuickActions({ todos: data.todos, onSaveTodo: save, onEditTodo: noop, onDeleteTodo: noop });
   showQuickActions = () => { actions.openQuickActions(data.todos[0]); setMode('quick'); };
   showDetail = () => { actions.closeQuickActions(true); setMode('detail'); setEpoch((value) => value + 1); };
@@ -108,6 +110,7 @@ function Screen() {
     <TodoQuickActionsModal isOpen={Boolean(actions.quickActionTodo)} todo={actions.quickActionTodo}
     todos={data.todos} todoCategories={[category]} openedAt={actions.quickActionOpenedAt}
     onMoveDate={actions.handleQuickActionMove} onSelectDate={actions.handleQuickActionSelectDate} onClearDate={actions.handleQuickActionClearDate}
+    onSavePlan={savePlan}
     onOpenDetail={showDetail} onComplete={actions.handleQuickActionComplete} onUndoComplete={actions.handleQuickActionUndoComplete}
     onTogglePin={actions.handleQuickActionTogglePin} onEditMaybeDates={actions.handleQuickActionMaybeDates}
     onSkipNextRecurrence={actions.handleQuickActionSkipNextRecurrence} onSkipToMaybeDate={actions.handleQuickActionSkipToMaybeDate}
@@ -118,8 +121,8 @@ function Screen() {
       <span>记录</span><span>待办</span><span>脉络</span><span>档案</span><span>索引</span>
     </nav></>;
   return <TodoDetailModal key={epoch} initialTodo={data.todos[0]} todos={data.todos} currentCategory={category}
-    todoCategories={[category]} logs={[]} categories={[]} scopes={[]} displayMode="page" onClose={noop}
-    onSave={save} />;
+    todoCategories={[category]} logs={data.logs} categories={[]} scopes={[]} displayMode="page" onClose={noop}
+    onSave={save} onLogUpdate={savePlan} />;
 }
 
 const passed: string[] = [];
@@ -429,6 +432,86 @@ async function run() {
   passed.push('Calendar default-off, denied/retried permission, calendar-only saving, revocation recovery, error display, independent sources and disabling sync');
   check(!persistenceError, persistenceError);
   check(scheduleCalls > 5, 'Committed writes must reconcile reminders');
+
+  const input = async (label: string, value: string) => {
+    const target = document.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    check(target?.inputMode === 'numeric', 'Plan time inputs must use numeric entry');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(target, value);
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    await delay();
+  };
+  const savedPlans = async () => (await storageRepository.getData<Log[]>('logs')) || [];
+  for (const surface of ['detail', 'quick'] as const) {
+    for (const field of ['scheduledDate', 'deadlineDate'] as const) {
+      replace({ scheduledDate: future(3), deadlineDate: future(5), reminders: undefined });
+      await delay();
+      if (surface === 'detail') showDetail(); else showQuickActions();
+      await delay(350);
+      if (surface === 'detail') await click('细节');
+      await click(surface === 'detail' ? (field === 'scheduledDate' ? '选择安排日期' : '选择截止日期')
+        : (field === 'scheduledDate' ? '安排到' : '截止到'));
+      const date = new Date(todos[0][field]! + 'T12:00:00');
+      date.setDate(date.getDate() + 1);
+      const targetDate = formatDateKey(date);
+      const opposite = field === 'scheduledDate' ? 'deadlineDate' : 'scheduledDate';
+      const oppositeDate = todos[0][opposite];
+      const selected = document.querySelector<HTMLButtonElement>('.date-picker-selected')!;
+      check(selected?.nextElementSibling instanceof HTMLButtonElement, 'Selected day needs its next calendar day');
+      (selected.nextElementSibling as HTMLButtonElement).click();
+      await until(() => button('添加当天计划块'), 'selected-date action panel');
+      await until(async () => (await persisted())?.[field] === targetDate, 'date persistence');
+      check((await persisted())?.[opposite] === oppositeDate, 'Selecting a date must preserve the other field');
+      const actionPanel = document.querySelector('#todo-date-quick-actions-title')!.closest('[role="dialog"]')!;
+      const rect = actionPanel.getBoundingClientRect();
+      check(actionPanel.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)), 'Date actions must be above isolated pages and navigation');
+      if (surface === 'quick' && field === 'scheduledDate') await capture('todo-date-actions-mobile', 390, 844);
+      await click('添加当天计划块');
+      if (surface === 'quick' && field === 'scheduledDate') {
+        await input('计划开始时间', '2460');
+        await input('计划结束时间', '1000');
+        await click('保存计划块');
+        check(document.querySelector('[role="alert"]')?.textContent?.includes('有效'), 'Invalid HHMM must be rejected');
+        await input('计划开始时间', '1100');
+        await click('保存计划块');
+        check(document.querySelector('[role="alert"]')?.textContent?.includes('晚于'), 'Reversed time ranges must be rejected');
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await delay();
+        check(button('添加当天计划块'), 'Escape must return to the date actions');
+        await click('添加当天计划块');
+        check(runRegisteredHardwareBackHandler(), 'Plan editor must handle Android back');
+        await delay();
+        check(button('添加当天计划块'), 'Android back must preserve date actions');
+        await click('添加当天计划块');
+      }
+      await input('计划开始时间', '0915');
+      await input('计划结束时间', '1045');
+      if (surface === 'quick' && field === 'scheduledDate') {
+        await capture('todo-date-plan-mobile');
+        document.documentElement.dataset.themeMode = 'dark';
+        await capture('todo-date-plan-dark');
+        document.documentElement.dataset.themeMode = 'light';
+      }
+      const count = (await savedPlans()).length;
+      await click('保存计划块');
+      await until(async () => (await savedPlans()).length === count + 1, 'plan persistence');
+      const plan = (await savedPlans()).at(-1)!;
+      check(plan.linkedTodoId === task.id && plan.isPlanned && plan.duration === 5400, 'Plan must link to the current todo and preserve duration');
+      check(formatDateKey(new Date(plan.startTime)) === targetDate && new Date(plan.startTime).getHours() === 9
+        && new Date(plan.startTime).getMinutes() === 15 && new Date(plan.endTime).getHours() === 10, 'Plan must use selected local date and clock times');
+      check(button('继续添加计划块'), 'Saved plan must return to date actions');
+      await click(field === 'scheduledDate' ? '设置安排日期提醒' : '设置截止日期提醒');
+      await setTime('08:45');
+      await click('保存提醒');
+      await until(async () => (await persisted())?.reminders?.[field]?.time === '08:45', 'follow-up reminder persistence');
+      check(!(await persisted())?.reminders?.[opposite], 'Follow-up reminders must remain independent');
+      check(document.querySelector('#todo-date-quick-actions-title'), 'Saved reminder must return to date actions');
+      check(runRegisteredHardwareBackHandler(), 'Date actions must consume Android back');
+      await delay();
+      check(!document.querySelector('#todo-date-quick-actions-title'), 'Back must close only date actions');
+      if (surface === 'quick') check(button('安排到'), 'The quick sheet must remain open');
+      passed.push(`${surface}/${field}: selected date and linked plan persistence, independent reminder and nested back`);
+    }
+  }
   window.__todoReminderResult = { passed };
 }
 

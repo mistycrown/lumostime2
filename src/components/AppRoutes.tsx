@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-27: Persists date-created plan blocks from both todo and timeline quick actions.
  * @updated 2026-10-18: Wires abandonment into shared quick actions outside the todo view.
  * @updated 2026-10-18: Enables reminder editing from timeline-launched todo quick actions.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
@@ -948,6 +949,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     todoCategories={getRealTodoCategories(todoCategories)}
                     onMoveDate={handleQuickActionMove}
                     onSelectDate={handleQuickActionSelectDate}
+                    onSavePlan={(log) => setLogs((previous) => [...previous, log])}
                     onClearDate={handleQuickActionClearDate}
                     onOpenDetail={handleQuickActionOpenDetail}
                     onComplete={handleQuickActionComplete}
@@ -1140,6 +1142,7 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onStartFocus={handleStartTodoFocus}
                     onDuplicateTodo={handleDuplicateTodo}
                     onSaveTodo={handleSaveTodo}
+                    onSavePlan={(log) => setLogs((previous) => [...previous, log])}
                     onDeleteTodo={handleDeleteTodo}
                     autoLinkRules={autoLinkRules}
                 />

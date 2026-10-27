@@ -1,5 +1,6 @@
 /**
  * @file check-todo-reminder-types.mjs
+ * @updated 2026-10-27: Includes date action dialogs and plan-save integrations.
  * @input Project TypeScript configuration and reminder implementation entry points
  * @output Type diagnostics in reminder modules and their directly changed integration files
  * @pos Focused type verification; existing diagnostics in other modules remain outside its scope
@@ -11,6 +12,8 @@ import path from 'node:path';
 
 const files = [
   'src/components/TodoReminderButton.tsx', 'src/components/TodoReminderModal.tsx',
+  'src/components/TodoDateQuickActionsModal.tsx', 'src/components/TodoPlanBlockQuickAddModal.tsx',
+  'src/hooks/useTodoDateDialog.ts', 'src/views/TodoView.tsx', 'src/components/AppRoutes.tsx',
   'src/components/TodoDetailModal.tsx', 'src/components/__tests__/todoReminderHarness.tsx',
   'src/components/TodoQuickActionsModal.tsx', 'src/components/TodoQuickActionsModal.test.tsx',
   'src/hooks/useTodoQuickActions.ts', 'src/hooks/useTodoQuickActions.test.ts',

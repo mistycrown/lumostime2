@@ -1,5 +1,6 @@
 /**
  * @file TodoDetailModal.tsx
+ * @updated 2026-10-27: Shares date-scoped quick plan/reminder actions with the list sheet.
  * @updated 2026-10-18: Uses concise abandon/restore controls and icon/date abandonment markers for subtasks.
  * @updated 2026-10-17: Adds independent reminder controls beside arranged and deadline dates.
  * @updated 2026-10-16: Preserves occurrence history on autosave and labels series completion explicitly.
@@ -61,6 +62,7 @@ import { formatDateKey, formatMonthlyDayInput, getTodayDateKey, matchesRecurrenc
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { TodoReminderButton } from './TodoReminderButton';
 import { TodoReminderModal } from './TodoReminderModal';
+import { TodoDateQuickActionsModal } from './TodoDateQuickActionsModal';
 import { normalizeTodoReminders } from '../utils/todoReminderUtils';
 import { DataCollectionSelector } from './DataCollectionSelector';
 import {
@@ -370,6 +372,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     initialRecurringPlan?.horizonCount ?? DEFAULT_RECURRING_PLAN_HORIZON_COUNT
   ));
   const [activeDatePicker, setActiveDatePicker] = useState<DatePickerField>(null);
+  const [quickDateActions, setQuickDateActions] = useState<{ field: TodoReminderField; date: string } | null>(null);
   const parsedRecurrenceMonthDays = useMemo(
     () => parseMonthlyDayInput(recurrenceMonthDaysInput),
     [recurrenceMonthDaysInput]
@@ -710,12 +713,18 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     switch (activeDatePicker) {
       case 'scheduledDate':
         setScheduledDate(value);
+        if (persistedTodo && !isCompleted && !abandonedAt && title.trim()) {
+          setQuickDateActions({ field: 'scheduledDate', date: value });
+        }
         if (recurrenceFrequency !== 'none') {
           clearRecurrence();
         }
         break;
       case 'deadlineDate':
         setDeadlineDate(value);
+        if (persistedTodo && !isCompleted && !abandonedAt && title.trim()) {
+          setQuickDateActions({ field: 'deadlineDate', date: value });
+        }
         if (recurrenceFrequency !== 'none') {
           clearRecurrence();
         }
@@ -1624,6 +1633,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setActiveDatePicker('scheduledDate')}
+                      aria-label="选择安排日期"
                       className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
                     >
                       {formatDateFieldValue(scheduledDate)}
@@ -1656,6 +1666,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveDatePicker('deadlineDate')}
+                    aria-label="选择截止日期"
                     className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
                   >
                     {formatDateFieldValue(deadlineDate)}
@@ -2223,6 +2234,23 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         }}
         onClose={() => setActiveDatePicker(null)}
       />
+      {quickDateActions && persistedTodo && (
+        <TodoDateQuickActionsModal
+          key={`${persistedTodo.id}-${quickDateActions.field}-${quickDateActions.date}`}
+          date={quickDateActions.date}
+          field={quickDateActions.field}
+          todo={{ ...buildTodoPayload(), id: persistedTodo.id }}
+          onSavePlan={onLogUpdate}
+          reminder={effectiveReminders?.[quickDateActions.field]}
+          onSaveReminder={(setting) => setReminders((previous) => {
+            const next = { ...(previous || {}) };
+            if (setting) next[quickDateActions.field] = setting;
+            else delete next[quickDateActions.field];
+            return Object.keys(next).length ? next : undefined;
+          })}
+          onClose={() => setQuickDateActions(null)}
+        />
+      )}
     </div >
   );
 };

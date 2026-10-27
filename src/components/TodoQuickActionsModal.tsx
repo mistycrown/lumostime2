@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.tsx
+ * @updated 2026-10-27: Keeps selected arrange/deadline dates open for linked plan blocks and independent reminders.
  * @updated 2026-10-18: Uses icon/date abandonment metadata and places abandon/restore beside delete.
  * @updated 2026-10-18: Portals all quick-action states to the body so isolated todo pages cannot place them below navigation.
  * @updated 2026-10-18: Adds independent reminder bells to arranged/deadline card headers and reuses the numeric time editor.
@@ -45,7 +46,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowRightLeft, Ban, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, RotateCcw, SkipForward, Trash2, X } from 'lucide-react';
-import { TodoCategory, TodoItem, TodoReminderField, TodoReminderSetting } from '../types';
+import { Log, TodoCategory, TodoItem, TodoReminderField, TodoReminderSetting } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
 import { getQuickActionTodoNote, isTodoQuickActionInteractionGuardActive } from '../hooks/useTodoQuickActions';
@@ -54,6 +55,7 @@ import { IconRenderer } from './IconRenderer';
 import { TodoDatePickerModal } from './TodoDatePickerModal';
 import { TodoReminderButton } from './TodoReminderButton';
 import { TodoReminderModal } from './TodoReminderModal';
+import { TodoDateQuickActionsModal } from './TodoDateQuickActionsModal';
 import { normalizeTodoReminders } from '../utils/todoReminderUtils';
 import { TodoParentPickerModal } from './TodoParentPickerModal';
 import { canTodoLinkToParent } from '../utils/todoParentLinkUtils';
@@ -68,7 +70,8 @@ interface TodoQuickActionsModalProps {
   todos?: TodoItem[];
   onLinkParent?: (parentTodoId: string) => void;
   onMoveDate: (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => void;
-  onSelectDate: (type: 'scheduled' | 'deadline', dateKey: string) => void;
+  onSelectDate: (type: 'scheduled' | 'deadline', dateKey: string, keepOpen?: boolean) => void;
+  onSavePlan?: (log: Log) => void;
   onClearDate: (type: 'scheduled' | 'deadline') => void;
   onOpenDetail: () => void;
   onComplete: (dateKey?: string) => void;
@@ -100,6 +103,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   onLinkParent,
   onMoveDate,
   onSelectDate,
+  onSavePlan,
   onClearDate,
   onOpenDetail,
   onComplete,
@@ -129,6 +133,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   const [isMaybePickerOpen, setIsMaybePickerOpen] = useState(false);
   const [datePickerType, setDatePickerType] = useState<'scheduled' | 'deadline' | null>(null);
   const [reminderField, setReminderField] = useState<TodoReminderField | null>(null);
+  const [quickDateActions, setQuickDateActions] = useState<{ field: TodoReminderField; date: string } | null>(null);
   const [isSkipToPickerOpen, setIsSkipToPickerOpen] = useState(false);
   const [isCompletionPickerOpen, setIsCompletionPickerOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -148,6 +153,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
     setIsMaybePickerOpen(false);
     setDatePickerType(null);
     setReminderField(null);
+    setQuickDateActions(null);
     setIsSkipToPickerOpen(false);
     setIsCompletionPickerOpen(false);
     setIsEditingTitle(false);
@@ -165,7 +171,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
 
     return registerHardwareBackHandler(() => {
       // The reminder editor owns its own nested calendar/back stack, including after parent rerenders.
-      if (reminderField) return false;
+      if (reminderField || quickDateActions) return false;
       if (isParentPickerOpen) {
         setIsParentPickerOpen(false);
         return true;
@@ -229,7 +235,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, datePickerType, reminderField, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, datePickerType, reminderField, quickDateActions, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -907,13 +913,23 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
         title={datePickerType === 'scheduled' ? '选择安排日期' : '选择截止日期'}
         value={datePickerType === 'scheduled' ? todo.scheduledDate : todo.deadlineDate}
         onSelect={(dateKey) => {
-          if (datePickerType) onSelectDate(datePickerType, dateKey);
+          if (!datePickerType) return;
+          const canAddActions = !todo.isCompleted && !todo.abandonedAt && Boolean(todo.title.trim()) && Boolean(onSavePlan || onUpdateReminder);
+          onSelectDate(datePickerType, dateKey, canAddActions);
+          if (canAddActions) setQuickDateActions({ field: datePickerType === 'scheduled' ? 'scheduledDate' : 'deadlineDate', date: dateKey });
         }}
         onClear={() => {
           if (datePickerType) onClearDate(datePickerType);
         }}
         onClose={() => setDatePickerType(null)}
       />
+      {quickDateActions && (
+        <TodoDateQuickActionsModal key={`${todo.id}-${quickDateActions.field}-${quickDateActions.date}`}
+          todo={todo} date={quickDateActions.date} field={quickDateActions.field}
+          reminder={reminders?.[quickDateActions.field]} onSavePlan={onSavePlan}
+          onSaveReminder={onUpdateReminder ? (setting) => onUpdateReminder(quickDateActions.field, setting) : undefined}
+          onClose={() => setQuickDateActions(null)} />
+      )}
 
       <TodoDatePickerModal
         isOpen={isMaybePickerOpen}

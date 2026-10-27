@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-27: Selecting an arrange or deadline date in todo details, list/week/month quick actions, or timeline-launched quick actions opens a shared panel for adding a same-day plan block and/or a source-date reminder. Plan times use four numeric HHMM digits and save a plan linked to the current persisted todo; reminders reuse `TodoReminderModal` and retain its permission and calendar-sync behavior. Saving either editor returns to the panel so both can be configured. Portaled dialogs support focus containment, Escape and Android back without dismissing the underlying todo.
+
 Update 2026-10-26: The detail-statistics renderer harness now exercises real tag and category pages, rather than only chart persistence callbacks. It checks switching either cross-day/tag-duration display mode and unmounting before the 300 ms tag edit delay, serialized reentry, independent cards and both category-calendar modes.
 
 Update 2026-10-25: Cross-day and ordinary tag/category/record duration calendars share five stronger heat shades while retaining palette sequences. Recorded-value bounds use the complete selected range, missing dates remain neutral and date markers are no longer dimmed with the cell background. Browser checks verify rendered shade separation as well as existing numeric label fitting and title-row toggles.
@@ -360,7 +362,9 @@ Overlay components for complex interactions.
 - `AIBackfillChatModal.tsx`: The long-term-memory viewer now renders `用户画像记忆`, `偏好记忆`, and `活跃 reminders` as readable note/reminder cards with manual add/delete controls; reminder due-times stay normalized onto a single canonical timeline, cold app launch now performs one overdue-reminder catch-up after native hydration, foreground turns receive explicit local/UTC current-time anchors for reminder math, background assistant replies can persist per-message debug payloads, the check-in interval inputs keep editable draft text with inline validation so invalid intermediate states never auto-save, and the built-in persona roster ships with six richer voices while allowing AI self-address and user-address fields to stay intentionally empty.
 - `AddLogModal.tsx`: Main modal for logging time, including segmented start/end time inputs that auto-advance from hour to minute after two digits, direct camera capture, and multi-image picker uploads from desktop file dialogs or mobile galleries.
 - `TodoDatePickerModal.tsx`: Lightweight planning picker shared by todo scheduling and Memoir, supporting both full date selection and a centered month-only modal with the duplicate footer close action removed.
-- `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, and lightweight recurrence rules.
+- `TodoDateQuickActionsModal.tsx`: Offers plan-block and reminder follow-up actions for a selected todo arrange/deadline date.
+- `TodoPlanBlockQuickAddModal.tsx`: Creates a same-day plan block with validated four-digit start/end times.
+- `TodoDetailModal.tsx`: Detailed view and editing for Todos, including planning fields for assigned date, deadline date, lightweight recurrence rules, and date-scoped plan/reminder quick actions.
 - `TodoDuplicateModal.tsx`: Lightweight pre-copy modal for renaming duplicated todos and clearing dates, tags, or scopes before creation.
 - `TodoQuickActionsModal.tsx`: Shared quick-actions bottom sheet for lightweight todo scheduling, completion, and detail-entry flows reused by list-row taps and week-plan badges.
 - `GoalEditor.tsx`: Goal creation and editing.

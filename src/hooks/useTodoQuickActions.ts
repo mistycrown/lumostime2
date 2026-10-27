@@ -1,5 +1,6 @@
 /**
  * @file useTodoQuickActions.ts
+ * @updated 2026-10-27: Can retain the sheet after calendar selection for plan/reminder follow-up actions.
  * @updated 2026-10-18: Adds mutually exclusive abandon/restore actions using the latest saved task.
  * @updated 2026-10-18: Saves independent date reminders from quick-action cards against the latest todo state.
  * @updated 2026-10-16: Carries occurrence dates into complete, undo and skip actions.
@@ -131,15 +132,19 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     setQuickActionTodo(null);
   };
 
-  const handleQuickActionSelectDate = (type: 'scheduled' | 'deadline', dateKey: string) => {
+  const handleQuickActionSelectDate = (type: 'scheduled' | 'deadline', dateKey: string, keepOpen = false) => {
     if (!quickActionTodo) return;
+    const liveTodo = todos.find((item) => item.id === quickActionTodo.id);
+    if (!liveTodo) return;
 
-    onSaveTodo({
-      ...quickActionTodo,
-      scheduledDate: type === 'scheduled' ? dateKey : quickActionTodo.scheduledDate,
-      deadlineDate: type === 'deadline' ? dateKey : quickActionTodo.deadlineDate
-    });
-    closeQuickActions(true);
+    const nextTodo = {
+      ...liveTodo,
+      scheduledDate: type === 'scheduled' ? dateKey : liveTodo.scheduledDate,
+      deadlineDate: type === 'deadline' ? dateKey : liveTodo.deadlineDate
+    };
+    if (keepOpen) setQuickActionTodo(nextTodo);
+    onSaveTodo(nextTodo);
+    if (!keepOpen) closeQuickActions(true);
   };
 
   const handleQuickActionMove = (type: 'scheduled' | 'deadline', mode: 'today' | 'tomorrow' | 'nextWeek') => {
