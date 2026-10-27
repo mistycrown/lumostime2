@@ -3,6 +3,7 @@
  * @input App Component, DOM Element (#root)
  * @output Mounted React Application
  * @pos Entry Point (Bootstrapping)
+ * @updated 2026-10-27: Installs UUID compatibility before app imports and catches provider startup failures at the root.
  * @description The entry point that mounts the React App component, keeps the native loading screen until data hydration is ready, and handles polyfills.
  * @updated 2026-07-22: Desktop widget renderer windows now opt out of the main app's global dark-mode attribute.
  * @updated 2026-05-17: 扩展了桌面小组件的分流路由逻辑，新增对 DesktopTimerWidgetView（计时器小组件）的渲染路由分发。
@@ -12,6 +13,7 @@
  * @updated 2026-08-15: Marks native Android documents so CSS does not reserve a duplicate top status-bar inset.
  * @updated 2026-08-11: Starts optional error reporting and records normal-app startup attempts for timeout diagnosis.
  */
+import './utils/cryptoCompatibility';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Buffer } from 'buffer';
@@ -28,6 +30,7 @@ import { initializeErrorReporting } from './services/errorReporting';
 import { startStartupDiagnostics } from './services/startupDiagnostics';
 import { Capacitor } from '@capacitor/core';
 import { shouldUseNativeAndroidTopInset } from './utils/topSafeArea';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 
 const APP_READY_EVENT = 'lumostime:app-ready';
 const getRendererBootTimingNow = (): number => (
@@ -91,18 +94,20 @@ if (isDesktopWidgetRenderer) {
 
 root.render(
   <React.StrictMode>
-    {isDesktopWidgetRenderer ? (
-      getDesktopWidgetType() === 'month' ? (
-        <DesktopMonthWidgetView />
-      ) : getDesktopWidgetType() === 'quick' ? (
-        <DesktopQuickWidgetView />
-      ) : getDesktopWidgetType() === 'editor' ? (
-        <DesktopTodoQuickEditorWindowView />
-      ) : getDesktopWidgetType() === 'timer' ? (
-        <DesktopTimerWidgetView />
-      ) : (
-        <DesktopTodayWidgetView />
-      )
-    ) : <App />}
+    <AppErrorBoundary>
+      {isDesktopWidgetRenderer ? (
+        getDesktopWidgetType() === 'month' ? (
+          <DesktopMonthWidgetView />
+        ) : getDesktopWidgetType() === 'quick' ? (
+          <DesktopQuickWidgetView />
+        ) : getDesktopWidgetType() === 'editor' ? (
+          <DesktopTodoQuickEditorWindowView />
+        ) : getDesktopWidgetType() === 'timer' ? (
+          <DesktopTimerWidgetView />
+        ) : (
+          <DesktopTodayWidgetView />
+        )
+      ) : <App />}
+    </AppErrorBoundary>
   </React.StrictMode>
 );

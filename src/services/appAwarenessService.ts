@@ -1,5 +1,6 @@
 /**
  * @file appAwarenessService.ts
+ * @updated 2026-10-27: Builds preset templates only when persisted templates are missing or invalid.
  * @updated 2026-10-18: Persists the master switch separately from individual binding and template states.
  * @input localStorage-backed app-awareness settings and run snapshots
  * @output Normalized workflow templates, app bindings, and active run helpers
@@ -382,7 +383,7 @@ export const appAwarenessService = {
   },
 
   getTemplates(): AppAwarenessWorkflowTemplate[] {
-    return normalizeTemplates(storage.getJSON<unknown>(SETTINGS_KEYS.APP_AWARENESS_TEMPLATES, buildPresetTemplates()));
+    return normalizeTemplates(storage.getJSON<unknown>(SETTINGS_KEYS.APP_AWARENESS_TEMPLATES, null));
   },
 
   saveTemplates(templates: AppAwarenessWorkflowTemplate[]): boolean {

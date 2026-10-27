@@ -1,13 +1,39 @@
 /**
  * @file appAwarenessService.test.ts
+ * @updated 2026-10-27: Covers startup with missing randomUUID and avoids regenerating saved template IDs.
  * @input Persisted master switch, mixed app bindings and template enabled states
  * @output Regression coverage for suspend, reload and restore behavior
  * @pos Test
  * @updated 2026-10-18: Verifies the master switch preserves all individual settings across repeated toggles.
  */
-import { beforeEach, describe, expect, test } from 'vitest';
+import { webcrypto } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { installRandomUUIDFallback } from '../utils/cryptoCompatibility';
 import { SETTINGS_KEYS } from '../constants/storageKeys';
 import { appAwarenessService, buildAppAwarenessNativeBindings } from './appAwarenessService';
+
+describe('legacy WebView startup', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.unstubAllGlobals());
+
+  test('loads a new installation without native randomUUID', () => {
+    const cryptoProvider = { getRandomValues: webcrypto.getRandomValues.bind(webcrypto) } as Crypto;
+    vi.stubGlobal('crypto', cryptoProvider);
+    installRandomUUIDFallback();
+    const templates = appAwarenessService.getTemplates();
+    expect(templates).toHaveLength(1);
+    expect(templates[0].steps).toHaveLength(5);
+    expect(templates[0].steps[0].id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  test('loads valid persisted templates without generating unused preset IDs', () => {
+    const templates = appAwarenessService.buildPresetTemplates();
+    appAwarenessService.saveTemplates(templates);
+    const persistedTemplates = appAwarenessService.getTemplates();
+    vi.stubGlobal('crypto', {});
+    expect(appAwarenessService.getTemplates()).toEqual(persistedTemplates);
+  });
+});
 
 describe('app-awareness master switch', () => {
   beforeEach(() => localStorage.clear());
