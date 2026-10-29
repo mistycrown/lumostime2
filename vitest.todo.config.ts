@@ -35,6 +35,7 @@ export default defineConfig({
       'src/utils/todoHierarchyUtils.test.ts',
       'src/utils/todoScheduleUtils.test.ts',
       'src/utils/todoExecutionTags.test.ts',
+      'src/utils/todoExecutionGrouping.test.ts',
       'src/components/TodoSchedulePlan.test.tsx',
       'src/components/TimelineTodoSidebar.test.ts',
       'src/services/desktopWidgetService.test.ts'
