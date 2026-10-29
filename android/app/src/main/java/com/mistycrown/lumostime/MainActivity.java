@@ -12,6 +12,7 @@
  * @updated 2026-08-15: Hides a native ActionBar restored by certain Android activity-alias theme fallbacks so it cannot cover the WebView header.
  * @updated 2026-08-15: Installs the AndroidX splash screen before Activity creation so MIUI applies the configured post-splash NoActionBar theme.
  * @updated 2026-10-03: Registers the local Feishu encrypted-storage and authorization-browser bridge.
+ * @updated 2026-10-29: Publishes Android launcher shortcuts for quick punch, supplement logging, today's review, and the AI assistant.
  */
 package com.mistycrown.lumostime;
 
@@ -19,6 +20,10 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.graphics.drawable.Icon;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -64,6 +69,7 @@ public class MainActivity extends BridgeActivity {
         TodoReminderPlugin.captureNavigation(this, getIntent());
         ensureStatusBarBackdrop();
         initializeIconState();
+        publishLauncherShortcuts();
     }
 
     @Override
@@ -246,5 +252,54 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "启动图标初始化失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * Publishes stable launcher actions. The deep-link parser in the Web layer
+     * handles the same URI on cold start and when an existing task is resumed.
+     */
+    private void publishLauncherShortcuts() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) {
+            return;
+        }
+
+        ShortcutManager shortcutManager = getSystemService(ShortcutManager.class);
+        if (shortcutManager == null) {
+            return;
+        }
+
+        shortcutManager.setDynamicShortcuts(java.util.Arrays.asList(
+            buildLauncherShortcut(
+                "quick_punch",
+                R.string.shortcut_quick_punch,
+                "lumostime://widget?action=quick_punch"
+            ),
+            buildLauncherShortcut(
+                "supplement_log",
+                R.string.shortcut_supplement_log,
+                "lumostime://widget?action=open_supplement_log"
+            ),
+            buildLauncherShortcut(
+                "ai_assistant",
+                R.string.shortcut_ai_assistant,
+                "lumostime://widget?action=open_ai_assistant"
+            ),
+            buildLauncherShortcut(
+                "today_review",
+                R.string.shortcut_today_review,
+                "lumostime://widget?action=open_today_review"
+            )
+        ));
+    }
+
+    private ShortcutInfo buildLauncherShortcut(String id, int labelResId, String uri) {
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri), this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        return new ShortcutInfo.Builder(this, id)
+            .setShortLabel(getString(labelResId))
+            .setLongLabel(getString(labelResId))
+            .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+            .setIntent(intent)
+            .build();
     }
 }

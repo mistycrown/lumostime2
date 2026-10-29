@@ -32,4 +32,8 @@
     <string name="widget_label_quick_todo_4x3">&#x5C0F;&#x4E8B; 4x3</string>
     <string name="widget_label_scene_4x3">&#x573A;&#x666F; 4x3</string>
     <string name="widget_label_principle_card_4x2">&#x539F;&#x5219;&#x5361; 4x2</string>
+    <string name="shortcut_quick_punch">&#x5FEB;&#x901F;&#x6253;&#x70B9;</string>
+    <string name="shortcut_supplement_log">&#x6DFB;&#x52A0;&#x8865;&#x8BB0;</string>
+    <string name="shortcut_ai_assistant">AI &#x52A9;&#x624B;</string>
+    <string name="shortcut_today_review">&#x4ECA;&#x65E5; Review</string>
 </resources>
