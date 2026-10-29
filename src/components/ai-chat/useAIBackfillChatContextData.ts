@@ -1,5 +1,6 @@
 /**
  * @file useAIBackfillChatContextData.ts
+ * @updated 2026-10-29: Includes normalized todo execution tags in foreground assistant context.
  * @updated 2026-10-26: Includes existing reminder settings in todo update context.
  * @input Current logs, todos, categories, scopes, and todo categories
  * @output Structured read-only context arrays for assistant tool calls
@@ -9,6 +10,7 @@
 import { useMemo } from 'react';
 import type { Category, Log, Scope, TodoCategory, TodoItem } from '../../types';
 import { formatDateKey } from '../../utils/aiBackfillUtils';
+import { normalizeTodoExecutionTags } from '../../utils/todoExecutionTags';
 
 interface ContextDataOptions {
   categories: Category[];
@@ -50,6 +52,7 @@ export const useAIBackfillChatContextData = ({
       linkedCategoryId: todo.linkedCategoryId,
       linkedActivityId: todo.linkedActivityId,
       linkedActivityName: linkedActivity?.name,
+      executionTags: normalizeTodoExecutionTags(todo.executionTags),
       scheduledDate: todo.scheduledDate,
       deadlineDate: todo.deadlineDate,
       reminders: todo.reminders,

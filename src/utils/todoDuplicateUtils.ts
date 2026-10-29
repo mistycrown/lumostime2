@@ -1,5 +1,6 @@
 /**
  * @file todoDuplicateUtils.ts
+ * @updated 2026-10-29: Preserves execution tags during duplication and clears them with the existing tag-cleanup option.
  * @updated 2026-10-18: Normalizes terminal states and resets abandonment when duplicating.
  * @updated 2026-10-17: Normalizes local reminders and never copies notification settings to a duplicate.
  * @updated 2026-10-16: Normalizes occurrence history and clears it when duplicating tasks.
@@ -18,6 +19,7 @@ import { normalizeTodoRecurringPlanConfig } from './todoRecurringPlanUtils';
 import { normalizeOccurrenceCompletions } from './todoOccurrenceUtils';
 import { normalizeTodoReminders } from './todoReminderUtils';
 import { normalizeTodoStatus } from './todoStatusUtils';
+import { normalizeTodoExecutionTags } from './todoExecutionTags';
 
 export const normalizeTodoScheduleFields = (todo: TodoItem): TodoItem => {
   const skipDates = todo.recurrenceRule?.skipDates?.length
@@ -53,6 +55,7 @@ export const buildDuplicatedTodo = (
   const clearDates = options?.clearDates ?? true;
   const clearTags = options?.clearTags ?? false;
   const clearScopes = options?.clearScopes ?? false;
+  const executionTags = normalizeTodoExecutionTags(todo.executionTags);
 
   return normalizeTodoScheduleFields({
     ...todo,
@@ -76,6 +79,11 @@ export const buildDuplicatedTodo = (
     maybeDates: clearDates ? undefined : todo.maybeDates,
     linkedActivityId: clearTags ? undefined : todo.linkedActivityId,
     linkedCategoryId: clearTags ? undefined : todo.linkedCategoryId,
+    executionTags: clearTags
+      ? undefined
+      : (executionTags.length > 0
+        ? executionTags
+        : undefined),
     defaultScopeIds: clearScopes ? undefined : todo.defaultScopeIds
   });
 };

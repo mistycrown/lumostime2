@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-29: `TodoExecutionTagPicker` adds optional execution tags to todo details and drafts. Presets cover energy, scene, and time, while custom tags remain free-form; tags are stored separately from linked activity tags and are included in assistant context.
+
 Update 2026-10-27: Selecting an arrange or deadline date in todo details, list/week/month quick actions, or timeline-launched quick actions opens a shared panel for adding a same-day plan block and/or a source-date reminder. Plan times use four numeric HHMM digits and save a plan linked to the current persisted todo; reminders reuse `TodoReminderModal` and retain its permission and calendar-sync behavior. Saving either editor returns to the panel so both can be configured. Portaled dialogs support focus containment, Escape and Android back without dismissing the underlying todo.
 
 Update 2026-10-26: The detail-statistics renderer harness now exercises real tag and category pages, rather than only chart persistence callbacks. It checks switching either cross-day/tag-duration display mode and unmounting before the 300 ms tag edit delay, serialized reentry, independent cards and both category-calendar modes.

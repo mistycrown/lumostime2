@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-29: Adds optional structured execution tags for todo energy, scene, time, and custom context.
  * @updated 2026-10-25: Adds a standalone cross-day overview table card.
  * @updated 2026-10-25: Adds cross-day statistic sources, chart types, metrics and local day boundaries.
  * @updated 2026-10-23: Persists per-card daily duration labels in calendar heatmaps.
@@ -596,6 +597,15 @@ export interface TodoReminderSetting {
 
 export type TodoReminders = Partial<Record<TodoReminderField, TodoReminderSetting>>;
 
+export type TodoExecutionTagGroup = 'energy' | 'scene' | 'time' | 'custom';
+
+export interface TodoExecutionTag {
+  id: string;
+  name: string;
+  group: TodoExecutionTagGroup;
+  source: 'preset' | 'user';
+}
+
 export interface TodoItem {
   id: string;
   categoryId: string; // Belongs to a TodoCategory
@@ -610,6 +620,7 @@ export interface TodoItem {
   linkedActivityId?: string; // Links to a Record Activity for stats
   linkedCategoryId?: string; // Link back to Category
   defaultScopeIds?: string[]; // NEW: Default Scopes when starting this todo - changed from defaultScopeId
+  executionTags?: TodoExecutionTag[]; // Optional execution context labels used by task recommendations
   createdAt?: number; // Unix timestamp used by legacy and collection timeline fallbacks
   note?: string;
   coverImage?: string; // NEW: Cover image filename (only one image allowed)

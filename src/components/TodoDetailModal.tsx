@@ -1,5 +1,6 @@
 /**
  * @file TodoDetailModal.tsx
+ * @updated 2026-10-29: Adds lightweight execution-tag editing for todo energy, scene, time, and custom context.
  * @updated 2026-10-27: Shares date-scoped quick plan/reminder actions with the list sheet.
  * @updated 2026-10-18: Uses concise abandon/restore controls and icon/date abandonment markers for subtasks.
  * @updated 2026-10-17: Adds independent reminder controls beside arranged and deadline dates.
@@ -47,7 +48,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig, TodoReminderField, TodoReminders } from '../types';
+import { TodoItem, TodoCategory, Log, Category, Scope, TodoProgressTrackingMode, TodoRecurrenceFrequency, TodoRecurrenceRule, TodoRecurringPlanConfig, TodoReminderField, TodoReminders, TodoExecutionTag } from '../types';
 import { ScopeAssociation } from './ScopeAssociation';
 import { TagAssociation } from './TagAssociation';
 import { AssociationOptionGrid } from './AssociationOptionGrid';
@@ -87,6 +88,8 @@ import {
 } from '../utils/todoRecurringPlanUtils';
 import { filterCountableLogs } from '../utils/statLogUtils';
 import { setTodoCompletion } from '../utils/todoOccurrenceUtils';
+import { normalizeTodoExecutionTags } from '../utils/todoExecutionTags';
+import { TodoExecutionTagPicker } from './TodoExecutionTagPicker';
 
 interface TodoDetailModalProps {
   initialTodo?: TodoItem | null;
@@ -269,6 +272,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const initialLinkedCategoryId = initialTodo?.linkedCategoryId || initialDraft?.linkedCategoryId || '';
   const initialLinkedActivityId = initialTodo?.linkedActivityId || initialDraft?.linkedActivityId || '';
   const initialDefaultScopeIds = initialTodo?.defaultScopeIds || initialDraft?.defaultScopeIds;
+  const initialExecutionTags = normalizeTodoExecutionTags(initialTodo?.executionTags || initialDraft?.executionTags);
   const initialTotalAmount = initialTodo?.totalAmount || initialDraft?.totalAmount || 100;
   const initialUnitAmount = initialTodo?.unitAmount || initialDraft?.unitAmount || 1;
   const initialCompletedUnits = initialTodo?.completedUnits || initialDraft?.completedUnits || 0;
@@ -308,6 +312,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
   const [linkedCategoryId, setLinkedCategoryId] = useState<string>(initialLinkedCategoryId);
   const [linkedActivityId, setLinkedActivityId] = useState<string>(initialLinkedActivityId);
   const [defaultScopeIds, setDefaultScopeIds] = useState<string[] | undefined>(initialDefaultScopeIds);
+  const [executionTags, setExecutionTags] = useState<TodoExecutionTag[]>(initialExecutionTags);
 
   // Progress State
   const [progressTrackingMode, setProgressTrackingMode] = useState<TodoProgressTrackingMode>(() => (
@@ -815,6 +820,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     linkedCategoryId: isQuickReminder ? undefined : (effectiveLinkedCategoryId || undefined),
     linkedActivityId: isQuickReminder ? undefined : (resolvedLinkedActivityId || undefined),
     defaultScopeIds: isQuickReminder ? undefined : resolvedDefaultScopeIds,
+    executionTags: executionTags.length > 0 ? normalizeTodoExecutionTags(executionTags) : undefined,
     isProgress: isQuickReminder ? false : isProgress,
     progressTrackingMode: isQuickReminder ? 'none' : resolvedProgressTrackingMode,
     totalAmount: isQuickReminder ? undefined : (isManualProgress ? totalAmount : (isSubtaskAutoProgress ? progressSnapshot.totalAmount : undefined)),
@@ -850,6 +856,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
         (isQuickReminder ? '' : effectiveLinkedCategoryId) !== normalizeOptionalText(persistedTodo.linkedCategoryId) ||
         (isQuickReminder ? '' : resolvedLinkedActivityId) !== normalizeOptionalText(persistedTodo.linkedActivityId) ||
         JSON.stringify(normalizeOptionalScopeIds(isQuickReminder ? undefined : resolvedDefaultScopeIds)) !== JSON.stringify(normalizeOptionalScopeIds(persistedTodo.defaultScopeIds)) ||
+        JSON.stringify(normalizeTodoExecutionTags(executionTags)) !== JSON.stringify(normalizeTodoExecutionTags(persistedTodo.executionTags)) ||
         (isQuickReminder ? 'none' : resolvedProgressTrackingMode) !== persistedProgressTrackingMode ||
         (!isQuickReminder && isManualProgress && totalAmount !== persistedTodo.totalAmount) ||
         (!isQuickReminder && isManualProgress && unitAmount !== persistedTodo.unitAmount) ||
@@ -871,7 +878,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
     }
 
     onSave(buildTodoPayload());
-  }, [selectedCategoryId, title, note, isCompleted, completedAt, abandonedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, effectiveReminders, isSubtask, recurrenceRule, recurringPlanConfig, initialTodo, onSave, todos]); // 监听所有状态变化
+  }, [selectedCategoryId, title, note, isCompleted, completedAt, abandonedAt, linkedCategoryId, linkedActivityId, defaultScopeIds, executionTags, resolvedProgressTrackingMode, isManualProgress, totalAmount, unitAmount, completedUnits, heatmapMin, heatmapMax, pin, coverImage, parentTodoId, childOrder, scheduledDate, deadlineDate, effectiveReminders, isSubtask, recurrenceRule, recurringPlanConfig, initialTodo, onSave, todos]); // 监听所有状态变化
 
   React.useEffect(() => {
     if (!title.trim()) return;
@@ -972,6 +979,7 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
       linkedCategoryId: parentTodoForInheritance.linkedCategoryId,
       linkedActivityId: parentTodoForInheritance.linkedActivityId,
       defaultScopeIds: parentTodoForInheritance.defaultScopeIds ? [...parentTodoForInheritance.defaultScopeIds] : undefined,
+      executionTags: undefined,
       isProgress: false,
       progressTrackingMode: 'none',
       completedUnits: 0,
@@ -1305,6 +1313,14 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                   onChange={e => setNote(e.target.value)}
                   className="min-h-[100px] w-full resize-none rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3 text-[13px] text-stone-700 outline-none transition-colors focus:border-stone-400"
                   placeholder="添加备注..."
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-stone-600">{'\u6267\u884c\u6807\u7b7e'}</label>
+                <TodoExecutionTagPicker
+                  executionTags={executionTags}
+                  onChange={setExecutionTags}
                 />
               </div>
 

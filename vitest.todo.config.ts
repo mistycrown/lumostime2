@@ -26,6 +26,7 @@ export default defineConfig({
       'src/hooks/useTodoQuickActions.test.ts',
       'src/components/TodoQuickActionsModal.test.tsx',
       'src/components/TodoDetailModal.test.tsx',
+      'src/components/TodoExecutionTagPicker.test.tsx',
       'src/components/TodoScheduleViewsFallback.test.tsx',
       'src/views/TodoView.recurrenceFallback.test.tsx',
       'src/services/widgetService.test.ts',
@@ -33,6 +34,7 @@ export default defineConfig({
       'src/utils/referenceDeletion.test.ts',
       'src/utils/todoHierarchyUtils.test.ts',
       'src/utils/todoScheduleUtils.test.ts',
+      'src/utils/todoExecutionTags.test.ts',
       'src/components/TodoSchedulePlan.test.tsx',
       'src/components/TimelineTodoSidebar.test.ts',
       'src/services/desktopWidgetService.test.ts'

@@ -1,5 +1,6 @@
 ﻿/**
  * @file assistantContextBuilder.ts
+ * @updated 2026-10-29: Includes structured todo execution tags in compact and JSON assistant dictionaries.
  * @updated 2026-10-26: Exposes application reminder settings in JSON and compact todo dictionaries.
  * @updated 2026-10-18: Excludes abandonment from active summaries and exposes it in todo dictionaries.
  * @updated 2026-10-09: Exposes the full node dictionary in JSON and lossless table contexts.
@@ -43,6 +44,7 @@ import type {
 import { getTodoKind } from '../utils/todoKindUtils';
 import { ensureQuickTodoCategory } from '../utils/todoQuickCategoryUtils';
 import { getSortedActivityAttributes } from '../utils/activityAttributeUtils';
+import { normalizeTodoExecutionTags } from '../utils/todoExecutionTags';
 
 interface BuildStateContextParams {
   currentDateTime: string;
@@ -399,26 +401,30 @@ export const assistantContextBuilder = {
       category.name
     ]));
 
-    const todoRows = (context.todos || []).map((todo) => ([
-      todo.id,
-      todo.title,
-      getTodoKind(todo),
-      todo.path,
-      todo.parentTodoId,
-      todo.parentTodoTitle,
-      todo.categoryId,
-      todo.categoryName,
-      todo.linkedCategoryId,
-      todo.linkedActivityId,
-      todo.linkedActivityName,
-      todo.defaultScopeIds,
-      todo.scheduledDate,
-      todo.deadlineDate,
-      todo.reminders,
-      todo.pin,
-      todo.isCompleted,
-      todo.abandonedAt
-    ]));
+    const todoRows = (context.todos || []).map((todo) => {
+      const executionTags = normalizeTodoExecutionTags(todo.executionTags);
+      return [
+        todo.id,
+        todo.title,
+        getTodoKind(todo),
+        todo.path,
+        todo.parentTodoId,
+        todo.parentTodoTitle,
+        todo.categoryId,
+        todo.categoryName,
+        todo.linkedCategoryId,
+        todo.linkedActivityId,
+        todo.linkedActivityName,
+        todo.defaultScopeIds,
+        executionTags.length > 0 ? executionTags : undefined,
+        todo.scheduledDate,
+        todo.deadlineDate,
+        todo.reminders,
+        todo.pin,
+        todo.isCompleted,
+        todo.abandonedAt
+      ];
+    });
 
     const logRows = (context.logs || []).map((log) => ([
       log.id,
@@ -440,7 +446,7 @@ export const assistantContextBuilder = {
       buildExactTableSection('Scopes', ['id', 'name'], scopeRows),
       buildExactTableSection('Nodes', ['id', 'name', 'aliases', 'description', 'categoryId'], (context.nodes || []).map((node) => [node.id, node.name, node.aliases, node.description, node.categoryId])),
       buildExactTableSection('TodoCategories', ['id', 'name'], todoCategoryRows),
-      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'scheduledDate', 'deadlineDate', 'reminders', 'pin', 'isCompleted', 'abandonedAt'], todoRows),
+      buildExactTableSection('Todos', ['id', 'title', 'kind', 'path', 'parentTodoId', 'parentTodoTitle', 'categoryId', 'categoryName', 'linkedCategoryId', 'linkedActivityId', 'linkedActivityName', 'defaultScopeIds', 'executionTags', 'scheduledDate', 'deadlineDate', 'reminders', 'pin', 'isCompleted', 'abandonedAt'], todoRows),
       buildExactTableSection('Logs', ['id', 'date', 'timeRange', 'categoryId', 'categoryName', 'activityId', 'activityName', 'linkedTodoId', 'linkedTodoTitle', 'note'], logRows)
     ].join('\n\n');
   },
@@ -498,6 +504,7 @@ export const assistantContextBuilder = {
         ...(todo.linkedActivityId ? { linkedActivityId: todo.linkedActivityId } : {}),
         ...(linkedActivity?.name ? { linkedActivityName: linkedActivity.name } : {}),
         ...(todo.defaultScopeIds?.length ? { defaultScopeIds: todo.defaultScopeIds } : {}),
+        ...(normalizeTodoExecutionTags(todo.executionTags).length > 0 ? { executionTags: normalizeTodoExecutionTags(todo.executionTags) } : {}),
         ...(todo.scheduledDate ? { scheduledDate: todo.scheduledDate } : {}),
         ...(todo.deadlineDate ? { deadlineDate: todo.deadlineDate } : {}),
         ...(todo.reminders ? { reminders: todo.reminders } : {}),

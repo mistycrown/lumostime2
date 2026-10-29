@@ -1,5 +1,6 @@
 /**
  * @file assistant.ts
+ * @updated 2026-10-29: Exposes structured todo execution tags to assistant dictionary contexts.
  * @updated 2026-10-26: Defines todo reminder patches independently of assistant reminder drafts.
  * @updated 2026-10-18: Exposes optional abandonment timestamps in todo dictionary context.
  * @updated 2026-10-09: Adds node dictionaries and foreground node-description writeback.
@@ -38,7 +39,7 @@
  * @updated 2026-04-26: Added Android-first assistant agent memory, reminder, trigger, config, and system-turn decision types for the new background AI architecture.
  */
 
-import type { ActivityAttributeDefinition, ActivityAttributeValue, TodoKind, TodoRecurrenceRule, TodoReminderField, TodoReminderSetting, TodoReminders } from '../types';
+import type { ActivityAttributeDefinition, ActivityAttributeValue, TodoExecutionTag, TodoKind, TodoRecurrenceRule, TodoReminderField, TodoReminderSetting, TodoReminders } from '../types';
 
 // Omitted fields are preserved; null removes one reminder (or all reminders at the patch root).
 export type AssistantTodoReminderPatch = Partial<Record<TodoReminderField, TodoReminderSetting | null>>;
@@ -412,6 +413,7 @@ export interface AssistantTodoDictionaryItem {
   linkedActivityId?: string;
   linkedActivityName?: string;
   defaultScopeIds?: string[];
+  executionTags?: TodoExecutionTag[];
   scheduledDate?: string;
   deadlineDate?: string;
   reminders?: TodoReminders;

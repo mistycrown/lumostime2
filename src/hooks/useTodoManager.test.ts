@@ -29,7 +29,10 @@ describe('buildDuplicatedTodo', () => {
       maybeDates: ['2099-06-10'],
       linkedActivityId: 'activity-1',
       linkedCategoryId: 'category-1',
-      defaultScopeIds: ['scope-1']
+      defaultScopeIds: ['scope-1'],
+      executionTags: [
+        { id: 'energy:high', name: '高精力', group: 'energy', source: 'preset' }
+      ]
     };
 
     const duplicatedTodo = buildDuplicatedTodo(sourceTodo, {
@@ -52,7 +55,16 @@ describe('buildDuplicatedTodo', () => {
       maybeDates: ['2099-06-10'],
       linkedActivityId: 'activity-1',
       linkedCategoryId: 'category-1',
-      defaultScopeIds: ['scope-1']
+      defaultScopeIds: ['scope-1'],
+      executionTags: [
+        { id: 'energy:high', name: '高精力', group: 'energy', source: 'preset' }
+      ]
     });
+
+    expect(buildDuplicatedTodo(sourceTodo, {
+      duplicateId: 'todo-3',
+      title: 'Read book copy',
+      clearTags: true
+    }).executionTags).toBeUndefined();
   });
 });

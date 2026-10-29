@@ -1,5 +1,6 @@
 /**
  * @file assistantContextBuilder.test.ts
+ * @updated 2026-10-29: Checks structured todo execution tags in assistant dictionaries.
  * @updated 2026-10-26: Checks lossless todo reminder time and calendar preference context.
  * @updated 2026-10-18: Ensures abandoned tasks remain dated in dictionaries and leave active summaries.
  * @input Runtime dictionaries, logs, and assistant date context
@@ -110,6 +111,22 @@ describe('assistantContextBuilder', () => {
     const context = assistantContextBuilder.buildDictionaryContext({ categories, todos: [{ ...todos[0], scheduledDate: '2099-12-31', reminders }] });
     expect(context.todos?.[0].reminders).toEqual(reminders);
     expect(assistantContextBuilder.buildDictionaryDigest(context)).toContain(JSON.stringify(reminders));
+  });
+  it('exposes normalized execution tags without changing legacy todo fields', () => {
+    const context = assistantContextBuilder.buildDictionaryContext({
+      todos: [{
+        ...todos[0],
+        executionTags: [
+          { id: 'energy:high', name: '高精力', group: 'energy', source: 'preset' }
+        ]
+      }]
+    });
+
+    expect(context.todos?.[0].executionTags).toEqual([
+      { id: 'energy:high', name: '高精力', group: 'energy', source: 'preset' }
+    ]);
+    expect(assistantContextBuilder.buildDictionaryDigest(context)).toContain('executionTags');
+    expect(assistantContextBuilder.buildDictionaryDigest(context)).toContain('高精力');
   });
   it('provides active attribute schemas losslessly to JSON and compact dictionaries', () => {
     const attributeCategories: Category[] = [{
@@ -335,9 +352,9 @@ describe('assistantContextBuilder', () => {
     expect(digest).toContain('"__virtual_future__"\t"未来"');
     expect(digest).toContain('"__virtual_quick__"\t"小事"');
     expect(digest).toContain('[Todos] rows=2');
-    expect(digest).toContain('id\ttitle\tkind\tpath\tparentTodoId\tparentTodoTitle\tcategoryId\tcategoryName\tlinkedCategoryId\tlinkedActivityId\tlinkedActivityName\tdefaultScopeIds\tscheduledDate\tdeadlineDate\treminders\tpin\tisCompleted');
-    expect(digest).toContain('"todo-parent"\t"Thesis"\t"project"\t-\t-\t-\t"todo-general"\t"General"\t-\t-\t-\t-\t-\t-\t-\tfalse\tfalse');
-    expect(digest).toContain('"todo-draft"\t"Draft chapter"\t"project"\t"Thesis / Draft chapter"\t"todo-parent"\t"Thesis"\t"todo-general"\t"General"\t-\t"act-writing"\t"Writing"\t["scope-research"]\t"2026-04-27"\t"2026-04-30"\t-\ttrue\tfalse');
+    expect(digest).toContain('id\ttitle\tkind\tpath\tparentTodoId\tparentTodoTitle\tcategoryId\tcategoryName\tlinkedCategoryId\tlinkedActivityId\tlinkedActivityName\tdefaultScopeIds\texecutionTags\tscheduledDate\tdeadlineDate\treminders\tpin\tisCompleted');
+    expect(digest).toContain('"todo-parent"\t"Thesis"\t"project"\t-\t-\t-\t"todo-general"\t"General"\t-\t-\t-\t-\t-\t-\t-\t-\tfalse\tfalse');
+    expect(digest).toContain('"todo-draft"\t"Draft chapter"\t"project"\t"Thesis / Draft chapter"\t"todo-parent"\t"Thesis"\t"todo-general"\t"General"\t-\t"act-writing"\t"Writing"\t["scope-research"]\t-\t"2026-04-27"\t"2026-04-30"\t-\ttrue\tfalse');
     expect(digest).toContain('[Logs] rows=1');
     expect(digest).toContain('id\tdate\ttimeRange\tcategoryId\tcategoryName\tactivityId\tactivityName\tlinkedTodoId\tlinkedTodoTitle\tnote');
     expect(digest).toContain('"log-1"\t"2026-04-27"\t"09:00-10:00"\t"cat-work"\t"Work"\t"act-writing"\t"Writing"\t"todo-draft"\t"Draft chapter"\t"outline note"');
