@@ -1,5 +1,6 @@
 /**
  * @file check-todo-execution-smoke.mjs
+ * @updated 2026-10-29: Captures themed category dropdowns on desktop and mobile.
  * @updated 2026-10-29: Checks real execution views and reusable label management at both viewport widths.
  * @input Installed Chrome, production CSS and real todo/picker harness
  * @output Browser checks and screenshots in node_modules/.cache/todo-execution-smoke
@@ -94,10 +95,12 @@ try {
   const passed = await evaluate('window.__todoExecutionHarness.run()');
   await evaluate('window.__todoExecutionHarness.prepare()'); await capture('desktop');
   await evaluate("window.__todoExecutionHarness.prepare('select')"); await capture('desktop-modal');
+  await evaluate("window.__todoExecutionHarness.prepare('dropdown')"); await capture('desktop-dropdown');
   await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await send('Emulation.setTouchEmulationEnabled', { enabled: true });
   passed.push(...await evaluate('window.__todoExecutionHarness.run()'));
   await evaluate('window.__todoExecutionHarness.prepare()'); await capture('mobile');
+  await evaluate("window.__todoExecutionHarness.prepare('dropdown')"); await capture('mobile-dropdown');
   await evaluate("window.__todoExecutionHarness.prepare('manage')"); await capture('mobile-manage');
   await evaluate("window.__todoExecutionHarness.prepare('quick')"); await capture('mobile-quick-actions');
   if (errors.length) throw new Error(errors.join('\n'));

@@ -1,5 +1,6 @@
 /**
  * @file todoExecutionRendererHarness.tsx
+ * @updated 2026-10-29: Checks icon switching, single-row scrolling and themed modal dropdowns without search.
  * @updated 2026-10-29: Checks category tabs, nested label sections and category-specific empty states.
  * @input Real todo view and picker with isolated example tasks/browser storage
  * @output Interactive desktop/mobile smoke checks and screenshot fixtures
@@ -66,8 +67,13 @@ const input = async (label: string, value: string) => {
   element.dispatchEvent(new Event('input', { bubbles: true })); await delay();
 };
 const select = async (label: string, value: string) => {
-  const element = document.querySelector<HTMLSelectElement>(`[aria-label="${label}"]`)!;
-  element.value = value; element.dispatchEvent(new Event('change', { bubbles: true })); await delay();
+  await click(label);
+  const list = document.querySelector<HTMLElement>('[role="listbox"]')!;
+  check(list?.closest('[role="dialog"]'), 'Dropdown escaped modal focus scope');
+  const bounds = list.getBoundingClientRect();
+  check(bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight, 'Dropdown exceeds viewport');
+  const option = list.querySelector<HTMLButtonElement>(`[data-select-value="${value}"]`);
+  check(option, `Option missing: ${value}`); option!.click(); await delay();
 };
 const reset = async () => {
   root.render(null); await delay(); localStorage.clear(); service.save(DEFAULT_EXECUTION_LIBRARY);
@@ -80,7 +86,18 @@ const run = async () => {
   await document.fonts.load('16px VerifiedChinese', '执行标签精力分类');
   check(document.fonts.check('16px VerifiedChinese'), 'Chinese font did not load');
   check(!document.querySelector('button[title="执行"]'), 'Unexpected execution sidebar tab');
+  check(document.querySelector('[aria-label="切换到执行"]')?.textContent?.trim() === '', 'Mode switch should show only an icon');
   await click('切换到执行');
+  const modeSwitch = document.querySelector<HTMLElement>('[aria-label="切换到排期"]')!;
+  check(modeSwitch.textContent?.trim() === '' && getComputedStyle(modeSwitch).borderTopWidth === '0px', 'Mode switch has text or capsule border');
+  const categoryBar = document.querySelector<HTMLElement>('[aria-label="执行标签分类"]')!;
+  const categoryButtons = Array.from(categoryBar.querySelectorAll('button'));
+  check(categoryButtons.every((item) => Math.abs(item.getBoundingClientRect().top - categoryButtons[0].getBoundingClientRect().top) < 1), 'Execution categories wrap to multiple rows');
+  check(getComputedStyle(categoryBar).overflowX === 'auto' && getComputedStyle(categoryBar).scrollbarWidth === 'none', 'Category scrolling or hidden scrollbar missing');
+  categoryBar.style.maxWidth = '160px';
+  categoryBar.scrollLeft = categoryBar.scrollWidth;
+  check(categoryBar.scrollLeft > 0, 'Execution categories cannot scroll horizontally');
+  categoryBar.style.maxWidth = ''; categoryBar.scrollLeft = 0;
   check(document.querySelector('h1')?.textContent?.includes('执行'), 'Execution title missing');
   check(document.querySelector('[aria-label="执行分类：精力"]')?.getAttribute('aria-pressed') === 'true', 'Default energy category not selected');
   check(document.querySelectorAll('#todo-content section').length === 2, 'Energy label subgroups missing');
@@ -98,9 +115,15 @@ const run = async () => {
   check(localStorage.getItem('todoScheduleListMode') === 'execution', 'View switch not persisted');
   document.getElementById('edit-mail')!.click(); await delay(); await click('添加');
   check(document.querySelector('[role="dialog"]')?.parentElement?.parentElement === document.body, 'Picker is not a portal modal');
+  check(!document.querySelector('[aria-label="搜索执行标签"]') && !document.querySelector('[role="dialog"] select'), 'Picker still has search or native selects');
+  await click('低精力'); await click('低精力');
+  const selectedStyle = getComputedStyle(button('低精力')!);
+  check(selectedStyle.outlineStyle === 'none' || selectedStyle.outlineColor === 'rgba(0, 0, 0, 0)', `Selected execution tag has a visible outline: ${selectedStyle.outlineColor}`);
+  await select('新标签分类', 'scene');
   await input('新执行标签名称', '通勤可做'); await click('添加新执行标签');
   const created = service.getSnapshot().tags.find((item) => item.name === '通勤可做')!;
   check(created && currentTodos[0].executionTags?.some((item) => item.id === created.id), 'New label not saved/selected');
+  check(getExecutionCategoryId(created) === 'scene', 'Themed category selection did not apply');
   await click('完成'); await click('添加');
   check(button('通勤可做')?.getAttribute('aria-pressed') === 'true', 'Saved label unavailable on reopen');
   await click('通勤可做'); await click('通勤可做');
@@ -173,6 +196,7 @@ const prepare = async (mode = 'view') => {
   if (mode !== 'view') {
     document.getElementById('edit-mail')!.click(); await delay(); await click('添加');
     if (mode === 'manage') await click('管理');
+    if (mode === 'dropdown') await click('新标签分类');
   }
 };
 

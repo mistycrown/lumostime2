@@ -1,5 +1,6 @@
 /**
  * @file TodoView.tsx
+ * @updated 2026-10-29: Uses an icon-only mode switch and single-row scrollable execution categories.
  * @updated 2026-10-29: Uses schedule-style execution category tabs with label subgroups.
  * @updated 2026-10-29: Switches schedule/execution beside Tasks and filters by reusable execution labels.
  * @updated 2026-10-27: Passes plan persistence into date quick actions for all todo schedule views.
@@ -2894,16 +2895,17 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
         />
 
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between mt-2 md:mt-0">
-          <div className="min-w-0">
+        <div className={`mb-6 items-center mt-2 md:mt-0 ${isVirtualExecutionCategory ? 'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3' : 'flex justify-between'}`}>
+          <div className={isVirtualExecutionCategory ? 'contents' : 'min-w-0'}>
             <h1 className="text-2xl font-bold text-stone-900 tracking-tight flex flex-wrap items-center gap-x-3 gap-y-2">
               {selectedCategoryName}
               <span className="text-stone-300 text-lg font-normal">Tasks</span>
               {isScheduleCategory && <button type="button"
                 aria-label={isVirtualExecutionCategory ? '切换到排期' : '切换到执行'}
+                title={isVirtualExecutionCategory ? '切换到排期' : '切换到执行'}
                 onClick={() => setScheduleListMode(isVirtualExecutionCategory ? 'schedule' : 'execution')}
-                className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/70 px-2.5 py-1 text-xs font-medium tracking-normal text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-800">
-                <ArrowLeftRight size={13} />{isVirtualExecutionCategory ? '排期' : '执行'}
+                className="inline-flex shrink-0 items-center justify-center p-1.5 text-stone-500 outline-none transition-colors hover:text-stone-800 focus-visible:ring-2 focus-visible:ring-stone-400">
+                <ArrowLeftRight size={15} />
               </button>}
             </h1>
             {isVirtualScheduleCategory && (
@@ -2933,13 +2935,13 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               </div>
             )}
             {isVirtualExecutionCategory && (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="执行标签分类">
+              <div className="col-span-2 row-start-2 mt-3 flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto no-scrollbar [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="执行标签分类">
                 {executionTodoSections.map((section) => {
                   const isActive = selectedExecutionSection?.id === section.id;
                   return (
                     <button key={section.id} type="button" aria-pressed={isActive} aria-label={`执行分类：${section.label}`}
                       onClick={() => setSelectedExecutionCategoryId(section.id)}
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] tracking-[0.12em] transition-all ${isActive
+                      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] tracking-[0.12em] transition-all ${isActive
                         ? 'border-stone-300 bg-white text-stone-800 shadow-sm'
                         : 'border-stone-200 bg-white/55 text-stone-500 hover:border-stone-300 hover:bg-white/80'}`}>
                       <span>{section.label}</span>
@@ -2952,7 +2954,7 @@ export const TodoView: React.FC<TodoViewProps> = ({ todos, logs, categories, act
               </div>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-3">
+          <div className={`flex shrink-0 items-center gap-3 ${isVirtualExecutionCategory ? 'col-start-2 row-start-1' : ''}`}>
             <button
               onClick={() => openAIChat({ targetDate: todayDate, initialInputText: QUICK_ADD_TODO_PREFIX })}
               className="theme-icon-button relative overflow-visible"

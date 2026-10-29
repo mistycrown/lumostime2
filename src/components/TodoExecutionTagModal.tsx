@@ -1,5 +1,6 @@
 /**
  * @file TodoExecutionTagModal.tsx
+ * @updated 2026-10-29: Removes search and reuses themed category dropdowns with neutral focus.
  * @input Label library, current selection, all tasks and persistence callbacks
  * @output Modal label selection, label/category CRUD and confirmed unlinking
  * @pos Component (Todo execution context)
@@ -16,6 +17,7 @@ import {
 } from '../utils/todoExecutionLibrary';
 import { todoExecutionLibraryService } from '../services/todoExecutionLibraryService';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
+import { CustomSelect } from './CustomSelect';
 
 interface TodoExecutionTagModalProps {
   library: TodoExecutionLibrary;
@@ -34,7 +36,6 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
   library, selectedTags, todos, currentTodoId, onChange, onSaveTodo, onClose
 }) => {
   const [managing, setManaging] = useState(false);
-  const [query, setQuery] = useState('');
   const [tagName, setTagName] = useState('');
   const [categoryId, setCategoryId] = useState('custom');
   const [categoryName, setCategoryName] = useState('');
@@ -42,6 +43,7 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
   const [pending, setPending] = useState<{ type: 'tag' | 'category'; id: string; name: string } | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const selectedIds = new Set(selectedTags.map((tag) => tag.id));
+  const categoryOptions = library.categories.map((category) => ({ value: category.id, label: category.name }));
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -148,17 +150,16 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
   };
 
   const close = () => { if (pending) setPending(null); else onClose(); };
-  const queryKey = query.trim().toLocaleLowerCase();
 
   return createPortal(
     <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/25 px-4 py-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm"
       onClick={(event) => { if (event.target === event.currentTarget) close(); }}>
       <div ref={dialogRef} role={pending ? 'alertdialog' : 'dialog'} aria-modal="true" aria-labelledby="execution-tag-modal-title"
-        className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#faf9f6] shadow-2xl">
+        className="flex max-h-[85dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-[#faf9f6] shadow-2xl [&_button]:outline-none [&_button:focus-visible]:ring-2 [&_button:focus-visible]:ring-stone-400">
         <header className="flex shrink-0 items-center gap-2 border-b border-stone-200 px-5 py-4">
           <Tag size={18} className="text-stone-500" />
           <h2 id="execution-tag-modal-title" className="flex-1 text-base font-semibold text-stone-800">{pending ? `删除${pending.type === 'tag' ? '标签' : '分类'}` : '执行标签'}</h2>
-          {!pending && <button type="button" className={buttonClass} onClick={() => { setManaging(!managing); setError(''); }}>{managing ? '完成管理' : '管理'}</button>}
+          {!pending && <button data-initial-focus type="button" className={buttonClass} onClick={() => { setManaging(!managing); setError(''); }}>{managing ? '完成管理' : '管理'}</button>}
           <button type="button" className="p-2 text-stone-400 hover:text-stone-700" aria-label="关闭执行标签" onClick={close}><X size={18} /></button>
         </header>
         {pending ? <div className="px-5 py-6">
@@ -172,10 +173,8 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
           </div>
         </div> : <>
           <div className="min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
-            <input data-initial-focus aria-label="搜索执行标签" placeholder="搜索标签" value={query} onChange={(event) => setQuery(event.target.value)} className={`${inputClass} mb-5 w-full`} />
             {library.categories.map((category) => {
-              const tags = library.tags.filter((tag) => getExecutionCategoryId(tag) === category.id
-                && (!queryKey || tag.name.toLocaleLowerCase().includes(queryKey)));
+              const tags = library.tags.filter((tag) => getExecutionCategoryId(tag) === category.id);
               if (!managing && !tags.length) return null;
               return <section key={category.id} className="mb-5 last:mb-0">
                 <div className="mb-2 flex items-center gap-2">
@@ -198,9 +197,9 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
                         if (value !== tag.name) updateTag(tag.id, { name: value });
                       }}
                       onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }} className="min-w-0 flex-1 bg-transparent text-sm text-stone-700 outline-none" />
-                    <select aria-label={`移动${tag.name}到分类`} value={getExecutionCategoryId(tag)} onChange={(event) => updateTag(tag.id, { categoryId: event.target.value })} className="max-w-[7rem] rounded border border-stone-200 bg-white px-1 py-1.5 text-xs text-stone-500">
-                      {library.categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
+                    <CustomSelect ariaLabel={`移动${tag.name}到分类`} value={getExecutionCategoryId(tag)}
+                      onChange={(value) => updateTag(tag.id, { categoryId: value })} options={categoryOptions}
+                      className="w-28 shrink-0" renderDropdownInPortal portalContainerRef={dialogRef} />
                     <button type="button" aria-label={`删除标签${tag.name}`} className="p-2 text-stone-400 hover:text-red-500" onClick={() => setPending({ type: 'tag', id: tag.id, name: tag.name })}><Trash2 size={14} /></button>
                   </div> : <button key={tag.id} type="button" aria-pressed={selectedIds.has(tag.id)} onClick={() => onChange(toggleTodoExecutionTag(selectedTags, tag))}
                     className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors ${selectedIds.has(tag.id) ? 'border-stone-800 bg-stone-800 text-white' : 'border-stone-200 bg-white text-stone-600 hover:border-stone-400'}`}>
@@ -209,7 +208,6 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
                 </div>
               </section>;
             })}
-            {queryKey && !library.tags.some((tag) => tag.name.toLocaleLowerCase().includes(queryKey)) && <p className="py-4 text-center text-sm text-stone-400">没有匹配的标签</p>}
           </div>
           <footer className="shrink-0 space-y-3 border-t border-stone-200 px-5 py-4">
             {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
@@ -221,9 +219,9 @@ export const TodoExecutionTagModal: React.FC<TodoExecutionTagModalProps> = ({
             <div className="flex flex-wrap gap-2">
               <input aria-label="新执行标签名称" placeholder="新标签" value={tagName} maxLength={60} onChange={(event) => setTagName(event.target.value)}
                 onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addTag(); } }} className={`${inputClass} w-24 flex-1`} />
-              <select aria-label="新标签分类" value={library.categories.some((category) => category.id === categoryId) ? categoryId : 'custom'} onChange={(event) => setCategoryId(event.target.value)} className={`${inputClass} max-w-[7rem]`}>
-                {library.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
+              <CustomSelect ariaLabel="新标签分类" value={library.categories.some((category) => category.id === categoryId) ? categoryId : 'custom'}
+                onChange={setCategoryId} options={categoryOptions} className="w-28 shrink-0"
+                renderDropdownInPortal portalContainerRef={dialogRef} />
               <button type="button" aria-label="添加新执行标签" disabled={!tagName.trim()} onClick={addTag} className="rounded-lg bg-stone-800 px-3 py-2 text-white disabled:opacity-40"><Plus size={18} /></button>
             </div>
             <button type="button" onClick={onClose} className="w-full rounded-lg bg-stone-800 py-2.5 text-sm text-white">完成</button>

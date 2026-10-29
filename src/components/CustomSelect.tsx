@@ -1,5 +1,6 @@
 /**
  * @file CustomSelect.tsx
+ * @updated 2026-10-29: Supports modal-owned dropdown portals and neutral keyboard focus.
  * @updated 2026-10-18: Adds optional accessible naming and semantic selection states.
  * @updated 2026-09-12: Renders portal dropdowns only after measuring their position and removes slide-in motion.
  * @updated 2026-07-21: Added semantic hooks for high-contrast dark-mode select states.
@@ -28,6 +29,7 @@ interface CustomSelectProps {
   disabled?: boolean;
   dropdownPosition?: 'auto' | 'top' | 'bottom'; // 新增：下拉框位置
   renderDropdownInPortal?: boolean;
+  portalContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -40,7 +42,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   className = '',
   disabled = false,
   dropdownPosition = 'auto',
-  renderDropdownInPortal = false
+  renderDropdownInPortal = false,
+  portalContainerRef
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [shouldOpenUpward, setShouldOpenUpward] = useState(false);
@@ -158,7 +161,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
           setIsOpen(!isOpen);
         }}
         disabled={disabled}
-        className={`theme-select-trigger w-full rounded-xl border px-4 py-2 text-sm outline-none transition-all flex items-center justify-between text-left ${
+        className={`theme-select-trigger w-full rounded-xl border px-4 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-stone-400 transition-all flex items-center justify-between text-left ${
           disabled
             ? 'cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400'
             : 'bg-stone-50 border-stone-200 hover:border-stone-300'
@@ -214,7 +217,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     e.stopPropagation();
                     handleSelect(option.value);
                   }}
-                  className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm transition-colors hover:bg-stone-50 ${
+                  className={`flex w-full items-center justify-between px-4 py-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-stone-400 transition-colors hover:bg-stone-50 ${
                     option.value === value ? 'theme-select-option-selected font-bold' : 'text-stone-700'
                   }`}
                 >
@@ -236,7 +239,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         );
 
         return renderDropdownInPortal && typeof document !== 'undefined'
-          ? createPortal(dropdown, document.body)
+          ? createPortal(dropdown, portalContainerRef?.current || document.body)
           : dropdown;
       })()}
     </div>

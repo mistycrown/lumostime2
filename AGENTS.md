@@ -30,6 +30,7 @@
 - Keep files focused; prefer small pure helpers in `src/utils/`.
 - Preserve and update file header comments (`@file`, `@input`, `@output`, etc.) when modifying source files.
 - In frontend UI, avoid adding explanatory microcopy under buttons, options, or menu items unless explicitly requested. Prefer concise labels only.
+- Reuse the existing `CustomSelect` component for dropdowns instead of native `select` controls. Selected and focused controls must not have orange borders, outlines, or rings; use the existing neutral stone styling and retain a visible neutral keyboard-focus indicator.
 - Date and time inputs must use plain digit entry: 8 digits `YYYYMMDD` for dates and 4 digits `HHMM` for times, with numeric keyboards and validation. Do not use native or custom date/calendar pickers, time pickers, or `input type="date"`, `type="time"`, or `type="datetime-local"`. Statistical calendars are visualizations, not date-entry controls.
 - Prefer a minimalist editorial/print-inspired frontend style. Avoid box-inside-box, card-inside-card, or overly nested container treatments unless the existing screen already requires them.
 
