@@ -3,7 +3,6 @@ package com.mistycrown.lumostime
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
@@ -16,7 +15,8 @@ import java.util.Locale
  * @file WidgetDailyCheckListRemoteViewsService.kt
  * @input Today's shared native daily progress and ordered template metadata.
  * @output Stable checklist rows for both Android 12+ collections and legacy launcher factories.
- * @updated 2026-10-29: Adds read-only automatic rows, count progress and large manual tap targets.
+ * @updated 2026-10-29: Adds read-only automatic rows, count progress and native manual actions.
+ * @updated 2026-10-29: Aligns row typography, leading controls and compact icons with QUICK TODO / TODAY + PIN.
  */
 internal data class WidgetDailyCheckListRow(
     val meta: WidgetDailyCheckMeta,
@@ -48,15 +48,14 @@ internal object WidgetDailyCheckListRows {
         val readOnly = meta.type != "manual"
         val enabled = WidgetDailyCheckListRules.actionMode(meta.type, meta.manualMode, row.currentCount, row.targetCount, row.date, row.date) != null
         views.setTextViewText(R.id.widget_daily_list_item_title, meta.content)
-        views.setTextColor(R.id.widget_daily_list_item_title, Color.parseColor(if (row.completed) "#929B87" else "#302F2A"))
         views.setTextViewText(R.id.widget_daily_list_item_count, if (countMode) "${row.currentCount} / ${row.targetCount}" else if (readOnly) context.getString(R.string.widget_daily_list_auto) else "")
         views.setViewVisibility(R.id.widget_daily_list_item_count, if (countMode || readOnly) View.VISIBLE else View.GONE)
         views.setViewVisibility(R.id.widget_daily_list_item_divider, if (isLast) View.GONE else View.VISIBLE)
         views.setImageViewResource(R.id.widget_daily_list_item_action, when {
-            row.completed -> R.drawable.widget_daily_list_checked
-            countMode -> R.drawable.widget_daily_list_plus
+            row.completed -> R.drawable.widget_todo_pin_checkbox_checked
+            countMode -> R.drawable.widget_quick_todo_add_icon
             readOnly -> R.drawable.widget_daily_list_auto
-            else -> R.drawable.widget_daily_list_unchecked
+            else -> R.drawable.widget_todo_pin_checkbox_unchecked
         })
         views.setBoolean(R.id.widget_daily_list_item_action, "setEnabled", enabled)
         views.setContentDescription(R.id.widget_daily_list_item_action, when {
@@ -68,14 +67,15 @@ internal object WidgetDailyCheckListRows {
         } + "：" + meta.content)
         val bitmap = WidgetSlotBitmapRenderer.loadUiIconBitmap(
             context, meta.uiIconAssetPath, meta.uiIconFallbackAssetPath,
-            (20 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            (14 * context.resources.displayMetrics.density).toInt().coerceAtLeast(1)
         )
-        views.setViewVisibility(R.id.widget_daily_list_item_icon_image, if (bitmap != null) View.VISIBLE else View.GONE)
-        views.setViewVisibility(R.id.widget_daily_list_item_icon_text, if (bitmap == null) View.VISIBLE else View.GONE)
-        if (bitmap != null) views.setImageViewBitmap(R.id.widget_daily_list_item_icon_image, bitmap)
-        else views.setTextViewText(R.id.widget_daily_list_item_icon_text, meta.icon?.takeIf {
+        val emoji = meta.icon?.takeIf {
             it.isNotBlank() && !it.startsWith("ui:") && Character.codePointCount(it, 0, it.length) <= 5
-        } ?: "·")
+        }
+        views.setViewVisibility(R.id.widget_daily_list_item_icon_image, if (bitmap != null) View.VISIBLE else View.GONE)
+        views.setViewVisibility(R.id.widget_daily_list_item_icon_text, if (bitmap == null && emoji != null) View.VISIBLE else View.GONE)
+        if (bitmap != null) views.setImageViewBitmap(R.id.widget_daily_list_item_icon_image, bitmap)
+        else views.setTextViewText(R.id.widget_daily_list_item_icon_text, emoji.orEmpty())
         if (enabled) {
             val fillIn = Intent().apply {
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)

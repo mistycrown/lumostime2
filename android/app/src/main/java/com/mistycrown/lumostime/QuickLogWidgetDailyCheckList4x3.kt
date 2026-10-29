@@ -19,6 +19,7 @@ import java.util.Locale
  * @input Mirrored daily templates/progress, launcher updates, refresh and dated row taps.
  * @output A scrollable 4x3 paper-style daily checklist with native offline punch actions.
  * @updated 2026-10-29: Adds the approved list design with stable rows and capped count actions.
+ * @updated 2026-10-29: Matches TODAY + PIN's date style and invalidates legacy factories for the compact layout.
  */
 class QuickLogWidgetDailyCheckList4x3 : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
@@ -78,8 +79,8 @@ class QuickLogWidgetDailyCheckList4x3 : AppWidgetProvider() {
             val rows = WidgetDailyCheckListRows.load(context, date)
             for (widgetId in ids) {
                 val views = RemoteViews(context.packageName, R.layout.widget_layout_daily_check_list_4x3)
-                views.setTextViewText(R.id.widget_daily_list_date, SimpleDateFormat("MM.dd  EEE", Locale.getDefault()).format(now))
-                views.setTextViewText(R.id.widget_daily_list_progress, "${rows.count { it.completed }} / ${rows.size}")
+                views.setTextViewText(R.id.widget_daily_list_date, SimpleDateFormat("EEEE / MMM dd", Locale.ENGLISH).format(now).uppercase(Locale.ENGLISH))
+                views.setTextViewText(R.id.widget_daily_list_progress, "${rows.count { it.completed }}/${rows.size}")
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val collection = RemoteViews.RemoteCollectionItems.Builder()
                         .setHasStableIds(true).setViewTypeCount(1)
@@ -91,7 +92,7 @@ class QuickLogWidgetDailyCheckList4x3 : AppWidgetProvider() {
                     val service = Intent(context, WidgetDailyCheckListRemoteViewsService::class.java).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
                         // Date changes must create a fresh factory; ordinary taps retain scroll position.
-                        data = Uri.parse("lumostime-widget://daily-list/v1/$widgetId/$date")
+                        data = Uri.parse("lumostime-widget://daily-list/v2/$widgetId/$date")
                     }
                     views.setRemoteAdapter(R.id.widget_daily_list, service)
                 }

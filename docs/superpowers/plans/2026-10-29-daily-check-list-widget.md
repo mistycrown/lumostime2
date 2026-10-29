@@ -8,14 +8,14 @@
 
 **Tech Stack:** Kotlin / Java、Android RemoteViews XML、Capacitor、Vitest、JUnit。
 
-**Spec:** `static/design/daily-check-widget/concept-a.png`，用户回复「1」确认。
+**Spec:** 用户先选择 A 版清单布局，随后要求模仿现有小事和 TODAY 组件。最新样式对照为 `static/design/daily-check-widget/shared-widget-style.png`（非真机截图）。
 
 ## Global Constraints
 
 - 所有源文件 UTF-8，维护修改头注释。
 - 不编译 Android 应用；在本机独立运行纯 Java 规则测试，执行 Web build 和相关 Vitest。
 - 不提交用户预先存在或并行产生的其他修改。
-- 采用浅纸色、细分隔线、绿色完成圆点，按钮不附加说明文字。
+- 视觉修订以现有 QUICK TODO / TODAY + PIN 为准：白色 16dp 圆角、15sp 粗体等宽标题、12sp 轻字重正文、28dp 紧凑行、共用方形勾选框与加号。
 
 ## Review Focus
 
@@ -43,7 +43,7 @@
 **Interfaces:** provider 提供 `refreshAllAsync(context)`、`refreshWidget(context, widgetId)`；service 从共享 daily payload 获取今天的行，使用实例、日期与布局版本区分 RemoteViews 缓存；点击项携带稳定 item ID 和渲染日期。
 
 - [x] 实现独立接收器、日期/完成数标题、滚动列表、空状态和 picker 预览。
-- [x] 行内保留名称与图标，右侧圆形勾选 / 次数 +；自动项只读，完成项不重排。
+- [x] 行内保留名称与小图标，左侧共用方形勾选 / 次数 +；自动项只读，完成项不重排。
 - [x] 注册 provider/service，并接入全部、daily payload 及单实例刷新。
 - [x] 验证 XML 资源引用、注册、缓存 URI、动作模板与日期切换。
 
@@ -63,3 +63,10 @@
 - 旧缓存缺少 type 时只读；新版本应用启动同步后恢复正确的手动/自动类型。
 - Android 12+ 使用稳定 ID 的 RemoteCollectionItems；较早系统复用按实例/日期区分的 RemoteViewsService，日常刷新只通知数据变化。
 - 真机验收待用户手动编译安装：添加「日课清单 4x3」，确认勾选/取消、次数达标、自动项只读、重开应用回写、跨天与滚动状态。
+
+## 视觉修订
+
+- 复用 `widget_background`、`widget_todo_pin_checkbox_checked/unchecked` 与 `widget_quick_todo_add_icon`，移除日课专用的绿色圆形按钮和底板。
+- 标题与日期沿用 TODAY + PIN 的等宽字体和英文日期格式；正文直接使用小事清单的 `sans-serif-light`、12sp 和文字颜色。
+- 行高、内边距与全宽分隔线对齐现有清单；日课图标缩至 14dp，未设置图标时不占空白。
+- 较早系统的列表工厂版本更新为 v2，避免更新后沿用旧布局缓存。
