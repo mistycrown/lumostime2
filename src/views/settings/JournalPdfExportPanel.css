@@ -3,6 +3,7 @@
  * @input Settings card, shared dropdowns and color palette
  * @output Compact page selection and monochrome checkboxes without restyling shared components
  * @updated 2026-10-24: Matches adjacent settings cards and preserves shared dropdown and palette styles.
+ * @updated 2026-10-29: Constrains nested grid columns so long font names truncate within the settings card.
  */
 @import '@radix-ui/colors/gray.css';
 @import '@radix-ui/colors/gray-dark.css';
@@ -12,7 +13,7 @@
 /* The app uses data-theme-mode rather than Radix's .dark root class. */
 html[data-theme-mode='dark'] .journal-export { --gray-1: #111111; --gray-3: #222222; --gray-8: #606060; --gray-11: #b4b4b4; --gray-12: #eeeeee; --red-11: #ff9592; }
 .journal-export { font-size: 14px; line-height: 1.5; }
-.journal-export fieldset { display: grid; gap: 20px; min-width: 0; }
+.journal-export fieldset { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
 .journal-export fieldset:disabled { opacity: 0.6; }
 .journal-export-dates, .journal-export-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
 .journal-export-dates label { min-width: 0; color: var(--gray-11); font-size: 12px; }
@@ -38,6 +39,6 @@ html[data-theme-mode='dark'] .journal-export { --gray-1: #111111; --gray-3: #222
 .journal-export button:disabled { opacity: 0.5; cursor: default; }
 .journal-export-part-group + .journal-export-part-group { margin-top: 16px; }
 .journal-export-part-group h4 { margin: 0 0 8px; font-size: 12px; font-weight: 500; color: var(--gray-11); }
-.journal-export-appearance { display: grid; gap: 16px; }
+.journal-export-appearance { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
 .journal-export-paper > div { min-width: 0; width: min(66%, 240px); }
 .journal-export-palette { width: min(100%, 280px); margin: 16px 0 0 auto; padding: 4px; }
