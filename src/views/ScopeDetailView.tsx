@@ -681,7 +681,7 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                 
                 // 计算归档目标的成功和失败数量
                 const archivedStats = archivedGoals.reduce((acc, goal) => {
-                    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos);
+                    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
                     const isLimitGoal = goal.metric === 'duration_limit';
                     
                     // 判断成功或失败
