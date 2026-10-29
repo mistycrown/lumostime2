@@ -9,6 +9,7 @@
  * @updated 2026-10-23: Uses concise covers, grouped reviews, multi-column body pages and integrated bar distributions.
  * @updated 2026-10-24: Honors independent annual/month/week/day part selections while retaining nested ordering.
  * @updated 2026-10-24: Adds independently selectable annual and weekly time distributions beside the existing monthly statistics.
+ * @updated 2026-10-29: Renders Markdown in standalone reviews, annual summaries and goal descriptions.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { Goal, MajorGoal } from '../types';
@@ -21,6 +22,7 @@ import { writeAnnualMood } from './journalPdfMood';
 import { writeJournalCover } from './journalPdfCover';
 import { writeJournalDistributions } from './journalPdfStatistics';
 import { writeJournalDay } from './journalPdfDay';
+import { writeJournalMarkdown } from './journalPdfMarkdown';
 
 const MUTED = C.muted;
 const ACCENT = C.accent;
@@ -29,7 +31,7 @@ const writeReview = (w: JournalPdfWriter, review: JournalReview, omitSummary = f
   if (w.model.options.paperSize === 'a4' && !w.compact) w.beginColumns(3);
   journalReviewLines(omitSummary ? { ...review, summary: undefined } : review, w.model.reviewTemplates).forEach((line) => {
     if (line.role === 'print') w.heading(line.text);
-    else w.paragraph(line.text);
+    else writeJournalMarkdown(w, line.text);
   });
 };
 
@@ -45,8 +47,8 @@ const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[]): void 
       w.heading(`${Number(month.slice(5))} 月`);
       w.paragraph(stats(monthDays), 9, MUTED, 0, 'print');
       const review = model.monthlyReviews.find((item) => item.monthStartDate.startsWith(month));
-      if (review?.cite) w.paragraph(review.cite);
-      if (review?.summary) w.paragraph(review.summary);
+      if (review?.cite) writeJournalMarkdown(w, review.cite);
+      if (review?.summary) writeJournalMarkdown(w, review.summary);
     }
   }
   const goals = journalHasPart(model.options, 'goals') ? model.goals.filter((goal) => goal.startDate <= `${year}-12-31` && goal.endDate >= `${year}-01-01`) : [];
@@ -56,7 +58,7 @@ const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[]): void 
     const writeGoal = (goal: Goal | MajorGoal, child = false) => {
       w.ensure(85);
       w.heading(child ? '子目标' : '目标');
-      w.paragraph(goal.title, w.bodySize + 2);
+      writeJournalMarkdown(w, goal.title);
       const state = goal.status === 'completed' ? '已完成' : goal.status === 'archived' ? '已归档' : goal.status === 'failed' ? '未达成' : '进行中';
       w.paragraph(`${goal.startDate} — ${goal.endDate} ${state}`, 8, MUTED, 0, 'print');
       const progress = model.goalProgress[goal.id];
@@ -67,8 +69,8 @@ const writeYear = (w: JournalPdfWriter, year: number, days: JournalDay[]): void 
         w.rect(w.margin, w.y, w.contentWidth * Math.max(0, Math.min(1, progress.percentage / 100)), 3, ACCENT);
         w.y += 12;
       }
-      if (goal.motivation) w.paragraph(goal.motivation);
-      if ('description' in goal && goal.description) w.paragraph(goal.description);
+      if (goal.motivation) writeJournalMarkdown(w, goal.motivation);
+      if ('description' in goal && goal.description) writeJournalMarkdown(w, goal.description);
     };
     const majorIds = new Set(model.majorGoalIds);
     goals.filter((goal) => majorIds.has(goal.id)).forEach((major) => {

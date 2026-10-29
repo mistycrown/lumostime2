@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file journalPdfChecks.ts
  * @input Historical daily check snapshots for one month
  * @output Aligned completion circles, incomplete dashes and direct counts without a heavy grid
@@ -11,6 +11,7 @@ import { JOURNAL_STROKE } from '../utils/journalTheme';
 import { getCheckItemCountState } from '../utils/dailyCheckUtils';
 import type { JournalDay } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
+import { journalMarkdownText } from '../utils/journalMarkdown';
 
 export const writeJournalCheckMatrix = (w: JournalPdfWriter, month: string, days: JournalDay[]): void => {
   const keyOf = (item: JournalDay['checks'][number]) => `${item.category || ''}\u0000${item.id || item.content}`;

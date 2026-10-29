@@ -4,11 +4,13 @@
  * @output Semantic print blocks with inline emphasis, links, lists and quotes
  * @pos Utility (Journal PDF)
  * @updated 2026-10-24: Shares the application's remark syntax while keeping PDF layout independent of HTML.
+ * @updated 2026-10-29: Preserves inline journal node aliases alongside Markdown emphasis and links.
  */
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import type { Nodes } from 'mdast';
+import { journalNoteRuns } from './journalLogContent';
 
 export interface JournalMarkdownSpan {
   text: string;
@@ -17,6 +19,7 @@ export interface JournalMarkdownSpan {
   strike?: boolean;
   code?: boolean;
   url?: string;
+  node?: string;
 }
 export interface JournalMarkdownBlock {
   kind: 'paragraph' | 'heading' | 'code' | 'rule';
@@ -39,7 +42,7 @@ export const wrapJournalMarkdownSpans = (spans: JournalMarkdownSpan[], width: nu
     const merged: JournalMarkdownSpan[] = [];
     for (const token of line) {
       const previous = merged.at(-1);
-      if (previous && previous.bold === token.bold && previous.italic === token.italic && previous.strike === token.strike && previous.code === token.code && previous.url === token.url) previous.text += token.text;
+      if (previous && previous.bold === token.bold && previous.italic === token.italic && previous.strike === token.strike && previous.code === token.code && previous.url === token.url && previous.node === token.node) previous.text += token.text;
       else merged.push({ ...token });
     }
     lines.push(merged); line = []; length = 0;
@@ -71,6 +74,7 @@ export const parseJournalMarkdown = (source: string): JournalMarkdownBlock[] => 
       return [{ ...style, text: [node.alt, url].filter(Boolean).join(' '), url }];
     }
     if (node.type === 'footnoteReference') return [{ ...style, text: `[${node.identifier}]` }];
+    if (node.type === 'text' && !style.code) return journalNoteRuns(node.value).map((run) => ({ ...style, ...run }));
     if ('value' in node) return [{ ...style, text: node.value, code: style.code || node.type === 'inlineCode' }];
     if ('children' in node) return inline(node.children, {
       ...style,
@@ -123,3 +127,6 @@ export const parseJournalMarkdown = (source: string): JournalMarkdownBlock[] => 
   walk(root.children);
   return blocks;
 };
+
+/** Calendar/time-grid excerpts retain readable content; full details retain rich styles. */
+export const journalMarkdownText = (source: string): string => parseJournalMarkdown(source).map((block) => block.spans.map((span) => span.text).join('')).join('\n');

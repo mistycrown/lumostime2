@@ -11,6 +11,7 @@
  * @updated 2026-10-24: Saves and reopens books with over 1000 daily pages and verifies A5 spreads beyond that boundary.
  * @updated 2026-10-24: Verifies styled Markdown and long lists stay searchable and within A4/A5 column bounds.
  * @updated 2026-10-25: Covers unclassified planned blocks, task-title fallback and unchanged actual-log activity labels.
+ * @updated 2026-10-29: Covers review sidebar overflow and Markdown throughout authored journal content.
  */
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
@@ -25,9 +26,10 @@ import { writeJournalDistributions } from './journalPdfStatistics';
 import { journalDataColor } from './journalPdfTheme';
 import { journalDemoData } from '../../scripts/fixtures/journal-demo';
 import { writeWeeklyTimeline } from './journalPdfTimeline';
-import { writeJournalCalendar } from './journalPdfOverview';
+import { writeJournalCalendar, writeJournalOverview } from './journalPdfOverview';
 import type { DailyReview } from '../types';
-import { writeJournalMarkdown } from './journalPdfMarkdown';
+import { writeJournalMarkdown, writeJournalMarkdownBlocks } from './journalPdfMarkdown';
+import { parseJournalMarkdown } from '../utils/journalMarkdown';
 
 const data: JournalExportData = { logs: [], todos: [], scopes: [], categories: [], todoCategories: [], dailyReviews: [], weeklyReviews: [], monthlyReviews: [] };
 const options: JournalExportOptions = { startDate: '2026-10-19', endDate: '2026-10-20', sections: ['timeline'], paperSize: 'a4', includeCover: false, includeEmptyDays: false };
@@ -39,6 +41,66 @@ const make = async (size: 'a4' | 'a5', patch: Partial<JournalExportOptions> = {}
 };
 
 describe('PDF pagination with bundled Chinese font', () => {
+  it.each(['a4', 'a5'] as const)('preserves styled review sidebar content through %s continuation pages', async (paper) => {
+    const w = await make(paper);
+    const narrative = '# 回顾标题\n\n**重要片刻**与*轻松时光*。\n\n- [x] 第一件事\n\n> 引用内容\n\n' + Array.from({ length: 60 }, (_, index) => `- 回顾第${index}项 **完整内容**和[资料](https://example.com/review)。`).join('\n');
+    const calls: { value: string; bold?: boolean; italic?: boolean }[] = [];
+    const text = w.text.bind(w);
+    let sidebarPage = 0;
+    w.text = (value, x, top, size = 9, color, role, style) => {
+      if (value === '月度回顾') sidebarPage = w.pageCount;
+      if (sidebarPage && !/^2026-10/.test(value) && !value.includes('月度回顾 续')) {
+        expect(x + w.widthOf(value, size, role)).toBeLessThanOrEqual(w.margin + w.contentWidth + 0.1);
+        expect(top + size).toBeLessThanOrEqual(w.bottom + 0.1);
+      }
+      calls.push({ value, ...style }); text(value, x, top, size, color, role, style);
+    };
+    writeJournalOverview(w, '月计划', '', () => {}, { id: 'm', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', answers: [], narrative, createdAt: 0, updatedAt: 0 }, '月度回顾');
+    const body = calls.map((call) => call.value).join('');
+    for (let index = 0; index < 60; index++) expect(body.split(`回顾第${index}项`)).toHaveLength(2);
+    expect(calls).toContainEqual(expect.objectContaining({ value: '重要片刻', bold: true }));
+    expect(calls.filter((call) => call.italic).map((call) => call.value).join('')).toContain('轻松时光');
+    expect(body).not.toMatch(/\*\*|\[x\]|```/);
+    expect(w.pageCount).toBeGreaterThan(sidebarPage);
+    expect(w.pdf.getPages().flatMap((page) => page.node.Annots()?.asArray() || []).length).toBeGreaterThan(0);
+  });
+  it('rewraps partial styled blocks without losing hard breaks, whitespace or node targets', async () => {
+    const w = await make('a5'); w.startPage('回顾');
+    const source = '> **第一行\t保留空格**\n> 下一行[[书签丨阅读]]继续\n> 最后一句保留。';
+    const blocks = parseJournalMarkdown(source);
+    const calls: string[] = []; const text = w.text.bind(w);
+    w.text = (value, ...args) => { calls.push(value); text(value, ...args); };
+    const remaining = w.withTextRegion(300, w.y, 50, w.y + 34, () => writeJournalMarkdownBlocks(w, blocks, { stopAtBottom: true }));
+    expect(remaining[0].continued).toBe(true);
+    w.startPage('回顾续');
+    writeJournalMarkdownBlocks(w, remaining);
+    expect(calls.filter((value) => value !== '回顾续').join('')).toBe('第一行    保留空格下一行书签继续最后一句保留。');
+    expect(remaining[0].spans.some((span) => span.node === '阅读')).toBe(true);
+    expect(w.page.node.Annots()?.size()).toBe(1);
+  });
+  it.each(['a4', 'a5'] as const)('renders Markdown throughout %s standalone reviews and authored detail sections', async (paper) => {
+    const answer = (name: string) => `**${name}加粗**\n\n- ${name}列表\n\n> ${name}引用`;
+    const source: JournalExportData = { ...data,
+      dailyReviews: [{ id: 'd', date: '2026-10-19', createdAt: 0, updatedAt: 0, summary: answer('每日摘要'), answers: [{ questionId: 'q', question: '每日问题', answer: answer('每日回答') }] }],
+      monthlyReviews: [{ id: 'm', monthStartDate: '2026-10-01', monthEndDate: '2026-10-31', createdAt: 0, updatedAt: 0, cite: answer('月引言'), summary: answer('月摘要'), narrative: answer('月叙事'), answers: [{ questionId: 'q', question: '月问题', answer: answer('月回答') }] }],
+      weeklyReviews: [{ id: 'wk', weekStartDate: '2026-10-19', weekEndDate: '2026-10-25', createdAt: 0, updatedAt: 0, summary: answer('周摘要'), narrative: answer('周叙事'), answers: [{ questionId: 'q', question: '周问题', answer: answer('周回答') }] }],
+      todos: [{ id: 'todo', categoryId: 'c', title: '计划', isCompleted: false, scheduledDate: '2026-10-19', note: answer('计划备注') }],
+      logs: [{ id: 'log', categoryId: 'c', activityId: 'a', title: '日志', startTime: new Date(2026, 9, 19, 9).getTime(), endTime: new Date(2026, 9, 19, 10).getTime(), duration: 3600, note: answer('日志备注'), attributeValues: [{ attributeId: 'text', value: answer('文本属性') }], comments: [{ id: 'comment', content: answer('评论'), createdAt: 0 }] }]
+    };
+    const parts: NonNullable<JournalExportOptions['parts']> = ['annualReview', 'oneLine', 'monthReview', 'weekReview', 'daySummary', 'dayReview', 'dayPlans', 'dayLogs'];
+    const w = await make(paper, { sections: journalSectionsForParts(parts), parts }, source);
+    const calls: { value: string; bold?: boolean }[] = []; const text = w.text.bind(w);
+    w.text = (value, ...args) => { calls.push({ value, ...args[5] }); text(value, ...args); };
+    await composeJournalPdf(w);
+    const body = calls.map((call) => call.value).join('');
+    for (const name of ['每日摘要', '每日回答', '月引言', '月摘要', '月叙事', '月回答', '周摘要', '周叙事', '周回答', '计划备注', '日志备注', '文本属性', '评论']) {
+      expect(calls).toContainEqual(expect.objectContaining({ value: `${name}加粗`, bold: true }));
+      expect(body).toContain(`${name}列表`);
+      expect(body).toContain(`${name}引用`);
+    }
+    expect(body).not.toContain('**');
+    for (const name of ['计划备注', '日志备注', '评论']) expect(body.split(`${name}加粗`)).toHaveLength(2);
+  });
   it.each(['a4', 'a5'] as const)('labels planned blocks with plan/task names in the %s weekly timeline', async (paper) => {
     const changes = [
       { title: '写方案', linkedTodoId: 'other-title' },

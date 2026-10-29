@@ -16,6 +16,7 @@
  * @updated 2026-10-24: Removes the arbitrary 1000-page cutoff for content and A5 spread alignment pages.
  * @updated 2026-10-24: Adds single-pass searchable bold/italic text without changing the selected fonts.
  * @updated 2026-10-24: Carries native byte-write progress separately from the rendered page count.
+ * @updated 2026-10-29: Shares Markdown note rendering and bounded review-column geometry.
  */
 import { PDFDocument, PDFFont, PDFImage, PDFPage, PDFHexString, degrees, pushGraphicsState, popGraphicsState, setLineWidth, setTextRenderingMode, TextRenderingMode, setStrokingRgbColor } from 'pdf-lib';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, type JournalDay, type JournalModel } from '../utils/journalExport';
@@ -27,6 +28,8 @@ import { journalPageTitle } from '../utils/journalTitles';
 import { journalNoteRuns, wrapJournalNoteRuns, type JournalNoteRun } from '../utils/journalLogContent';
 import { journalDataColor } from './journalPdfTheme';
 import { getTodoScheduleBadgeLabel } from '../utils/todoScheduleLabels';
+import { journalMarkdownText } from '../utils/journalMarkdown';
+import { writeJournalMarkdown } from './journalPdfMarkdown';
 
 
 export const JOURNAL_FONT_FAMILY = 'LumosJournal';
@@ -66,6 +69,7 @@ export class JournalPdfWriter {
   private blankPages = new Set<PDFPage>();
   private coverPages = new Set<PDFPage>();
   private columns: { index: number; count: number; top: number; width: number; gap: number; bottom: number } | undefined;
+  private textRegion?: { x: number; width: number; bottom: number };
   readonly stickers = new Map<string, PDFImage>();
   readonly photos = new Map<string, PDFImage>();
 
@@ -80,10 +84,10 @@ export class JournalPdfWriter {
     this.fallbackCharacters = new Set(fallbackFont?.getCharacterSet() || []);
   }
 
-  get margin(): number { return this.pageMargin + (this.columns ? this.columns.index * (this.columns.width + this.columns.gap) : 0); }
-  get contentWidth(): number { return this.columns?.width ?? this.width - this.pageMargin * 2; }
+  get margin(): number { return this.textRegion?.x ?? this.pageMargin + (this.columns ? this.columns.index * (this.columns.width + this.columns.gap) : 0); }
+  get contentWidth(): number { return this.textRegion?.width ?? this.columns?.width ?? this.width - this.pageMargin * 2; }
   get pageBottom(): number { return this.height - this.pageMargin - 22; }
-  get bottom(): number { return this.columns?.bottom ?? this.pageBottom; }
+  get bottom(): number { return this.textRegion?.bottom ?? this.columns?.bottom ?? this.pageBottom; }
   get compact(): boolean { return Boolean(this.columns); }
   get pageCount(): number { return this.pdf.getPageCount(); }
   get standardBodyTop(): number { return this.pageMargin + 64; }
@@ -189,7 +193,7 @@ export class JournalPdfWriter {
   noteOnce(key: string, content: string | undefined, indent = 0): void {
     if (!content?.trim() || this.printedNotes.has(key)) return;
     this.printedNotes.add(key);
-    this.paragraph(content, this.bodySize, INK, indent, 'hand');
+    writeJournalMarkdown(this, content, { indent });
   }
 
   claimLogDetails(id: string): boolean {
@@ -208,6 +212,16 @@ export class JournalPdfWriter {
     const previous = this.smallType;
     this.smallType = size;
     try { draw(); } finally { this.smallType = previous; }
+  }
+
+  /** Bounded renderers return overflow before ensure() can leave this region. */
+  withTextRegion<T>(x: number, top: number, width: number, bottom: number, draw: () => T): T {
+    const previous = this.textRegion;
+    const previousY = this.y;
+    this.textRegion = { x, width, bottom };
+    this.y = top;
+    try { return draw(); }
+    finally { this.textRegion = previous; this.y = previousY; }
   }
 
   private flushLogRail(bottom: number): void {
@@ -378,7 +392,7 @@ export class JournalPdfWriter {
   heading(value: string): void {
     this.ensure(this.compact ? 32 : 45);
     this.y += this.compact ? 5 : 9;
-    this.paragraph(value, 12, ACCENT, 0, 'print');
+    writeJournalMarkdown(this, value, { size: 12, color: ACCENT, role: 'print' });
   }
 
   rule(): void { this.ensure(this.compact ? 8 : 12); this.line(this.margin, this.y + 2, this.contentWidth); this.y += this.compact ? 8 : 13; }

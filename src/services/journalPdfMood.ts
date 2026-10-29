@@ -6,10 +6,12 @@
  * @updated 2026-10-23: Keeps 12 months and 31 day rows on one page with small original stickers.
  * @updated 2026-10-23: Aligns the compact annual day labels at the 9pt minimum print size.
  * @updated 2026-10-23: Uses twelve A4 mini calendars with stickers replacing dates and one-line 12pt summary stickers.
+ * @updated 2026-10-29: Uses the shared Markdown renderer for annual one-line summaries.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { journalHasPart, type JournalDay } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
+import { writeJournalMarkdown } from './journalPdfMarkdown';
 
 const MUTED = C.muted;
 const INK = C.ink;
@@ -86,12 +88,7 @@ export const writeAnnualMood = (w: JournalPdfWriter, year: number, days: Journal
     const icon = day.review!.moodEmoji;
     if (icon) w.sticker(icon, x, top, 12);
     const indent = icon ? 18 : 0;
-    for (const line of w.wrap(day.review!.summary!, w.contentWidth - indent, 9, 'hand')) {
-      w.ensure(13.5);
-      w.text(line, w.margin + indent, w.y, 9, INK, 'hand');
-      w.y += 13.5;
-    }
-    w.y += 3;
+    writeJournalMarkdown(w, day.review!.summary!, { indent });
     if (w.page === page && w.margin === x) w.y = Math.max(w.y, top + 13.5);
     if (w.y + 8 <= w.bottom) w.line(w.margin, w.y + 3, w.contentWidth);
     w.y += 8;

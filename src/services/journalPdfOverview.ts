@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file journalPdfOverview.ts
  * @input Shared app month layout, review records and PDF writer
  * @output A5 facing spreads or a single landscape A4 overview with an eighth review column
@@ -9,6 +9,7 @@
  * @updated 2026-10-23: Retains historical review groups and preserves the user schedule/category color settings.
  * @updated 2026-10-24: Spaces review groups, questions and answers and supports the shared timeline axis geometry.
  * @updated 2026-10-24: Separates template guidance from AI narrative content for daily section rendering.
+ * @updated 2026-10-29: Renders sidebar Markdown in bounds and rewraps semantic overflow on continuation pages.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { DailyReview, MonthlyReview, WeeklyReview, ReviewTemplate } from '../types';
@@ -18,6 +19,8 @@ import { buildTodoMonthWeekLayout, formatDateKey, getStartOfWeek, parseDateKey, 
 import { JOURNAL_STROKE } from '../utils/journalTheme';
 import type { JournalPdfWriter, JournalTextRole } from './journalPdfLayout';
 import { journalBlockColor } from './journalPdfTimeline';
+import { journalMarkdownText, parseJournalMarkdown } from '../utils/journalMarkdown';
+import { writeJournalMarkdownBlocks, type JournalPdfMarkdownBlock } from './journalPdfMarkdown';
 
 const INK = C.ink;
 const MUTED = C.muted;
@@ -70,7 +73,7 @@ export const writeJournalOverview = (
 ): void => {
   const spread = w.model.options.paperSize === 'a5';
   if (spread) w.alignSpread();
-  let remaining: ReviewLine[] = [];
+  let remaining: JournalPdfMarkdownBlock[] = [];
   for (let side = 0; side < (spread ? 2 : 1); side++) {
     w.startPage(title, `${subtitle}${spread ? ` ${side ? '右页' : '左页'}` : ''}`);
     const count = spread ? 4 : 8;
@@ -79,37 +82,22 @@ export const writeJournalOverview = (
     if (panel.start + count === 8) {
       const x = panel.reviewX ?? panel.x + (7 - panel.start) * panel.column + 9;
       const width = panel.reviewWidth ?? panel.column - 18;
-      let y = panel.top;
-      w.text(reviewLabel, x, y, 9, MUTED);
-      y += 25;
-      let block = 0;
-      const lines = journalReviewLines(review, w.model.reviewTemplates).flatMap((line) => line.text.replace(/\r\n?/g, '\n').split('\n').flatMap((paragraph) => {
-        const id = block++;
-        return w.wrap(paragraph, width, 9, line.role).map((text, index) => ({ ...line, text, block: id, gap: index ? 0 : line.level === 'group' ? 12 : line.level === 'question' ? 8 : line.role === 'hand' ? 3 : 6 }));
-      }));
-      for (let i = 0; i < lines.length; i++) {
-        if (y + lines[i].gap + 12 > panel.top + panel.height - 15) {
-          for (const rest of lines.slice(i)) {
-            const previous = remaining[remaining.length - 1] as (ReviewLine & { block: number }) | undefined;
-            if (previous?.block === rest.block) previous.text += rest.text;
-            else remaining.push({ ...rest });
-          }
-          break;
-        }
-        const line = lines[i];
-        y += line.gap;
-        w.text(line.text, x, y, 9, line.role === 'print' ? MUTED : INK, line.role);
-        y += 13.5;
-      }
+      w.text(reviewLabel, x, panel.top, 9, MUTED);
+      const blocks = journalReviewLines(review, w.model.reviewTemplates).flatMap((line) => parseJournalMarkdown(line.text).map((block, index): JournalPdfMarkdownBlock => ({
+        ...block,
+        role: line.role === 'print' ? 'print' : undefined,
+        color: line.role === 'print' ? MUTED : undefined,
+        spaceBefore: index ? undefined : line.level === 'group' ? 12 : line.level === 'question' ? 8 : line.role === 'hand' ? 3 : 6
+      })));
+      remaining = w.withTextRegion(x, panel.top + 25, width, panel.top + panel.height - 15,
+        () => writeJournalMarkdownBlocks(w, blocks, { stopAtBottom: true }));
     }
     w.y = w.bottom;
   }
   if (remaining.length) {
     w.startPage(`${reviewLabel} 续`, subtitle);
-    remaining.forEach((line) => {
-      w.ensure(35); w.y += line.level === 'group' ? 12 : line.level === 'question' ? 8 : 3;
-      w.paragraph(line.text, w.bodySize, line.role === 'print' ? MUTED : INK, 0, line.role);
-    });
+    w.beginColumns(w.model.options.paperSize === 'a4' ? 3 : 2);
+    writeJournalMarkdownBlocks(w, remaining);
   }
 };
 
@@ -150,7 +138,7 @@ export const writeJournalCalendar = (w: JournalPdfWriter, month: string, days: J
           w.rect(cellX + 2, blockY, column - 4, laneHeight - 2, journalBlockColor('', color, 0.65));
           if (entry.primaryKind === 'maybe') w.page.drawRectangle({ x: cellX + 2, y: w.height - blockY - laneHeight + 2, width: column - 4, height: laneHeight - 2, borderColor: journalBlockColor('', color, 0), borderWidth: JOURNAL_STROKE, borderDashArray: [2, 2] });
           const marker = entry.primaryKind === 'deadline' || entry.primaryKind === 'recurring';
-          const title = w.fitted(entry.todo.title, column - 11 - (marker ? 8 : 0), 9, 'hand');
+          const title = w.fitted(journalMarkdownText(entry.todo.title), column - 11 - (marker ? 8 : 0), 9, 'hand');
           w.text(title, cellX + 5, blockY + 1, 9, entry.primaryKind === 'completed' ? MUTED : INK, 'hand');
           if (entry.primaryKind === 'deadline') {
             w.verticalLine(cellX + column - 10, blockY + 2, 7, journalBlockColor('', color, 0));

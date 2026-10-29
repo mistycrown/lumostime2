@@ -5,22 +5,32 @@
  * @pos Service (Journal log details)
  * @updated 2026-10-23: Retains rich Log content once across midnight and chapter repetition.
  * @updated 2026-10-24: Keeps each Log reaction beside its own title and excludes sticker reactions.
+ * @updated 2026-10-29: Renders Markdown in Log titles, authored fields and comments with existing indentation.
  */
 import type { JournalLog } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
+import { writeJournalMarkdown } from './journalPdfMarkdown';
+import { parseJournalMarkdown } from '../utils/journalMarkdown';
 
 export const journalLogReactions = (log: JournalLog): string[] => (log.source.reactions || []).filter((value) => !value.startsWith('image:') && !value.startsWith('ui:'));
 
 export const writeJournalLogTitle = (w: JournalPdfWriter, log: JournalLog): void => {
   const reactions = w.claimLogReactions(log.source.id) ? journalLogReactions(log) : [];
-  w.paragraph(`${log.source.title || log.activity}${reactions.length ? ` ${reactions.join(' ')}` : ''}`, 9, C.ink, 12, 'hand');
+  writeJournalMarkdown(w, `${log.source.title || log.activity}${reactions.length ? ` ${reactions.join(' ')}` : ''}`, { indent: 12 });
 };
 
 export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog, includeTitle = false): void => {
   if (!w.claimLogDetails(log.source.id)) return;
   if (includeTitle) writeJournalLogTitle(w, log);
   const field = (label: string, value: string) => {
+    const blocks = parseJournalMarkdown(value);
+    if (blocks.some((block) => block.kind !== 'paragraph' || block.indent || block.spans.some((span) => span.bold || span.italic || span.strike || span.code || span.url || span.node))) {
+      w.ensure(32);
+      w.paragraph(label, 9, C.muted, 12, 'print');
+      writeJournalMarkdown(w, value, { indent: 12 });
+      return;
+    }
     const labelWidth = w.widthOf(label, 9) + 8;
     if (labelWidth > (w.contentWidth - 12) * 0.45) {
       w.ensure(32);
@@ -74,7 +84,7 @@ export const writeJournalLogDetails = (w: JournalPdfWriter, log: JournalLog, inc
       const date = new Date(comment.createdAt);
       w.ensure(32);
       w.paragraph(Number.isFinite(date.getTime()) ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}` : String(comment.createdAt), 9, C.muted, 12, 'print');
-      w.paragraph(comment.content, 9, C.ink, 12, 'hand');
+      writeJournalMarkdown(w, comment.content, { indent: 12 });
     });
   }
 };

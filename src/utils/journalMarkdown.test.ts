@@ -3,11 +3,23 @@
  * @input Mixed Chinese CommonMark/GFM narratives
  * @output Coverage for hierarchy, emphasis, nested/task lists and lossless styled wrapping
  * @updated 2026-10-24: Verifies syntax is parsed as structure instead of printed markers.
+ * @updated 2026-10-29: Checks aliases retain canonical node targets when mixed with Markdown.
  */
 import { describe, expect, it } from 'vitest';
 import { parseJournalMarkdown, wrapJournalMarkdownSpans } from './journalMarkdown';
 
 describe('journal narrative Markdown', () => {
+  it('preserves node aliases and their styles without interpreting nodes inside code', () => {
+    const blocks = parseJournalMarkdown('**[[书签丨阅读]]** 与[[朋友]]，`[[代码]]`。');
+    expect(blocks[0].spans).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: '书签', node: '阅读', bold: true }),
+      expect.objectContaining({ text: '朋友', node: '朋友' }),
+      expect.objectContaining({ text: '[[代码]]', code: true })
+    ]));
+    const wrapped = wrapJournalMarkdownSpans(blocks[0].spans, 20, (span) => span.text.length);
+    expect(wrapped.flat().find((span) => span.text === '书签')?.node).toBe('阅读');
+    expect(wrapped.flat().find((span) => span.code)?.node).toBeUndefined();
+  });
   it('keeps all six heading levels and nested inline emphasis', () => {
     const headings = parseJournalMarkdown(Array.from({ length: 6 }, (_, index) => '#'.repeat(index + 1) + ' 标题' + index).join('\n\n'));
     expect(headings.map((block) => block.depth)).toEqual([1, 2, 3, 4, 5, 6]);

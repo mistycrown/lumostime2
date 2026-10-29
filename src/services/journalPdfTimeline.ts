@@ -13,7 +13,7 @@
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import type { JournalDay } from '../utils/journalExport';
 import { shiftJournalDate } from '../utils/journalExport';
-import { journalNoteRuns } from '../utils/journalLogContent';
+import { journalMarkdownText } from '../utils/journalMarkdown';
 import { layoutJournalTimeline } from '../utils/journalTimelineLayout';
 import type { JournalPdfWriter } from './journalPdfLayout';
 import type { WeeklyReview } from '../types';
@@ -68,9 +68,9 @@ export const writeWeeklyTimeline = (w: JournalPdfWriter, week: string, days: Jou
         const label = log.source.isPlanned
           ? log.source.title?.trim() || log.todo?.name?.trim() || (log.activity === '未分类活动' ? '计划' : log.activity)
           : log.activity;
-        const title = w.fitted(label, width - 6, 7.5, 'hand');
+        const title = w.fitted(journalMarkdownText(label), width - 6, 7.5, 'hand');
         w.text(title, x + 3, y + 1, 7.5, ink, 'hand');
-        const note = journalNoteRuns(log.source.note || '').map((run) => run.text).join('').replace(/\s+/g, ' ').trim();
+        const note = journalMarkdownText(log.source.note || '').replace(/\s+/g, ' ').trim();
         const excerpt = Array.from(note).slice(0, 80).join('');
         const lines = w.wrap(excerpt + (excerpt !== note ? '…' : ''), width - 6, 7.5, 'hand');
         const available = Math.min(3, Math.max(0, Math.floor((blockHeight - 3) / 10) - 1));

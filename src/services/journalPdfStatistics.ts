@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file journalPdfStatistics.ts
  * @input Nested identity-preserving actual-time distributions with authored colors
  * @output Complete multi-column bar statistics without a separate detail appendix
@@ -10,6 +10,7 @@ import { JOURNAL_COLORS as C, journalDataColor } from './journalPdfTheme';
 import { buildJournalDistributions, type JournalStatItem } from '../utils/journalStatistics';
 import { formatJournalDuration, type JournalDay } from '../utils/journalExport';
 import type { JournalPdfWriter } from './journalPdfLayout';
+import { journalMarkdownText } from '../utils/journalMarkdown';
 
 export const writeJournalDistributions = (w: JournalPdfWriter, month: string, days: JournalDay[]): void => {
   if (!days.some((day) => day.actualSeconds > 0)) return;
@@ -24,12 +25,12 @@ export const writeJournalDistributions = (w: JournalPdfWriter, month: string, da
   for (const [index, group] of buildJournalDistributions(days).entries()) {
     if (wide && index > 0) { w.y = w.bottom; w.ensure(1); }
     const valueOf = (seconds: number, child = false) => child ? duration(seconds) : `${duration(seconds)} ${(seconds / group.total * 100).toFixed(1)}%`;
-    const linesOf = (name: string, seconds: number, child = false) => w.wrap(name, Math.max(36, w.contentWidth - (child ? 12 : 0) - w.widthOf(valueOf(seconds, child), 9) - 8), 9, 'hand');
+    const linesOf = (name: string, seconds: number, child = false) => w.wrap(journalMarkdownText(name), Math.max(36, w.contentWidth - (child ? 12 : 0) - w.widthOf(valueOf(seconds, child), 9) - 8), 9, 'hand');
     const itemHeight = (item: JournalStatItem, child = false) => linesOf(item.name, item.seconds, child).length * 13.5 + (child ? 2 : 6);
     const height = 47 + group.items.reduce((sum, item) => sum + itemHeight(item) + (item.children || []).reduce((total, child) => total + itemHeight(child, true), 0) + 8, 0);
     w.ensure(Math.min(height, w.pageBottom - w.standardBodyTop));
     const header = () => {
-      w.text(group.label, w.margin, w.y, 12, C.ink);
+      w.text(journalMarkdownText(group.label), w.margin, w.y, 12, C.ink);
       w.y += 20;
       w.paragraph(`${group.attributed ? '关联时长' : '记录时长'} ${duration(group.total)}`, 9, C.muted, 0, 'print');
       w.y += 3;

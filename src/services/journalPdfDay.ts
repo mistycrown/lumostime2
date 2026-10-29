@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file journalPdfDay.ts
  * @input One journal day and selected content groups
  * @output Balanced three-column A4 or two-column A5 daily details with full Log text
@@ -9,6 +9,7 @@
  * @updated 2026-10-24: Aligns checkboxes with their item text, removes duplicate completion words and reduces guidance headings.
  * @updated 2026-10-24: Renders template questions/answers under guidance and AI content under a separate peer narrative heading.
  * @updated 2026-10-24: Measures and renders narrative Markdown with styled blocks and inline emphasis.
+ * @updated 2026-10-29: Uses Markdown for guidance answers, summaries and their column-height estimates.
  */
 import { JOURNAL_COLORS as C } from './journalPdfTheme';
 import { formatJournalDuration, formatJournalTime, getJournalDayPlans, journalCheckValue, journalHasPart, type JournalDay, type JournalSection } from '../utils/journalExport';
@@ -16,6 +17,7 @@ import { dateLabel, writeLogs, writePlans, type JournalPdfWriter } from './journ
 import { journalReviewLines } from './journalPdfOverview';
 import { writeJournalLogDetails, writeJournalLogTitle } from './journalPdfLogDetails';
 import { estimateJournalMarkdown, writeJournalMarkdown } from './journalPdfMarkdown';
+import { journalMarkdownText } from '../utils/journalMarkdown';
 
 const MUTED = C.muted;
 const ACCENT = C.accent;
@@ -31,7 +33,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
   w.startPage(dateLabel(day.date), `${detail ? '一日一页' : logs ? '日志' : reviewLines.length ? '引导' : narrativeLines.length ? '叙事' : '总结'} ${formatJournalDuration(day.actualSeconds)}`);
   const count = w.model.options.paperSize === 'a4' ? 3 : 2;
   w.beginColumns(count);
-  const paraHeight = (value: string | undefined, size = 10, indent = 0) => value ? w.wrap(value, w.contentWidth - indent, size, 'hand').length * size * 1.5 + 3 : 0;
+  const paraHeight = (value: string | undefined, size = 9, indent = 0) => value ? estimateJournalMarkdown(w, value, { size: size >= 11.5 ? 12 : 9, indent }) : 0;
   let estimate = 0;
   const plans = has('dayPlans') ? getJournalDayPlans(day) : [];
   if (detail && plans.length) {
@@ -70,7 +72,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     day.checks.forEach((item) => {
       const status = item.manualMode === 'count' ? journalCheckValue(item) : '';
       const statusWidth = w.widthOf(status, 9);
-      const lines = w.wrap(item.content, w.contentWidth - statusWidth - 22, 9, 'hand');
+      const lines = w.wrap(journalMarkdownText(item.content), w.contentWidth - statusWidth - 22, 9, 'hand');
       w.ensure(Math.min(lines.length * 13.5 + 3, 90));
       lines.forEach((line, index) => {
         w.ensure(13.5);
@@ -92,7 +94,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     const top = w.y;
     const icon = day.review.moodEmoji;
     if (icon) w.sticker(icon, x, top, 12);
-    if (day.review.summary) w.paragraph(day.review.summary, 9, undefined, icon ? 18 : 0);
+    if (day.review.summary) writeJournalMarkdown(w, day.review.summary, { indent: icon ? 18 : 0 });
     if (page === w.page && x === w.margin) w.y = Math.max(w.y, top + (icon ? 13.5 : 0));
     w.rule();
   }
@@ -101,9 +103,9 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     w.y += 8;
     w.heading('引导');
     reviewLines.forEach((line) => {
-      if (line.level === 'group') { w.ensure(45); w.y += 9; w.paragraph(line.text, 9, C.ink, 0, 'print'); }
-      else if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
-      else w.paragraph(line.text);
+      if (line.level === 'group') { w.ensure(45); w.y += 9; writeJournalMarkdown(w, line.text, { color: C.ink, role: 'print' }); }
+      else if (line.role === 'print') { w.ensure(35); writeJournalMarkdown(w, line.text, { color: C.muted, role: 'print' }); }
+      else writeJournalMarkdown(w, line.text);
     });
   }
   if (narrativeLines.length) {
@@ -111,7 +113,7 @@ export const writeJournalDay = (w: JournalPdfWriter, day: JournalDay, selected: 
     w.y += 8;
     w.heading('叙事');
     narrativeLines.forEach((line) => {
-      if (line.role === 'print') { w.ensure(35); w.paragraph(line.text, 9, C.muted, 0, 'print'); }
+      if (line.role === 'print') { w.ensure(35); writeJournalMarkdown(w, line.text, { color: C.muted, role: 'print' }); }
       else writeJournalMarkdown(w, line.text);
     });
   }
