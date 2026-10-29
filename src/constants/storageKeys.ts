@@ -1,5 +1,6 @@
 /**
  * @file storageKeys.ts
+ * @updated 2026-10-29: Adds the reusable execution label/category library key.
  * @updated 2026-10-18: Adds the device-local app-awareness master switch.
  * @updated 2026-10-09: Adds the personal dictionary preference key.
  * @updated 2026-10-05: Stores a persistent anonymous diagnostics identifier.
@@ -115,6 +116,7 @@ export const USER_DATA_KEYS = {
  * 设置相关的存储键
  */
 export const SETTINGS_KEYS = {
+    TODO_EXECUTION_LIBRARY: 'lumostime_todo_execution_library',
     PERSONAL_DICTIONARY: 'lumostime_personal_dictionary',
     /** 隐私模式 */
     PRIVACY_MODE: 'lumostime_privacy_mode',

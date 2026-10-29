@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-29: `TodoView` switches schedule/execution beside Tasks within the same schedule sidebar tab. Execution groups and label filters use the reusable label library.
+
 Update 2026-10-26: `TagDetailView` sends statistic-card and palette changes directly to the activity save callback while updating its local display. Calendar visibility preferences no longer wait for the text-edit debounce, so switching a calendar and immediately leaving preserves either display mode on reentry.
 
 Update 2026-10-26: Settings routes Data Management's local-authoritative cloud image sync action and includes upload/delete counts and per-file repair errors alongside the refreshed consistency report.

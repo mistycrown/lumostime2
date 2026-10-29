@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key review editors by identity so changing review dates commits and resets drafts.
  * @file AppRoutes.tsx
+ * @updated 2026-10-29: Enables execution label quick editing for timeline-launched task shortcuts.
  * @updated 2026-10-27: Persists date-created plan blocks from both todo and timeline quick actions.
  * @updated 2026-10-18: Wires abandonment into shared quick actions outside the todo view.
  * @updated 2026-10-18: Enables reminder editing from timeline-launched todo quick actions.
@@ -453,7 +454,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
         handleQuickActionDelete,
         handleQuickActionUpdateTitle,
         handleQuickActionUpdateNote,
-        handleQuickActionUpdateReminder
+        handleQuickActionUpdateReminder,
+        handleQuickActionSaveTodo
     } = useTodoQuickActions({
         todos,
         onSaveTodo: handleSaveTodo,
@@ -945,6 +947,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                 <TodoQuickActionsModal
                     isOpen={quickActionTodo !== null}
                     todo={quickActionTodo}
+                    todos={todos}
+                    onSaveTodo={handleQuickActionSaveTodo}
                     occurrenceDateKey={quickActionOccurrenceDateKey}
                     todoCategories={getRealTodoCategories(todoCategories)}
                     onMoveDate={handleQuickActionMove}

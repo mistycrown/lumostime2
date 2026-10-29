@@ -1,3 +1,10 @@
+/**
+ * @file todoExecutionTags.test.ts
+ * @input Energy, preset and custom folder label selections
+ * @output Regression checks for selection semantics and category-aware deduplication
+ * @pos Test (Todo execution context)
+ * @updated 2026-10-29: Preserves distinct same-name labels in separate library categories.
+ */
 import { describe, expect, it } from 'vitest';
 import {
   createCustomTodoExecutionTag,
@@ -6,6 +13,13 @@ import {
 } from './todoExecutionTags';
 
 describe('todo execution tags', () => {
+  it('preserves separate label identities with the same name in different library categories', () => {
+    const tags = normalizeTodoExecutionTags([
+      { id: 'custom:one', name: '阅读', group: 'custom', categoryId: 'home', source: 'user' },
+      { id: 'custom:two', name: '阅读', group: 'custom', categoryId: 'travel', source: 'user' }
+    ]);
+    expect(tags.map((tag) => tag.categoryId)).toEqual(['home', 'travel']);
+  });
   it('keeps only one energy tag while allowing scene and time tags together', () => {
     const tags = normalizeTodoExecutionTags([
       { id: 'energy:low', name: '\u4f4e\u7cbe\u529b', group: 'energy', source: 'preset' },

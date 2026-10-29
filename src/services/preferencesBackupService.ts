@@ -1,5 +1,6 @@
 /**
  * @file preferencesBackupService.ts
+ * @updated 2026-10-29: Backs up reusable execution labels, categories and deleted-label markers.
  * @updated 2026-10-09: Includes the personal dictionary in export/cloud backup and restore.
  * @input Persisted user preference values and Memoir filter configuration
  * @output Versioned preference backup payloads and restore/change events
@@ -12,6 +13,7 @@ export const PREFERENCES_RESTORED_EVENT = 'lumostime:preferences-restored';
 export const PREFERENCES_CHANGED_EVENT = 'lumostime:preferences-changed';
 
 const PREFERENCE_STORAGE_KEYS = [
+  'lumostime_todo_execution_library',
   'lumostime_personal_dictionary',
   'lumos_min_idle_time',
   'lumos_default_view',

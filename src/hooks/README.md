@@ -1,5 +1,9 @@
 # Custom Hooks
 
+Update 2026-10-29: `useTodoQuickActions.handleQuickActionSaveTodo` refreshes the active shortcut task after execution-label edits, preventing later Pin and other quick actions from restoring stale labels.
+
+Update 2026-10-29: `useTodoExecutionLibrary` subscribes to reusable execution labels and discovers existing task labels without restoring deleted label IDs.
+
 Update 2026-10-27: `useHardwareBackButton` obtains weekly/monthly review period setters from navigation context, clears dates and the initial tab, and closes the review above Settings without exiting the app.
 
 Update 2026-10-18: `useTodoQuickActions` saves abandonment/restoration against the latest todo record through the shared save pipeline. `useTodoManager` rejects focus starts and optional focus-log completion for abandoned tasks; the existing recurring auto-plan cleanup applies when abandoning a series.

@@ -1,5 +1,6 @@
 /**
  * @file useTodoQuickActions.ts
+ * @updated 2026-10-29: Keeps the current quick-action snapshot in sync with execution-library task saves.
  * @updated 2026-10-27: Can retain the sheet after calendar selection for plan/reminder follow-up actions.
  * @updated 2026-10-18: Adds mutually exclusive abandon/restore actions using the latest saved task.
  * @updated 2026-10-18: Saves independent date reminders from quick-action cards against the latest todo state.
@@ -340,8 +341,14 @@ export const useTodoQuickActions = ({ todos, onSaveTodo, onEditTodo, onDeleteTod
     onSaveTodo(nextTodo);
   };
 
+  const handleQuickActionSaveTodo = (todo: TodoItem) => {
+    setQuickActionTodo((current) => current?.id === todo.id ? todo : current);
+    onSaveTodo(todo);
+  };
+
   return {
     quickActionTodo,
+    handleQuickActionSaveTodo,
     quickActionOccurrenceDateKey,
     quickActionOpenedAt: quickActionOpenedAtRef.current,
     openQuickActions,

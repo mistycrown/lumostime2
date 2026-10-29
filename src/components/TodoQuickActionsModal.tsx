@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.tsx
+ * @updated 2026-10-29: Edits reusable execution labels beside Pin without leaving quick actions.
  * @updated 2026-10-27: Keeps selected arrange/deadline dates open for linked plan blocks and independent reminders.
  * @updated 2026-10-18: Uses icon/date abandonment metadata and places abandon/restore beside delete.
  * @updated 2026-10-18: Portals all quick-action states to the body so isolated todo pages cannot place them below navigation.
@@ -45,7 +46,7 @@
  */
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowRightLeft, Ban, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, RotateCcw, SkipForward, Trash2, X } from 'lucide-react';
+import { ArrowRightLeft, Ban, CalendarDays, Check, CheckCircle2, Copy, FilePenLine, Flag, Link, PanelRightOpen, Pin, RotateCcw, SkipForward, Tag, Trash2, X } from 'lucide-react';
 import { Log, TodoCategory, TodoItem, TodoReminderField, TodoReminderSetting } from '../types';
 import { formatDateKey, formatTodoRecurrenceSummary, normalizeMaybeDates, parseDateKey } from '../utils/todoScheduleUtils';
 import { registerHardwareBackHandler } from '../utils/hardwareBackHandlerStack';
@@ -60,6 +61,7 @@ import { normalizeTodoReminders } from '../utils/todoReminderUtils';
 import { TodoParentPickerModal } from './TodoParentPickerModal';
 import { canTodoLinkToParent } from '../utils/todoParentLinkUtils';
 import { canCompleteTodoOccurrence } from '../utils/todoOccurrenceUtils';
+import { TodoExecutionTagPicker } from './TodoExecutionTagPicker';
 
 type CategoryPickerMode = 'move' | 'upgrade' | null;
 
@@ -93,6 +95,7 @@ interface TodoQuickActionsModalProps {
   onUpdateTitle?: (title: string) => void;
   onUpdateNote?: (note: string) => void;
   onUpdateReminder?: (field: TodoReminderField, setting?: TodoReminderSetting) => void;
+  onSaveTodo?: (todo: TodoItem) => void;
 }
 
 const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
@@ -124,9 +127,11 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
   showUpgradeToProject = false,
   onUpdateTitle,
   onUpdateNote,
-  onUpdateReminder
+  onUpdateReminder,
+  onSaveTodo
 }) => {
   const [isDeleteConfirming, setIsDeleteConfirming] = useState(false);
+  const [isExecutionTagPickerOpen, setIsExecutionTagPickerOpen] = useState(false);
   const [isParentPickerOpen, setIsParentPickerOpen] = useState(false);
   const [parentPickerHeight, setParentPickerHeight] = useState(0);
   const [categoryPickerMode, setCategoryPickerMode] = useState<CategoryPickerMode>(null);
@@ -148,6 +153,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
 
   useEffect(() => {
     setIsDeleteConfirming(false);
+    setIsExecutionTagPickerOpen(false);
     setIsParentPickerOpen(false);
     setCategoryPickerMode(null);
     setIsMaybePickerOpen(false);
@@ -171,7 +177,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
 
     return registerHardwareBackHandler(() => {
       // The reminder editor owns its own nested calendar/back stack, including after parent rerenders.
-      if (reminderField || quickDateActions) return false;
+      if (reminderField || quickDateActions || isExecutionTagPickerOpen) return false;
       if (isParentPickerOpen) {
         setIsParentPickerOpen(false);
         return true;
@@ -235,7 +241,7 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
       }
       return true;
     });
-  }, [categoryPickerMode, datePickerType, reminderField, quickDateActions, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
+  }, [categoryPickerMode, datePickerType, reminderField, quickDateActions, isExecutionTagPickerOpen, isDeleteConfirming, isEditingNote, isEditingTitle, isMaybePickerOpen, isParentPickerOpen, isOpen, isSkipToPickerOpen, isCompletionPickerOpen, onClose, onForceClose, todo?.note, todo?.title]);
 
   if (!isOpen || !todo) return null;
 
@@ -766,14 +772,39 @@ const TodoQuickActionsModalContent: React.FC<TodoQuickActionsModalProps> = ({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={withActionGuard(onTogglePin)}
-              className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
-            >
-              <Pin size={13} className={`${todo.pin ? 'text-stone-600' : 'text-stone-400'} rotate-[28deg]`} />
-              <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
-            </button>
+            <div className={onSaveTodo ? 'grid grid-cols-2 gap-2' : ''}>
+              <button
+                type="button"
+                onClick={withActionGuard(onTogglePin)}
+                className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white"
+              >
+                <Pin size={13} className={`${todo.pin ? 'text-stone-600' : 'text-stone-400'} rotate-[28deg]`} />
+                <span>{todo.pin ? '取消 Pin' : 'Pin'}</span>
+              </button>
+              {onSaveTodo && <TodoExecutionTagPicker
+                key={todo.id}
+                executionTags={(todos.find((item) => item.id === todo.id) || todo).executionTags}
+                todos={todos}
+                currentTodoId={todo.id}
+                onSaveTodo={onSaveTodo}
+                onOpenChange={setIsExecutionTagPickerOpen}
+                onChange={(executionTags) => {
+                  const current = todos.find((item) => item.id === todo.id) || todo;
+                  onSaveTodo({ ...current, executionTags: executionTags.length ? executionTags : undefined });
+                }}
+                renderTrigger={(open, isPickerOpen, selectedTags) => <button
+                  type="button"
+                  aria-label="执行标签"
+                  aria-haspopup="dialog"
+                  aria-expanded={isPickerOpen}
+                  onClick={withActionGuard(open)}
+                  className="flex w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white/80 px-4 py-3 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-white">
+                  <Tag size={13} className="shrink-0 text-stone-400" />
+                  <span>执行标签</span>
+                  {selectedTags.length > 0 && <span className="ml-auto text-xs text-stone-400">{selectedTags.length}</span>}
+                </button>}
+              />}
+            </div>
 
             {(onDuplicate || canLinkParent) && (
               <div className={onDuplicate && canLinkParent ? 'grid grid-cols-2 gap-2' : ''}>

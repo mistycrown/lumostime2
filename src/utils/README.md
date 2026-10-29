@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-29: `todoExecutionLibrary` discovers legacy task labels, resolves current names/categories, preserves label IDs when moving categories and safely removes task associations. `todoExecutionGrouping` follows library category ordering while retaining untagged tasks.
+
 Update 2026-10-24: `journalMarkdown.ts` parses narrative CommonMark/GFM through the same remark stack as the reading view. It keeps heading/list/quote structure and inline styles, resolves reference links, and wraps styled Chinese/emoji graphemes without dropping content.
 
 Update 2026-10-23: Journal projection includes direct Collection memberships and review templates, preserves user-saved colors and inherits activity colors for uncolored legacy keywords. Template-only colors remain Radix. No synthetic color palette is generated during export.

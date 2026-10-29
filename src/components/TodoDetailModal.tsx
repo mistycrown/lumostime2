@@ -1,5 +1,6 @@
 /**
  * @file TodoDetailModal.tsx
+ * @updated 2026-10-29: Wires reusable execution labels and usage-aware global label management.
  * @updated 2026-10-29: Adds lightweight execution-tag editing for todo energy, scene, time, and custom context.
  * @updated 2026-10-27: Shares date-scoped quick plan/reminder actions with the list sheet.
  * @updated 2026-10-18: Uses concise abandon/restore controls and icon/date abandonment markers for subtasks.
@@ -1321,6 +1322,9 @@ export const TodoDetailModal: React.FC<TodoDetailModalProps> = ({
                 <TodoExecutionTagPicker
                   executionTags={executionTags}
                   onChange={setExecutionTags}
+                  todos={todos}
+                  currentTodoId={persistedTodo?.id}
+                  onSaveTodo={onSave}
                 />
               </div>
 

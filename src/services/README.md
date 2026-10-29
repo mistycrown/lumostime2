@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-29: `todoExecutionLibraryService` stores reusable labels, organizational categories and deletion markers with stable reactive snapshots. The library participates in preference export/cloud backup and restore.
+
 Update 2026-10-29: `updateService.ts` reports app version 1.6.7, matching package metadata, Android versionCode 167 and the release manifest.
 
 Update 2026-10-27: WebDAV native downloads check and create parent directories before transferring backups, image manifests and images. Existing directories are reused, concurrent creation is accepted only after verification, and real filesystem failures stop the download.

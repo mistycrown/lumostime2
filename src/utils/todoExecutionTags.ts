@@ -1,5 +1,6 @@
 /**
  * @file todoExecutionTags.ts
+ * @updated 2026-10-29: Preserves library category assignments independently of execution semantics.
  * @input Optional structured execution tags attached to a TodoItem
  * @output Preset definitions and pure helpers for selecting, normalizing, and creating execution tags
  * @pos Utility (Todo execution context)
@@ -64,20 +65,23 @@ export const normalizeTodoExecutionTags = (value?: unknown): TodoExecutionTag[] 
     const group = isExecutionTagGroup((candidate as Partial<TodoExecutionTag>).group)
       ? (candidate as Partial<TodoExecutionTag>).group
       : 'custom';
-    const nameKey = group + ':' + name.toLocaleLowerCase();
+    const categoryId = typeof (candidate as Partial<TodoExecutionTag>).categoryId === 'string'
+      ? (candidate as Partial<TodoExecutionTag>).categoryId.trim()
+      : '';
+    const nameKey = (categoryId || group) + ':' + name.toLocaleLowerCase();
     if (!id || !name || seenIds.has(id) || seenNames.has(nameKey)) return;
 
     if (group === 'energy') {
       for (let index = normalized.length - 1; index >= 0; index -= 1) {
         if (normalized[index].group === 'energy') {
           seenIds.delete(normalized[index].id);
-          seenNames.delete('energy:' + normalized[index].name.toLocaleLowerCase());
+          seenNames.delete((normalized[index].categoryId || 'energy') + ':' + normalized[index].name.toLocaleLowerCase());
           normalized.splice(index, 1);
         }
       }
     }
 
-    normalized.push({ id, name, group, source });
+    normalized.push({ id, name, group, source, ...(categoryId ? { categoryId } : {}) });
     seenIds.add(id);
     seenNames.add(nameKey);
   });

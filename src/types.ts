@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-10-29: Adds execution label folder identity independent of semantic groups.
  * @updated 2026-10-29: Adds optional structured execution tags for todo energy, scene, time, and custom context.
  * @updated 2026-10-25: Adds a standalone cross-day overview table card.
  * @updated 2026-10-25: Adds cross-day statistic sources, chart types, metrics and local day boundaries.
@@ -605,6 +606,7 @@ export interface TodoExecutionTag {
   id: string;
   name: string;
   group: TodoExecutionTagGroup;
+  categoryId?: string; // Library folder; independent of the tag's semantic group.
   source: 'preset' | 'user';
 }
 

@@ -1,5 +1,6 @@
 /**
  * @file todoExecutionGrouping.ts
+ * @updated 2026-10-29: Resolves current library labels and respects custom category organization.
  * @input Todo items with optional execution tags
  * @output Stable tag groups for the execution view
  * @pos Utility (Todo execution context)
@@ -8,6 +9,7 @@
 
 import type { TodoExecutionTag, TodoItem } from '../types';
 import { normalizeTodoExecutionTags, TODO_EXECUTION_TAG_PRESETS } from './todoExecutionTags';
+import { getExecutionCategoryId, resolveExecutionTags, type TodoExecutionLibrary } from './todoExecutionLibrary';
 
 export interface TodoExecutionGroup {
   id: string;
@@ -45,13 +47,13 @@ const compareTags = (left: TodoExecutionTag, right: TodoExecutionTag): number =>
  */
 export const groupTodosByExecutionTags = (
   todos: TodoItem[],
-  options: { includeUntagged?: boolean } = {}
+  options: { includeUntagged?: boolean; library?: TodoExecutionLibrary } = {}
 ): TodoExecutionGroup[] => {
   const includeUntagged = options.includeUntagged !== false;
   const grouped = new Map<string, { tag: TodoExecutionTag | null; todos: TodoItem[] }>();
 
   todos.forEach((todo) => {
-    const tags = normalizeTodoExecutionTags(todo.executionTags);
+    const tags = options.library ? resolveExecutionTags(todo.executionTags, options.library) : normalizeTodoExecutionTags(todo.executionTags);
     if (tags.length === 0) {
       if (!includeUntagged) return;
       const untagged = grouped.get('__untagged__') || { tag: null, todos: [] };
@@ -71,10 +73,16 @@ export const groupTodosByExecutionTags = (
   });
 
   return Array.from(grouped.entries())
-    .sort(([leftId, left], [rightId, right]) => {
+    .sort(([, left], [, right]) => {
       if (!left.tag && !right.tag) return 0;
       if (!left.tag) return 1;
       if (!right.tag) return -1;
+      if (options.library) {
+        const categories = options.library.categories;
+        const difference = categories.findIndex((category) => category.id === getExecutionCategoryId(left.tag))
+          - categories.findIndex((category) => category.id === getExecutionCategoryId(right.tag));
+        if (difference) return difference;
+      }
       return compareTags(left.tag, right.tag);
     })
     .map(([id, group]) => ({

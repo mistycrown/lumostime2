@@ -1,5 +1,6 @@
 /**
  * @file TodoQuickActionsModal.test.tsx
+ * @updated 2026-10-29: Places execution labels beside Pin for both pinned and unpinned tasks.
  * @updated 2026-10-18: Verifies abandon/restore entries, dated status and suppressed actions for closed tasks.
  * @updated 2026-10-18: Verifies dated reminder visibility, independent active state and color-only card actions.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
@@ -66,6 +67,16 @@ const baseProps = {
 };
 
 describe('TodoQuickActionsModal category move', () => {
+  test('renders execution tag editing and selection count in the Pin row', () => {
+    for (const pin of [true, false]) {
+      const html = renderToStaticMarkup(<TodoQuickActionsModal {...baseProps} onSaveTodo={vi.fn()}
+        todo={{ id: 'labels', categoryId: 'cat-a', title: 'Read', isCompleted: false, pin,
+          executionTags: [{ id: 'energy:low', name: '低精力', group: 'energy', source: 'preset' }] }} />);
+      expect(html).toMatch(/grid grid-cols-2 gap-2"><button[^>]*>[\s\S]*?<span>(?:取消 Pin|Pin)<\/span><\/button><div><button[^>]*aria-label="执行标签"/);
+      expect(html).toContain('aria-haspopup="dialog" aria-expanded="false"');
+      expect(html).toContain('>1</span>');
+    }
+  });
   test('shows abandonment with its date and a restore action, without completion or reminder actions', () => {
     const todo = { id: 'abandoned', categoryId: 'cat-a', title: 'Read', isCompleted: false,
       abandonedAt: '2026-10-18T04:00:00Z', scheduledDate: '2026-10-20' };

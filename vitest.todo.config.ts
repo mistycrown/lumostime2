@@ -1,5 +1,6 @@
 /**
  * @file vitest.todo.config.ts
+ * @updated 2026-10-29: Covers execution library persistence, migrations and association management.
  * @updated 2026-10-18: Includes terminal todo status and dated abandonment regressions.
  * @input Todo scheduling and related sidebar/widget regression tests
  * @output Node test runner independent of Vite's Electron launch plugins
@@ -36,6 +37,7 @@ export default defineConfig({
       'src/utils/todoScheduleUtils.test.ts',
       'src/utils/todoExecutionTags.test.ts',
       'src/utils/todoExecutionGrouping.test.ts',
+      'src/services/todoExecutionLibraryService.test.ts',
       'src/components/TodoSchedulePlan.test.tsx',
       'src/components/TimelineTodoSidebar.test.ts',
       'src/services/desktopWidgetService.test.ts'
