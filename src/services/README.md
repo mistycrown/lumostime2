@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-29: `updateService.ts` reports app version 1.6.7, matching package metadata, Android versionCode 167 and the release manifest.
+
 Update 2026-10-27: WebDAV native downloads check and create parent directories before transferring backups, image manifests and images. Existing directories are reused, concurrent creation is accepted only after verification, and real filesystem failures stop the download.
 
 Update 2026-10-26: AI todo tools and quick-add support per-date application reminders, partial edits, explicit cancellation and opt-in system calendar sync. `assistantTodoReminderService.ts` reads native permissions without prompting and reports blocked sync/notifications. Todo dictionaries preserve existing settings; foreground routing converts an unambiguous legacy AI reminder into a todo write while retaining independent assistant reminders. Invalid/past settings fail atomically; undo restores the original reminders. Native scheduling still runs only after the existing todo persistence path succeeds.
