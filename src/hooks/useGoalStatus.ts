@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { useMemo } from 'react';
-import { Goal, Log, TodoItem } from '../types';
+import { Category, Goal, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { calculateGoalProgress } from '../utils/goalUtils';
 
 export type GoalStatus = 
@@ -34,10 +34,13 @@ export interface GoalStatusInfo {
 export const useGoalStatus = (
   goal: Goal,
   logs: Log[],
-  todos: TodoItem[]
+  todos: TodoItem[],
+  categories: Category[] = [],
+  scopes: Scope[] = [],
+  todoCategories: TodoCategory[] = []
 ): GoalStatusInfo => {
   return useMemo(() => {
-    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos);
+    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
     
     const now = Date.now();
     const endTime = new Date(goal.endDate).setHours(23, 59, 59, 999);
@@ -79,5 +82,5 @@ export const useGoalStatus = (
       daysUntilDeadline,
       isExpired
     };
-  }, [goal, logs, todos]);
+  }, [categories, goal, logs, scopes, todoCategories, todos]);
 };

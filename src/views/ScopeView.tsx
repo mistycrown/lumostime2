@@ -11,7 +11,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useMemo, useState } from 'react';
-import { Scope, Goal, Log, TodoItem, MajorGoal } from '../types';
+import { Scope, Goal, Log, TodoCategory, Category, TodoItem, MajorGoal } from '../types';
 import { GoalCard } from '../components/GoalCard';
 import { GoalStatusAlert } from '../components/GoalStatusAlert';
 import { Settings2, Archive, ChevronDown, ChevronRight } from 'lucide-react';
@@ -27,6 +27,8 @@ interface ScopeViewProps {
     goals: Goal[];
     majorGoals: MajorGoal[]; // 添加目标系列
     todos: TodoItem[];
+    categories?: Category[];
+    todoCategories?: TodoCategory[];
     onScopeClick: (scopeId: string) => void;
     onManageClick: () => void;
     onArchiveGoal?: (goalId: string) => void;
@@ -41,6 +43,8 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
     goals = [],
     majorGoals = [],
     todos = [],
+    categories = [],
+    todoCategories = [],
     onScopeClick,
     onManageClick,
     onArchiveGoal,
@@ -133,7 +137,7 @@ export const ScopeView: React.FC<ScopeViewProps> = ({
         // 计算每个目标的状态
         const goalsWithStatus = allRelevantGoals.map(goal => ({
             goal,
-            statusInfo: useGoalStatus(goal, logs, todos)
+            statusInfo: useGoalStatus(goal, logs, todos, categories, scopes, todoCategories)
         }));
 
         // 分别找出完成和失败的目标

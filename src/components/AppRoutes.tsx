@@ -887,8 +887,9 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     refreshKey={refreshKey}
                     logs={logs}
                     todos={todos}
-                    goals={goals}
                     categories={categories}
+                    todoCategories={todoCategories}
+                    goals={goals}
                     onAddLog={openAddModal}
                     onEditLog={openEditModal}
                     onUpdateLog={handleUpdateLog}
@@ -902,7 +903,6 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     onBatchAddLogs={handleBatchAddLogs}
                     onSync={handleQuickSync}
                     isSyncing={isSyncing}
-                    todoCategories={todoCategories}
                     onToast={addToast}
                     autoLinkRules={autoLinkRules}
                     scopes={scopes}
@@ -1207,6 +1207,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                     goals={goals}
                     majorGoals={majorGoals}
                     todos={todos}
+                    categories={categories}
+                    todoCategories={todoCategories}
                     onScopeClick={(id) => setSelectedScopeId(id)}
                     onManageClick={() => setIsScopeManaging(true)}
                     onArchiveGoal={handleArchiveGoal}
