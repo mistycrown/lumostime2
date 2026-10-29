@@ -1,5 +1,6 @@
 /**
  * @file todoExecutionGrouping.ts
+ * @updated 2026-10-29: Builds category sections with label subgroups and distinct task counts.
  * @updated 2026-10-29: Resolves current library labels and respects custom category organization.
  * @input Todo items with optional execution tags
  * @output Stable tag groups for the execution view
@@ -16,6 +17,13 @@ export interface TodoExecutionGroup {
   tag: TodoExecutionTag | null;
   label: string;
   todos: TodoItem[];
+}
+
+export interface TodoExecutionCategoryGroup {
+  id: string;
+  label: string;
+  groups: TodoExecutionGroup[];
+  todoCount: number;
 }
 
 const GROUP_ORDER: Record<TodoExecutionTag['group'], number> = {
@@ -91,5 +99,28 @@ export const groupTodosByExecutionTags = (
       label: group.tag?.name || '\u672a\u8bbe\u7f6e\u6267\u884c\u6807\u7b7e',
       todos: group.todos
     }));
+};
+
+export const groupTodosByExecutionCategories = (
+  todos: TodoItem[],
+  library: TodoExecutionLibrary
+): TodoExecutionCategoryGroup[] => {
+  const sections: TodoExecutionCategoryGroup[] = library.categories.map((category) => ({
+    id: category.id, label: category.name, groups: [], todoCount: 0
+  }));
+  const sectionMap = new Map(sections.map((section) => [section.id, section]));
+
+  groupTodosByExecutionTags(todos, { library }).forEach((group) => {
+    if (!group.tag) {
+      sections.push({ id: group.id, label: '未设置', groups: [group], todoCount: group.todos.length });
+      return;
+    }
+    const section = sectionMap.get(getExecutionCategoryId(group.tag)) || sectionMap.get('custom');
+    section?.groups.push(group);
+  });
+  sections.forEach((section) => {
+    section.todoCount = new Set(section.groups.flatMap((group) => group.todos.map((todo) => todo.id))).size;
+  });
+  return sections;
 };
 

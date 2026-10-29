@@ -1,6 +1,14 @@
+/**
+ * @file todoExecutionGrouping.test.ts
+ * @input Tasks with multiple execution labels and custom library categories
+ * @output Regression checks for category sections, label subgroups and distinct task counts
+ * @pos Test (Todo execution context)
+ * @updated 2026-10-29: Covers nested grouping and empty/custom category behavior.
+ */
 import { describe, expect, it } from 'vitest';
 import type { TodoItem } from '../types';
-import { groupTodosByExecutionTags } from './todoExecutionGrouping';
+import { groupTodosByExecutionCategories, groupTodosByExecutionTags } from './todoExecutionGrouping';
+import { DEFAULT_EXECUTION_LIBRARY } from './todoExecutionLibrary';
 
 const makeTodo = (id: string, title: string, executionTags?: TodoItem['executionTags']): TodoItem => ({
   id,
@@ -13,6 +21,40 @@ const makeTodo = (id: string, title: string, executionTags?: TodoItem['execution
 });
 
 describe('todo execution grouping', () => {
+  it('groups by library category and then by label, counting a task only once per category', () => {
+    const todos = [makeTodo('1', '在家阅读', [
+      { id: 'energy:low', name: '低精力', group: 'energy', source: 'preset' },
+      { id: 'scene:home', name: '家里', group: 'scene', source: 'preset' },
+      { id: 'scene:quiet', name: '需要安静', group: 'scene', source: 'preset' }
+    ]), makeTodo('2', '整理桌面')];
+    const sections = groupTodosByExecutionCategories(todos, DEFAULT_EXECUTION_LIBRARY);
+    expect(sections.map((section) => [section.label, section.todoCount])).toEqual([
+      ['精力', 1], ['场景', 1], ['时段', 0], ['自定义', 0], ['未设置', 1]
+    ]);
+    expect(sections[1].groups.map((group) => group.label)).toEqual(['家里', '需要安静']);
+    expect(sections[1].groups.every((group) => group.todos[0].id === '1')).toBe(true);
+    expect(sections[4].groups[0].todos.map((todo) => todo.id)).toEqual(['2']);
+  });
+
+  it('uses the current organizational category after moving a label without changing its semantics', () => {
+    const low = DEFAULT_EXECUTION_LIBRARY.tags[0];
+    const library = {
+      ...DEFAULT_EXECUTION_LIBRARY,
+      categories: [...DEFAULT_EXECUTION_LIBRARY.categories, { id: 'relax', name: '轻松时刻' }],
+      tags: DEFAULT_EXECUTION_LIBRARY.tags.map((tag) => tag.id === low.id ? { ...tag, categoryId: 'relax' } : tag)
+    };
+    const sections = groupTodosByExecutionCategories([makeTodo('1', '回复邮件', [low])], library);
+    expect(sections.find((section) => section.id === 'energy')?.groups).toEqual([]);
+    expect(sections.find((section) => section.id === 'relax')).toMatchObject({
+      label: '轻松时刻', todoCount: 1, groups: [{ label: '低精力' }]
+    });
+  });
+
+  it('retains empty library categories without inventing an untagged section', () => {
+    const sections = groupTodosByExecutionCategories([], DEFAULT_EXECUTION_LIBRARY);
+    expect(sections.map((section) => section.id)).toEqual(['energy', 'scene', 'time', 'custom']);
+    expect(sections.every((section) => section.todoCount === 0 && section.groups.length === 0)).toBe(true);
+  });
   it('groups a realistic mix of tasks in preset order and keeps untagged work visible', () => {
     const todos = [
       makeTodo('1', '\u56de\u590d\u90ae\u4ef6', [

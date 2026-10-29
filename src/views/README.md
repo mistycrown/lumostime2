@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-29: Execution mode uses the same category-pill style as schedule ranges. Top-level sections follow the execution library categories; each category displays task groups for its individual labels. Category badges count distinct tasks, empty categories show their own empty state, and unlabeled tasks retain a separate entry.
+
 Update 2026-10-29: `TodoView` switches schedule/execution beside Tasks within the same schedule sidebar tab. Execution groups and label filters use the reusable label library.
 
 Update 2026-10-26: `TagDetailView` sends statistic-card and palette changes directly to the activity save callback while updating its local display. Calendar visibility preferences no longer wait for the text-edit debounce, so switching a calendar and immediately leaving preserves either display mode on reentry.

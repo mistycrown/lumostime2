@@ -1,5 +1,6 @@
 /**
  * @file todoExecutionRendererHarness.tsx
+ * @updated 2026-10-29: Checks category tabs, nested label sections and category-specific empty states.
  * @input Real todo view and picker with isolated example tasks/browser storage
  * @output Interactive desktop/mobile smoke checks and screenshot fixtures
  * @pos Test (Todo execution context)
@@ -81,11 +82,19 @@ const run = async () => {
   check(!document.querySelector('button[title="执行"]'), 'Unexpected execution sidebar tab');
   await click('切换到执行');
   check(document.querySelector('h1')?.textContent?.includes('执行'), 'Execution title missing');
-  await click('低精力');
-  check(document.querySelectorAll('#todo-content section').length === 1, 'Tag filtering failed');
+  check(document.querySelector('[aria-label="执行分类：精力"]')?.getAttribute('aria-pressed') === 'true', 'Default energy category not selected');
+  check(document.querySelectorAll('#todo-content section').length === 2, 'Energy label subgroups missing');
   check(document.getElementById('todo-content')!.innerText.includes('回复邮件'), 'Low-energy example missing');
-  check(!document.getElementById('todo-content')!.innerText.includes('写项目提案'), 'Unmatched task leaked into filter');
-  await click('全部'); await click('切换到排期'); await click('切换到执行');
+  check(document.querySelector('[aria-label="执行分类：精力"]')?.textContent === '精力3', 'Category count is not distinct task count');
+  await click('执行分类：场景');
+  check(Array.from(document.querySelectorAll('#todo-content section > div:first-child')).map((heading) => heading.textContent?.trim()).join('|') === '家里1|电脑前1|需要安静1', 'Scene labels are not category subgroups');
+  await click('执行分类：时段');
+  check(document.querySelectorAll('#todo-content section').length === 2, 'Time category subgroups missing');
+  await click('执行分类：自定义');
+  check(document.getElementById('todo-content')!.innerText.includes('自定义暂无任务'), 'Empty category feedback missing');
+  await click('执行分类：未设置');
+  check(document.getElementById('todo-content')!.innerText.includes('整理桌面') && !document.getElementById('todo-content')!.innerText.includes('回复邮件'), 'Untagged category did not isolate untagged tasks');
+  await click('执行分类：精力'); await click('切换到排期'); await click('切换到执行');
   check(localStorage.getItem('todoScheduleListMode') === 'execution', 'View switch not persisted');
   document.getElementById('edit-mail')!.click(); await delay(); await click('添加');
   check(document.querySelector('[role="dialog"]')?.parentElement?.parentElement === document.body, 'Picker is not a portal modal');
