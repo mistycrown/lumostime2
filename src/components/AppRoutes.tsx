@@ -1160,6 +1160,8 @@ export const AppRoutes: React.FC<AppRoutesProps> = ({
                         todos={todos}
                         goals={goals}
                         majorGoals={majorGoals}
+                        scopes={scopes}
+                        todoCategories={todoCategories}
                         onBack={() => setSelectedScopeId(null)}
                         onUpdate={(updatedScope) => {
                             setScopes(prev => prev.map(s => s.id === updatedScope.id ? updatedScope : s));

@@ -9,8 +9,9 @@
  * 
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import { MajorGoal, Goal, Log, TodoItem } from '../types';
-import { calculateGoalProgress, getGoalDateRange } from './goalUtils';
+import { Category, MajorGoal, Goal, Log, Scope, TodoCategory, TodoItem } from '../types';
+import { calculateGoalProgress, getGoalDateRange, getGoalFilterExpression } from './goalUtils';
+import { matchesFilter, matchesTodoFilter, parseFilterExpression } from './filterUtils';
 import { filterCountableLogs } from './statLogUtils';
 
 /**
@@ -25,7 +26,10 @@ export const calculateMajorGoalProgress = (
   majorGoal: MajorGoal,
   goals: Goal[],
   logs: Log[],
-  todos: TodoItem[]
+  todos: TodoItem[],
+  categories: Category[] = [],
+  scopes: Scope[] = [],
+  todoCategories: TodoCategory[] = []
 ): { current: number; target: number; percentage: number } => {
   // 获取该大目标下的所有子目标
   const childGoals = goals.filter(g => g.majorGoalId === majorGoal.id);
@@ -37,7 +41,7 @@ export const calculateMajorGoalProgress = (
     let totalCurrent = 0;
     
     childGoals.forEach(goal => {
-      const { current } = calculateGoalProgress(goal, logs, todos);
+      const { current } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
       totalCurrent += current;
     });
     
@@ -56,7 +60,7 @@ export const calculateMajorGoalProgress = (
   // 转换日期为时间戳
   const { start, end } = getGoalDateRange(majorGoal.startDate, majorGoal.endDate);
   
-  if (majorGoal.metric === 'task_count') {
+    if (majorGoal.metric === 'task_count') {
     // 任务数量：统计完成的待办
     const filteredTodos = todos.filter(todo => {
       if (!todo.isCompleted) return false;
@@ -67,7 +71,9 @@ export const calculateMajorGoalProgress = (
       const completedTime = new Date(todo.completedAt).getTime();
       if (completedTime < start || completedTime > end) return false;
 
-      if (majorGoal.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) {
+      if (majorGoal.filterExpression?.trim()) {
+        if (!matchesTodoFilter(todo, parseFilterExpression(getGoalFilterExpression(majorGoal, categories, todoCategories)), { categories, scopes, todoCategories })) return false;
+      } else if (majorGoal.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) {
         return majorGoal.filterTodoCategories.includes(todo.categoryId);
       }
       return true;
@@ -78,7 +84,9 @@ export const calculateMajorGoalProgress = (
     const baseFilteredLogs = filterCountableLogs(logs).filter(log => {
       if (log.startTime < start || log.startTime > end) return false;
       if (!log.scopeIds?.includes(majorGoal.scopeId)) return false;
-      if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
+      if (majorGoal.filterExpression?.trim()) {
+        if (!matchesFilter(log, parseFilterExpression(getGoalFilterExpression(majorGoal, categories, todoCategories)), { categories, scopes, todos, todoCategories })) return false;
+      } else if (majorGoal.filterActivityIds && majorGoal.filterActivityIds.length > 0) {
         return majorGoal.filterActivityIds.includes(log.activityId);
       }
       return true;

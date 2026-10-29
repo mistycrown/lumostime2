@@ -33,6 +33,7 @@ export const useGoalManager = () => {
                 filterActivityIds: inheritedMajorGoal?.filterActivityIds,
                 filterTodoCategories: inheritedMajorGoal?.filterTodoCategories,
                 filterTodoCategorySource: inheritedMajorGoal?.filterTodoCategorySource,
+                filterExpression: inheritedMajorGoal?.filterExpression,
                 majorGoalId, // 关联到目标系列
                 order: 0
             };

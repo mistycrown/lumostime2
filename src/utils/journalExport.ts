@@ -373,8 +373,8 @@ export const buildJournalModel = (data: JournalExportData, options: JournalExpor
     reviewTemplates: data.reviewTemplates || [],
     goalProgress: Object.fromEntries([...(data.majorGoals || []), ...(data.goals || [])].map((goal) => {
       const progress = majorGoalIds.has(goal.id)
-        ? calculateMajorGoalProgress(goal as MajorGoal, data.goals || [], progressLogs, progressTodos)
-        : calculateGoalProgress(goal as Goal, progressLogs, progressTodos);
+        ? calculateMajorGoalProgress(goal as MajorGoal, data.goals || [], progressLogs, progressTodos, data.categories, data.scopes, data.todoCategories)
+        : calculateGoalProgress(goal as Goal, progressLogs, progressTodos, data.categories, data.scopes, data.todoCategories);
       return [goal.id, progress];
     }))
   };

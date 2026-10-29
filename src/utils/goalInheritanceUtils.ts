@@ -16,7 +16,8 @@ export const applyMajorGoalInheritance = (goal: Goal, majorGoal: MajorGoal): Goa
     metric: majorGoal.metric,
     filterActivityIds: majorGoal.filterActivityIds,
     filterTodoCategories: majorGoal.filterTodoCategories,
-    filterTodoCategorySource: majorGoal.filterTodoCategorySource
+    filterTodoCategorySource: majorGoal.filterTodoCategorySource,
+    filterExpression: majorGoal.filterExpression
   };
 };
 

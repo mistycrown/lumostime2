@@ -1197,6 +1197,9 @@ const AppContent: React.FC = () => {
           scopeId={goalScopeId || ''}
           categories={categories}
           todoCategories={normalizedTodoCategories}
+          scopes={scopes}
+          todos={todos}
+          filters={filters}
           mode="independent"
           majorGoals={majorGoals}
         />
@@ -1205,6 +1208,7 @@ const AppContent: React.FC = () => {
       {/* 大目标编辑器 */}
       {isMajorGoalEditorOpen && (
         <GoalEditor
+          onSave={() => undefined}
           onClose={() => {
             setIsMajorGoalEditorOpen(false);
             setEditingMajorGoal(null);
@@ -1227,6 +1231,9 @@ const AppContent: React.FC = () => {
           scopeId={majorGoalScopeId}
           categories={categories}
           todoCategories={normalizedTodoCategories}
+          scopes={scopes}
+          todos={todos}
+          filters={filters}
           mode="majorGoal"
           majorGoal={editingMajorGoal || undefined}
         />

@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState } from 'react';
-import { MajorGoal, Goal, Log, TodoItem } from '../types';
+import { Category, MajorGoal, Goal, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { Target, Edit2, Trash2, Archive, ChevronDown, ChevronUp, Plus, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { 
   calculateMajorGoalProgress, 
@@ -23,6 +23,9 @@ interface MajorGoalCardProps {
   goals: Goal[];
   logs: Log[];
   todos: TodoItem[];
+  categories?: Category[];
+  scopes?: Scope[];
+  todoCategories?: TodoCategory[];
   onEdit?: (majorGoal: MajorGoal) => void;
   onDelete?: (majorGoalId: string) => void;
   onArchive?: (majorGoalId: string) => void;
@@ -35,6 +38,9 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
   goals,
   logs,
   todos,
+  categories = [],
+  scopes = [],
+  todoCategories = [],
   onEdit,
   onDelete,
   onArchive,
@@ -51,7 +57,10 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
     majorGoal,
     goals,
     logs,
-    todos
+    todos,
+    categories,
+    scopes,
+    todoCategories
   );
 
   // 获取状态信息
@@ -77,7 +86,7 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
 
   // 获取子目标的状态图标
   const getChildGoalIcon = (goal: Goal) => {
-    const { percentage } = calculateGoalProgress(goal, logs, todos);
+    const { percentage } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
     const now = Date.now();
     const endTime = new Date(goal.endDate).setHours(23, 59, 59, 999);
     const isGoalExpired = now > endTime;
@@ -222,7 +231,7 @@ export const MajorGoalCard: React.FC<MajorGoalCardProps> = ({
           {isExpanded && (
             <div className="space-y-3 mt-3">
               {childGoals.map(goal => {
-                const { current: goalCurrent, target: goalTarget, percentage: goalPercentage } = calculateGoalProgress(goal, logs, todos);
+                const { current: goalCurrent, target: goalTarget, percentage: goalPercentage } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
                 const GoalIcon = getChildGoalIcon(goal);
                 
                 // 判断是否为反向目标

@@ -8,7 +8,7 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React from 'react';
-import { Goal, Log, TodoItem } from '../types';
+import { Category, Goal, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { Target, Edit2, Trash2, Archive, CheckCircle2, XCircle } from 'lucide-react';
 import { calculateGoalProgress, formatGoalValue, getGoalMetricLabel } from '../utils/goalUtils';
 import { formatShortDate } from '../utils/dateUtils';
@@ -17,14 +17,17 @@ interface GoalCardProps {
     goal: Goal;
     logs: Log[];
     todos: TodoItem[];
+    categories?: Category[];
+    scopes?: Scope[];
+    todoCategories?: TodoCategory[];
     onEdit?: (goal: Goal) => void;
     onDelete?: (goalId: string) => void;
     onArchive?: (goalId: string) => void; // 归档操作
     compact?: boolean; // 紧凑模式（用于ScopeView）
 }
 
-export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, onEdit, onDelete, onArchive, compact = false }) => {
-    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos);
+export const GoalCard: React.FC<GoalCardProps> = ({ goal, logs, todos, categories = [], scopes = [], todoCategories = [], onEdit, onDelete, onArchive, compact = false }) => {
+    const { current, target, percentage } = calculateGoalProgress(goal, logs, todos, categories, scopes, todoCategories);
 
     // 判断是否为归档目标
     const isArchived = goal.status === 'archived';

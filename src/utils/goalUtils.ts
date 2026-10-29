@@ -9,8 +9,29 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  * @updated 2026-08-09: Planned timeline blocks are excluded from goal progress calculations.
  */
-import { Goal, Log, TodoItem } from '../types';
+import { Category, Goal, Log, Scope, TodoCategory, TodoItem } from '../types';
 import { filterCountableLogs } from './statLogUtils';
+import { matchesFilter, matchesTodoFilter, parseFilterExpression } from './filterUtils';
+
+export const getGoalFilterExpression = (
+    goal: Pick<Goal, 'filterExpression' | 'filterActivityIds' | 'filterTodoCategories'>,
+    categories: Category[],
+    todoCategories: TodoCategory[]
+): string => {
+    if (goal.filterExpression?.trim()) return goal.filterExpression.trim();
+    const tokens = (goal.filterActivityIds || []).flatMap((id) => {
+        for (const category of categories) {
+            const activity = category.activities.find((item) => item.id === id);
+            if (activity) return [`#${activity.name}`];
+        }
+        return [];
+    });
+    tokens.push(...(goal.filterTodoCategories || []).flatMap((id) => {
+        const category = todoCategories.find((item) => item.id === id);
+        return category ? [`@${category.name}`] : [];
+    }));
+    return tokens.join(' ');
+};
 
 export const getGoalDateRange = (startDate: string, endDate: string): { start: number; end: number } => {
     const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
@@ -28,12 +49,18 @@ export const getGoalDateRange = (startDate: string, endDate: string): { start: n
 export const calculateGoalProgress = (
     goal: Goal,
     logs: Log[],
-    todos: TodoItem[]
+    todos: TodoItem[],
+    categories: Category[] = [],
+    scopes: Scope[] = [],
+    todoCategories: TodoCategory[] = []
 ): { current: number; target: number; percentage: number } => {
     const { metric, targetValue, scopeId, filterActivityIds, filterTodoCategories, startDate, endDate } = goal;
 
     // 转换日期为时间戳
     const { start, end } = getGoalDateRange(startDate, endDate);
+    const expression = getGoalFilterExpression(goal, categories, todoCategories);
+    const condition = expression ? parseFilterExpression(expression) : null;
+    const filterContext = { categories, scopes, todos, todoCategories };
 
     // 过滤符合条件的logs
     let relevantLogs = filterCountableLogs(logs).filter(log => {
@@ -42,6 +69,8 @@ export const calculateGoalProgress = (
 
         // 必须关联到该领域
         if (!log.scopeIds?.includes(scopeId)) return false;
+
+        if (condition) return matchesFilter(log, condition, filterContext);
 
         // 如果有filterActivityIds筛选器，必须匹配activityId
         if (filterActivityIds && filterActivityIds.length > 0) {
@@ -88,6 +117,8 @@ export const calculateGoalProgress = (
             const relevantTodos = todos.filter(todo => {
                 if (!todo.isCompleted) return false;
                 if (!todo.defaultScopeIds?.includes(scopeId)) return false;
+
+                if (condition) return matchesTodoFilter(todo, condition, { categories, scopes, todoCategories });
 
                 // 如果有filterTodoCategories筛选器，必须匹配categoryId
                 if (filterTodoCategories && filterTodoCategories.length > 0) {

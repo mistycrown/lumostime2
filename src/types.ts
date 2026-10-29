@@ -277,6 +277,7 @@ export interface Goal {
   // Filters for duration and frequency goals.
   filterActivityIds?: string[];
   filterTodoCategorySource?: string[];
+  filterExpression?: string;
 
   status: 'active' | 'completed' | 'failed' | 'archived';
 
@@ -306,6 +307,7 @@ export interface MajorGoal {
   filterActivityIds?: string[];
   filterTodoCategories?: string[];
   filterTodoCategorySource?: string[];
+  filterExpression?: string;
   
   status: 'active' | 'completed' | 'archived';
   

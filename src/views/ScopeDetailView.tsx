@@ -15,7 +15,7 @@
  */
 import { useBufferedRecord } from '../hooks/useBufferedRecord';
 import React, { useMemo, useState } from 'react';
-import { Scope, Log, Category, TodoItem, Goal, MajorGoal } from '../types';
+import { Scope, Log, Category, TodoItem, TodoCategory, Goal, MajorGoal } from '../types';
 import { CalendarWidget } from '../components/CalendarWidget';
 import { MatrixAnalysisChart } from '../components/MatrixAnalysisChart';
 import { DateRangeFilter, RangeType } from '../components/DateRangeFilter';
@@ -48,6 +48,8 @@ interface ScopeDetailViewProps {
     todos: TodoItem[];
     goals: Goal[];
     majorGoals: MajorGoal[];
+    scopes?: Scope[];
+    todoCategories?: TodoCategory[];
     onBack: () => void;
     onUpdate: (scope: Scope) => void;
     onEditLog?: (log: Log) => void;
@@ -71,6 +73,8 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
     todos,
     goals,
     majorGoals,
+    scopes = [],
+    todoCategories = [],
     onBack,
     onUpdate,
     onEditLog,
@@ -739,6 +743,9 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                     goals={inheritedGoals.filter(g => g.majorGoalId === majorGoal.id)}
                                                     logs={logs}
                                                     todos={todos}
+                                                    categories={categories}
+                                                    scopes={scopes}
+                                                    todoCategories={todoCategories}
                                                     onEdit={onEditMajorGoal}
                                                     onDelete={onDeleteMajorGoal}
                                                     onArchive={onArchiveMajorGoal}
@@ -774,6 +781,9 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                     goal={goal}
                                                     logs={logs}
                                                     todos={todos}
+                                                    categories={categories}
+                                                    scopes={scopes}
+                                                    todoCategories={todoCategories}
                                                     onEdit={onEditGoal}
                                                     onDelete={onDeleteGoal}
                                                     onArchive={handleArchiveGoal}
@@ -847,6 +857,9 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 goals={inheritedGoals.filter(g => g.majorGoalId === majorGoal.id)}
                                                 logs={logs}
                                                 todos={todos}
+                                                categories={categories}
+                                                scopes={scopes}
+                                                todoCategories={todoCategories}
                                                 onEdit={onEditMajorGoal}
                                                 onDelete={onDeleteMajorGoal}
                                                 onArchive={onArchiveMajorGoal}
@@ -869,6 +882,9 @@ export const ScopeDetailView: React.FC<ScopeDetailViewProps> = ({
                                                 goal={goal}
                                                 logs={logs}
                                                 todos={todos}
+                                                categories={categories}
+                                                scopes={scopes}
+                                                todoCategories={todoCategories}
                                                 onEdit={onEditGoal}
                                                 onDelete={onDeleteGoal}
                                                 onArchive={handleArchiveGoal}

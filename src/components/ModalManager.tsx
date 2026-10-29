@@ -22,6 +22,7 @@ import {
     TodoCategory,
     Category,
     Goal,
+    Filter,
     AutoLinkRule,
     ActiveSession
 } from '../types';
@@ -55,6 +56,7 @@ interface ModalManagerProps {
     onSaveGoal: (goal: Goal) => void;
     onCloseGoal: () => void;
     onDeleteGoal?: (goalId: string) => void;
+    filters?: Filter[];
 
     // TimerFloating
     activeSessions: ActiveSession[];
@@ -104,6 +106,7 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
     onSaveGoal,
     onCloseGoal,
     onDeleteGoal,
+    filters = [],
 
     activeSessions,
     focusDetailSessionId,
@@ -204,6 +207,9 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
                     scopeId={goalScopeId}
                     categories={categories}
                     todoCategories={todoCategories}
+                    scopes={scopes}
+                    todos={todos}
+                    filters={filters}
                     onSave={onSaveGoal}
                     onClose={onCloseGoal}
                     onDelete={onDeleteGoal}

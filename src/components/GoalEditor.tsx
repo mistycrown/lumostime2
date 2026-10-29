@@ -12,15 +12,19 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import React, { useState, useEffect } from 'react';
-import { Goal, Category, TodoCategory, MajorGoal } from '../types';
+import { Goal, Category, TodoCategory, MajorGoal, Scope, TodoItem, Filter } from '../types';
 import { X, Check } from 'lucide-react';
-import { TagMultipleAssociation } from './TagMultipleAssociation';
+import { GoalFilterEditor } from './GoalFilterEditor';
+import { getGoalFilterExpression } from '../utils/goalUtils';
 
 interface GoalEditorProps {
     goal?: Goal;
     scopeId: string;
     categories: Category[];
     todoCategories: TodoCategory[];
+    scopes?: Scope[];
+    todos?: TodoItem[];
+    filters?: Filter[];
     onSave: (goal: Goal) => void;
     onClose: () => void;
     
@@ -46,6 +50,9 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
     scopeId, 
     categories, 
     todoCategories, 
+    scopes = [],
+    todos = [],
+    filters = [],
     onSave, 
     onClose,
     mode = 'independent',
@@ -121,20 +128,9 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
     const [filterActivityIds, setFilterActivityIds] = useState<string[]>(
         majorGoal ? (majorGoal.filterActivityIds || []) : (goal?.filterActivityIds || [])
     );
-    const [isTodoFilterEnabled, setIsTodoFilterEnabled] = useState<boolean>(
-        (goal?.filterTodoCategories && goal.filterTodoCategories.length > 0) || 
-        (majorGoal?.filterTodoCategories && majorGoal.filterTodoCategories.length > 0) ||
-        false
-    );
-
-    const findActivityById = (activityId: string) => {
-        for (const category of categories) {
-            const activity = category.activities?.find(a => a.id === activityId);
-            if (activity) return activity;
-        }
-        return undefined;
-    };
-
+    const [filterExpressionDraft, setFilterExpressionDraft] = useState(() => getGoalFilterExpression(
+        majorGoal || goal || {}, categories, todoCategories
+    ));
     useEffect(() => {
         if (mode === 'majorGoal') return;
         if (!selectedMajorGoalId) return;
@@ -145,10 +141,8 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
         setMetric(inheritedMajorGoal.metric);
         setFilterActivityIds(inheritedMajorGoal.filterActivityIds || []);
         setFilterTodoCategories(inheritedMajorGoal.filterTodoCategories || []);
+        setFilterExpressionDraft(getGoalFilterExpression(inheritedMajorGoal, categories, todoCategories));
 
-        if (inheritedMajorGoal.metric === 'task_count') {
-            setIsTodoFilterEnabled((inheritedMajorGoal.filterTodoCategories || []).length > 0);
-        }
     }, [majorGoal, majorGoals, mode, selectedMajorGoalId]);
     
     // 判断字段是否应该禁用
@@ -157,7 +151,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
         if (mode === 'majorGoal') return false;
 
         // 阶段目标模式或选择了目标系列：禁用继承字段
-        if ((mode === 'phase' || (mode === 'independent' && selectedMajorGoalId)) && ['metric', 'filterActivityIds', 'filterTodoCategories'].includes(fieldName)) {
+        if ((mode === 'phase' || (mode === 'independent' && selectedMajorGoalId)) && ['metric', 'filterActivityIds', 'filterTodoCategories', 'filterExpression'].includes(fieldName)) {
             return true;
         }
         
@@ -209,6 +203,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                 motivation: motivation.trim() || undefined,
                 filterActivityIds: metric !== 'task_count' && filterActivityIds.length > 0 ? filterActivityIds : undefined,
                 filterTodoCategories: metric === 'task_count' && filterTodoCategories.length > 0 ? filterTodoCategories : undefined,
+                filterExpression: filterExpressionDraft.trim() || undefined,
                 status: majorGoal?.status || 'active',
                 createdAt: majorGoal?.createdAt || new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -248,6 +243,7 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
             // 筛选器字段
             filterTodoCategories: metric === 'task_count' && filterTodoCategories.length > 0 ? filterTodoCategories : undefined,
             filterActivityIds: metric !== 'task_count' && filterActivityIds.length > 0 ? filterActivityIds : undefined,
+            filterExpression: filterExpressionDraft.trim() || undefined,
             // 目标系列关联
             majorGoalId: selectedMajorGoalId,
             order: goal?.order,
@@ -650,170 +646,17 @@ export const GoalEditor: React.FC<GoalEditorProps> = ({
                         <p className="mt-1.5 text-xs text-stone-400">格式：YYYYMMDD（例如：20250101）</p>
                     </div>
 
-                    {/* 🔍 高级筛选器 (Advanced Filters) */}
-                    {metric === 'task_count' ? (
-                        /* 待办模式筛选 */
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="text-xs font-medium text-stone-400 uppercase tracking-wider">
-                                    限定待办清单
-                                    <span className="text-stone-300 ml-1">（可选）</span>
-                                    {isFieldDisabled('filterTodoCategories') && (
-                                        <span className="text-stone-300 ml-1">（继承自目标系列）</span>
-                                    )}
-                                </label>
-                                {/* Toggle 开关 */}
-                                {!isFieldDisabled('filterTodoCategories') && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsTodoFilterEnabled(!isTodoFilterEnabled);
-                                            if (isTodoFilterEnabled) {
-                                                // 关闭时清空选择
-                                                setFilterTodoCategories([]);
-                                            }
-                                        }}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all ${isTodoFilterEnabled
-                                            ? 'text-white'
-                                            : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                                            }`}
-                                        style={isTodoFilterEnabled ? { backgroundColor: 'var(--accent-color)' } : {}}
-                                    >
-                                        {isTodoFilterEnabled ? '已开启' : '关闭'}
-                                    </button>
-                                )}
-                            </div>
-                            
-                            {isFieldDisabled('filterTodoCategories') ? (
-                                // 只读显示
-                                <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg">
-                                    {filterTodoCategories.length > 0 ? (
-                                        <div className="text-xs text-stone-600">
-                                            {filterTodoCategories.map((catId, index) => {
-                                                const category = todoCategories.find(c => c.id === catId);
-                                                return category ? (
-                                                    <span key={catId}>
-                                                        {category.icon} {category.name}{index < filterTodoCategories.length - 1 ? '、' : ''}
-                                                    </span>
-                                                ) : null;
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs text-stone-400">不限定</span>
-                                    )}
-                                </div>
-                            ) : (
-                                <>
-                                    <p className="text-xs text-stone-500 mb-3">
-                                        仅统计选中清单中的待办任务
-                                    </p>
-
-                                    {isTodoFilterEnabled && (
-                                        <>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                {todoCategories.map(cat => {
-                                                    const isSelected = filterTodoCategories.includes(cat.id);
-                                                    return (
-                                                        <button
-                                                            key={cat.id}
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (isSelected) {
-                                                                    setFilterTodoCategories(filterTodoCategories.filter(id => id !== cat.id));
-                                                                } else {
-                                                                    setFilterTodoCategories([...filterTodoCategories, cat.id]);
-                                                                }
-                                                            }}
-                                                            className={`
-                                                                px-2 py-2 rounded-lg text-[10px] font-medium text-center transition-colors flex items-center justify-center gap-1.5 truncate
-                                                                ${isSelected
-                                                                    ? 'btn-template-filled'
-                                                                    : 'bg-stone-50 text-stone-500 border border-stone-100 hover:bg-stone-100'}
-                                                            `}
-                                                        >
-                                                            <span>{cat.icon}</span>
-                                                            <span className="truncate">{cat.name}</span>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            {/* Clear 按钮 */}
-                                            {filterTodoCategories.length > 0 && (
-                                                <div className="flex justify-end mt-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setFilterTodoCategories([])}
-                                                        className="text-xs font-medium text-stone-400 hover:text-red-400 transition-colors"
-                                                    >
-                                                        Clear
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {/* 已选择清单提示 */}
-                                            {filterTodoCategories.length > 0 && (
-                                                <div className="mt-3 text-xs text-stone-500 animate-in fade-in">
-                                                    <span className="font-medium">已选择：</span>
-                                                    {filterTodoCategories.map((catId, index) => {
-                                                        const category = todoCategories.find(c => c.id === catId);
-                                                        return category ? (
-                                                            <span key={catId}>
-                                                                {category.icon} {category.name}{index < filterTodoCategories.length - 1 ? '、' : ''}
-                                                            </span>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-                                            )}
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    ) : (
-                        /* 记录模式筛选 - 使用 TagMultipleAssociation 组件 */
-                        <div>
-                            {isFieldDisabled('filterActivityIds') ? (
-                                // 只读显示
-                                <div>
-                                    <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
-                                        限定标签（Activity）
-                                        <span className="text-stone-300 ml-1">（继承自目标系列）</span>
-                                    </label>
-                                    <div className="px-3 py-2 bg-stone-100 border border-stone-200 rounded-lg">
-                                        {filterActivityIds.length > 0 ? (
-                                            <div className="text-xs text-stone-600">
-                                                {filterActivityIds.map((actId, index) => {
-                                                    const activity = findActivityById(actId);
-                                                    return activity ? (
-                                                        <span key={actId}>
-                                                            {activity.icon} {activity.name}{index < filterActivityIds.length - 1 ? '、' : ''}
-                                                        </span>
-                                                    ) : (
-                                                        <span key={actId}>
-                                                            {actId}{index < filterActivityIds.length - 1 ? '、' : ''}
-                                                        </span>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <span className="text-xs text-stone-400">不限定</span>
-                                        )}
-                                    </div>
-                                </div>
-                            ) : (
-                                <TagMultipleAssociation
-                                    categories={categories}
-                                    selectedActivityIds={filterActivityIds}
-                                    onChange={setFilterActivityIds}
-                                    showToggle={true}
-                                    toggleLabel="限定标签（Activity）"
-                                    description="仅统计选中标签的时间记录"
-                                />
-                            )}
-                        </div>
-                    )}
-
+                    <GoalFilterEditor
+                        expression={filterExpressionDraft}
+                        onExpressionChange={setFilterExpressionDraft}
+                        categories={categories}
+                        scopes={scopes}
+                        todos={todos}
+                        todoCategories={todoCategories}
+                        filters={filters}
+                        disabled={isFieldDisabled('filterExpression')}
+                        mode={metric === 'task_count' ? 'todo' : 'record'}
+                    />
                     {/* 激励/备注 */}
                     <div>
                         <label className="block text-xs font-medium text-stone-400 mb-2 uppercase tracking-wider">
