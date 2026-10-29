@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lucide FilePlus: supplement log action. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:pathData="M15,2 L6,2 A2,2 0,0 0,4 4 L4,20 A2,2 0,0 0,6 22 L18,22 A2,2 0,0 0,20 20 L20,7 Z M14,2 L14,8 L20,8 M12,18 L12,12 M9,15 L15,15"
+        android:strokeColor="@android:color/white"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="2" />
+</vector>

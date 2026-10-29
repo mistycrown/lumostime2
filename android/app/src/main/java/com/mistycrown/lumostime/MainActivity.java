@@ -272,33 +272,37 @@ public class MainActivity extends BridgeActivity {
             buildLauncherShortcut(
                 "quick_punch",
                 R.string.shortcut_quick_punch,
+                R.drawable.shortcut_quick_punch,
                 "lumostime://widget?action=quick_punch"
             ),
             buildLauncherShortcut(
                 "supplement_log",
                 R.string.shortcut_supplement_log,
+                R.drawable.shortcut_supplement_log,
                 "lumostime://widget?action=open_supplement_log"
             ),
             buildLauncherShortcut(
                 "ai_assistant",
                 R.string.shortcut_ai_assistant,
+                R.drawable.shortcut_ai_assistant,
                 "lumostime://widget?action=open_ai_assistant"
             ),
             buildLauncherShortcut(
                 "today_review",
                 R.string.shortcut_today_review,
+                R.drawable.shortcut_today_review,
                 "lumostime://widget?action=open_today_review"
             )
         ));
     }
 
-    private ShortcutInfo buildLauncherShortcut(String id, int labelResId, String uri) {
+    private ShortcutInfo buildLauncherShortcut(String id, int labelResId, int iconResId, String uri) {
         Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri), this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         return new ShortcutInfo.Builder(this, id)
             .setShortLabel(getString(labelResId))
             .setLongLabel(getString(labelResId))
-            .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+            .setIcon(Icon.createWithResource(this, iconResId))
             .setIntent(intent)
             .build();
     }
