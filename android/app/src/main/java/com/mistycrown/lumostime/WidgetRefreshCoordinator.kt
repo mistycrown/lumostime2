@@ -8,6 +8,7 @@ import android.os.Looper
 
 /**
  * Refreshes every registered widget provider so runtime state stays in sync across sizes.
+ * Updated 2026-10-29: Routes global, daily-payload and targeted refreshes to the quick-check list.
  * Updated 2026-05-02: Added the dedicated scene 4x3 widget provider to global refresh routing.
  * Updated 2026-05-03: Added widget-family refresh helpers so bridge sync calls can refresh only the providers that depend on each payload.
  * Updated 2026-05-05: Extended tap-feedback refresh frames so shortcut success states can animate back after one second.
@@ -99,6 +100,10 @@ object WidgetRefreshCoordinator {
         QuickLogWidgetDailyCheckWeek4x3.refreshAllAsync(context)
     }
 
+    fun refreshDailyCheckListWidgets(context: Context) {
+        QuickLogWidgetDailyCheckList4x3.refreshAllAsync(context)
+    }
+
     fun refreshTodoPinWidgets(context: Context) {
         QuickLogWidgetTodoPin4x2.refreshAllAsync(context)
         QuickLogWidgetTodoPin4x3.refreshAllAsync(context)
@@ -116,6 +121,7 @@ object WidgetRefreshCoordinator {
         refreshPrincipleCardWidgets(context)
         refreshDailyRuntimeWidgets(context)
         refreshDailyCheckWeekWidgets(context)
+        refreshDailyCheckListWidgets(context)
         refreshTodoPinWidgets(context)
         refreshSceneWidgets(context)
     }
@@ -162,6 +168,8 @@ object WidgetRefreshCoordinator {
                 QuickLogWidgetDailyCheckWeek4x4.refreshWidget(context, appWidgetId)
             ComponentName(context, QuickLogWidgetDailyCheckWeek4x3::class.java).className ->
                 QuickLogWidgetDailyCheckWeek4x3.refreshWidget(context, appWidgetId)
+            ComponentName(context, QuickLogWidgetDailyCheckList4x3::class.java).className ->
+                QuickLogWidgetDailyCheckList4x3.refreshWidget(context, appWidgetId)
             else -> refreshAll(context)
         }
     }

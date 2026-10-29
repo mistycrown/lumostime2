@@ -12,6 +12,7 @@ import org.json.JSONObject
 /**
  * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
+ * Updated 2026-10-29: Parses daily-check types and refreshes the new quick-check list after daily sync.
  * Updated 2026-10-14: Synchronizes timer scope rules separately from configured template scopes.
  * Updated 2026-07-22: Exposes queued TODAY + PIN checkbox changes so the app can persist widget-side todo completion updates.
  * Updated 2026-08-10: Parses recurring item state for non-completable TODAY + PIN rows.
@@ -275,6 +276,7 @@ class WidgetBridgePlugin : Plugin() {
         WidgetStores.saveDailySyncPayload(context, mergedPayload)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshDailyCheckWeekWidgets(context)
+        WidgetRefreshCoordinator.refreshDailyCheckListWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)
         call.resolve()
     }
@@ -648,7 +650,10 @@ class WidgetBridgePlugin : Plugin() {
                     targetCount = item.optInt("targetCount", 1).coerceAtLeast(1),
                     color = parseNullableString(item.optString("color")),
                     icon = parseNullableString(item.optString("icon")),
-                    uiIcon = parseNullableString(item.optString("uiIcon"))
+                    uiIcon = parseNullableString(item.optString("uiIcon")),
+                    type = parseNullableString(item.optString("type")),
+                    uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                    uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath"))
                 )
             )
         }

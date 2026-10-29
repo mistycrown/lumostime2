@@ -3,6 +3,7 @@ package com.mistycrown.lumostime
 /**
  * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Lightweight native models used by the unified Android widget system.
+ * Updated 2026-10-29: Preserves daily-check type; legacy unknown metadata remains read-only in the list.
  * Templates are size-based, while each slot carries its own timer, daily, or shortcut type.
  * Updated 2026-05-21: Expanded mirrored TODAY + PIN source models with todo `maybeDates` plus recurrence `skipDates` so native rebuilds can match app-side today visibility.
  * Updated 2026-05-02: Added native scene-widget payload, group, slot, item, and per-instance selection models.
@@ -293,7 +294,10 @@ data class WidgetDailyCheckMeta(
     val targetCount: Int = 1,
     val color: String? = null,
     val icon: String? = null,
-    val uiIcon: String? = null
+    val uiIcon: String? = null,
+    val type: String? = null,
+    val uiIconAssetPath: String? = null,
+    val uiIconFallbackAssetPath: String? = null
 )
 
 data class WidgetDailyProgress(

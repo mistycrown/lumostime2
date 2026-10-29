@@ -23,6 +23,15 @@
     <string name="widget_label_daily_check_week_4x4">&#x65E5;&#x8BFE;&#x5468;&#x7EDF;&#x8BA1; 4x4</string>
     <string name="widget_label_daily_check_week_4x3">&#x65E5;&#x8BFE;&#x5468;&#x7EDF;&#x8BA1; 4x3</string>
     <string name="widget_daily_check_empty">&#x6682;&#x65E0;&#x65E5;&#x8BFE;</string>
+    <!-- 2026-10-29: Daily checklist widget labels and accessible action names. -->
+    <string name="widget_label_daily_check_list_4x3">日课清单 4x3</string>
+    <string name="widget_daily_list_title">日课</string>
+    <string name="widget_daily_list_open">打开今日日课</string>
+    <string name="widget_daily_list_auto">自动</string>
+    <string name="widget_daily_list_check">打卡</string>
+    <string name="widget_daily_list_cancel">取消打卡</string>
+    <string name="widget_daily_list_increment">增加一次</string>
+    <string name="widget_daily_list_completed">已达标</string>
     <string name="widget_refresh">&#x5237;&#x65B0;</string>
     <string name="widget_label_daily_runtime_4x4">DAILY_RUNTIME 4x3</string>
     <string name="widget_label_daily_runtime_4x2">DAILY_RUNTIME 4x2</string>

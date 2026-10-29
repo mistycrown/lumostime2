@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-10-29: Independently addable daily checklist; resize to see more rows. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/widget_layout_daily_check_list_4x3"
+    android:previewImage="@drawable/widget_preview_daily_check_list_4x3"
+    android:minWidth="220dp"
+    android:minHeight="180dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="128dp"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="1800000"
+    android:description="@string/widget_label_daily_check_list_4x3"
+    android:widgetCategory="home_screen"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3" />

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-10-29: Count increment button. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#EDF0E6" android:pathData="M24,8a16,16 0,1 0,0 32a16,16 0,1 0,0 -32" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#657C59" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M18,24 L30,24 M24,18 L24,30" />
+</vector>

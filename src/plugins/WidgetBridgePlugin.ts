@@ -1,5 +1,6 @@
 /**
  * @file WidgetBridgePlugin.ts
+ * @updated 2026-10-29: Mirrors daily-check types so the quick-check list keeps automatic items read-only.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Native widget bridge calls
  * @output Typed Capacitor widget bridge methods
@@ -146,11 +147,14 @@ export interface WidgetBridgeDailyCheckMeta {
   checkItemId: string;
   content: string;
   category: string;
+  type?: 'manual' | 'auto';
   manualMode: DailyWidgetManualMode;
   targetCount: number;
   color?: string | null;
   icon?: string | null;
   uiIcon?: string | null;
+  uiIconAssetPath?: string | null;
+  uiIconFallbackAssetPath?: string | null;
 }
 
 export interface WidgetBridgeDailyProgress {

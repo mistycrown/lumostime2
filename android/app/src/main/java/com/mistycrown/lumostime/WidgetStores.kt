@@ -9,6 +9,7 @@ import org.json.JSONObject
  * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
+ * Updated 2026-10-29: Round-trips manual/automatic daily metadata and icon assets for quick-check list actions.
  * Updated 2026-10-14: Persists preferred timer scope rules and resolves them at widget tap time.
  * Updated 2026-07-22: Persists queued TODAY + PIN checkbox changes until the app writes them back to todo storage.
  * Updated 2026-08-10: Persists the recurring flag on TODAY + PIN items across native cache reloads.
@@ -1555,7 +1556,10 @@ object WidgetStores {
                         ),
                         color = parseNullableString(item.optString("color")),
                         icon = parseNullableString(item.optString("icon")),
-                        uiIcon = parseNullableString(item.optString("uiIcon"))
+                        uiIcon = parseNullableString(item.optString("uiIcon")),
+                        type = parseNullableString(item.optString("type")),
+                        uiIconAssetPath = parseNullableString(item.optString("uiIconAssetPath")),
+                        uiIconFallbackAssetPath = parseNullableString(item.optString("uiIconFallbackAssetPath"))
                     )
                 )
             }
@@ -1601,6 +1605,9 @@ object WidgetStores {
                 put("color", item.color ?: JSONObject.NULL)
                 put("icon", item.icon ?: JSONObject.NULL)
                 put("uiIcon", item.uiIcon ?: JSONObject.NULL)
+                put("type", item.type ?: JSONObject.NULL)
+                put("uiIconAssetPath", item.uiIconAssetPath ?: JSONObject.NULL)
+                put("uiIconFallbackAssetPath", item.uiIconFallbackAssetPath ?: JSONObject.NULL)
             })
         }
         return array

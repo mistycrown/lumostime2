@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-10-29: Completed daily check, centered in a 48dp touch target. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#657C59" android:pathData="M24,11a13,13 0,1 0,0 26a13,13 0,1 0,0 -26" />
+    <path android:fillColor="@android:color/transparent" android:strokeColor="#FFFFFF" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M18.5,24 L22.5,28 L30,20" />
+</vector>

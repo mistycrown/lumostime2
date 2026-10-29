@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 2026-10-29: Flat daily row, 48dp action target, no nested card or completion sorting. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="48dp"
+        android:orientation="horizontal">
+        <ImageView
+            android:id="@+id/widget_daily_list_item_icon_image"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+        <TextView
+            android:id="@+id/widget_daily_list_item_icon_text"
+            android:layout_width="22dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="10dp"
+            android:gravity="center"
+            android:textColor="#657C59"
+            android:textSize="19sp" />
+        <TextView
+            android:id="@+id/widget_daily_list_item_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:maxLines="1"
+            android:textColor="#302F2A"
+            android:textSize="14sp" />
+        <TextView
+            android:id="@+id/widget_daily_list_item_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="monospace"
+            android:textColor="#85867B"
+            android:textSize="11sp"
+            android:visibility="gone" />
+        <ImageView
+            android:id="@+id/widget_daily_list_item_action"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:contentDescription="@string/widget_daily_list_check"
+            android:src="@drawable/widget_daily_list_unchecked" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/widget_daily_list_item_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="32dp"
+        android:background="#EBECE4" />
+</LinearLayout>

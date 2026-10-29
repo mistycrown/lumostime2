@@ -634,6 +634,12 @@
             </intent-filter>
         </service>
 
+        <!-- 2026-10-29: Daily checklist collection for Android launchers before Android 12. -->
+        <service
+            android:name=".WidgetDailyCheckListRemoteViewsService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
         <service
             android:name=".WidgetDailyCheckWeek4x3RemoteViewsService"
             android:enabled="true"
@@ -786,6 +792,23 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_tracking_calendar_2x2" />
+        </receiver>
+
+        <!-- 2026-10-29: Independent paper-style 4x3 daily checklist. -->
+        <receiver
+            android:name=".QuickLogWidgetDailyCheckList4x3"
+            android:exported="true"
+            android:label="@string/widget_label_daily_check_list_4x3">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_daily_check_list_4x3" />
         </receiver>
 
         <receiver

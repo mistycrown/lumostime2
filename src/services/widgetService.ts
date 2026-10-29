@@ -1,5 +1,6 @@
 /**
  * @file widgetService.ts
+ * @updated 2026-10-29: Includes manual/automatic daily-check types in the shared native payload.
  * @updated 2026-10-18: Omits abandoned tasks from native widget source data.
  * @updated 2026-10-16: Mirrors occurrence completion history into Android TODAY + PIN snapshots.
  * @input Category/activity data, daily template data, ActiveSession state, widget bridge payloads
@@ -1188,17 +1189,26 @@ export const buildDailyWidgetSyncPayload = ({
     day.setDate(weekStart.getDate() + index);
     return getLocalDateStr(day);
   });
-  const items: WidgetBridgeDailyCheckMeta[] = getEligibleTrackingCalendarDailyCheckItems(checkTemplates).map((item) => ({
-    checkTemplateId: item.checkTemplateId,
-    checkItemId: item.checkItemId,
-    content: item.content,
-    category: item.category,
-    manualMode: item.manualMode,
-    targetCount: item.targetCount,
-    color: item.color ?? null,
-    icon: item.icon ?? null,
-    uiIcon: item.uiIcon ?? null
-  }));
+  const items: WidgetBridgeDailyCheckMeta[] = getEligibleTrackingCalendarDailyCheckItems(checkTemplates).map((item) => {
+    const parsedIcon = uiIconService.parseIconString(item.uiIcon || item.icon || '');
+    const iconAssets = parsedIcon.isUIIcon
+      ? getUIIconAssetPathWithFallback(parsedIcon.value as UIIconType, uiIconService.getCurrentTheme())
+      : null;
+    return {
+      checkTemplateId: item.checkTemplateId,
+      checkItemId: item.checkItemId,
+      content: item.content,
+      category: item.category,
+      type: item.type,
+      manualMode: item.manualMode,
+      targetCount: item.targetCount,
+      color: item.color ?? null,
+      icon: item.icon ?? null,
+      uiIcon: item.uiIcon ?? null,
+      uiIconAssetPath: iconAssets?.primary ?? null,
+      uiIconFallbackAssetPath: iconAssets?.fallback ?? null
+    };
+  });
 
   const progress: WidgetBridgeDailyProgress[] = weekDates.flatMap((progressDate) => items.map((item) => {
     const state = getDailyCheckProgressForDate({

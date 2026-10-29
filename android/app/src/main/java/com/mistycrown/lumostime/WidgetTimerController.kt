@@ -12,6 +12,7 @@ import java.util.UUID
 
 /**
  * Native widget action controller for timer, daily, and shortcut widgets.
+ * Updated 2026-10-29: Adds date-validated list taps with capped counts, reusing the native progress/replay queue.
  * Updated 2026-10-14: Merges current preferred scope rules into timer-slot runtime without replacing configured scopes.
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
  * Updated 2026-05-03: Reused the shared tap-animation state for scene widget items so scene timers and checklist cards get the same springy tap feedback as the timer widget family.
@@ -458,6 +459,28 @@ object WidgetTimerController {
         return true
     }
 
+    @Synchronized
+    fun handleDailyListItemTap(
+        context: Context,
+        appWidgetId: Int,
+        checkItemId: String,
+        renderedDate: String
+    ): Boolean {
+        val payload = WidgetStores.loadDailySyncPayload(context) ?: return false
+        val meta = payload.items.firstOrNull { it.checkItemId == checkItemId } ?: return false
+        val todayDate = getCurrentDateString()
+        val progress = payload.progress.firstOrNull { it.checkItemId == checkItemId && it.date == todayDate }
+        val action = WidgetDailyCheckListRules.actionMode(
+            meta.type, meta.manualMode, progress?.currentCount ?: 0, meta.targetCount, renderedDate, todayDate
+        ) ?: return false
+        return applyDailyCheckTap(
+            context, appWidgetId, meta.checkTemplateId, checkItemId,
+            meta.manualMode, meta.targetCount, null,
+            cycleCount = action != "increment", expectedDate = renderedDate
+        ) != null
+    }
+
+    @Synchronized
     private fun applyDailyCheckTap(
         context: Context,
         appWidgetId: Int,
@@ -465,11 +488,14 @@ object WidgetTimerController {
         checkItemId: String,
         fallbackManualMode: String?,
         fallbackTargetCount: Int?,
-        pendingSlotIndex: Int?
+        pendingSlotIndex: Int?,
+        cycleCount: Boolean = true,
+        expectedDate: String? = null
     ): DailyTapMutationResult? {
         val payload = WidgetStores.loadDailySyncPayload(context)
         val todayDate = getCurrentDateString()
         val meta = payload?.items?.firstOrNull { it.checkItemId == checkItemId }
+        if (expectedDate != null && (expectedDate != todayDate || meta?.type != "manual")) return null
         val currentProgress =
             if (payload?.date == todayDate) {
                 payload.progress.firstOrNull {
@@ -507,6 +533,7 @@ object WidgetTimerController {
                 WidgetTapAnimationModes.DAILY_COUNT
             }
         } else {
+            if (!cycleCount && currentCount >= targetCount) return null
             val nextCount = if (currentCount >= targetCount) 0 else currentCount + 1
             WidgetStores.upsertDailyProgress(
                 context,
@@ -520,7 +547,7 @@ object WidgetTimerController {
                     updatedAt = occurredAt
                 )
             )
-            actionMode = "cycle"
+            actionMode = if (cycleCount) "cycle" else "increment"
 
             if (nextCount in 1 until targetCount) {
                 WidgetTapAnimationModes.DAILY_COUNT
@@ -545,6 +572,7 @@ object WidgetTimerController {
                 slotIndex = pendingSlotIndex
             )
         )
+        WidgetRefreshCoordinator.refreshDailyCheckListWidgets(context)
         WidgetBridgePlugin.notifyDailyActionPending()
 
         return DailyTapMutationResult(

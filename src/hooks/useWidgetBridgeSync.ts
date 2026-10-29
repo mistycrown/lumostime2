@@ -1,5 +1,6 @@
 /**
  * @file useWidgetBridgeSync.ts
+ * @updated 2026-10-29: Resyncs daily-list icon assets after a widget/theme revision.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Widget native bridge state, categories, active sessions, logs, daily reviews, and daily templates
  * @output Runtime reconciliation between the Android widget layer and the React app
@@ -528,7 +529,7 @@ export const useWidgetBridgeSync = () => {
       'Failed to sync daily widget data to native widget',
       () => WidgetBridge.syncDailyWidgetData({ payload })
     );
-  }, [checkTemplates, dailyReviews, hasHydratedNativeState]);
+  }, [checkTemplates, dailyReviews, hasHydratedNativeState, widgetTemplateRevision]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
