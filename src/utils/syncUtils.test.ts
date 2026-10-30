@@ -1,5 +1,6 @@
 /**
  * @file syncUtils.test.ts
+ * @updated 2026-10-30: Checks live transfer, verification and restore stage callbacks.
  * @updated 2026-10-02: Covers exact-snapshot restores, missing-object classification, and destination identity.
  * @updated 2026-10-11: Ensures unavailable image inventories stop further uploads.
  * @updated 2026-10-22: Covers conditional snapshot reads and native manifest inventory reuse.
@@ -105,11 +106,16 @@ describe('uploadDataToCloud', () => {
 
     vi.spyOn(Date, 'now').mockReturnValueOnce(10);
 
-    const result = await uploadDataToCloud(cloud as any, buildValidPayload(10));
+    const progress = vi.fn();
+    const result = await uploadDataToCloud(cloud as any, buildValidPayload(10), progress);
 
     expect(result.success).toBe(true);
     expect(cloud.uploadData).toHaveBeenCalledWith(expect.objectContaining({ timestamp: 10 }), 'lumostime_backup.json');
     expect(cloud.downloadData).toHaveBeenCalledWith('lumostime_backup.json');
+    expect(progress.mock.calls.map(([message]) => message)).toEqual([
+      expect.stringContaining('正在上传数据'), '正在校验云端数据...',
+      '正在检查云端图片...', '正在保存图片清单...'
+    ]);
   });
 
   test('native WebDAV uses the existing manifest instead of treating unsupported listing as an empty cloud', async () => {
@@ -166,11 +172,16 @@ describe('downloadWithBackup', () => {
     const selected = buildValidPayload(20);
     const local = buildValidPayload(10);
     const cloud = createMockCloudService(vi.fn(async () => local));
-    const result = await downloadWithBackup(cloud as any, local, undefined, selected);
+    const progress = vi.fn();
+    const result = await downloadWithBackup(cloud as any, local, progress, selected);
     expect(result.success).toBe(true);
     expect(result.data.timestamp).toBe(20);
     expect(cloud.downloadData).toHaveBeenCalledTimes(1);
     expect(cloud.downloadData).toHaveBeenCalledWith(expect.stringMatching(/^backups\/local_backup_/));
+    expect(progress.mock.calls.map(([message]) => message)).toEqual([
+      '正在备份本地数据...', '正在校验本地安全备份...',
+      expect.stringContaining('备份'), expect.stringContaining('正在从'), '正在读取云端图片清单...'
+    ]);
   });
   test('does not restore from cloud when the local safety backup fails', async () => {
     const cloud = createMockCloudService(vi.fn(async () => buildValidPayload(20)));

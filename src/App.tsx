@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-10-30: Keeps cloud transfer stage and image counts visible across views.
  * @updated 2026-10-18: Includes principle groups in manual backups.
  * @updated 2026-10-17: Reconciles local reminders on resume and opens todos from reminder notifications.
  * @updated 2026-10-16: Keeps the selected occurrence date when handling desktop widget completion actions.
@@ -89,6 +90,7 @@ import { ReferenceDeleteModal } from './components/ReferenceDeleteModal';
 import { getTodoReferenceDeleteTargets } from './utils/referenceDeleteTargets';
 import { SyncConflictModal } from './components/SyncConflictModal';
 import { SyncDirectionModal } from './components/SyncDirectionModal';
+import { SyncProgress } from './components/SyncProgress';
 import { BottomNavigation } from './components/BottomNavigation';
 import { LazyViewRecoveryBoundary } from './components/LazyViewRecoveryBoundary';
 
@@ -1575,6 +1577,7 @@ const AppContent: React.FC = () => {
       />
       
       {/* Sync Direction Modal */}
+      <SyncProgress progress={syncManager.syncProgress} />
       {syncManager.isApplyingCloud && (
         <div className="fixed inset-0 z-[12000] flex items-center justify-center bg-black/20" role="status" aria-live="polite">
           <span className="rounded-xl bg-white px-5 py-3 text-sm text-stone-700">正在应用云端数据…</span>

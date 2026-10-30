@@ -1,5 +1,6 @@
 /**
  * @file useSyncManager.ts
+ * @updated 2026-10-30: Publishes live stage and settled image progress for every cloud-sync entry point.
  * @updated 2026-10-18: Backs up and restores principle groups, clearing stale groups on legacy library restores.
  * @updated 2026-10-07: Runs daily manual-mode uploads only in foreground and recovers missed backups.
  * @updated 2026-10-07: Backs up, restores and tracks node categories with node assignments.
@@ -42,6 +43,7 @@ import {
 } from '../services/customColorGroupService';
 import { downloadWithBackup, getServiceName, getCloudDestinationIdentity, uploadDataToCloud, readCloudSnapshot, CloudService } from '../utils/syncUtils';
 import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
+import type { SyncProgressCallback, SyncProgressState } from '../utils/syncProgress';
 import { AppView } from '../types';
 import { SYNC_CONFIG } from '../config/syncConfig';
 import { normalizeCheckTemplates, normalizeDailyReviews } from '../utils/checkItemNormalizer';
@@ -149,6 +151,7 @@ export const useSyncManager = () => {
 
     // Removed local isSyncing state to use global state
     const [refreshKey, setRefreshKey] = useState(0);
+    const [syncProgress, setSyncProgress] = useState<SyncProgressState | null>(null);
     const [isSyncDirectionModalOpen, setIsSyncDirectionModalOpen] = useState(false);
     const [syncConflictModalState, setSyncConflictModalState] = useState<SyncConflictModalState>({
         isOpen: false,
@@ -488,6 +491,10 @@ export const useSyncManager = () => {
         };
         syncLock.current = true;
         setIsSyncing(true);
+        const onProgress: SyncProgressCallback = (message, counts) => {
+            if (mountedRef.current) setSyncProgress({ message, counts });
+        };
+        onProgress('正在准备同步...');
         let message = '';
         let imageWarnings = false;
 
@@ -498,6 +505,7 @@ export const useSyncManager = () => {
                 readLocal: () => latestRef.current.getLocal(),
                 readRemote: async () => {
                     ensureDestination();
+                    onProgress('正在读取云端数据...');
                     return readCloudSnapshot(activeService);
                 },
                 readCheckpoint: () => readSyncCheckpoint(destination),
@@ -518,7 +526,7 @@ export const useSyncManager = () => {
                 },
                 upload: async (snapshot) => {
                     ensureDestination();
-                    const uploaded = await uploadDataToCloud(activeService, snapshot);
+                    const uploaded = await uploadDataToCloud(activeService, snapshot, onProgress);
                     if (!uploaded.success || !uploaded.data) throw new Error(uploaded.message);
                     message = uploaded.message;
                     imageWarnings = !!uploaded.imageStats?.errors.length;
@@ -526,7 +534,7 @@ export const useSyncManager = () => {
                 },
                 prepareRestore: async (remote, local) => {
                     ensureDestination();
-                    const downloaded = await downloadWithBackup(activeService, local, undefined, remote);
+                    const downloaded = await downloadWithBackup(activeService, local, onProgress, remote);
                     if (!downloaded.success || !downloaded.data) throw new Error(downloaded.message);
                     message = downloaded.message;
                     imageWarnings = !!downloaded.imageStats?.errors.length;
@@ -534,12 +542,15 @@ export const useSyncManager = () => {
                 },
                 applyRestore: async (remote) => {
                     ensureDestination();
+                    onProgress('正在应用云端数据...');
                     await latestRef.current.applyDataUpdate(remote, 'cloud');
                 },
                 backupRemote: async (remote) => {
                     ensureDestination();
+                    onProgress('正在备份原有云端数据...');
                     const filename = 'backups/cloud_backup_' + crypto.randomUUID() + '.json';
                     await activeService.uploadData(remote, filename);
+                    onProgress('正在校验云端安全备份...');
                     const verified = await activeService.downloadData(filename);
                     if (JSON.stringify(verified) !== JSON.stringify(remote)) throw new Error('云端安全备份校验失败，已停止覆盖');
                 }
@@ -578,6 +589,7 @@ export const useSyncManager = () => {
             return 'retry';
         } finally {
             syncLock.current = false;
+            if (mountedRef.current) setSyncProgress(null);
             setIsSyncing(false);
         }
     };
@@ -769,7 +781,7 @@ export const useSyncManager = () => {
     }, []);
 
     return {
-        isSyncing, isApplyingCloud, refreshKey, setRefreshKey,
+        isSyncing, syncProgress, isApplyingCloud, refreshKey, setRefreshKey,
         handleQuickSync, handleSyncDataUpdate, handleLocalDataUpdate,
         isSyncDirectionModalOpen, setIsSyncDirectionModalOpen,
         handleManualUpload, handleManualDownload,

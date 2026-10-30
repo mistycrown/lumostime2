@@ -1,5 +1,6 @@
 /**
  * @file syncService.test.ts
+ * @updated 2026-10-30: Verifies upload/download progress waits for actual completion, including out-of-order failures.
  * @input Local image deletion records, backup references, and cloud image inventories
  * @output Regression coverage for safe image deletion during backup uploads
  * @pos Test (Cloud Sync)
@@ -19,6 +20,7 @@ vi.mock('./imageService', () => ({
   imageService: {
     listImages: vi.fn(),
     readImage: vi.fn(),
+    writeImage: vi.fn(),
     getDeletedImages: vi.fn(),
     clearDeletedImages: vi.fn()
   }
@@ -44,6 +46,34 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
+describe('image transfer progress', () => {
+  it.each(['upload', 'download'] as const)('counts settled %s transfers rather than scheduled requests', async direction => {
+    const files = ['first.webp', 'second.webp', 'third.webp'];
+    pendingDeletions = [];
+    vi.mocked(imageService.listImages).mockResolvedValue(direction === 'upload' ? files : []);
+    const pending: { resolve: (value: any) => void; reject: (error: Error) => void }[] = [];
+    const transfer = vi.fn(() => new Promise<any>((resolve, reject) => pending.push({ resolve, reject })));
+    const service = { ...createStorageService(), uploadImage: transfer, downloadImage: transfer };
+    const progress = vi.fn();
+    const counts = () => progress.mock.calls.filter((call) => call[1]).map((call) => call[1]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const operation = direction === 'upload'
+      ? syncService.uploadImages(service as unknown as StorageService, progress, files, [])
+      : syncService.downloadImages(service as unknown as StorageService, progress, files);
+    await vi.waitFor(() => expect(transfer).toHaveBeenCalledTimes(3));
+    expect(counts()).toEqual([{ completed: 0, total: 3 }]);
+    pending[1].resolve(direction === 'upload' ? true : new ArrayBuffer(3));
+    await vi.waitFor(() => expect(counts()).toHaveLength(2));
+    pending[2].reject(new Error('Missing image'));
+    await vi.waitFor(() => expect(counts()).toHaveLength(3));
+    pending[0].resolve(direction === 'upload' ? true : new ArrayBuffer(3));
+    const result = await operation;
+    expect(counts()).toEqual([0, 1, 2, 3].map(completed => ({ completed, total: 3 })));
+    expect(result.failedFiles).toEqual(['third.webp']);
+    expect(direction === 'upload' ? result.uploaded : result.downloaded).toBe(2);
+  });
+});
+
 describe('image deletion during backup upload', () => {
   it('uploads into an empty cloud without deleting historical originals or thumbnails', async () => {
     const service = createStorageService();
@@ -55,7 +85,7 @@ describe('image deletion during backup upload', () => {
     expect(service.uploadImage).toHaveBeenCalledWith('new.webp', expect.any(ArrayBuffer));
     expect(result).toMatchObject({ uploaded: 1, deletedRemote: 0, errors: [] });
     expect(pendingDeletions).toEqual([]);
-    expect(onProgress.mock.calls.flat().some((message) => message.includes('同步删除'))).toBe(false);
+    expect(onProgress.mock.calls.some(([message]) => message.includes('同步删除'))).toBe(false);
   });
 
   it('only deletes pending files that exist in the current cloud inventory', async () => {

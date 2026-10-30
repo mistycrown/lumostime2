@@ -1,5 +1,6 @@
 /**
  * @file syncUtils.ts
+ * @updated 2026-10-30: Reports transfer, inventory, verification and manifest stages to persistent sync feedback.
  * @description Unified cloud sync helpers for WebDAV, COS, and compatible S3.
  * @updated 2026-10-22: Uses conditional snapshot reads and native WebDAV manifests to avoid redundant transfers.
  * @updated 2026-10-11: Stops uploads after WebDAV inventory failures instead of treating unavailable storage as empty.
@@ -23,6 +24,7 @@ import { isWebDAVUnavailable } from '../services/webdavRequestQueue';
 import { validateAndFixData, validateLocalData } from './dataValidation';
 import { buildSyncPayloadMetadata, isSameSyncPayload } from './syncPayloadMetadata';
 import { reportDiagnostic, reportException, withErrorReference } from '../services/errorReporting';
+import type { SyncProgressCallback } from './syncProgress';
 import {
   flattenImageManifestGroups,
   ImageManifestGroups,
@@ -31,7 +33,7 @@ import {
 
 export type CloudService = typeof webdavService | typeof s3Service | typeof compatibleS3Service;
 export type CloudServiceName = 'webdav' | 's3' | 'compatible-s3';
-export type ProgressCallback = (message: string) => void;
+export type ProgressCallback = SyncProgressCallback;
 
 export interface SyncResult {
   success: boolean;
@@ -332,7 +334,7 @@ export async function uploadDataToCloud(
     onProgress?.(`正在上传数据到${displayName}...`);
     await service.uploadData(dataToSync, MAIN_BACKUP_FILENAME);
 
-    onProgress?.('Verifying cloud main backup...');
+    onProgress?.('正在校验云端数据...');
     const verifyResult = await verifyMainBackupUpload(service, dataToSync, displayName);
     if (!verifyResult.success) {
       return {
@@ -350,6 +352,7 @@ export async function uploadDataToCloud(
     }
 
     let oldCloudImageList: string[] = [];
+    onProgress?.('正在检查云端图片...');
     try {
       const cloudImageData = await service.downloadImageList();
       oldCloudImageList = normalizeCloudImageManifest(cloudImageData).images;
@@ -376,6 +379,7 @@ export async function uploadDataToCloud(
       content: localImageGroups.content.filter((filename) => finalSet.has(filename)),
       theme: localImageGroups.theme.filter((filename) => finalSet.has(filename))
     };
+    onProgress?.('正在保存图片清单...');
     await service.uploadImageList(finalGroups);
 
 
@@ -469,6 +473,7 @@ export async function downloadDataFromCloud(
     }
 
     let cloudImageList: string[] = [];
+    onProgress?.('正在读取云端图片清单...');
     try {
       const cloudImageData = await service.downloadImageList();
       const normalizedCloudManifest = normalizeCloudImageManifest(cloudImageData);
@@ -533,7 +538,7 @@ export async function backupLocalDataToCloud(
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFilename = `backups/local_backup_${timestamp}.json`;
-    onProgress?.(`正在备份本地数据到 ${backupFilename}...`);
+    onProgress?.('正在备份本地数据...');
 
     await service.uploadData(localData, backupFilename);
 

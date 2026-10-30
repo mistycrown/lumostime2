@@ -1,5 +1,6 @@
 /**
  * @file syncService.ts
+ * @updated 2026-10-30: Reports settled image counts so queued and in-flight transfers never appear completed.
  * @input WebDAV/COS/compatible-S3 storage services, local image service, image reference lists
  * @output Image sync operations and storage service selection
  * @pos Service
@@ -18,6 +19,7 @@ import { imageService } from './imageService';
 import { SYNC_CONFIG } from '../config/syncConfig';
 import { CloudImageManifest, ImageManifestUpload } from './imageManifest';
 import { isWebDAVUnavailable } from './webdavRequestQueue';
+import type { SyncProgressCallback } from '../utils/syncProgress';
 
 export interface SyncResult {
   uploaded: number;
@@ -100,7 +102,7 @@ export const syncService = {
 
   uploadImages: async (
     storageService?: StorageService | null,
-    onProgress?: (message: string) => void,
+    onProgress?: SyncProgressCallback,
     localReferencedImages?: string[],
     cloudReferencedImages?: string[]
   ): Promise<SyncResult> => {
@@ -159,11 +161,12 @@ export const syncService = {
       const concurrentUploads = SYNC_CONFIG.CONCURRENT_OPERATIONS;
       const batch: Promise<void>[] = [];
       let serviceUnavailable: unknown;
+      let completedUploads = 0;
+      onProgress?.('正在上传图片...', { completed: 0, total: toUpload.length });
 
       for (let index = 0; index < toUpload.length; index += 1) {
         const filename = toUpload[index];
         const task = (async () => {
-          onProgress?.(`正在上传 (${index + 1}/${toUpload.length}): ${filename}...`);
           try {
             const data = await imageService.readImage(filename);
             const uploaded = await targetService.uploadImage(filename, data as any);
@@ -175,6 +178,9 @@ export const syncService = {
             result.errors.push(`Upload failed: ${filename} - ${error?.message || 'unknown error'}`);
             result.failedFiles.push(filename);
             if (isWebDAVUnavailable(error)) serviceUnavailable = error;
+          } finally {
+            completedUploads += 1;
+            onProgress?.('正在上传图片...', { completed: completedUploads, total: toUpload.length });
           }
         })();
 
@@ -208,7 +214,7 @@ export const syncService = {
 
   downloadImages: async (
     storageService?: StorageService | null,
-    onProgress?: (message: string) => void,
+    onProgress?: SyncProgressCallback,
     cloudReferencedImages?: string[]
   ): Promise<SyncResult> => {
     const result = createEmptyResult();
@@ -229,11 +235,12 @@ export const syncService = {
 
       const concurrentDownloads = SYNC_CONFIG.CONCURRENT_OPERATIONS;
       const batch: Promise<void>[] = [];
+      let completedDownloads = 0;
+      onProgress?.('正在下载图片...', { completed: 0, total: toDownload.length });
 
       for (let index = 0; index < toDownload.length; index += 1) {
         const filename = toDownload[index];
         const task = (async () => {
-          onProgress?.(`正在下载 (${index + 1}/${toDownload.length}): ${filename}...`);
           try {
             const buffer = await targetService.downloadImage(filename);
             if (buffer.byteLength > 0) {
@@ -245,6 +252,9 @@ export const syncService = {
             console.error(`[Sync] Failed to download image: ${filename}`, error);
             result.errors.push(`Download failed: ${filename} - ${error?.message || 'unknown error'}`);
             result.failedFiles.push(filename);
+          } finally {
+            completedDownloads += 1;
+            onProgress?.('正在下载图片...', { completed: completedDownloads, total: toDownload.length });
           }
         })();
 

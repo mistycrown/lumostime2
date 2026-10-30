@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-30: `SyncProgress` keeps cloud-sync stages visible across views in a non-blocking status strip. Image transfers expose settled/total counts; data transfers and verification show their current stage without estimated percentages. Existing completion/error toasts remain authoritative.
+
 Update 2026-10-29: Todo quick actions place an execution-label shortcut beside Pin, using the shared label picker and showing its selection count. Both todo and timeline shortcut hosts persist changes immediately and keep the sheet open when dismissing the nested picker.
 
 Update 2026-10-29: `TodoExecutionTagPicker` opens a portaled `TodoExecutionTagModal` for reusable label selection and management. Labels and categories can be renamed; labels can move between categories. Deleting a used label shows the affected task count before unlinking; deleting a category moves its labels to the custom folder. The modal contains focus and handles Escape/Android back.

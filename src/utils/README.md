@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-30: `syncProgress.ts` shares stage messages and optional settled/total image counts. `syncUtils` reports data transfer, cloud verification, image inventory and manifest stages; callbacks are connected by the coordinator and do not expose backup paths in status feedback.
+
 Update 2026-10-30: `compatibleS3Transport.ts` shares the typed desktop S3 request contract, validates bounded single-line client identifiers, and recognizes exact Data Capsule endpoint hosts for the optional settings placeholder.
 
 Update 2026-10-29: `groupTodosByExecutionCategories` builds library-category sections containing individual label groups, preserving current category names/moves and distinct task counts across multiple labels.
