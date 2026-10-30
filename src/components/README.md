@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-10-30: `SyncProgress` follows the existing rounded toast surface, with a single-row stage/count layout, subtle stone colors and a thin image progress track. Its live progress and cross-view visibility remain unchanged.
+
 Update 2026-10-30: `SyncProgress` keeps cloud-sync stages visible across views in a non-blocking status strip. Image transfers expose settled/total counts; data transfers and verification show their current stage without estimated percentages. Existing completion/error toasts remain authoritative.
 
 Update 2026-10-29: Todo quick actions place an execution-label shortcut beside Pin, using the shared label picker and showing its selection count. Both todo and timeline shortcut hosts persist changes immediately and keep the sheet open when dismissing the nested picker.
