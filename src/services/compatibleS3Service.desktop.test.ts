@@ -4,6 +4,7 @@
  * @output Signed desktop backup/image/error and default-transport coverage
  * @updated 2026-10-30: Verifies per-connection identity through the real SDK.
  * @updated 2026-10-30: Reproduces unknown JSON gateway errors and preserves actionable download diagnostics.
+ * @updated 2026-10-30: Distinguishes missing optional manifests from failed backup/image reads, retaining request IDs without object paths.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { streamCollector } from '@smithy/fetch-http-handler';
@@ -101,6 +102,43 @@ describe('S3 desktop SDK transport', () => {
     const service = configured('S3Drive');
     request.mockResolvedValue({ status: 403, headers: {}, data: new Uint8Array() });
     await expect(service.downloadData()).rejects.toMatchObject({ $metadata: { httpStatusCode: 403 }, message: expect.stringContaining('HTTP 403') });
+  });
+
+  it('silently falls back for a missing optional manifest but logs missing main backups and images', async () => {
+    const service = configured('S3Drive');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      request.mockResolvedValue({ status: 404, headers: {}, data: new TextEncoder().encode('<Error><Code>NoSuchKey</Code></Error>') });
+      expect(await service.downloadImageList()).toBeNull();
+      expect(log).not.toHaveBeenCalled();
+      request.mockResolvedValueOnce({ status: 404, headers: { 'content-type': 'application/json' }, data: new TextEncoder().encode('{"code":"NoSuchKey","message":"Missing manifest"}') });
+      expect(await service.downloadImageList()).toBeNull();
+      expect(log).not.toHaveBeenCalled();
+      await expect(service.downloadData()).rejects.toMatchObject({ name: 'NoSuchKey' });
+      await expect(service.downloadImage('missing-private-photo.png')).rejects.toMatchObject({ name: 'NoSuchKey' });
+      const diagnostics = log.mock.calls.map((call) => JSON.parse(call[1]));
+      expect(diagnostics.map((entry) => entry.objectType)).toEqual(['main-backup', 'image']);
+      expect(JSON.stringify(diagnostics)).not.toContain('missing-private-photo.png');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('identifies which restore object was rejected and retains the server request ID', async () => {
+    const service = configured('S3Drive');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      request.mockResolvedValue({ status: 401, headers: { 'x-amz-request-id': 'request-123' }, data: new Uint8Array() });
+      await service.downloadImageList();
+      await expect(service.downloadImage('private-photo.png')).rejects.toMatchObject({ $metadata: { httpStatusCode: 401 } });
+      await expect(service.downloadData('backups/local_backup_private.json')).rejects.toMatchObject({ $metadata: { httpStatusCode: 401 } });
+      const diagnostics = log.mock.calls.filter((call) => call[0] === '[CompatibleS3] Request failed:').map((call) => JSON.parse(call[1]));
+      expect(diagnostics.map((entry) => entry.objectType)).toEqual(['image-manifest', 'image', 'safety-backup']);
+      for (const entry of diagnostics) expect(entry).toMatchObject({ operation: 'GetObject', httpStatus: 401, requestId: 'request-123' });
+      for (const value of ['private-photo.png', 'local_backup_private.json', 'test-ak', 'test-sk']) expect(JSON.stringify(diagnostics)).not.toContain(value);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('does not let SDK retries or a new service instance bypass Data Capsule Retry-After', async () => {

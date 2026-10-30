@@ -4,6 +4,7 @@
  * @updated 2026-10-30: Logs safe connection diagnostics and preserves original HTTP 401 details.
  * @updated 2026-10-30: Exposes HTTP status and bounded JSON service errors for failed downloads without logging credentials or backup bodies.
  * @updated 2026-10-30: Serializes Data Capsule requests and persists 429 cooldown while disabling hidden SDK retries for this provider.
+ * @updated 2026-10-30: Identifies failed object categories and request IDs, and keeps an absent optional image manifest out of error logs.
  * @input Compatible S3 credentials, endpoint config, local data
  * @output Remote storage operations for S3-compatible storage
  * @pos Service (Data Synchronization)
@@ -324,7 +325,7 @@ export class CompatibleS3Service {
     return this.client;
   }
 
-  private async send(command: Parameters<S3Client['send']>[0]): Promise<any> {
+  private async send(command: Parameters<S3Client['send']>[0], options: { allowMissing?: boolean } = {}): Promise<any> {
     if (this.config?.userAgent && !Capacitor.isNativePlatform()
       && (typeof window === 'undefined' || !window.compatibleS3Connection)) {
       throw new Error('自定义 User-Agent 需要使用支持此功能的桌面端或手机端');
@@ -371,9 +372,20 @@ export class CompatibleS3Service {
           ? `对象存储请求受限（HTTP 429），请 ${seconds} 秒后重试`
           : '对象存储请求受限（HTTP 429），请稍后重试';
       }
-      if (httpStatus !== 304) {
+      const code = this.getErrorCode(error) || error?.name;
+      const missingOptionalObject = options.allowMissing && httpStatus === 404 && ['NoSuchKey', 'NotFound'].includes(code);
+      if (httpStatus !== 304 && !missingOptionalObject) {
+        // Record the role, rather than arbitrary object paths or signed URLs.
+        const key = (command.input as { Key?: string }).Key;
+        const objectType = key === 'lumostime_backup.json' ? 'main-backup'
+          : key === 'lumostime_images.json' ? 'image-manifest'
+          : key?.startsWith('images/') ? 'image'
+          : key?.startsWith('backups/local_backup_') ? 'safety-backup'
+          : key ? 'other-object' : 'bucket';
+        const requestId = error?.$metadata?.requestId;
         console.error('[CompatibleS3] Request failed:', JSON.stringify({
-          operation, httpStatus, code: this.getErrorCode(error) || error?.name,
+          operation, objectType, httpStatus, code,
+          ...(typeof requestId === 'string' && /^[A-Za-z0-9_.:/+=-]{1,200}$/.test(requestId) ? { requestId } : {}),
           message: this.getErrorMessage(error), userAgent: this.config?.userAgent || '(default)'
         }));
       }
@@ -423,6 +435,10 @@ export class CompatibleS3Service {
 
     if (error && typeof error === 'object' && 'code' in error && typeof (error as { code?: unknown }).code === 'string') {
       return (error as { code: string }).code;
+    }
+
+    if (error instanceof Error) {
+      return error.name;
     }
 
     return undefined;
@@ -751,7 +767,7 @@ export class CompatibleS3Service {
         ResponseCacheControl: 'no-cache, no-store, must-revalidate',
         ResponseContentDisposition: `inline; filename="lumostime_images.json"; fresh=${Date.now()}`,
         ResponseExpires: new Date(0)
-      }));
+      }), { allowMissing: true });
 
       const content = await this.normalizeStringBody(response.Body);
       return JSON.parse(content);
