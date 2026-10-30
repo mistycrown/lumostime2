@@ -1,5 +1,7 @@
 # Electron Layer
 
+Update 2026-10-30: The S3 bridge preserves `amz-sdk-invocation-id` and `amz-sdk-request`, which the AWS SDK includes in SigV4 `SignedHeaders`. Filtering these out caused 401 even when the configured User-Agent was correct. The Electron smoke server now verifies the complete SigV4 signature rather than only checking authorization presence.
+
 Update 2026-10-30: `compatibleS3Request.ts` handles signed compatible-S3 requests from the trusted main app and AI app windows (both run the sync lifecycle), limited to their expected top-level renderer frames. Native requests can set an optional standard `User-Agent`, preserve binary bodies and HTTP status, omit session cookies, reject redirects, and let Electron generate restricted Host/Content-Length headers. Empty User-Agent configurations continue using the renderer SDK transport.
 
 Update 2026-10-16: Todo completion actions and quick-editor payloads accept an optional occurrence date, preserving the selected widget date across IPC and midnight boundaries.

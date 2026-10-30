@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-30：S3 User-Agent 的 Electron 联调服务按实际收到的 URL、请求头与请求体重新计算完整 SigV4 签名；缺少签名头或签名不匹配均返回 401，覆盖 SDK 重试/请求编号请求头被转发过滤导致的鉴权失败。
+
 2026-10-30：`node scripts/test-s3-user-agent.mjs` 在隔离、隐藏的 Electron 中连接本地 HTTP 测试服务，验证实际 User-Agent、签名上传/下载、图片二进制、条件读取、401 提示及设置页草稿/保存/重载；先运行 `npm run build`，移动尺寸截图保存在临时目录。`node node_modules/vitest/vitest.mjs run --config vitest.s3.config.ts` 运行相关单元测试。
 
 2026-10-26：`node scripts/test-detail-statistics-renderer.mjs` 补充真实标签详情的日历切换后立即离开/重开检查，覆盖跨天和普通时长日历、开启/关闭两个方向、序列化恢复和各卡片独立状态；同时验证分类详情的两个显示状态可复用。

@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-10-30: Compatible-S3 connection checks log safe operation/status/error/transport diagnostics without request credentials. HTTP 401 retains the original service message alongside the configuration hint.
+
 Update 2026-10-30: Compatible S3 persists an optional per-connection `userAgent`. Android applies it through native HTTP; Electron uses `compatibleS3DesktopTransport.ts` and the trusted preload bridge only when a custom value is present. Empty settings retain the existing SDK transport. Unsupported browsers report the limitation; HTTP 401 keeps its status and adds an actionable configuration hint.
 
 Update 2026-10-29: `todoExecutionLibraryService` stores reusable labels, organizational categories and deletion markers with stable reactive snapshots. The library participates in preference export/cloud backup and restore.

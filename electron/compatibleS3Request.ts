@@ -3,13 +3,14 @@
  * @input Trusted main-frame requests containing signed S3 HTTP messages
  * @output Cookie-free HTTP responses with a configurable standard User-Agent
  * @updated 2026-10-30: Adds a validated Electron network bridge with bounded requests and no redirects.
+ * @updated 2026-10-30: Preserves SDK retry/invocation headers included in SigV4 signatures.
  */
 import { ipcMain, net, type BrowserWindow } from 'electron';
 import { normalizeS3UserAgent, type DesktopS3Request, type DesktopS3Response } from '../src/utils/compatibleS3Transport';
 
 const MAX_BYTES = 256 * 1024 * 1024;
 // Electron derives Host and Content-Length from the URL/body; setting either is forbidden.
-const ALLOWED_HEADERS = /^(authorization|content-type|content-md5|cache-control|if-none-match|if-match|range|x-amz-[a-z0-9-]+)$/i;
+const ALLOWED_HEADERS = /^(authorization|content-type|content-md5|cache-control|if-none-match|if-match|range|amz-sdk-invocation-id|amz-sdk-request|x-amz-[a-z0-9-]+)$/i;
 
 export async function sendCompatibleS3Request(input: DesktopS3Request): Promise<DesktopS3Response> {
   if (!input || typeof input.url !== 'string' || typeof input.method !== 'string') throw new Error('Invalid S3 request');

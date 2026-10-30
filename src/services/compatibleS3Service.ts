@@ -1,6 +1,7 @@
 /**
  * @file compatibleS3Service.ts
  * @updated 2026-10-30: Persists optional User-Agent and uses native desktop transport when configured.
+ * @updated 2026-10-30: Logs safe connection diagnostics and preserves original HTTP 401 details.
  * @input Compatible S3 credentials, endpoint config, local data
  * @output Remote storage operations for S3-compatible storage
  * @pos Service (Data Synchronization)
@@ -325,7 +326,8 @@ export class CompatibleS3Service {
       return await this.getClient().send(command);
     } catch (error: any) {
       if (error?.$metadata?.httpStatusCode === 401) {
-        error.message = '对象存储鉴权失败（HTTP 401）：请检查密钥、区域及 User-Agent 是否与服务商的客户端类型一致';
+        const detail = error.message && error.message !== 'UnknownError' ? `（${error.message}）` : '';
+        error.message = `对象存储鉴权失败（HTTP 401）：请检查密钥、区域及 User-Agent 是否与服务商的客户端类型一致${detail}`;
       }
       throw error;
     }
@@ -550,7 +552,15 @@ export class CompatibleS3Service {
       }));
 
       return { success: true };
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[CompatibleS3] Connection check failed:', {
+        operation: 'HeadBucket',
+        httpStatus: error?.$metadata?.httpStatusCode,
+        code: this.getErrorCode(error) || error?.name,
+        message: this.getErrorMessage(error),
+        userAgent: this.config.userAgent || '(default)',
+        transport: Capacitor.isNativePlatform() ? 'native' : this.config.userAgent ? 'desktop' : 'sdk-default'
+      });
       const code = this.getErrorCode(error);
       let message = `连接失败: ${this.getErrorMessage(error)}`;
 

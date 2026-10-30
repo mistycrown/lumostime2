@@ -141,6 +141,27 @@ describe('CompatibleS3Service', () => {
     expect(new CompatibleS3Service().getConfig()).toEqual(service.getConfig());
   });
 
+  it('logs safe connection failures without credentials and retains the original service message', async () => {
+    const service = await configured();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      sendMock.mockRejectedValueOnce(Object.assign(new Error('Client type mismatch'), {
+        name: 'Unauthorized', $metadata: { httpStatusCode: 401 }
+      }));
+      const result = await service.checkConnection();
+      expect(result).toMatchObject({ success: false, message: expect.stringContaining('Client type mismatch') });
+      expect(log).toHaveBeenCalledWith('[CompatibleS3] Connection check failed:', expect.objectContaining({
+        operation: 'HeadBucket', httpStatus: 401, code: 'Unauthorized', userAgent: '(default)', transport: 'sdk-default'
+      }));
+      const diagnostics = JSON.stringify(log.mock.calls);
+      expect(diagnostics).not.toContain('accessKeyId');
+      expect(diagnostics).not.toContain('secretAccessKey');
+      expect(diagnostics).not.toContain('authorization');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it('uses conditional reads for unchanged snapshots and full reads for verification', async () => {
     const service = await configured();
     const body = { logs: [{ note: 'original' }], timestamp: 1 };

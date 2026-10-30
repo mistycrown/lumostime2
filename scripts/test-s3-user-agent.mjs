@@ -3,6 +3,7 @@
  * @input Real settings view, S3 SDK, Electron preload/main bridge and a local HTTP fixture
  * @output Header/binary/error/UI persistence smoke checks and a mobile screenshot in a temporary directory
  * @updated 2026-10-30: Exercises the full custom User-Agent path without cloud credentials or user profiles.
+ * @updated 2026-10-30: Rejects requests missing any header included in the SDK signature.
  */
 import { build } from 'esbuild';
 import { mkdtemp, writeFile, readdir } from 'node:fs/promises';
@@ -42,6 +43,7 @@ await build({
   stdin: { contents: `
     import { app, BrowserWindow } from 'electron';
     import http from 'node:http';
+    import { createHash, createHmac } from 'node:crypto';
     import path from 'node:path';
     import { pathToFileURL } from 'node:url';
     import { writeFile } from 'node:fs/promises';
@@ -52,12 +54,45 @@ await build({
     const check = (value, message) => { if (!value) throw new Error(message); };
     const objects = new Map();
     const seen = [];
+    const hash = value => createHash('sha256').update(value).digest('hex');
+    const hmac = (key, value) => createHmac('sha256', key).update(value).digest();
+    const escape = value => encodeURIComponent(value).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase());
+    const verifySignature = (req, body, names) => {
+      const auth = req.headers.authorization || '';
+      const scope = /Credential=([^, ]+)/.exec(auth)?.[1].split('/');
+      if (!scope || scope[0] !== 'test-key') return false;
+      const url = new URL(req.url, 'http://localhost');
+      const query = Array.from(url.searchParams, ([key, value]) => [escape(key), escape(value)]).sort((a,b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0).map(([key,value])=>key+'='+value).join('&');
+      const canonicalHeaders = names.map(name => name + ':' + String(req.headers[name]).trim().replace(/\\s+/g, ' ') + '\\n').join('');
+      const payloadHash = req.headers['x-amz-content-sha256'] || hash(body);
+      if (payloadHash !== 'UNSIGNED-PAYLOAD' && payloadHash !== hash(body)) return false;
+      const canonical = [req.method, url.pathname, query, canonicalHeaders, names.join(';'), payloadHash].join('\\n');
+      const scopeText = scope.slice(1).join('/');
+      const toSign = ['AWS4-HMAC-SHA256', req.headers['x-amz-date'], scopeText, hash(canonical)].join('\\n');
+      let key = 'AWS4test-secret';
+      for (const part of scope.slice(1)) key = hmac(key, part);
+      return createHmac('sha256', key).update(toSign).digest('hex') === /Signature=([a-f0-9]+)/.exec(auth)?.[1];
+    };
     const server = http.createServer((req, res) => {
       const chunks = [];
       req.on('data', chunk => chunks.push(chunk));
       req.on('end', () => {
         const body = Buffer.concat(chunks);
         seen.push({ method: req.method, url: req.url, headers: req.headers, body });
+        const signedHeaders = /SignedHeaders=([^, ]+)/.exec(req.headers.authorization || '')?.[1].split(';') || [];
+        const missingHeaders = signedHeaders.filter(name => req.headers[name] === undefined);
+        if (missingHeaders.length) {
+          console.error('MISSING_SIGNED_HEADERS=' + missingHeaders.join(','));
+          res.writeHead(401, { 'Content-Type': 'application/xml' });
+          res.end('<Error><Code>SignatureDoesNotMatch</Code><Message>Signed headers missing</Message></Error>');
+          return;
+        }
+        if (signedHeaders.length && !verifySignature(req, body, signedHeaders)) {
+          console.error('INVALID_SIGV4=' + req.method + ' ' + req.url);
+          res.writeHead(401, { 'Content-Type': 'application/xml' });
+          res.end('<Error><Code>SignatureDoesNotMatch</Code><Message>Invalid canonical request or signature</Message></Error>');
+          return;
+        }
         if (req.headers['user-agent'] !== 'S3Drive') {
           res.writeHead(401, { 'Content-Type': 'application/xml' });
           res.end('<Error><Code>Unauthorized</Code><Message>Client rejected</Message></Error>');
@@ -132,7 +167,7 @@ await build({
       check(plain.status === 401 && seen.at(-1).headers['user-agent'] !== 'S3Drive', 'Identity leaked to unrelated requests');
       const ui = await evaluate('({width: innerWidth, scrollWidth: document.documentElement.scrollWidth})');
       check(ui.scrollWidth <= ui.width, 'Mobile layout overflows horizontally');
-      console.log('S3_USER_AGENT_SMOKE=passed: real Electron UA, IPC, signed upload/download, binary images, conditional GET, 401, draft/save/reload and mobile layout');
+      console.log('S3_USER_AGENT_SMOKE=passed: real Electron UA, full SigV4 verification, signed upload/download, binary images, conditional GET, 401, draft/save/reload and mobile layout');
       console.log('SCREENSHOT=' + screenshot);
       server.close(); window.destroy(); app.exit(0);
     }).catch(error => { console.error(error); server.close(); window?.destroy(); app.exit(1); });
