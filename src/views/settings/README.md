@@ -1,5 +1,7 @@
 # Settings Views
 
+Update 2026-10-30: WebDAV, COS and compatible-S3 restore buttons share the app's `ConfirmModal` warning style and local-backup notice. Cancellation does not start a transfer; confirmed restores retain busy state until completion and reset it in `finally`.
+
 Update 2026-10-26: Data Management names cloud image repair “按本地同步云端图片”, with an explicit upload-missing/delete-extra confirmation. Image maintenance and ZIP import controls are mutually disabled during active work.
 
 Update 2026-10-24: Journal export shows native save percentage separately from the rendered page count so large/custom-font PDFs do not appear stuck at their final page while writing to Android storage.

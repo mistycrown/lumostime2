@@ -1,5 +1,6 @@
 /**
  * @file S3SyncSettingsView.tsx
+ * @updated 2026-10-30: Confirms COS/compatible-S3 restores with the existing in-app modal before starting any transfer.
  * @updated 2026-10-30: Edits and persists optional per-connection User-Agent with a Data Capsule example.
  * @description Cloud sync settings for Tencent Cloud COS and generic compatible S3 storage.
  * @updated 2026-07-21: Replaced COS and compatible-S3 configuration clearing with in-app confirmation modals.
@@ -102,6 +103,19 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
   const [showCosPassword, setShowCosPassword] = useState(false);
   const [showCompatiblePassword, setShowCompatiblePassword] = useState(false);
   const [pendingClearConfig, setPendingClearConfig] = useState<'cos' | 'compatible' | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<SyncTab | null>(null);
+
+  const handleConfirmRestore = async () => {
+    if (!pendingRestore) return;
+    const onRestore = pendingRestore === 'cos' ? onS3SyncDownload : onCompatibleS3SyncDownload;
+    setPendingRestore(null);
+    setIsSyncing(true);
+    try {
+      await onRestore();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const confirm = () => {
     setPendingClearConfig(activeTab === 'cos' ? 'cos' : 'compatible');
@@ -324,7 +338,6 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
     label: string,
     region: string,
     onUpload: () => Promise<void>,
-    onDownload: () => Promise<void>,
     onDisconnect: () => void,
     onClear: () => void
   ) => (
@@ -352,11 +365,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
         </button>
 
         <button
-          onClick={async () => {
-            setIsSyncing(true);
-            await onDownload();
-            setIsSyncing(false);
-          }}
+          onClick={() => setPendingRestore(activeTab)}
           disabled={isSyncing}
           className="sync-restore-action flex flex-col items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white py-4 font-medium text-stone-700 transition-transform hover:bg-stone-50 active:scale-[0.98] disabled:opacity-70"
         >
@@ -391,7 +400,6 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
         s3Config.bucketName,
         s3Config.region,
         onS3SyncUpload,
-        onS3SyncDownload,
         handleCosDisconnect,
         () => {
           if (window.confirm('确定要完全清空腾讯云 COS 配置吗？下次需要重新输入。')) {
@@ -499,7 +507,6 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
             compatibleS3Config.bucketName,
             compatibleS3Config.region,
             onCompatibleS3SyncUpload,
-            onCompatibleS3SyncDownload,
             handleCompatibleDisconnect,
             () => {
               if (window.confirm('确定要完全清空兼容 S3 配置吗？下次需要重新输入。')) {
@@ -685,6 +692,16 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
           <p className="mt-1">2. 上传之后不能马上下载，需要等一会儿</p>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={pendingRestore !== null}
+        onClose={() => setPendingRestore(null)}
+        onConfirm={handleConfirmRestore}
+        title="从云端恢复数据"
+        description="这将使用云端版本覆盖本地数据。覆盖前会备份本地数据，确定恢复吗？"
+        confirmText="确认恢复"
+        cancelText="取消"
+        type="warning"
+      />
       <ConfirmModal
         isOpen={pendingClearConfig !== null}
         onClose={() => setPendingClearConfig(null)}

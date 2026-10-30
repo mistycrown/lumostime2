@@ -1,5 +1,6 @@
 /**
  * @file CloudSyncSettingsView.tsx
+ * @updated 2026-10-30: Uses the existing in-app confirmation style before WebDAV restore and clears busy state in finally.
  * @description WebDAV 云同步配置页面
  * @updated 2026-07-21: Replaced WebDAV configuration clearing with an in-app confirmation modal.
  * @updated 2026-07-21: Added semantic dark-mode styles for WebDAV sync surfaces and actions.
@@ -31,6 +32,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
     const [isSyncing, setIsSyncing] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [isClearConfigConfirmOpen, setIsClearConfigConfirmOpen] = useState(false);
+    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
 
     const confirm = () => {
         setIsClearConfigConfirmOpen(true);
@@ -109,9 +111,14 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
     };
 
     const handleSyncDownload = async () => {
+        if (!isRestoreConfirmOpen) return;
+        setIsRestoreConfirmOpen(false);
         setIsSyncing(true);
-        await onSyncDownload();
-        setIsSyncing(false);
+        try {
+            await onSyncDownload();
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
     return (
@@ -151,7 +158,7 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                                 </button>
 
                                 <button
-                                    onClick={handleSyncDownload}
+                                    onClick={() => setIsRestoreConfirmOpen(true)}
                                     disabled={isSyncing}
                                     className="flex flex-col items-center justify-center gap-2 py-4 bg-white border border-stone-200 text-stone-700 rounded-xl font-medium active:scale-[0.98] transition-transform hover:bg-stone-50 disabled:opacity-70"
                                 >
@@ -280,6 +287,16 @@ export const CloudSyncSettingsView: React.FC<CloudSyncSettingsViewProps> = ({
                     </div>
                 </div>
             </div>
+            <ConfirmModal
+                isOpen={isRestoreConfirmOpen}
+                onClose={() => setIsRestoreConfirmOpen(false)}
+                onConfirm={handleSyncDownload}
+                title="从云端恢复数据"
+                description="这将使用云端版本覆盖本地数据。覆盖前会备份本地数据，确定恢复吗？"
+                confirmText="确认恢复"
+                cancelText="取消"
+                type="warning"
+            />
             <ConfirmModal
                 isOpen={isClearConfigConfirmOpen}
                 onClose={() => setIsClearConfigConfirmOpen(false)}

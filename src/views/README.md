@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-10-30: Settings delegates restore confirmation to the WebDAV/COS/compatible-S3 views, using the existing in-app `ConfirmModal`. Cloud sync begins only after confirmation; the native system confirmation has been removed from these restore actions.
+
 Update 2026-10-29: Execution mode uses the same category-pill style as schedule ranges. Top-level sections follow the execution library categories; each category displays task groups for its individual labels. Category badges count distinct tasks, empty categories show their own empty state, and unlabeled tasks retain a separate entry.
 
 Update 2026-10-29: `TodoView` switches schedule/execution beside Tasks within the same schedule sidebar tab. Execution groups and label filters use the reusable label library.

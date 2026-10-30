@@ -1,5 +1,6 @@
 /**
  * @file SettingsView.tsx
+ * @updated 2026-10-30: Leaves restore confirmation to the providers' shared in-app ConfirmModal before starting cloud sync.
  * @updated 2026-10-26: Exposes local-authoritative cloud image synchronization with transfer counts and per-file failures.
  * @updated 2026-10-23: Passes goals and major goals to journal PDF export in data management.
  * @updated 2026-10-10: Uses the dictionary-specific BookA icon for personal words.
@@ -105,7 +106,6 @@ import { getTodoProgressTrackingMode, syncSubtaskProgressToParentTodos } from '.
 import { ToastType } from '../components/Toast';
 import { CloudService } from '../utils/syncUtils';
 
-import { ConfirmModal } from '../components/ConfirmModal';
 import { FeedbackReportModal } from '../components/FeedbackReportModal';
 import { AppView, ReviewTemplate, NarrativeTemplate, Log, TodoItem, Scope, DailyReview, WeeklyReview, MonthlyReview, TodoCategory, Filter, Category, CheckTemplate, Routine, NoteNode, NodeCategory, DataCollection, DataCollectionEntry } from '../types';
 import { DefaultArchiveView, DefaultIndexView, DefaultRecordView, TimelineQuickActionKey, TimelineSortOrder, useSettings } from '../contexts/SettingsContext';
@@ -575,13 +575,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onCloudSync, onClose
     const handleSyncUpload = () => onCloudSync(webdavService, 'upload');
     const handleS3SyncUpload = () => onCloudSync(s3Service, 'upload');
     const handleCompatibleS3SyncUpload = () => onCloudSync(compatibleS3Service, 'upload');
-    const confirmCloudDownload = async (service: CloudService) => {
-        if (!window.confirm('这将使用云端版本覆盖本地数据。覆盖前会备份本地数据，确定吗？')) return;
-        await onCloudSync(service, 'restore');
-    };
-    const handleSyncDownload = () => confirmCloudDownload(webdavService);
-    const handleS3SyncDownload = () => confirmCloudDownload(s3Service);
-    const handleCompatibleS3SyncDownload = () => confirmCloudDownload(compatibleS3Service);
+    // Provider views confirm with the app's modal before calling these actions.
+    const handleSyncDownload = () => onCloudSync(webdavService, 'restore');
+    const handleS3SyncDownload = () => onCloudSync(s3Service, 'restore');
+    const handleCompatibleS3SyncDownload = () => onCloudSync(compatibleS3Service, 'restore');
 
     const handleGenerateDemo = () => {
         if (!window.confirm('Generate 50 random logs? This helps debugging heatmaps.')) return;
