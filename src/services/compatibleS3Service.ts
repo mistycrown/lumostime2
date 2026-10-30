@@ -2,6 +2,8 @@
  * @file compatibleS3Service.ts
  * @updated 2026-10-30: Persists optional User-Agent and uses native desktop transport when configured.
  * @updated 2026-10-30: Logs safe connection diagnostics and preserves original HTTP 401 details.
+ * @updated 2026-10-30: Exposes HTTP status and bounded JSON service errors for failed downloads without logging credentials or backup bodies.
+ * @updated 2026-10-30: Serializes Data Capsule requests and persists 429 cooldown while disabling hidden SDK retries for this provider.
  * @input Compatible S3 credentials, endpoint config, local data
  * @output Remote storage operations for S3-compatible storage
  * @pos Service (Data Synchronization)
@@ -32,8 +34,9 @@ import { HttpRequest, HttpResponse } from '@smithy/protocol-http';
 import type { HttpHandlerOptions } from '@smithy/types';
 import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 import { CloudJsonCache, CloudJsonReadOptions } from '../utils/cloudJsonCache';
-import { normalizeS3UserAgent } from '../utils/compatibleS3Transport';
+import { isDataCapsuleEndpoint, normalizeS3UserAgent } from '../utils/compatibleS3Transport';
 import { DesktopCompatibleS3RequestHandler } from './compatibleS3DesktopTransport';
+import { CompatibleS3RequestQueue } from './compatibleS3RequestQueue';
 
 export interface CompatibleS3Config {
   bucketName: string;
@@ -245,6 +248,7 @@ export class CompatibleS3Service {
   private jsonCache = new CloudJsonCache();
   private config: CompatibleS3Config | null = null;
   private client: S3Client | null = null;
+  private requestQueue?: CompatibleS3RequestQueue;
 
   constructor() {
     this.loadConfig();
@@ -286,10 +290,13 @@ export class CompatibleS3Service {
     }
 
     try {
+      const isDataCapsule = isDataCapsuleEndpoint(this.config.endpoint);
+      this.requestQueue = isDataCapsule ? new CompatibleS3RequestQueue(localStorage) : undefined;
       const clientConfig: ConstructorParameters<typeof S3Client>[0] = {
         region: this.config.region,
         endpoint: this.config.endpoint,
         forcePathStyle: this.config.forcePathStyle,
+        ...(isDataCapsule ? { maxAttempts: 1 } : {}),
         credentials: {
           accessKeyId: this.config.accessKeyId,
           secretAccessKey: this.config.secretAccessKey
@@ -323,11 +330,52 @@ export class CompatibleS3Service {
       throw new Error('自定义 User-Agent 需要使用支持此功能的桌面端或手机端');
     }
     try {
-      return await this.getClient().send(command);
+      const client = this.getClient();
+      return await (this.requestQueue ? this.requestQueue.run(() => client.send(command)) : client.send(command));
     } catch (error: any) {
+      const httpStatus = Number(error?.$metadata?.httpStatusCode ?? error?.$response?.statusCode) || undefined;
+      const operation = command.constructor.name.replace(/Command$/, '');
+      let serviceMessage: string | undefined;
+      if (httpStatus && httpStatus >= 400 && (!error?.message || error.message === 'UnknownError' || error.name === 'Unknown' || error.message.includes('Deserialization error:'))) {
+        // The S3 XML decoder hides JSON gateway errors behind UnknownError. Read
+        // only small error responses, never a successful backup or an HTML page.
+        const body = error?.$response?.body;
+        try {
+          const text = typeof body === 'string' && body.length <= 16_384 ? body
+            : body instanceof Blob && body.size <= 16_384 ? await body.text() : '';
+          if (text.trimStart().startsWith('{')) {
+            const parsed = JSON.parse(text);
+            const code = parsed.Code ?? parsed.code ?? parsed.error;
+            const message = parsed.Message ?? parsed.message;
+            if (typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,79}$/.test(code)) error.name = code;
+            if (typeof message === 'string') serviceMessage = message;
+          }
+        } catch {
+          // Keep the SDK failure and HTTP status when the gateway body is unavailable.
+        }
+        if (serviceMessage) {
+          for (const value of [this.config?.accessKeyId, this.config?.secretAccessKey]) {
+            if (value) serviceMessage = serviceMessage.split(value).join('[REDACTED]');
+          }
+          serviceMessage = serviceMessage.slice(0, 600);
+        }
+        error.message = `对象存储请求失败（HTTP ${httpStatus}，${operation}）：${serviceMessage || error.name || '服务端未返回具体错误信息'}`;
+      }
       if (error?.$metadata?.httpStatusCode === 401) {
         const detail = error.message && error.message !== 'UnknownError' ? `（${error.message}）` : '';
         error.message = `对象存储鉴权失败（HTTP 401）：请检查密钥、区域及 User-Agent 是否与服务商的客户端类型一致${detail}`;
+      }
+      if (httpStatus === 429) {
+        const seconds = Math.ceil(Number(error?.retryAfterMs) / 1000);
+        error.message = Number.isFinite(seconds) && seconds > 0
+          ? `对象存储请求受限（HTTP 429），请 ${seconds} 秒后重试`
+          : '对象存储请求受限（HTTP 429），请稍后重试';
+      }
+      if (httpStatus !== 304) {
+        console.error('[CompatibleS3] Request failed:', JSON.stringify({
+          operation, httpStatus, code: this.getErrorCode(error) || error?.name,
+          message: this.getErrorMessage(error), userAgent: this.config?.userAgent || '(default)'
+        }));
       }
       throw error;
     }
