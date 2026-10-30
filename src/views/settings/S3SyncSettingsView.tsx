@@ -1,5 +1,6 @@
 /**
  * @file S3SyncSettingsView.tsx
+ * @updated 2026-10-30: Edits and persists optional per-connection User-Agent with a Data Capsule example.
  * @description Cloud sync settings for Tencent Cloud COS and generic compatible S3 storage.
  * @updated 2026-07-21: Replaced COS and compatible-S3 configuration clearing with in-app confirmation modals.
  * @updated 2026-07-21: Added semantic dark-mode states for providers, sync actions, and status feedback.
@@ -26,6 +27,7 @@ import { s3Service, S3Config } from '../../services/s3Service';
 import { compatibleS3Service, CompatibleS3Config } from '../../services/compatibleS3Service';
 import { ToastType } from '../../components/Toast';
 import { ConfirmModal } from '../../components/ConfirmModal';
+import { isDataCapsuleEndpoint, MAX_S3_USER_AGENT_LENGTH, normalizeS3UserAgent } from '../../utils/compatibleS3Transport';
 
 interface S3SyncSettingsViewProps {
   onBack: () => void;
@@ -56,7 +58,8 @@ const COMPATIBLE_DRAFT_KEYS = {
   endpoint: 'lumos_compatible_s3_draft_endpoint',
   accessKeyId: 'lumos_compatible_s3_draft_access_key_id',
   secretAccessKey: 'lumos_compatible_s3_draft_secret_access_key',
-  forcePathStyle: 'lumos_compatible_s3_draft_force_path_style'
+  forcePathStyle: 'lumos_compatible_s3_draft_force_path_style',
+  userAgent: 'lumos_compatible_s3_draft_user_agent'
 } as const;
 
 const LEGACY_COMPATIBLE_PROVIDER_DRAFT_KEY = 'lumos_compatible_s3_draft_provider';
@@ -168,15 +171,17 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
     const draftAccessKeyId = localStorage.getItem(COMPATIBLE_DRAFT_KEYS.accessKeyId);
     const draftSecretAccessKey = localStorage.getItem(COMPATIBLE_DRAFT_KEYS.secretAccessKey);
     const draftForcePathStyle = localStorage.getItem(COMPATIBLE_DRAFT_KEYS.forcePathStyle);
+    const draftUserAgent = localStorage.getItem(COMPATIBLE_DRAFT_KEYS.userAgent);
 
-    if (draftBucketName || draftRegion || draftEndpoint || draftAccessKeyId || draftSecretAccessKey) {
+    if (draftBucketName || draftRegion || draftEndpoint || draftAccessKeyId || draftSecretAccessKey || draftUserAgent) {
       setCompatibleForm({
         bucketName: draftBucketName || '',
         region: draftRegion || '',
         endpoint: draftEndpoint || '',
         accessKeyId: draftAccessKeyId || '',
         secretAccessKey: draftSecretAccessKey || '',
-        forcePathStyle: draftForcePathStyle !== 'false'
+        forcePathStyle: draftForcePathStyle !== 'false',
+        userAgent: draftUserAgent || ''
       });
     }
   }, [compatibleS3Config]);
@@ -197,7 +202,8 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
       compatibleForm.region ||
       compatibleForm.endpoint ||
       compatibleForm.accessKeyId ||
-      compatibleForm.secretAccessKey
+      compatibleForm.secretAccessKey ||
+      compatibleForm.userAgent
     ) {
       localStorage.removeItem(LEGACY_COMPATIBLE_PROVIDER_DRAFT_KEY);
       localStorage.setItem(COMPATIBLE_DRAFT_KEYS.bucketName, compatibleForm.bucketName);
@@ -206,6 +212,7 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
       localStorage.setItem(COMPATIBLE_DRAFT_KEYS.accessKeyId, compatibleForm.accessKeyId);
       localStorage.setItem(COMPATIBLE_DRAFT_KEYS.secretAccessKey, compatibleForm.secretAccessKey);
       localStorage.setItem(COMPATIBLE_DRAFT_KEYS.forcePathStyle, String(compatibleForm.forcePathStyle));
+      localStorage.setItem(COMPATIBLE_DRAFT_KEYS.userAgent, compatibleForm.userAgent || '');
     }
   }, [compatibleForm]);
 
@@ -263,6 +270,13 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
       return;
     }
 
+    let userAgent: string | undefined;
+    try {
+      userAgent = normalizeS3UserAgent(compatibleForm.userAgent);
+    } catch (error) {
+      onToast('error', (error as Error).message);
+      return;
+    }
     setIsSyncing(true);
 
     const cleanConfig: CompatibleS3Config = {
@@ -271,7 +285,8 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
       endpoint: compatibleForm.endpoint.trim(),
       accessKeyId: compatibleForm.accessKeyId.trim(),
       secretAccessKey: compatibleForm.secretAccessKey.trim(),
-      forcePathStyle: compatibleForm.forcePathStyle
+      forcePathStyle: compatibleForm.forcePathStyle,
+      ...(userAgent ? { userAgent } : {})
     };
 
     compatibleS3Service.saveConfig(cleanConfig);
@@ -579,6 +594,23 @@ export const S3SyncSettingsView: React.FC<S3SyncSettingsViewProps> = ({
               >
                 {showCompatiblePassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
+            </div>
+          </label>
+
+          <label className="block">
+            <span className="ml-1 text-xs font-bold text-stone-400">User-Agent（可选）</span>
+            <div className="mt-1 flex items-center gap-2 rounded-xl bg-stone-50 px-3 py-2 focus-within:ring-2 focus-within:ring-stone-200">
+              <Globe size={18} className="shrink-0 text-stone-400" />
+              <input
+                type="text"
+                placeholder={isDataCapsuleEndpoint(compatibleForm.endpoint) ? 'S3Drive' : '留空使用默认值'}
+                maxLength={MAX_S3_USER_AGENT_LENGTH}
+                autoComplete="off"
+                spellCheck={false}
+                className="min-w-0 flex-1 bg-transparent text-sm text-stone-700 outline-none placeholder:text-stone-300"
+                value={compatibleForm.userAgent || ''}
+                onChange={(event) => setCompatibleForm((previous) => ({ ...previous, userAgent: event.target.value }))}
+              />
             </div>
           </label>
 

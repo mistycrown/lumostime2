@@ -1,5 +1,6 @@
 /**
  * @file preload.ts
+ * @updated 2026-10-30: Exposes the restricted compatible-S3 native request bridge.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Window Object
  * @output IPC Bridge
@@ -16,6 +17,11 @@
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
 import { ipcRenderer, contextBridge } from 'electron'
+import type { DesktopS3Request } from '../src/utils/compatibleS3Transport';
+
+contextBridge.exposeInMainWorld('compatibleS3Connection', {
+    request: (request: DesktopS3Request) => ipcRenderer.invoke('compatible-s3:request', request)
+});
 
 contextBridge.exposeInMainWorld('feishuConnection', {
     request: (action: string, body?: unknown) => ipcRenderer.invoke('feishu:request', action, body)

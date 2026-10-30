@@ -1,5 +1,7 @@
 # 图片优化脚本使用说明
 
+2026-10-30：`node scripts/test-s3-user-agent.mjs` 在隔离、隐藏的 Electron 中连接本地 HTTP 测试服务，验证实际 User-Agent、签名上传/下载、图片二进制、条件读取、401 提示及设置页草稿/保存/重载；先运行 `npm run build`，移动尺寸截图保存在临时目录。`node node_modules/vitest/vitest.mjs run --config vitest.s3.config.ts` 运行相关单元测试。
+
 2026-10-26：`node scripts/test-detail-statistics-renderer.mjs` 补充真实标签详情的日历切换后立即离开/重开检查，覆盖跨天和普通时长日历、开启/关闭两个方向、序列化恢复和各卡片独立状态；同时验证分类详情的两个显示状态可复用。
 
 2026-10-25：`node scripts/check-cross-day-statistics-smoke.mjs` 在隔离的无头 Chrome 中验证标签统计的跨天来源、三个指标、四位数字日期分界、周月年/全部范围、三种图表及保存后重开。覆盖非法/未完整输入、午夜拆分、缺记录、中断、紧凑年历、年度时段小图、全部范围按年翻页、仅折线保留点选、既有数值折线回归和手机原生触屏选点。先执行 `npm run build`；显式加载微软雅黑，桌面与手机的普通/年度/全部图表、编辑器截图和结果保存在 `node_modules/.cache/cross-day-statistics-smoke`。

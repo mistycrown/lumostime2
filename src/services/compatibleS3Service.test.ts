@@ -1,5 +1,6 @@
 /**
  * @file compatibleS3Service.test.ts
+ * @updated 2026-10-30: Covers optional client identity persistence, clearing and atomic validation.
  * @description Regression tests for the compatible S3 service.
  * @updated 2026-10-22: Covers conditional GET, changed versions and upload/config invalidation.
  * @updated 2026-10-25: Covers OSS JSON reads that reject response content-type overrides.
@@ -109,6 +110,36 @@ describe('CompatibleS3Service', () => {
     service.saveConfig({ bucketName: 'bucket', region: 'r', endpoint: 'https://example.com', accessKeyId: 'ak', secretAccessKey: 'sk', forcePathStyle: true });
     return service;
   };
+
+  it('persists a trimmed identity and removes it when cleared', async () => {
+    const service = await configured();
+    const { CompatibleS3Service } = await import('./compatibleS3Service');
+    service.saveConfig({ ...service.getConfig()!, userAgent: ' S3Drive ' });
+    expect(new CompatibleS3Service().getConfig()?.userAgent).toBe('S3Drive');
+    expect(localStorage.getItem('lumos_compatible_s3_user_agent')).toBe('S3Drive');
+    service.saveConfig({ ...service.getConfig()!, userAgent: '  ' });
+    expect(new CompatibleS3Service().getConfig()).not.toHaveProperty('userAgent');
+    expect(localStorage.getItem('lumos_compatible_s3_user_agent')).toBeNull();
+    service.saveConfig({ ...service.getConfig()!, userAgent: 'rclone/test' });
+    service.clearStorage();
+    expect(new CompatibleS3Service().getConfig()).toBeNull();
+    expect(localStorage.getItem('lumos_compatible_s3_user_agent')).toBeNull();
+  });
+
+  it('does not replace saved credentials when identity validation fails', async () => {
+    const service = await configured();
+    const previous = service.getConfig();
+    expect(() => service.saveConfig({ ...previous!, accessKeyId: 'changed', userAgent: 'S3Drive\nInjected' })).toThrow('User-Agent');
+    expect(service.getConfig()).toEqual(previous);
+    expect(localStorage.getItem('lumos_compatible_s3_access_key_id')).toBe('ak');
+  });
+
+  it('does not prevent startup when a stored identity is invalid', async () => {
+    const service = await configured();
+    const { CompatibleS3Service } = await import('./compatibleS3Service');
+    localStorage.setItem('lumos_compatible_s3_user_agent', 'invalid\nheader');
+    expect(new CompatibleS3Service().getConfig()).toEqual(service.getConfig());
+  });
 
   it('uses conditional reads for unchanged snapshots and full reads for verification', async () => {
     const service = await configured();

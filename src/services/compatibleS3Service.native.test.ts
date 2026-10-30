@@ -1,5 +1,6 @@
 /**
  * @file compatibleS3Service.native.test.ts
+ * @updated 2026-10-30: Verifies explicit client identity and empty native defaults.
  * @input Mock native HTTP responses and the real S3 SDK with its browser body collector
  * @output Native backup, binary download and service-error deserialization regression coverage
  * @pos Test (Cloud Sync)
@@ -14,7 +15,7 @@ const { sendRequest } = vi.hoisted(() => ({ sendRequest: vi.fn() }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }));
 vi.mock('@awesome-cordova-plugins/http', () => ({ HTTP: { sendRequest } }));
 
-const configured = async () => {
+const configured = async (userAgent?: string) => {
   const { CompatibleS3Service } = await import('./compatibleS3Service');
   const service = new CompatibleS3Service();
   service.saveConfig({
@@ -23,7 +24,8 @@ const configured = async () => {
     endpoint: 'https://oss-cn-beijing.aliyuncs.com',
     accessKeyId: 'test-key',
     secretAccessKey: 'test-secret',
-    forcePathStyle: false
+    forcePathStyle: false,
+    userAgent
   });
   // Vitest runs in Node; use the browser collector selected by the production WebView bundle.
   const client = (service as unknown as { client: S3Client }).client;
@@ -43,6 +45,14 @@ describe('CompatibleS3Service native SDK transport', () => {
   });
 
   afterEach(() => vi.unstubAllGlobals());
+
+  it('sends custom User-Agent through native HTTP only when configured', async () => {
+    sendRequest.mockResolvedValue({ status: 200, headers: {}, data: '{}' });
+    await (await configured(' S3Drive ')).downloadData();
+    expect(sendRequest.mock.calls[0][1].headers['User-Agent']).toBe('S3Drive');
+    await (await configured()).downloadData();
+    expect(sendRequest.mock.calls[1][1].headers).not.toHaveProperty('User-Agent');
+  });
 
   it('uploads and reads back a local safety backup through the real SDK', async () => {
     const service = await configured();

@@ -1,5 +1,6 @@
 /**
  * @file main.ts
+ * @updated 2026-10-30: Registers trusted main-frame S3 requests with custom client identity.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input App Lifecycle
  * @output Window Management
@@ -32,6 +33,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { registerFeishuConnection } from './feishuConnection';
+import { registerCompatibleS3Request } from './compatibleS3Request';
 import { createPersonalFeishuExecutor } from './feishuPersonalConnection';
 import { DesktopWidgetStateStore, type DesktopWidgetStartupType, type PersistedWidgetWindowState } from './desktopWidgetState';
 import { buildLoginItemSettings, isLoginItemEnabled } from './loginItemSettings';
@@ -1490,6 +1492,7 @@ async function createTodoQuickEditorWindow() {
 }
 
 app.whenReady().then(() => {
+  registerCompatibleS3Request(() => mainWindow, buildRendererUrl(), () => aiWidgetWindow);
   registerFeishuConnection(() => mainWindow, process.env.LUMOS_FEISHU_SERVICE_URL || VITE_DEV_SERVER_URL || '',
     buildRendererUrl(), createPersonalFeishuExecutor);
   createTray();

@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 /** @updated 2026-10-16: Adds occurrence dates to desktop todo action contracts. */
+/** @updated 2026-10-30: Adds typed compatible-S3 desktop transport. */
 
 declare module '*?raw' {
   const content: string;
@@ -27,6 +28,7 @@ type DesktopAIWidgetBridgeState = {
 };
 
 interface Window {
+  compatibleS3Connection?: import('./utils/compatibleS3Transport').DesktopS3Bridge;
   feishuConnection?: {
     request: (action: 'status' | 'connect' | 'calendar' | 'test' | 'import' | 'disconnect', body?: unknown) => Promise<{ status: number; data: any }>;
   };

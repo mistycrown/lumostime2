@@ -15,9 +15,11 @@
 
 在 `CompatibleS3Config` 中增加可选的 `userAgent` 字段。设置页增加普通文本输入框，默认空值；Endpoint 指向数据胶囊时提示用户填写 `S3Drive`，但不自动覆盖用户输入。保存配置时清理前后空白、限制为单行短文本，并兼容旧配置缺失字段。
 
-桌面端在用户填写 `userAgent` 时通过 Electron 主进程的受限 IPC 请求发送 S3 HTTP 请求，由主进程设置标准 `User-Agent`。未填写时继续使用 AWS SDK 默认请求。Android 继续使用现有原生 Request Handler，并将该字段加入请求头；Web 端不承诺修改浏览器保留的标准 `User-Agent`，仍保留默认行为。
+桌面端在用户填写 `userAgent` 时通过 Electron 主进程的受限 IPC 请求发送 S3 HTTP 请求，由主进程设置标准 `User-Agent`。未填写时继续使用 AWS SDK 默认请求。Android 继续使用现有原生 Request Handler，并将该字段加入请求头；Web 端留空时保留默认行为，填写自定义值时明确提示需要桌面端或手机端，避免静默忽略设置。
 
 IPC 只接受 S3 SDK 已生成的 URL、方法、请求头和二进制请求体，返回状态、响应头和二进制响应体；不暴露任意主进程执行能力。请求头会过滤连接、代理和 Cookie 等不应由渲染进程控制的字段，`userAgent` 只允许作为一个显式字段传入。
+
+实现中允许已知主窗口和 AI 窗口的预期顶层页面调用 IPC；这两个窗口都使用现有同步生命周期。子框架、其他窗口及远程导航仍被拒绝。
 
 ## 数据流
 

@@ -1,5 +1,6 @@
 /**
  * @file compatibleS3Service.ts
+ * @updated 2026-10-30: Persists optional User-Agent and uses native desktop transport when configured.
  * @input Compatible S3 credentials, endpoint config, local data
  * @output Remote storage operations for S3-compatible storage
  * @pos Service (Data Synchronization)
@@ -30,6 +31,8 @@ import { HttpRequest, HttpResponse } from '@smithy/protocol-http';
 import type { HttpHandlerOptions } from '@smithy/types';
 import { buildCloudImageManifest, CloudImageManifest, ImageManifestUpload } from './imageManifest';
 import { CloudJsonCache, CloudJsonReadOptions } from '../utils/cloudJsonCache';
+import { normalizeS3UserAgent } from '../utils/compatibleS3Transport';
+import { DesktopCompatibleS3RequestHandler } from './compatibleS3DesktopTransport';
 
 export interface CompatibleS3Config {
   bucketName: string;
@@ -38,6 +41,7 @@ export interface CompatibleS3Config {
   accessKeyId: string;
   secretAccessKey: string;
   forcePathStyle: boolean;
+  userAgent?: string;
 }
 
 const STORAGE_KEY_BUCKET = 'lumos_compatible_s3_bucket';
@@ -46,8 +50,11 @@ const STORAGE_KEY_ENDPOINT = 'lumos_compatible_s3_endpoint';
 const STORAGE_KEY_ACCESS_KEY_ID = 'lumos_compatible_s3_access_key_id';
 const STORAGE_KEY_SECRET_ACCESS_KEY = 'lumos_compatible_s3_secret_access_key';
 const STORAGE_KEY_FORCE_PATH_STYLE = 'lumos_compatible_s3_force_path_style';
+const STORAGE_KEY_USER_AGENT = 'lumos_compatible_s3_user_agent';
 
 class NativeCompatibleS3RequestHandler {
+  constructor(private userAgent?: string) {}
+
   destroy() {}
 
   updateHttpClientConfig() {}
@@ -60,6 +67,7 @@ class NativeCompatibleS3RequestHandler {
     const method = request.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'head' | 'delete' | 'options';
     const url = this.buildUrl(request);
     const headers = this.normalizeHeaders(request.headers);
+    if (this.userAgent) headers['User-Agent'] = this.userAgent;
     const normalizedBody = await this.normalizeRequestBody(request.body);
     const timeout = typeof options.requestTimeout === 'number'
       ? Math.max(1, Math.ceil(options.requestTimeout / 1000))
@@ -250,6 +258,12 @@ export class CompatibleS3Service {
 
     if (bucketName && region && endpoint && accessKeyId && secretAccessKey) {
       const forcePathStyle = localStorage.getItem(STORAGE_KEY_FORCE_PATH_STYLE) !== 'false';
+      let userAgent: string | undefined;
+      try {
+        userAgent = normalizeS3UserAgent(localStorage.getItem(STORAGE_KEY_USER_AGENT) || undefined);
+      } catch {
+        console.warn('[CompatibleS3] Ignored invalid stored User-Agent');
+      }
 
       this.config = {
         bucketName,
@@ -257,7 +271,8 @@ export class CompatibleS3Service {
         endpoint,
         accessKeyId,
         secretAccessKey,
-        forcePathStyle
+        forcePathStyle,
+        ...(userAgent ? { userAgent } : {})
       };
 
       this.initializeClient();
@@ -281,7 +296,9 @@ export class CompatibleS3Service {
       };
 
       if (Capacitor.isNativePlatform()) {
-        clientConfig.requestHandler = new NativeCompatibleS3RequestHandler();
+        clientConfig.requestHandler = new NativeCompatibleS3RequestHandler(this.config.userAgent);
+      } else if (this.config.userAgent && typeof window !== 'undefined' && window.compatibleS3Connection) {
+        clientConfig.requestHandler = new DesktopCompatibleS3RequestHandler(window.compatibleS3Connection, this.config.userAgent);
       }
 
       this.client = new S3Client(clientConfig);
@@ -297,6 +314,21 @@ export class CompatibleS3Service {
     }
 
     return this.client;
+  }
+
+  private async send(command: Parameters<S3Client['send']>[0]): Promise<any> {
+    if (this.config?.userAgent && !Capacitor.isNativePlatform()
+      && (typeof window === 'undefined' || !window.compatibleS3Connection)) {
+      throw new Error('自定义 User-Agent 需要使用支持此功能的桌面端或手机端');
+    }
+    try {
+      return await this.getClient().send(command);
+    } catch (error: any) {
+      if (error?.$metadata?.httpStatusCode === 401) {
+        error.message = '对象存储鉴权失败（HTTP 401）：请检查密钥、区域及 User-Agent 是否与服务商的客户端类型一致';
+      }
+      throw error;
+    }
   }
 
   private getBucket(): string {
@@ -322,13 +354,15 @@ export class CompatibleS3Service {
   }
 
   private normalizeConfig(config: CompatibleS3Config): CompatibleS3Config {
+    const userAgent = normalizeS3UserAgent(config.userAgent);
     return {
       bucketName: config.bucketName.trim(),
       region: config.region.trim(),
       endpoint: this.normalizeEndpoint(config.endpoint),
       accessKeyId: config.accessKeyId.trim(),
       secretAccessKey: config.secretAccessKey.trim(),
-      forcePathStyle: config.forcePathStyle
+      forcePathStyle: config.forcePathStyle,
+      ...(userAgent ? { userAgent } : {})
     };
   }
 
@@ -477,6 +511,8 @@ export class CompatibleS3Service {
     localStorage.setItem(STORAGE_KEY_ACCESS_KEY_ID, this.config.accessKeyId);
     localStorage.setItem(STORAGE_KEY_SECRET_ACCESS_KEY, this.config.secretAccessKey);
     localStorage.setItem(STORAGE_KEY_FORCE_PATH_STYLE, String(this.config.forcePathStyle));
+    if (this.config.userAgent) localStorage.setItem(STORAGE_KEY_USER_AGENT, this.config.userAgent);
+    else localStorage.removeItem(STORAGE_KEY_USER_AGENT);
 
     this.initializeClient();
   }
@@ -499,6 +535,7 @@ export class CompatibleS3Service {
     localStorage.removeItem(STORAGE_KEY_ACCESS_KEY_ID);
     localStorage.removeItem(STORAGE_KEY_SECRET_ACCESS_KEY);
     localStorage.removeItem(STORAGE_KEY_FORCE_PATH_STYLE);
+    localStorage.removeItem(STORAGE_KEY_USER_AGENT);
     this.disconnect();
   }
 
@@ -508,7 +545,7 @@ export class CompatibleS3Service {
     }
 
     try {
-      await this.getClient().send(new HeadBucketCommand({
+      await this.send(new HeadBucketCommand({
         Bucket: this.getBucket()
       }));
 
@@ -543,7 +580,7 @@ export class CompatibleS3Service {
     }
 
     try {
-      const response = await this.getClient().send(new HeadObjectCommand({
+      const response = await this.send(new HeadObjectCommand({
         Bucket: this.getBucket(),
         Key: filename
       }));
@@ -560,7 +597,7 @@ export class CompatibleS3Service {
 
   async uploadData(data: any, filename: string = 'lumostime_backup.json'): Promise<boolean> {
     if (filename === 'lumostime_backup.json') this.jsonCache.clear();
-    await this.getClient().send(new PutObjectCommand({
+    await this.send(new PutObjectCommand({
       Bucket: this.getBucket(),
       Key: filename,
       Body: JSON.stringify(data, null, 2),
@@ -573,7 +610,7 @@ export class CompatibleS3Service {
 
   async downloadData(filename: string = 'lumostime_backup.json', options: CloudJsonReadOptions = {}): Promise<any> {
     const fetchJson = async (etag?: string) => {
-      const response = await this.getClient().send(new GetObjectCommand({
+      const response = await this.send(new GetObjectCommand({
         Bucket: this.getBucket(),
         Key: filename,
         ...(etag ? { IfNoneMatch: etag } : {}),
@@ -594,7 +631,7 @@ export class CompatibleS3Service {
   async uploadImage(filename: string, buffer: ArrayBuffer | string | Blob): Promise<boolean> {
     const { body, contentType } = await this.normalizeUploadBody(buffer, 'image/jpeg');
 
-    await this.getClient().send(new PutObjectCommand({
+    await this.send(new PutObjectCommand({
       Bucket: this.getBucket(),
       Key: `images/${filename}`,
       Body: body,
@@ -608,7 +645,7 @@ export class CompatibleS3Service {
   }
 
   async downloadImage(filename: string): Promise<ArrayBuffer> {
-    const response = await this.getClient().send(new GetObjectCommand({
+    const response = await this.send(new GetObjectCommand({
       Bucket: this.getBucket(),
       Key: `images/${filename}`
     }));
@@ -622,7 +659,7 @@ export class CompatibleS3Service {
 
   async deleteFile(key: string): Promise<boolean> {
     try {
-      await this.getClient().send(new DeleteObjectCommand({
+      await this.send(new DeleteObjectCommand({
         Bucket: this.getBucket(),
         Key: key
       }));
@@ -637,7 +674,7 @@ export class CompatibleS3Service {
   async uploadImageList(imageList: ImageManifestUpload): Promise<boolean> {
     const data = buildCloudImageManifest(imageList);
 
-    await this.getClient().send(new PutObjectCommand({
+    await this.send(new PutObjectCommand({
       Bucket: this.getBucket(),
       Key: 'lumostime_images.json',
       Body: JSON.stringify(data, null, 2),
@@ -650,7 +687,7 @@ export class CompatibleS3Service {
 
   async downloadImageList(): Promise<CloudImageManifest | { images: string[]; timestamp: number } | null> {
     try {
-      const response = await this.getClient().send(new GetObjectCommand({
+      const response = await this.send(new GetObjectCommand({
         Bucket: this.getBucket(),
         Key: 'lumostime_images.json',
         ResponseCacheControl: 'no-cache, no-store, must-revalidate',
@@ -684,7 +721,7 @@ export class CompatibleS3Service {
 
   async getDirectoryContents(path: string): Promise<any[]> {
     try {
-      const response = await this.getClient().send(new ListObjectsV2Command({
+      const response = await this.send(new ListObjectsV2Command({
         Bucket: this.getBucket(),
         Prefix: path.endsWith('/') ? path : `${path}/`
       }));

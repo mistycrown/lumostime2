@@ -1,5 +1,7 @@
 # Utils Architecture
 
+Update 2026-10-30: `compatibleS3Transport.ts` shares the typed desktop S3 request contract, validates bounded single-line client identifiers, and recognizes exact Data Capsule endpoint hosts for the optional settings placeholder.
+
 Update 2026-10-29: `groupTodosByExecutionCategories` builds library-category sections containing individual label groups, preserving current category names/moves and distinct task counts across multiple labels.
 
 Update 2026-10-29: `todoExecutionLibrary` discovers legacy task labels, resolves current names/categories, preserves label IDs when moving categories and safely removes task associations. `todoExecutionGrouping` follows library category ordering while retaining untagged tasks.
