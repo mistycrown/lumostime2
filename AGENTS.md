@@ -2,6 +2,13 @@
 所有操作，只要用户没用明确说明，都按照native方式执行，不用开Subagent-driven，不需要询问用户。
 简单任务不需要写执行计划plan，直接执行修复即可。
 
+## Sentry 错误排查
+- 用户发送错误 ID（包括截图中的错误编号）时，必须先使用本机 Sentry CLI 查询事件详情，再结合代码和提交记录分析原因及修复状态。
+- 优先使用已登录的新版 `sentry` 命令；不要仅因项目内旧版 `sentry-cli` 未登录或浏览器不可连接，就判断无法查询。可用 `sentry auth status` 检查登录状态。
+- 当前项目查询示例：`sentry event view beijing-normol/javascript-react <错误ID> --fresh --json`。
+- 核对事件的发生时间、release、异常堆栈和 breadcrumbs，并查询关联 issue 的状态、最近发生时间及新版本是否复发。区分“代码已有修复”“新版本暂无上报”和“已在报错设备验证解决”，不要把它们混为一谈。
+- 若 CLI 查询确实失败，明确说明实际报错及缺失的访问条件；不要只根据截图或本地搜索结果断定问题已修复。
+
 ## Project Structure & Module Organization
 - `src/` contains the product code (React + TypeScript).
 - `src/components/` holds reusable UI blocks; `src/views/` contains page-level screens.
