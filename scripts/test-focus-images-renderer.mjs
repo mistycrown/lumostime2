@@ -3,6 +3,7 @@
  * @input Real timer attachment harness, production CSS, and installed Electron/esbuild
  * @output Isolated lifecycle checks and desktop/mobile screenshots in a temporary directory
  * @pos Test Runner
+ * @updated 2026-11-01: Resizes both empty and populated attachment screenshot checkpoints.
  * @updated 2026-11-01: Verifies timer photos without using saved user data or a real camera.
  */
 import { build } from 'esbuild';
@@ -44,7 +45,7 @@ app.whenReady().then(async () => {
   for (let i = 0; i < 500; i++) {
     const capture = await win.webContents.executeJavaScript('window.__focusImagesCapture');
     if (capture) {
-      if (capture.endsWith('mobile')) win.setSize(390, 844);
+      win.setSize(capture.endsWith('mobile') ? 390 : 1000, capture.endsWith('mobile') ? 844 : 850);
       await new Promise(resolve => setTimeout(resolve, 180));
       const screenshot = path.join(__dirname, capture + '.png');
       await fs.writeFile(screenshot, (await win.webContents.capturePage()).toPNG());

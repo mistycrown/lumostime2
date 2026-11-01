@@ -3,10 +3,11 @@
  * @input Running-session filenames, atomic attachment updater, and busy callback
  * @output Local gallery/camera attachments with thumbnails and shared image preview
  * @pos Component (Focus Detail)
+ * @updated 2026-11-01: Matches AddLog's icon actions, empty photo buttons, and wrapped attachment thumbnails.
  * @updated 2026-11-01: Saves each photo before appending it, retains unreadable drafts, and defers sync until submission.
  */
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Camera, Image as ImageIcon, Loader2, Plus } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { imageService } from '../services/imageService';
@@ -39,8 +40,12 @@ const AttachmentThumbnail: React.FC<{ filename: string; onClick: () => void }> =
 
   return (
     <button type="button" onClick={onClick} aria-label="预览图片"
-      className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-stone-100 flex items-center justify-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500">
-      {url ? <img src={url} alt="计时图片" className="w-full h-full object-cover" /> : <ImageIcon size={22} className="text-stone-400" />}
+      className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden border border-stone-200 cursor-zoom-in focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500">
+      {url ? <img src={url} alt="计时图片" className="w-full h-full object-cover" /> : (
+        <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+          <ImageIcon size={20} className="text-stone-300" />
+        </div>
+      )}
     </button>
   );
 };
@@ -128,26 +133,36 @@ export const FocusImageAttachments: React.FC<FocusImageAttachmentsProps> = ({ se
     }
   };
 
-  const buttonClass = 'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500';
+  const buttonClass = 'text-stone-500 hover:text-stone-800 transition-colors disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500';
+  const emptyButtonClass = 'flex-1 py-4 border border-dashed border-stone-200 rounded-xl flex items-center justify-center gap-2 text-stone-400 hover:text-stone-600 hover:bg-stone-50 cursor-pointer transition-colors disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-stone-500';
 
   return (
     <section aria-label="计时图片">
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-bold text-stone-400 uppercase tracking-widest">Images</span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {busy && <Loader2 size={16} className="animate-spin text-stone-400" aria-label="正在保存图片" />}
-          <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className={buttonClass}>
-            <ImageIcon size={16} /><span>添加图片</span>
+          <button type="button" disabled={busy} onClick={handleCamera} className={buttonClass} title="Take Photo" aria-label="Take Photo">
+            <Camera size={18} />
           </button>
-          <button type="button" disabled={busy} onClick={handleCamera} className={buttonClass}>
-            <Camera size={16} /><span>拍照</span>
+          <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className={buttonClass} title="Add Photos" aria-label="Add Photos">
+            <Plus size={18} />
           </button>
         </div>
       </div>
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles} className="hidden" aria-label="选择计时图片" />
-      {images.length > 0 && (
-        <div className="flex gap-3 overflow-x-auto pb-2">
+      {images.length > 0 ? (
+        <div className="flex flex-wrap gap-3 pb-2">
           {images.map((filename) => <AttachmentThumbnail key={filename} filename={filename} onClick={() => setPreview(filename)} />)}
+        </div>
+      ) : (
+        <div className="flex gap-2 w-full">
+          <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className={emptyButtonClass}>
+            <ImageIcon size={18} /><span className="text-sm">Add Photos</span>
+          </button>
+          <button type="button" disabled={busy} onClick={handleCamera} className={emptyButtonClass}>
+            <Camera size={18} /><span className="text-sm">Take Photo</span>
+          </button>
         </div>
       )}
       <ImagePreviewModal imageUrl={preview} images={images} initialIndex={preview ? images.indexOf(preview) : undefined}

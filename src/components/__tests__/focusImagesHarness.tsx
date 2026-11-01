@@ -3,6 +3,7 @@
  * @input Real timer view, session context, image service, IndexedDB, and isolated platform adapters
  * @output Attachment lifecycle assertions and desktop/mobile screenshot checkpoints
  * @pos Test (Renderer)
+ * @updated 2026-11-01: Captures the AddLog-style empty controls and uses icon action labels.
  * @updated 2026-11-01: Covers selection, native camera, restoration, cleanup, delayed saves, cancellation, and completion.
  */
 import React from 'react';
@@ -70,9 +71,9 @@ const pick = async (files: File[]) => {
   input.dispatchEvent(new Event('change', { bubbles: true }));
   await delay();
 };
-const clickText = (text: string) => {
-  const button = [...host.querySelectorAll('button')].find((item) => item.textContent === text);
-  check(button, 'Missing button ' + text);
+const clickCamera = () => {
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Take Photo"]');
+  check(button, 'Missing camera icon');
   button!.click();
 };
 const capture = async (name: string) => {
@@ -86,6 +87,9 @@ const run = async () => {
   await delay();
   const id = context.startActivity(activity, 'category', []);
   await delay();
+  host.querySelector('section[aria-label="计时图片"]')?.scrollIntoView();
+  await capture('focus-images-empty-desktop');
+  await capture('focus-images-empty-mobile');
   await pick([photo(), photo()]);
   await until(() => context.activeSessions[0].images?.length === 2);
   const initial = [...context.activeSessions[0].images!];
@@ -123,12 +127,12 @@ const run = async () => {
   passed.push('Unreadable attachments remain until explicitly deleted through preview');
 
   platform.native = true;
-  clickText('拍照');
+  clickCamera();
   await until(() => context.activeSessions[0].images?.length === 3);
   check(imageService.getReferencedImagesList().length === 0, 'Camera draft was published');
   platform.cancel = true;
   platform.native = true;
-  clickText('拍照');
+  clickCamera();
   await delay();
   check(context.activeSessions[0].images?.length === 3, 'Cancelled camera changed photos');
   passed.push('Native camera webPath fallback saves locally; camera cancellation preserves existing photos');
