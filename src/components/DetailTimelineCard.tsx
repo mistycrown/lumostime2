@@ -1,5 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-11-01: Softens keyword calendar segments and legend swatches with a shared 35% white overlay.
  * @updated 2026-10-11: Adds collapsible linked reviews with ten-card batches and resets pagination when the entity or period changes.
  * @updated 2026-10-11: Uses the Lucide Orbit icon for node identity in timeline metadata.
  * @updated 2026-10-07: Renders linked daily-review answers as independent cards above the Log history and keeps Log rows keyboard-accessible without nested buttons.
@@ -348,7 +349,10 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
 
     const getKeywordColor = (keyword: string): React.CSSProperties => {
         const record = timelineKeywordRecords.find((item) => item.label === keyword);
-        return { backgroundColor: record?.color || getDefaultKeywordColor(keyword) };
+        return {
+            backgroundColor: record?.color || getDefaultKeywordColor(keyword),
+            backgroundImage: 'linear-gradient(rgb(255 255 255 / 35%), rgb(255 255 255 / 35%))',
+        };
     };
 
     // 当月日志

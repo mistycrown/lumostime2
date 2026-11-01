@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-11-01: `DetailTimelineCard` applies a shared 35% white overlay to keyword calendar color segments and legend swatches, keeping date text and sticker rendering unchanged.
+
 Update 2026-10-30: `SyncProgress` follows the existing rounded toast surface, with a single-row stage/count layout, subtle stone colors and a thin image progress track. Its live progress and cross-view visibility remain unchanged.
 
 Update 2026-10-30: `SyncProgress` keeps cloud-sync stages visible across views in a non-blocking status strip. Image transfers expose settled/total counts; data transfers and verification show their current stage without estimated percentages. Existing completion/error toasts remain authoritative.
