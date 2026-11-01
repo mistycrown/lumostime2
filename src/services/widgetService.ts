@@ -1,5 +1,6 @@
 /**
  * @file widgetService.ts
+ * @updated 2026-11-01: Preserves app session fields and deterministic day-split identities on native timer switches.
  * @updated 2026-11-01: Carries local timer photos into native widget completion logs.
  * @updated 2026-10-29: Includes manual/automatic daily-check types in the shared native payload.
  * @updated 2026-10-18: Omits abandoned tasks from native widget source data.
@@ -30,6 +31,7 @@
  */
 import { getTodoForOccurrence } from '../utils/todoOccurrenceUtils';
 import { Capacitor } from '@capacitor/core';
+import { identifySessionLogs } from '../utils/sessionLogUtils';
 import { ActiveSession, Category, CheckTemplate, DailyReview, Log, TodoItem } from '../types';
 import type {
   WidgetBridgeDailyRuntimeLegendItem,
@@ -1153,12 +1155,22 @@ export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingActio
   startTime: action.startedAt,
   endTime: action.endedAt,
   duration: Math.max(0, (action.endedAt - action.startedAt) / 1000),
-  note: action.note || '',
-  title: action.label || undefined,
+  note: action.note || (session?.id === action.id ? session.note : '') || '',
+  title: (session?.id === action.id ? session.title : undefined) || action.label || undefined,
   linkedTodoId: action.linkedTodoId || undefined,
   scopeIds: action.scopeIds ?? undefined,
-  ...(session?.id === action.id && session.images ? { images: session.images } : {})
+  ...(session?.id === action.id ? {
+    ...(session.images ? { images: session.images } : {}),
+    attributeValues: session.attributeValues,
+    focusScore: session.focusScore,
+    moodScore: session.moodScore,
+    reactions: session.reactions,
+    appAwarenessMeta: session.appAwarenessMeta
+  } : {})
 });
+
+export const buildLogsFromWidgetPendingAction = (action: WidgetBridgePendingAction, session?: ActiveSession): Log[] =>
+  identifySessionLogs(action.id, splitLogByDays(buildLogFromWidgetPendingAction(action, session)));
 
 export const buildWidgetLogTailState = (
   logs: Log[]

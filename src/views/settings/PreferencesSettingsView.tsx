@@ -1,5 +1,6 @@
 /**
  * @file PreferencesSettingsView.tsx
+ * @updated 2026-11-01: Adds the default-enabled simultaneous timing switch.
  * @updated 2026-10-07: Uses four-digit daily backup input with validation under manual sync preferences.
  * @updated 2026-10-07: Includes the node directory in Timeline quick-action customization.
  * @description 偏好设置页面
@@ -131,6 +132,8 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
     onSetNavigationModuleVisibility
 }) => {
     const {
+        allowConcurrentTimers,
+        setAllowConcurrentTimers,
         themeMode,
         setThemeMode,
         fontScale,
@@ -502,6 +505,24 @@ export const PreferencesSettingsView: React.FC<PreferencesSettingsViewProps> = (
                 <div className="space-y-3">
                     <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-wider pl-2">记录与关联</h3>
                     <div className="bg-white rounded-2xl overflow-visible shadow-[0_2px_10px_rgba(0,0,0,0.03)]">
+                        <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                            <h4 className="font-bold text-stone-700">允许同时计时</h4>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-label="允许同时计时"
+                                aria-checked={allowConcurrentTimers}
+                                onClick={() => setAllowConcurrentTimers((current) => !current)}
+                                className={`flex-shrink-0 w-12 h-7 rounded-full transition-colors flex items-center px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500 ${
+                                    allowConcurrentTimers ? 'bg-stone-800' : 'bg-stone-200'
+                                }`}
+                            >
+                                <div className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                                    allowConcurrentTimers ? 'translate-x-5' : 'translate-x-0'
+                                }`} />
+                            </button>
+                        </div>
+
                         {/* Auto-focus Note Toggle */}
                         <div className="flex items-center justify-between gap-3 p-4 border-b border-stone-100 hover:bg-stone-50 transition-colors">
                             <div className="flex-1 min-w-0">

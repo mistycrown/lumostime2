@@ -1,7 +1,20 @@
+/** @file preferencesBackupService.test.ts
+ * @updated 2026-11-01: Verifies timer concurrency preference backup and restore.
+ */
 import { beforeEach, describe, expect, it } from 'vitest';
+import { ALLOW_CONCURRENT_TIMERS_KEY, readAllowConcurrentTimers } from '../utils/timerConcurrency';
 import { preferencesBackupService, PREFERENCES_RESTORED_EVENT } from './preferencesBackupService';
 
 describe('preferencesBackupService', () => {
+  it('defaults to simultaneous timing and round-trips the disabled preference', () => {
+    expect(readAllowConcurrentTimers(localStorage)).toBe(true);
+    localStorage.setItem(ALLOW_CONCURRENT_TIMERS_KEY, 'false');
+    const backup = preferencesBackupService.buildBackupPayload();
+    expect(backup.storage[ALLOW_CONCURRENT_TIMERS_KEY]).toBe('false');
+    localStorage.removeItem(ALLOW_CONCURRENT_TIMERS_KEY);
+    preferencesBackupService.applyBackupPayload(backup);
+    expect(readAllowConcurrentTimers(localStorage)).toBe(false);
+  });
   beforeEach(() => {
     const store = new Map<string, string>();
     Object.defineProperty(globalThis, 'localStorage', {

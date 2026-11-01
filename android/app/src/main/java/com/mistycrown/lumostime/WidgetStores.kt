@@ -6,6 +6,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * Updated 2026-11-01: Retains timer policy and retired IDs across WebView/process lifetimes.
  * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * SharedPreferences-backed storage for widget templates, instance bindings, runtime state,
  * pending imports, and the daily widget's mirrored review snapshot.
@@ -27,6 +28,8 @@ object WidgetStores {
     private const val PREFS_NAME = "lumostime_widget_timer"
     private const val KEY_TEMPLATES = "templates_v1"
     private const val KEY_TIMER_SCOPE_RULES = "timer_scope_rules_v1"
+    private const val KEY_ALLOW_CONCURRENT_TIMERS = "allow_concurrent_timers_v1"
+    private const val KEY_FINISHED_RUNTIME_IDS = "finished_runtime_ids_v1"
     private const val KEY_INSTANCE_BINDINGS = "instance_bindings_v1"
     private const val KEY_RUNTIME = "runtime_v1"
     private const val KEY_PENDING_ACTIONS = "pending_actions_v1"
@@ -58,6 +61,22 @@ object WidgetStores {
 
     fun saveTimerScopeRules(context: Context, rules: JSONObject) {
         prefs(context).edit().putString(KEY_TIMER_SCOPE_RULES, rules.toString()).apply()
+    }
+
+    fun saveAllowConcurrentTimers(context: Context, allow: Boolean) {
+        prefs(context).edit().putBoolean(KEY_ALLOW_CONCURRENT_TIMERS, allow).apply()
+    }
+
+    fun loadAllowConcurrentTimers(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_ALLOW_CONCURRENT_TIMERS, true)
+
+    fun loadFinishedRuntimeIds(context: Context): List<String> = runCatching {
+        JSONArray(prefs(context).getString(KEY_FINISHED_RUNTIME_IDS, null) ?: "[]").toStringList()
+    }.getOrDefault(emptyList())
+
+    fun markRuntimeFinished(context: Context, id: String) {
+        val ids = (loadFinishedRuntimeIds(context).filterNot { it == id } + id).takeLast(256)
+        prefs(context).edit().putString(KEY_FINISHED_RUNTIME_IDS, JSONArray(ids).toString()).apply()
     }
 
     fun resolveTimerScopeIds(context: Context, activityId: String?, scopeIds: List<String>): List<String> {

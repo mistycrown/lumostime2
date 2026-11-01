@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-11-01: Registers automatic switch log persistence and clears Routine state when its timer is replaced.
  * @updated 2026-11-01: Appends asynchronous timer photos to the latest session even after closing the detail view.
  * @updated 2026-10-30: Keeps cloud transfer stage and image counts visible across views.
  * @updated 2026-10-18: Includes principle groups in manual backups.
@@ -56,7 +57,7 @@
  *
  * ⚠️ Once I am updated, be sure to update my header comment and the folder's md.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Buffer } from 'buffer';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -419,7 +420,13 @@ const AppContent: React.FC = () => {
     saveActiveRoutineRun(activeRoutineRun);
   }, [activeRoutineRun]);
   const { buildBackupPayload: buildAchievementBackupPayload } = useAchievement();
-  const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions } = useSession();
+  const { startActivity, stopActivity, cancelSession, activeSessions, setActiveSessions, registerAutoStopLogSaver, isSessionPending } = useSession();
+  useEffect(() => {
+    if (activeRoutineRun && !activeSessions.some((session) => session.id === activeRoutineRun.currentSessionId)
+      && !isSessionPending(activeRoutineRun.currentSessionId)) {
+      setActiveRoutineRun(null);
+    }
+  }, [activeRoutineRun, activeSessions, isSessionPending]);
   const {
     logs,
     todos,
@@ -553,6 +560,9 @@ const AppContent: React.FC = () => {
   useAppInitialization();
   useRecurringPlanAutoCreation();
   const logManager = useLogManager();
+  useLayoutEffect(() => registerAutoStopLogSaver((stoppedLogs) => {
+    stoppedLogs.forEach((log) => logManager.handleSaveLog(log));
+  }));
   const todoManager = useTodoManager();
   useTodoReminderNavigation(todos, todoManager.openEditTodoModal);
   const goalManager = useGoalManager();
@@ -578,7 +588,7 @@ const AppContent: React.FC = () => {
   
   // 监听activeSessions变化，自动打开FocusDetailView
   React.useEffect(() => {
-    if (shouldAutoOpenFocus && activeSessions.length > 0) {
+    if (shouldAutoOpenFocus && activeSessions.length > 0 && !isSessionPending()) {
       const latestSession = activeSessions[activeSessions.length - 1];
       
       // 清除之前的定时器
@@ -598,7 +608,7 @@ const AppContent: React.FC = () => {
         clearTimeout(autoOpenTimeoutRef.current);
       }
     };
-  }, [activeSessions, shouldAutoOpenFocus, setFocusDetailSessionId]);
+  }, [activeSessions, isSessionPending, shouldAutoOpenFocus, setFocusDetailSessionId]);
 
   React.useEffect(() => {
     if (!focusDetailSessionId) {

@@ -1,5 +1,7 @@
 # Services Architecture
 
+Update 2026-11-01: `preferencesBackupService` includes simultaneous timing preferences. `widgetService` preserves local timer fields during native replacement and shares deterministic completion/day-split IDs with app-side stops so replay can update the original record.
+
 Update 2026-11-01: `imageService` accepts local-only gallery/camera saves that generate thumbnails without adding sync references. Both image cleanup paths retain persisted active-session photos until submission or explicit removal/cancellation.
 
 Update 2026-10-30: Image upload/download progress reports completed attempts after network and local writes settle, including failures, rather than counting requests when scheduled. Structured counts flow through the shared sync coordinator to the persistent application status strip.

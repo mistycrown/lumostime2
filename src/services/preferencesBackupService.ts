@@ -1,5 +1,6 @@
 /**
  * @file preferencesBackupService.ts
+ * @updated 2026-11-01: Includes the simultaneous timing preference in backup and restore.
  * @updated 2026-10-29: Backs up reusable execution labels, categories and deleted-label markers.
  * @updated 2026-10-09: Includes the personal dictionary in export/cloud backup and restore.
  * @input Persisted user preference values and Memoir filter configuration
@@ -26,6 +27,7 @@ const PREFERENCE_STORAGE_KEYS = [
   'lumostime_autoApplyAutoLinkRules',
   'lumostime_autoApplyTodoLink',
   'lumostime_auto_focus_note',
+  'lumostime_allow_concurrent_timers',
   'lumostime_auto_start_timer_jump_mode',
   'lumostime_auto_open_focus_detail',
   'lumostime_timeline_gallery_mode',

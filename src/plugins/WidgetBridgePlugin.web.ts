@@ -1,5 +1,6 @@
 /**
  * @file WidgetBridgePlugin.web.ts
+ * @updated 2026-11-01: Provides the timer preference synchronization fallback.
  * @input Web runtime widget bridge calls
  * @output No-op widget bridge implementation for browser environments
  * @pos Plugin
@@ -37,6 +38,7 @@ export class WidgetBridgeWeb extends WebPlugin implements WidgetBridgePlugin {
   async saveTemplates(): Promise<void> {}
 
   async syncTimerScopeRules(): Promise<void> {}
+  async syncTimerPreferences(): Promise<void> {}
 
   async getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }> {
     return { bindings: [] };

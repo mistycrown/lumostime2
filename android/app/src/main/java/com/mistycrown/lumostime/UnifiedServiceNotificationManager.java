@@ -1,5 +1,6 @@
 /**
  * @file UnifiedServiceNotificationManager.java
+ * @updated 2026-11-01: Hides app sessions retired by native single-timer switches before the WebView resumes.
  * @input Floating-window service and side-bubble state, assistant-agent runtime state, app focus sessions, and widget runtime state
  * @output A single shared Android foreground-status notification for background LumosTime services
  * @pos Native Helper
@@ -287,6 +288,7 @@ public final class UnifiedServiceNotificationManager {
 
     private static List<FocusEntry> getAppFocusEntries(Context context) {
         List<FocusEntry> entries = new ArrayList<>();
+        List<String> finishedSessionIds = WidgetStores.INSTANCE.loadFinishedRuntimeIds(context);
         String raw = prefs(context).getString(KEY_APP_FOCUS_SESSIONS, "[]");
         if (raw == null || raw.trim().isEmpty()) {
             return entries;
@@ -303,7 +305,7 @@ public final class UnifiedServiceNotificationManager {
                 String id = trimToNull(item.optString("id", null));
                 String label = sanitizeLabel(item.optString("label", null));
                 long startTime = item.optLong("startTime", 0L);
-                if (id == null || startTime <= 0L) {
+                if (id == null || startTime <= 0L || finishedSessionIds.contains(id)) {
                     continue;
                 }
 

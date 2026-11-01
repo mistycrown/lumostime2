@@ -1,5 +1,6 @@
 /**
  * @file SessionContext.tsx
+ * @updated 2026-11-01: Applies single-timer mode at the shared start entry and preserves the switch boundary while photos finish saving.
  * @updated 2026-11-01: Persists timer edits immediately and publishes local attachments on completion.
  * @description 绠＄悊娲诲姩璁℃椂浼氳瘽鐨勭姸鎬佸拰閫昏緫
  * @updated 2026-08-26: Invokes the completion callback for every stopped session so Routine transitions wait for the current step's save path.
@@ -16,6 +17,8 @@ import { hasPendingSessionImages, waitForSessionImages } from '../utils/sessionI
 import { ActiveSession, Activity, AppAwarenessSessionMeta, AutoLinkRule } from '../types';
 import { Capacitor } from '@capacitor/core';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
+import { readAllowConcurrentTimers } from '../utils/timerConcurrency';
+import { identifySessionLogs } from '../utils/sessionLogUtils';
 import {
     clearPersistedActiveSessions,
     loadPersistedActiveSessions,
@@ -23,6 +26,8 @@ import {
 } from '../utils/sessionPersistence';
 
 interface SessionContextType {
+    registerAutoStopLogSaver: (save: (logs: any[]) => void) => () => void;
+    isSessionPending: (sessionId?: string) => boolean;
     activeSessions: ActiveSession[];
     setActiveSessions: React.Dispatch<React.SetStateAction<ActiveSession[]>>;
     focusDetailSessionId: string | null;
@@ -63,6 +68,17 @@ interface SessionProviderProps {
 export const SessionProvider: React.FC<SessionProviderProps> = ({ children, splitLogByDays }) => {
     const [activeSessions, setActiveSessionsState] = useState<ActiveSession[]>(() => loadPersistedActiveSessions());
     const activeSessionsRef = useRef(activeSessions);
+    const autoStopLogSaverRef = useRef<((logs: any[]) => void) | null>(null);
+    const pendingStartRef = useRef<{ session: ActiveSession; endedAt: number; sessionIds: string[] } | null>(null);
+    const registerAutoStopLogSaver = useCallback((save: (logs: any[]) => void) => {
+        autoStopLogSaverRef.current = save;
+        return () => {
+            if (autoStopLogSaverRef.current === save) autoStopLogSaverRef.current = null;
+        };
+    }, []);
+    const isSessionPending = useCallback((sessionId?: string) => Boolean(
+        pendingStartRef.current && (!sessionId || pendingStartRef.current.session.id === sessionId)
+    ), []);
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
 
     // Persist before returning to native camera/background or accepting another update.
@@ -105,6 +121,10 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         note?: string,
         appAwarenessMeta?: AppAwarenessSessionMeta
     ): string => {
+        const pendingStart = pendingStartRef.current;
+        if (pendingStart?.session.activityId === activity.id && pendingStart.session.categoryId === categoryId) {
+            return pendingStart.session.id;
+        }
         let appliedScopeIds: string[] | undefined;
 
         if (Array.isArray(scopeIdOrIds)) {
@@ -125,6 +145,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             && session.categoryId === categoryId
         );
         if (existingSameActivitySession) {
+            pendingStartRef.current = null;
             return existingSameActivitySession.id;
         }
 
@@ -147,18 +168,37 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             appAwarenessMeta
         };
 
-        setActiveSessions((prev) => {
-            const existingSession = prev.find((session) =>
-                session.activityId === activity.id
-                && session.categoryId === categoryId
-            );
-
-            if (existingSession) {
-                return prev;
+        if (!readAllowConcurrentTimers(localStorage) && activeSessionsRef.current.length > 0) {
+            // Every caller (including NFC, todos and desktop widgets) shares the
+            // same save path. Keep the original stop time if a photo is pending.
+            if (!autoStopLogSaverRef.current) {
+                throw new Error('Timer log persistence is not ready');
             }
-
-            return [...prev, newSession];
-        });
+            pendingStartRef.current = {
+                session: newSession,
+                endedAt: pendingStart?.endedAt ?? Date.now(),
+                sessionIds: pendingStart?.sessionIds ?? activeSessionsRef.current.map((session) => session.id)
+            };
+            const finishSwitch = () => {
+                const request = pendingStartRef.current;
+                if (!request) return;
+                pendingStartRef.current = null;
+                activeSessionsRef.current.filter((session) => request.sessionIds.includes(session.id)).forEach((session) => {
+                    stopActivity(session.id, undefined, (logs) => autoStopLogSaverRef.current?.(logs), undefined, request.endedAt);
+                });
+                setActiveSessions((prev) => [...prev, request.session]);
+            };
+            if (activeSessionsRef.current.some((session) => hasPendingSessionImages(session.id))) {
+                if (!pendingStart) {
+                    void Promise.all(activeSessionsRef.current.map((session) => waitForSessionImages(session.id)))
+                        .then(finishSwitch);
+                }
+            } else {
+                finishSwitch();
+            }
+        } else {
+            setActiveSessions((prev) => [...prev, newSession]);
+        }
 
         return newSession.id;
     };
@@ -167,18 +207,19 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         sessionId: string,
         finalSessionData?: Partial<ActiveSession>,
         onSaveLog?: (logs: any[]) => void,
-        onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
+        onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void,
+        endedAt = Date.now()
     ) => {
         if (hasPendingSessionImages(sessionId)) {
             void waitForSessionImages(sessionId).then(() => {
-                stopActivity(sessionId, finalSessionData, onSaveLog, onUpdateTodo);
+                stopActivity(sessionId, finalSessionData, onSaveLog, onUpdateTodo, endedAt);
             });
             return;
         }
         const session = activeSessionsRef.current.find((item) => item.id === sessionId);
         let logs: any[] = [];
         if (session) {
-            const endTime = Date.now();
+            const endTime = Math.max(session.startTime, endedAt);
             const duration = (endTime - session.startTime) / 1000;
 
             const images = session.images ?? finalSessionData?.images;
@@ -194,7 +235,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     note: finalSessionData?.note || session.note,
                     images,
                     attributeValues: finalSessionData?.attributeValues || session.attributeValues,
-                    progressIncrement: finalSessionData?.progressIncrement,
+                    progressIncrement: finalSessionData?.progressIncrement ?? session.progressIncrement,
                     focusScore: finalSessionData?.focusScore || session.focusScore,
                     moodScore: finalSessionData?.moodScore || session.moodScore,
                     scopeIds: session.scopeIds,
@@ -202,7 +243,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     appAwarenessMeta: finalSessionData?.appAwarenessMeta || session.appAwarenessMeta
                 };
 
-                logs = splitLogByDays(baseLog);
+                logs = identifySessionLogs(session.id, splitLogByDays(baseLog));
 
                 logs.forEach((log, index) => {
                     if (index > 0) {
@@ -243,6 +284,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
     };
 
     const cancelSession = (sessionId: string) => {
+        if (pendingStartRef.current?.session.id === sessionId) pendingStartRef.current = null;
         setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
         if (focusDetailSessionId === sessionId) {
             setFocusDetailSessionId(null);
@@ -251,6 +293,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
 
     return (
         <SessionContext.Provider value={{
+            registerAutoStopLogSaver,
+            isSessionPending,
             activeSessions,
             setActiveSessions,
             focusDetailSessionId,

@@ -10,6 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
+ * Updated 2026-11-01: Synchronizes timer policy and rejects retired runtime echoes.
  * Updated 2026-10-16: Supports dated recurring completion and preserves series history.
  * Capacitor bridge for widget templates, instance binding state, runtime synchronization, and pending action import.
  * Updated 2026-10-29: Parses daily-check types and refreshes the new quick-check list after daily sync.
@@ -185,6 +186,12 @@ class WidgetBridgePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun syncTimerPreferences(call: PluginCall) {
+        WidgetStores.saveAllowConcurrentTimers(context, call.getBoolean("allowConcurrentTimers", true) ?: true)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun getRuntimeState(call: PluginCall) {
         val result = JSObject()
         val runtimeStates = WidgetStores.loadRuntimeStates(context)
@@ -193,6 +200,7 @@ class WidgetBridgePlugin : Plugin() {
             runtimeStates.forEach { put(runtimeToJs(it)) }
         })
         result.put("runtimeState", runtimeStates.maxByOrNull { it.startedAt }?.let(::runtimeToJs))
+        result.put("finishedSessionIds", JSArray(WidgetStores.loadFinishedRuntimeIds(context)))
         call.resolve(result)
     }
 
@@ -209,29 +217,13 @@ class WidgetBridgePlugin : Plugin() {
             call.getObject("runtimeState")?.let(::runtimeFromJson)?.let(::listOf) ?: emptyList()
         }
 
-        val existingWidgetStates = WidgetStores.loadRuntimeStates(context)
-            .filter { it.source == "widget" }
-        val statesToSave = if (runtimeStates.any { it.source == "app" } &&
-            runtimeStates.none { it.source == "widget" } &&
-            existingWidgetStates.isNotEmpty()
-        ) {
-            runtimeStates + existingWidgetStates.filterNot { existing ->
-                runtimeStates.any { incoming -> incoming.id == existing.id }
+        val removedArray = call.getArray("removedSessionIds")
+        val removedIds = buildSet {
+            if (removedArray != null) {
+                for (index in 0 until removedArray.length()) add(removedArray.optString(index))
             }
-        } else {
-            runtimeStates
         }
-
-        val lastWidgetStopAt = WidgetStores.loadLastWidgetStopAt(context)
-        if (statesToSave.any { it.source == "app" } &&
-            lastWidgetStopAt != null &&
-            System.currentTimeMillis() - lastWidgetStopAt < 2000L
-        ) {
-            call.resolve()
-            return
-        }
-
-        WidgetStores.saveRuntimeStates(context, statesToSave)
+        WidgetTimerController.syncRuntimeStates(context, runtimeStates, removedIds)
         WidgetRefreshCoordinator.refreshTimerWidgets(context)
         WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
         WidgetRefreshCoordinator.refreshSceneWidgets(context)

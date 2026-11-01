@@ -1,5 +1,6 @@
 /**
  * @file WidgetBridgePlugin.ts
+ * @updated 2026-11-01: Mirrors simultaneous timing preferences and retired session identities.
  * @updated 2026-10-29: Mirrors daily-check types so the quick-check list keeps automatic items read-only.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Native widget bridge calls
@@ -376,6 +377,7 @@ export interface WidgetBridgePlugin {
   getTemplates(): Promise<{ templates: WidgetBridgeTemplate[] }>;
   saveTemplates(options: { templates: WidgetBridgeTemplate[] }): Promise<void>;
   syncTimerScopeRules(options: { rules: Record<string, string[]> }): Promise<void>;
+  syncTimerPreferences(options: { allowConcurrentTimers: boolean }): Promise<void>;
   getInstanceBindings(): Promise<{ bindings: WidgetBridgeInstanceBinding[] }>;
   getPendingActions(): Promise<{ actions: WidgetBridgePendingAction[] }>;
   clearPendingActions(options: { ids: string[] }): Promise<void>;
@@ -383,11 +385,13 @@ export interface WidgetBridgePlugin {
     runtimeState: WidgetBridgeRuntimeState | null;
     runtimeStates?: WidgetBridgeRuntimeState[];
     version?: number;
+    finishedSessionIds?: string[];
   }>;
   syncRuntimeState(options: {
     runtimeState?: WidgetBridgeRuntimeState | null;
     runtimeStates?: WidgetBridgeRuntimeState[] | null;
     version?: number;
+    removedSessionIds?: string[];
   }): Promise<void>;
   getPendingDailyActions(): Promise<{ actions: WidgetBridgePendingDailyAction[] }>;
   clearPendingDailyActions(options: { ids: string[] }): Promise<void>;

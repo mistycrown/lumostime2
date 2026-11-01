@@ -12,6 +12,7 @@ import java.util.UUID
 
 /**
  * Native widget action controller for timer, daily, and shortcut widgets.
+ * Updated 2026-11-01: Applies single-timer switching to every native start and prevents retired sessions returning through sync.
  * Updated 2026-10-29: Adds date-validated list taps with capped counts, reusing the native progress/replay queue.
  * Updated 2026-10-14: Merges current preferred scope rules into timer-slot runtime without replacing configured scopes.
  * Updated 2026-05-02: Added dedicated scene-widget item handling for timer-like cards and checklist cards.
@@ -37,6 +38,7 @@ object WidgetTimerController {
         val occurredAt: Long
     )
 
+    @Synchronized
     fun handleSlotTap(
         context: Context,
         appWidgetId: Int,
@@ -56,6 +58,7 @@ object WidgetTimerController {
         }
     }
 
+    @Synchronized
     fun handleTodoPinItemTap(
         context: Context,
         appWidgetId: Int,
@@ -104,12 +107,11 @@ object WidgetTimerController {
             appWidgetId = appWidgetId
         )
 
-        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
-        WidgetStores.saveLastWidgetStopAt(context, null)
-        syncFloatingWindow(context, currentRuntimes + nextRuntime)
+        startRuntime(context, currentRuntimes, nextRuntime)
         return true
     }
 
+    @Synchronized
     fun handleSceneItemTap(
         context: Context,
         appWidgetId: Int,
@@ -195,8 +197,7 @@ object WidgetTimerController {
             appWidgetId = appWidgetId
         )
 
-        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
-        WidgetStores.saveLastWidgetStopAt(context, null)
+        startRuntime(context, currentRuntimes, nextRuntime)
         saveTapAnimation(
             context,
             appWidgetId = appWidgetId,
@@ -205,7 +206,6 @@ object WidgetTimerController {
             animationMode = WidgetTapAnimationModes.TIMER_START,
             startedAt = now
         )
-        syncFloatingWindow(context, currentRuntimes + nextRuntime)
         return true
     }
 
@@ -397,8 +397,7 @@ object WidgetTimerController {
             sceneItemId = item.id
         )
 
-        WidgetStores.saveRuntimeStates(context, currentRuntimes + nextRuntime)
-        WidgetStores.saveLastWidgetStopAt(context, null)
+        startRuntime(context, currentRuntimes, nextRuntime)
         saveTapAnimation(
             context,
             appWidgetId = appWidgetId,
@@ -407,7 +406,6 @@ object WidgetTimerController {
             animationMode = WidgetTapAnimationModes.TIMER_START,
             startedAt = now
         )
-        syncFloatingWindow(context, currentRuntimes + nextRuntime)
         return true
     }
 
@@ -609,6 +607,7 @@ object WidgetTimerController {
     }
 
     @JvmStatic
+    @Synchronized
     fun stopWidgetRuntimeFromExternalTrigger(context: Context, sessionId: String?): WidgetRuntimeState? {
         val runtimeStates = WidgetStores.loadRuntimeStates(context)
         val runtimeState = if (!sessionId.isNullOrBlank()) {
@@ -631,7 +630,64 @@ object WidgetTimerController {
         return runtimeState
     }
 
+    private fun startRuntime(context: Context, current: List<WidgetRuntimeState>, next: WidgetRuntimeState) {
+        val remaining = if (WidgetStores.loadAllowConcurrentTimers(context)) {
+            current
+        } else {
+            current.forEach { finishRuntime(context, it, next.startedAt) }
+            emptyList()
+        }
+        val states = remaining + next
+        WidgetStores.saveRuntimeStates(context, states)
+        WidgetStores.saveLastWidgetStopAt(context, null)
+        syncFloatingWindow(context, states)
+        WidgetRefreshCoordinator.refreshTimerWidgets(context)
+        WidgetRefreshCoordinator.refreshTodoPinWidgets(context)
+        WidgetRefreshCoordinator.refreshSceneWidgets(context)
+        WidgetBridgePlugin.notifyDailyActionPending()
+    }
+
+    @Synchronized
+    fun syncRuntimeStates(context: Context, incoming: List<WidgetRuntimeState>, removedIds: Set<String>) {
+        removedIds.forEach { WidgetStores.markRuntimeFinished(context, it) }
+        val finishedIds = WidgetStores.loadFinishedRuntimeIds(context).toSet()
+        val runtimes = incoming.filterNot { it.id in finishedIds }
+        val existing = WidgetStores.loadRuntimeStates(context).filterNot { it.id in finishedIds }
+        val existingWidgets = existing.filter { it.source == "widget" }
+        var states = if (runtimes.any { it.source == "app" } && runtimes.none { it.source == "widget" }) {
+            runtimes + existingWidgets.filterNot { widget -> runtimes.any { it.id == widget.id } }
+        } else {
+            runtimes
+        }
+
+        if (!WidgetStores.loadAllowConcurrentTimers(context)) {
+            val newAppRuntime = runtimes.filter { runtime ->
+                runtime.source == "app" && existing.none { it.id == runtime.id }
+            }.maxByOrNull { it.startedAt }
+            if (newAppRuntime != null) {
+                // A widget can have started while React was still hydrating.
+                // Keep whichever start is newer and finish the other only once.
+                val winner = (existingWidgets + newAppRuntime).maxByOrNull { it.startedAt }!!
+                states.filterNot { it.id == winner.id }.forEach {
+                    finishRuntime(context, it, maxOf(it.startedAt, winner.startedAt))
+                }
+                states = listOf(winner)
+            }
+        } else {
+            val lastStopAt = WidgetStores.loadLastWidgetStopAt(context)
+            if (states.any { it.source == "app" } && lastStopAt != null &&
+                System.currentTimeMillis() - lastStopAt < 2000L) return
+        }
+
+        WidgetStores.saveRuntimeStates(context, states)
+        syncFloatingWindow(context, states)
+        if (states.size != incoming.size || states.any { state -> incoming.none { it.id == state.id } }) {
+            WidgetBridgePlugin.notifyDailyActionPending()
+        }
+    }
+
     private fun syncFloatingWindow(context: Context, runtimeStates: List<WidgetRuntimeState>) {
+        UnifiedServiceNotificationManager.reconcileNotificationState(context)
         val displayedRuntime = runtimeStates.maxByOrNull { it.startedAt }
         if (displayedRuntime == null) {
             FloatingWindowService.syncFocusStateIfRunning("", false, 0L, null)
@@ -647,6 +703,8 @@ object WidgetTimerController {
     }
 
     private fun finishRuntime(context: Context, runtimeState: WidgetRuntimeState, endedAt: Long) {
+        if (runtimeState.id in WidgetStores.loadFinishedRuntimeIds(context)) return
+        WidgetStores.markRuntimeFinished(context, runtimeState.id)
         if (endedAt - runtimeState.startedAt < 1000L) {
             return
         }

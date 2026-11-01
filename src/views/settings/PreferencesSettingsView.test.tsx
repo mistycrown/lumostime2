@@ -1,5 +1,6 @@
 /**
  * @file PreferencesSettingsView.test.tsx
+ * @updated 2026-11-01: Covers the simultaneous timing switch accessibility and enabled state.
  * @updated 2026-10-07: Verifies manual-only daily backup controls and four-digit selected time.
  * @description Verifies the selected timer auto-jump label shown in preferences.
  * @updated 2026-05-10: Added coverage for the new three-option post-start jump selector.
@@ -13,6 +14,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 vi.mock('../../contexts/SettingsContext', () => ({
   useSettings: () => ({
     themeMode: 'light',
+    allowConcurrentTimers: true,
+    setAllowConcurrentTimers: vi.fn(),
     setThemeMode: vi.fn(),
     fontScale: 1,
     setFontScale: vi.fn(),
@@ -28,6 +31,11 @@ vi.mock('../../contexts/SettingsContext', () => ({
 }));
 
 import { PreferencesSettingsView } from './PreferencesSettingsView';
+
+test('shows simultaneous timing enabled by default', () => {
+  const html = renderToStaticMarkup(<PreferencesSettingsView onBack={() => {}} onToast={() => {}} />);
+  expect(html).toContain('role="switch" aria-label="允许同时计时" aria-checked="true"');
+});
 
 describe('PreferencesSettingsView daily backup', () => {
   test('shows the backup switch and selected time in manual mode', () => {

@@ -1,5 +1,6 @@
 /**
  * @file SettingsContext.tsx
+ * @updated 2026-11-01: Persists and restores the default-enabled simultaneous timing preference.
  * @updated 2026-10-18: Stores the device-local app-awareness master switch without modifying individual settings.
  * @updated 2026-10-07: Persists device-local daily backup preferences for manual sync mode.
  * @description 管理应用设置和用户偏好（不包括 Review 系统，Review 由 ReviewContext 管理），并兼容自定义筛选器排序。
@@ -33,6 +34,7 @@ import {
 } from '../types';
 import { DEFAULT_USER_PERSONAL_INFO } from '../constants';
 import { SETTINGS_KEYS, THEME_KEYS } from '../constants/storageKeys';
+import { ALLOW_CONCURRENT_TIMERS_KEY, readAllowConcurrentTimers } from '../utils/timerConcurrency';
 import { appAwarenessService } from '../services/appAwarenessService';
 import { uiIconService } from '../services/uiIconService';
 import { fontService } from '../services/fontService';
@@ -183,6 +185,9 @@ interface SettingsContextType {
     setAutoApplyTodoLink: React.Dispatch<React.SetStateAction<boolean>>;
 
     // 交互偏好
+    allowConcurrentTimers: boolean;
+    setAllowConcurrentTimers: React.Dispatch<React.SetStateAction<boolean>>;
+
     autoFocusNote: boolean;
     setAutoFocusNote: React.Dispatch<React.SetStateAction<boolean>>;
 
@@ -555,6 +560,12 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         appAwarenessService.saveActiveRun(appAwarenessActiveRun);
     }, [appAwarenessActiveRun]);
 
+    const [allowConcurrentTimers, setAllowConcurrentTimers] = useState(() => readAllowConcurrentTimers(localStorage));
+
+    useEffect(() => {
+        localStorage.setItem(ALLOW_CONCURRENT_TIMERS_KEY, String(allowConcurrentTimers));
+    }, [allowConcurrentTimers]);
+
     const [autoFocusNote, setAutoFocusNote] = useState<boolean>(() => {
         const stored = localStorage.getItem('lumostime_auto_focus_note');
         return stored !== 'false'; // Default to true
@@ -832,6 +843,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setImmersiveTimerDefaultOrientation(normalizeImmersiveTimerOrientation(get('lumostime_immersive_timer_default_orientation')));
             setAutoApplyAutoLinkRules(get('lumostime_autoApplyAutoLinkRules') !== 'false');
             setAutoApplyTodoLink(get('lumostime_autoApplyTodoLink') !== 'false');
+            setAllowConcurrentTimers(get(ALLOW_CONCURRENT_TIMERS_KEY) !== 'false');
             setAutoFocusNote(get('lumostime_auto_focus_note') !== 'false');
             const nextAutoStartTimerJumpMode = get(AUTO_START_TIMER_JUMP_MODE_STORAGE_KEY);
             setAutoStartTimerJumpMode(nextAutoStartTimerJumpMode
@@ -1069,6 +1081,7 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
         autoApplyTodoLink,
         autoFocusNote,
         autoStartTimerJumpMode,
+        allowConcurrentTimers,
         timelineGalleryMode,
         timelineSortOrder,
         timelineQuickActions,
@@ -1132,6 +1145,8 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
             setAutoApplyTodoLink,
             autoFocusNote,
             setAutoFocusNote,
+            allowConcurrentTimers,
+            setAllowConcurrentTimers,
             autoStartTimerJumpMode,
             setAutoStartTimerJumpMode,
             timelineGalleryMode,

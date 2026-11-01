@@ -1,5 +1,6 @@
 /**
  * @file useWidgetBridgeSync.ts
+ * @updated 2026-11-01: Mirrors timer concurrency and retired IDs, retaining metadata and day splits on native switches.
  * @updated 2026-11-01: Waits for camera saves and retains local attachments when importing widget completions.
  * @updated 2026-10-29: Resyncs daily-list icon assets after a widget/theme revision.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
@@ -45,7 +46,7 @@ import {
   buildDailyRuntimeWidgetPayload,
   buildDailyWidgetSyncPayload,
   buildWidgetLogTailState,
-  buildLogFromWidgetPendingAction,
+  buildLogsFromWidgetPendingAction,
   buildWidgetRuntimeStatesFromSessions,
   buildTrackingCalendarWidgetPayload,
   buildTodoPinWidgetPayload,
@@ -82,7 +83,7 @@ const fireAndForgetWidgetBridgeCall = (
 
 export const useWidgetBridgeSync = () => {
   const { categories, scopes } = useCategoryScope();
-  const { autoLinkRules, autoApplyAutoLinkRules } = useSettings();
+  const { autoLinkRules, autoApplyAutoLinkRules, allowConcurrentTimers } = useSettings();
   const { logs, todos, setLogs, setTodos } = useData();
   const { activeSessions, setActiveSessions } = useSession();
   const { dailyReviews, setDailyReviews, checkTemplates, reviewTemplates } = useReview();
@@ -102,6 +103,7 @@ export const useWidgetBridgeSync = () => {
     reviewTemplates
   });
   const hasHydratedSessionRuntimeRef = useRef(false);
+  const mirroredSessionIdsRef = useRef(activeSessions.map((session) => session.id));
 
   useEffect(() => {
     latestDailyStateRef.current = {
@@ -259,7 +261,7 @@ export const useWidgetBridgeSync = () => {
       isReconciling = true;
       try {
         let reconciledDailyState = latestDailyStateRef.current;
-        const [{ actions }, { runtimeState, runtimeStates }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
+        const [{ actions }, { runtimeState, runtimeStates, finishedSessionIds }, { actions: dailyActions }, { actions: todoPinActions }] = await Promise.all([
           WidgetBridge.getPendingActions(),
           WidgetBridge.getRuntimeState(),
           WidgetBridge.getPendingDailyActions(),
@@ -277,11 +279,23 @@ export const useWidgetBridgeSync = () => {
           setLogs((prevLogs) => {
             let nextLogs = prevLogs;
             actions.forEach((action) => {
-              const nextLog = buildLogFromWidgetPendingAction(action, sessionsById.get(action.id));
-              const exists = nextLogs.some((log) => log.id === nextLog.id);
-              nextLogs = exists
-                ? nextLogs.map((log) => (log.id === nextLog.id ? { ...nextLog, images: nextLog.images ?? log.images } : log))
-                : [nextLog, ...nextLogs];
+              const session = sessionsById.get(action.id);
+              const completedLogs = buildLogsFromWidgetPendingAction(action, session);
+              const completedIds = new Set(completedLogs.map((log) => log.id));
+              nextLogs = nextLogs.filter((log) => !log.id.startsWith(`${action.id}:day:`) || completedIds.has(log.id));
+              completedLogs.forEach((nextLog) => {
+                const exists = nextLogs.some((log) => log.id === nextLog.id);
+                nextLogs = exists
+                  ? nextLogs.map((log) => {
+                      if (log.id !== nextLog.id) return log;
+                      // App-side completion can win the race and remove the
+                      // draft first. Native still owns its earlier stop time.
+                      return session
+                        ? { ...nextLog, images: nextLog.images ?? log.images }
+                        : { ...log, startTime: nextLog.startTime, endTime: nextLog.endTime, duration: nextLog.duration };
+                    })
+                  : [nextLog, ...nextLogs];
+              });
             });
             return nextLogs;
           });
@@ -357,7 +371,7 @@ export const useWidgetBridgeSync = () => {
         }
 
         setActiveSessions((prevSessions) => {
-          const completedActionIds = new Set(actions.map((action) => action.id));
+          const completedActionIds = new Set([...actions.map((action) => action.id), ...(finishedSessionIds ?? [])]);
           const withoutCompletedSessions = prevSessions.filter(
             (session) => !completedActionIds.has(session.id)
           );
@@ -367,7 +381,7 @@ export const useWidgetBridgeSync = () => {
               ? [runtimeState]
               : [];
           const nativeWidgetSessions = nativeStates
-            .filter((state) => state.source === 'widget')
+            .filter((state) => state.source === 'widget' && !completedActionIds.has(state.id))
             .map((state) => buildWidgetSessionFromRuntimeState(state, categories));
           const appSessions = withoutCompletedSessions.filter((session) => session.source !== 'widget');
           const reconciledWidgetSessions = nativeWidgetSessions.map((nextNativeSession) => {
@@ -460,6 +474,9 @@ export const useWidgetBridgeSync = () => {
     }
 
     const syncRuntimeState = async () => {
+      const currentIds = new Set(activeSessions.map((session) => session.id));
+      const removedSessionIds = mirroredSessionIdsRef.current.filter((id) => !currentIds.has(id));
+      mirroredSessionIdsRef.current = [...currentIds];
       if (!latestSession) {
         if (!hasHydratedSessionRuntimeRef.current) {
           hasHydratedSessionRuntimeRef.current = true;
@@ -479,7 +496,7 @@ export const useWidgetBridgeSync = () => {
         }
 
         try {
-          await WidgetBridge.syncRuntimeState({ runtimeStates: [] });
+          await WidgetBridge.syncRuntimeState({ runtimeStates: [], removedSessionIds });
         } catch (error) {
           console.error('[useWidgetBridgeSync] Failed to clear native widget runtime state', error);
         }
@@ -491,12 +508,20 @@ export const useWidgetBridgeSync = () => {
 
       fireAndForgetWidgetBridgeCall(
         'Failed to sync runtime state to native widget',
-        () => WidgetBridge.syncRuntimeState({ runtimeStates, version: 2 })
+        () => WidgetBridge.syncRuntimeState({ runtimeStates, removedSessionIds, version: 2 })
       );
     };
 
     void syncRuntimeState();
   }, [activeSessions, categories, hasHydratedNativeState]);
+
+  useEffect(() => {
+    if (!isNativeAndroidWidgetSupported()) return;
+    fireAndForgetWidgetBridgeCall(
+      'Failed to sync timer preferences to native widget',
+      () => WidgetBridge.syncTimerPreferences({ allowConcurrentTimers })
+    );
+  }, [allowConcurrentTimers]);
 
   useEffect(() => {
     if (!isNativeAndroidWidgetSupported() || !hasHydratedNativeState) {
