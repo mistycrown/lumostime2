@@ -1,5 +1,6 @@
 /**
  * @file sessionPersistence.ts
+ * @updated 2026-11-01: Restores timer attachments and exposes local cleanup protection.
  * @input localStorage persisted active session payloads
  * @output Sanitized active sessions for SessionContext hydration and persistence helpers
  * @pos Utility
@@ -46,6 +47,7 @@ const isActiveSession = (value: unknown): value is ActiveSession => {
     isOptionalStringArray(session.scopeIds) &&
     isOptionalString(session.title) &&
     isOptionalString(session.note) &&
+    isOptionalStringArray(session.images) &&
     isOptionalNumber(session.progressIncrement) &&
     isOptionalNumber(session.focusScore) &&
     isOptionalNumber(session.moodScore) &&
@@ -82,3 +84,10 @@ export const savePersistedActiveSessions = (sessions: ActiveSession[]): boolean 
 
 export const clearPersistedActiveSessions = (): boolean =>
   storage.remove(USER_DATA_KEYS.ACTIVE_SESSIONS);
+
+// These files stay local until submission, so they must not enter the sync manifest.
+export const getActiveSessionImageFiles = (): Set<string> => new Set(
+  loadPersistedActiveSessions().flatMap((session) =>
+    (session.images || []).flatMap((filename) => [filename, `thumb_${filename}`])
+  )
+);

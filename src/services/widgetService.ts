@@ -1,5 +1,6 @@
 /**
  * @file widgetService.ts
+ * @updated 2026-11-01: Carries local timer photos into native widget completion logs.
  * @updated 2026-10-29: Includes manual/automatic daily-check types in the shared native payload.
  * @updated 2026-10-18: Omits abandoned tasks from native widget source data.
  * @updated 2026-10-16: Mirrors occurrence completion history into Android TODAY + PIN snapshots.
@@ -1145,7 +1146,7 @@ export const buildWidgetSessionFromRuntimeState = (
   };
 };
 
-export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingAction): Log => ({
+export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingAction, session?: ActiveSession): Log => ({
   id: action.id,
   activityId: action.activityId,
   categoryId: action.categoryId,
@@ -1155,7 +1156,8 @@ export const buildLogFromWidgetPendingAction = (action: WidgetBridgePendingActio
   note: action.note || '',
   title: action.label || undefined,
   linkedTodoId: action.linkedTodoId || undefined,
-  scopeIds: action.scopeIds ?? undefined
+  scopeIds: action.scopeIds ?? undefined,
+  ...(session?.id === action.id && session.images ? { images: session.images } : {})
 });
 
 export const buildWidgetLogTailState = (

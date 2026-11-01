@@ -1,5 +1,6 @@
 /**
  * @file SessionContext.tsx
+ * @updated 2026-11-01: Persists timer edits immediately and publishes local attachments on completion.
  * @description 绠＄悊娲诲姩璁℃椂浼氳瘽鐨勭姸鎬佸拰閫昏緫
  * @updated 2026-08-26: Invokes the completion callback for every stopped session so Routine transitions wait for the current step's save path.
  * @updated 2026-09-12: Removes stopped sessions before Routine transition callbacks so repeated steps receive a live session ID.
@@ -9,7 +10,9 @@
  * @updated 2026-05-09: Syncs app-origin active sessions into the native notification plugin so Android can render timer labels in the persistent status notification.
  * @updated 2026-05-09: Removed direct floating-window mutations so the shared sync hook remains the single source of truth for Android focus-state reconciliation.
  */
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
+import { imageService } from '../services/imageService';
+import { hasPendingSessionImages, waitForSessionImages } from '../utils/sessionImageOperations';
 import { ActiveSession, Activity, AppAwarenessSessionMeta, AutoLinkRule } from '../types';
 import { Capacitor } from '@capacitor/core';
 import FocusNotification from '../plugins/FocusNotificationPlugin';
@@ -58,19 +61,22 @@ interface SessionProviderProps {
 }
 
 export const SessionProvider: React.FC<SessionProviderProps> = ({ children, splitLogByDays }) => {
-    const [activeSessions, setActiveSessions] = useState<ActiveSession[]>(() => loadPersistedActiveSessions());
+    const [activeSessions, setActiveSessionsState] = useState<ActiveSession[]>(() => loadPersistedActiveSessions());
     const activeSessionsRef = useRef(activeSessions);
     const [focusDetailSessionId, setFocusDetailSessionId] = useState<string | null>(null);
 
-    useEffect(() => {
-        activeSessionsRef.current = activeSessions;
-        if (activeSessions.length === 0) {
+    // Persist before returning to native camera/background or accepting another update.
+    // Using the ref also keeps async photo appends and same-tick stop actions current.
+    const setActiveSessions = useCallback<React.Dispatch<React.SetStateAction<ActiveSession[]>>>((update) => {
+        const next = typeof update === 'function' ? update(activeSessionsRef.current) : update;
+        activeSessionsRef.current = next;
+        if (next.length === 0) {
             clearPersistedActiveSessions();
-            return;
+        } else {
+            savePersistedActiveSessions(next);
         }
-
-        savePersistedActiveSessions(activeSessions);
-    }, [activeSessions]);
+        setActiveSessionsState(next);
+    }, []);
 
     useEffect(() => {
         if (Capacitor.getPlatform() !== 'android') {
@@ -141,7 +147,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             appAwarenessMeta
         };
 
-        activeSessionsRef.current = [...activeSessionsRef.current, newSession];
         setActiveSessions((prev) => {
             const existingSession = prev.find((session) =>
                 session.activityId === activity.id
@@ -164,13 +169,20 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
         onSaveLog?: (logs: any[]) => void,
         onUpdateTodo?: (linkedTodoId: string, progressIncrement: number) => void
     ) => {
+        if (hasPendingSessionImages(sessionId)) {
+            void waitForSessionImages(sessionId).then(() => {
+                stopActivity(sessionId, finalSessionData, onSaveLog, onUpdateTodo);
+            });
+            return;
+        }
         const session = activeSessionsRef.current.find((item) => item.id === sessionId);
         let logs: any[] = [];
         if (session) {
             const endTime = Date.now();
             const duration = (endTime - session.startTime) / 1000;
 
-            if (duration > 1) {
+            const images = session.images ?? finalSessionData?.images;
+            if (duration > 1 || images?.length) {
                 const baseLog = {
                     activityId: session.activityId,
                     categoryId: session.categoryId,
@@ -180,6 +192,7 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
                     linkedTodoId: session.linkedTodoId,
                     title: finalSessionData?.title || session.title,
                     note: finalSessionData?.note || session.note,
+                    images,
                     attributeValues: finalSessionData?.attributeValues || session.attributeValues,
                     progressIncrement: finalSessionData?.progressIncrement,
                     focusScore: finalSessionData?.focusScore || session.focusScore,
@@ -212,14 +225,15 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({ children, spli
             // Remove the old session before invoking Routine's transition callback.
             // Otherwise a repeated activity can be deduplicated to this session ID,
             // which is immediately removed after the callback and cannot be stopped.
-            activeSessionsRef.current = activeSessionsRef.current.filter((item) => item.id !== sessionId);
             setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
 
             if (onSaveLog) {
                 onSaveLog(logs);
             }
+            if (logs.length > 0) {
+                images?.forEach((filename) => imageService.addToReferencedList(filename));
+            }
         } else {
-            activeSessionsRef.current = activeSessionsRef.current.filter((item) => item.id !== sessionId);
             setActiveSessions((prev) => prev.filter((item) => item.id !== sessionId));
         }
 

@@ -1,5 +1,6 @@
 /**
  * @file useWidgetBridgeSync.ts
+ * @updated 2026-11-01: Waits for camera saves and retains local attachments when importing widget completions.
  * @updated 2026-10-29: Resyncs daily-list icon assets after a widget/theme revision.
  * @updated 2026-10-16: Supports dated recurring completion without ending the task series.
  * @input Widget native bridge state, categories, active sessions, logs, daily reviews, and daily templates
@@ -62,6 +63,9 @@ import { buildSceneWidgetPayloadFromStorage } from '../services/widgetSceneServi
 import { applyDailyCheckActionForDate } from '../utils/dailyCheckUtils';
 import { syncSubtaskProgressToParentTodos } from '../utils/todoProgressUtils';
 import { applyTodoCompletionActions } from '../utils/todoOccurrenceUtils';
+import { loadPersistedActiveSessions } from '../utils/sessionPersistence';
+import { waitForSessionImages } from '../utils/sessionImageOperations';
+import { imageService } from '../services/imageService';
 
 const fireAndForgetWidgetBridgeCall = (
   label: string,
@@ -267,16 +271,23 @@ export const useWidgetBridgeSync = () => {
         }
 
         if (actions.length > 0) {
+          await Promise.all(actions.map((action) => waitForSessionImages(action.id)));
+          if (cancelled) return;
+          const sessionsById = new Map(loadPersistedActiveSessions().map((session) => [session.id, session]));
           setLogs((prevLogs) => {
             let nextLogs = prevLogs;
             actions.forEach((action) => {
-              const nextLog = buildLogFromWidgetPendingAction(action);
+              const nextLog = buildLogFromWidgetPendingAction(action, sessionsById.get(action.id));
               const exists = nextLogs.some((log) => log.id === nextLog.id);
               nextLogs = exists
-                ? nextLogs.map((log) => (log.id === nextLog.id ? nextLog : log))
+                ? nextLogs.map((log) => (log.id === nextLog.id ? { ...nextLog, images: nextLog.images ?? log.images } : log))
                 : [nextLog, ...nextLogs];
             });
             return nextLogs;
+          });
+
+          actions.forEach((action) => {
+            sessionsById.get(action.id)?.images?.forEach((filename) => imageService.addToReferencedList(filename));
           });
 
           await WidgetBridge.clearPendingActions({ ids: actions.map((action) => action.id) });

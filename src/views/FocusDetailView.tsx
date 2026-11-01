@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Save focus-note drafts on blur/exit/background and discard after completion or cancellation.
  * @file FocusDetailView.tsx
+ * @updated 2026-11-01: Adds persistent local gallery/camera attachments and waits for photo saves before submission.
  * @updated 2026-10-16: Completes the recurring occurrence on the session start date.
  * @updated 2026-10-09: Adds inline historical note completion while preserving buffered focus-note commits.
  * @input Active Session Data, Todos, Categories, Scopes
@@ -28,6 +29,7 @@ import { getActiveActivities } from '../utils/archiveUtils';
 import { FocusScoreSelector } from '../components/FocusScoreSelector';
 import { MoodScoreSelector } from '../components/MoodScoreSelector';
 import { ImmersiveTimer } from '../components/ImmersiveTimer';
+import { FocusImageAttachments } from '../components/FocusImageAttachments';
 import { IconRenderer } from '../components/IconRenderer';
 import { ReactionPicker, ReactionList } from '../components/ReactionComponents';
 import { RecommendedNoteTemplates } from '../components/RecommendedNoteTemplates';
@@ -59,14 +61,17 @@ interface FocusDetailViewProps {
     onComplete: (session: ActiveSession) => void;
     onCompleteLinkedTodo?: (todoId: string, occurrenceDateKey?: string) => boolean;
     onUpdate: (session: ActiveSession) => void;
+    onImagesChange?: React.Dispatch<React.SetStateAction<string[]>>;
     onUpdateActivity?: (activity: Activity) => void;
     logs?: Log[];
     autoFocusNote?: boolean;
     autoEnterImmersive?: boolean; // 新增：是否自动进入沉浸式模式
 }
 
-export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, onUpdateActivity, logs = [], autoFocusNote = true, autoEnterImmersive = false }) => {
+export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos, categories, todoCategories, scopes, autoLinkRules = [], autoApplyAutoLinkRules = true, autoApplyTodoLink = true, onClose, onCancel, onComplete, onCompleteLinkedTodo, onUpdate, onImagesChange, onUpdateActivity, logs = [], autoFocusNote = true, autoEnterImmersive = false }) => {
     const [elapsed, setElapsed] = useState(0);
+    const [isSavingImages, setIsSavingImages] = useState(false);
+    const savingImagesRef = useRef(false);
     const noteDraft = useBufferedRecord(session, onUpdate);
     const note = noteDraft.value.note || '';
     const setNote = (value: string | ((current: string) => string)) => {
@@ -404,6 +409,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     }, [reactions]);
 
     const handleComplete = () => {
+        if (savingImagesRef.current) return;
         noteDraft.discard();
         const linkedTodoIdToComplete = getCompletionModeTodoId(completeLinkedTodoOnSubmit, linkedTodo);
         const finalSession = {
@@ -427,6 +433,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
     };
 
     const handleCancel = () => {
+        if (savingImagesRef.current) return;
         noteDraft.discard();
         if (onCancel) {
             onCancel(session.id);
@@ -456,6 +463,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     {/* Immersive Mode Button */}
                     <button
                         onClick={() => setIsImmersiveMode(true)}
+                        disabled={isSavingImages}
                         className="p-2 rounded-full hover:bg-stone-100 transition-colors text-stone-400 hover:text-stone-600"
                         title="沉浸式计时"
                     >
@@ -464,7 +472,9 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     
                     <button
                         onClick={handleComplete}
-                        className="btn-template-filled w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+                        disabled={isSavingImages}
+                        aria-label="提交计时"
+                        className="btn-template-filled w-12 h-12 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform disabled:opacity-40"
                     >
                         <Check size={24} strokeWidth={3} />
                     </button>
@@ -773,6 +783,21 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                     />
                 </div>
 
+                <div className="w-full px-8 mb-8">
+                    <FocusImageAttachments
+                        sessionId={session.id}
+                        images={session.images || []}
+                        onChange={onImagesChange || ((update) => {
+                            const current = sessionRef.current;
+                            onUpdateRef.current({ ...current, images: typeof update === 'function' ? update(current.images || []) : update });
+                        })}
+                        onBusyChange={(busy) => {
+                            savingImagesRef.current = busy;
+                            setIsSavingImages(busy);
+                        }}
+                    />
+                </div>
+
                 {/* Reactions Section */}
                 <div className="w-full px-8 mb-8">
                     <div className="flex items-center justify-between mb-2 px-1">
@@ -798,6 +823,7 @@ export const FocusDetailView: React.FC<FocusDetailViewProps> = ({ session, todos
                 <div className="w-full px-8 mb-8">
                     <button
                         onClick={handleCancel}
+                        disabled={isSavingImages}
                         className="w-full py-2.5 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-full font-medium text-sm transition-colors active:scale-95"
                     >
                         取消计时

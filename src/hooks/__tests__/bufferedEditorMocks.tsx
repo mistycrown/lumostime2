@@ -1,5 +1,6 @@
 /**
  * @file bufferedEditorMocks.tsx
+ * @updated 2026-11-01: Isolates timer attachments from note/review lifecycle regressions.
  * @updated 2026-10-16: Adds review state adapters for real manager save/reopen regressions.
  * @input Isolated editor test renders
  * @output Platform and unrelated overlay adapters
@@ -18,7 +19,8 @@ export const useOptionalReview = () => undefined;
 export const useCategoryScope = () => ({ scopes: [] });
 export const narrativeService = { generateDailyNarrative: async () => 'Generated' };
 export const nativeState = { callback: undefined as undefined | ((state: { isActive: boolean }) => void), removals: 0 };
-export const Capacitor = { isNativePlatform: () => true };
+export const Capacitor = { isNativePlatform: () => true, getPlatform: () => 'android' };
+export const registerPlugin = () => new Proxy({}, { get: () => async () => ({ remove: () => {} }) });
 export const App = { addListener: async (_event: string, callback: typeof nativeState.callback) => {
   nativeState.callback = callback;
   return { remove: () => { nativeState.removals++; nativeState.callback = undefined; } };
@@ -32,6 +34,7 @@ export const ScopeAssociation = () => null;
 export const FocusScoreSelector = () => null;
 export const MoodScoreSelector = () => null;
 export const ImmersiveTimer = () => null;
+export const FocusImageAttachments = () => null;
 export const ReactionPicker = () => null;
 export const ReactionList = () => null;
 export const RecommendedNoteTemplates = () => null;

@@ -1,5 +1,6 @@
 /**
  * @file imageService.test.ts
+ * @updated 2026-11-01: Verifies draft saves stay out of sync manifests and survive cleanup.
  * @input Image formats, stored manifests, and persisted theme image references
  * @output Regression coverage for image formats and theme manifest rebuilding
  * @pos Test (Image Management)
@@ -10,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Filesystem } from '@capacitor/filesystem';
 
 import { imageService } from './imageService';
+import { savePersistedActiveSessions } from '../utils/sessionPersistence';
 
 vi.mock('@capacitor/filesystem', () => ({
   Filesystem: { readFile: vi.fn() },
@@ -17,6 +19,33 @@ vi.mock('@capacitor/filesystem', () => ({
 }));
 
 describe('imageService format preservation', () => {
+  it.each(['gallery', 'camera'])('keeps %s timer photos local until submission', async (source) => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value)
+    });
+    vi.spyOn(Filesystem, 'readFile').mockResolvedValue({ data: 'aW1hZ2U=' });
+    const write = vi.spyOn(imageService, 'writeImage').mockResolvedValue(undefined);
+    vi.spyOn(imageService, 'checkFileExists').mockResolvedValue(true);
+    vi.spyOn(imageService as any, 'generateThumbnail').mockResolvedValue(new Blob(['thumb']));
+    try {
+      const filename = source === 'gallery'
+        ? await imageService.saveImage(new Blob(['image'], { type: 'image/png' }), 'content', true)
+        : await imageService.saveNativeCameraImage('camera/photo.png', 'png', 'content', true);
+      expect(write.mock.calls.map(([name]) => name)).toEqual([filename, `thumb_${filename}`]);
+      expect(imageService.getReferencedImagesList()).toEqual([]);
+      savePersistedActiveSessions([{ id: 'timer', activityId: 'work', categoryId: 'category', activityName: 'Work', activityIcon: 'W', startTime: 100, images: [filename] }]);
+      vi.spyOn(imageService, 'listImages').mockResolvedValue([filename, `thumb_${filename}`]);
+      expect((await imageService.cleanupUnreferencedImages([])).cleaned).toBe(0);
+      expect(imageService.getReferencedImagesList()).toEqual([]);
+      imageService.addToReferencedList(filename);
+      expect(imageService.getReferencedImagesList()).toEqual([filename, `thumb_${filename}`]);
+    } finally {
+      vi.restoreAllMocks();
+      vi.unstubAllGlobals();
+    }
+  });
   it('preserves transparent-friendly formats for stored files and thumbnails', () => {
     expect(imageService.getStorageExtensionForTest('image/png')).toBe('png');
     expect(imageService.getThumbnailMimeTypeForTest('image/png')).toBe('image/png');

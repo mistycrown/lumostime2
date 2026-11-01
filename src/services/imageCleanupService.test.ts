@@ -1,5 +1,6 @@
 /**
  * @file imageCleanupService.test.ts
+ * @updated 2026-11-01: Protects timer draft originals and thumbnails during explicit cleanup.
  * @input Theme originals, obsolete thumbnails, content references, and cloud inventories
  * @output Regression coverage for settings image cleanup and report generation
  * @pos Test (Image Cleanup)
@@ -10,6 +11,8 @@ import { imageCleanupService } from './imageCleanupService';
 import { imageService } from './imageService';
 import { webdavService } from './webdavService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
+import { getActiveSessionImageFiles } from '../utils/sessionPersistence';
+vi.mock('../utils/sessionPersistence', () => ({ getActiveSessionImageFiles: vi.fn(() => new Set()) }));
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false } }));
 vi.mock('./imageService', () => ({ imageService: {
@@ -26,6 +29,7 @@ const todos = [{ coverImage: 'cover.jpg' }] as any;
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(getActiveSessionImageFiles).mockReturnValue(new Set());
   files = new Set(['theme.webp', 'thumb_theme.webp', 'theme-only.webp', 'photo.jpg', 'thumb_photo.jpg', 'cover.jpg', 'thumb_cover.jpg']);
   vi.mocked(getSettingsReferencedImages).mockReturnValue(new Set(['theme.webp', 'theme-only.webp']));
   vi.mocked(imageService.listImages).mockImplementation(async () => [...files]);
@@ -44,6 +48,17 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('settings image cleanup', () => {
+  it('preserves unsubmitted timer photos until the session is cancelled', async () => {
+    files.add('draft.jpg');
+    files.add('thumb_draft.jpg');
+    vi.mocked(getActiveSessionImageFiles).mockReturnValue(new Set(['draft.jpg', 'thumb_draft.jpg']));
+    const result = await imageCleanupService.cleanupUnreferencedImages(logs, { deleteRemote: false }, todos);
+    expect(result.unreferencedImages).toEqual(['thumb_theme.webp']);
+    expect(files.has('draft.jpg')).toBe(true);
+    expect(files.has('thumb_draft.jpg')).toBe(true);
+    vi.mocked(getActiveSessionImageFiles).mockReturnValue(new Set());
+    expect((await imageCleanupService.checkUnreferencedImages(logs, todos)).unreferencedImages).toEqual(['draft.jpg', 'thumb_draft.jpg']);
+  });
   it('finds obsolete theme thumbnails while preserving photo and cover thumbnails', async () => {
     const result = await imageCleanupService.checkUnreferencedImages(logs, todos);
     expect(result.unreferencedImages).toEqual(['thumb_theme.webp']);

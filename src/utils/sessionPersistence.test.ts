@@ -1,5 +1,6 @@
 /**
  * @file sessionPersistence.test.ts
+ * @updated 2026-11-01: Covers local attachment restoration and cleanup protection.
  * @input Session persistence helpers and a mocked localStorage implementation
  * @output Regression coverage for restoring running timers after process restarts
  * @pos Test
@@ -10,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { USER_DATA_KEYS } from '../constants/storageKeys';
 import {
   clearPersistedActiveSessions,
+  getActiveSessionImageFiles,
   loadPersistedActiveSessions,
   savePersistedActiveSessions
 } from './sessionPersistence';
@@ -103,6 +105,22 @@ describe('sessionPersistence', () => {
         startTime: 200
       }
     ]);
+  });
+
+  test('restores photos per session and protects originals and thumbnails until cleared', () => {
+    const session = { id: 'timer', activityId: 'work', categoryId: 'category', activityName: 'Work', activityIcon: 'W', startTime: 100 };
+    savePersistedActiveSessions([
+      { ...session, images: ['first.jpg', 'second.png'] },
+      { ...session, id: 'other', images: ['third.webp'] }
+    ]);
+    expect(loadPersistedActiveSessions().map((item) => item.images)).toEqual([
+      ['first.jpg', 'second.png'], ['third.webp']
+    ]);
+    expect([...getActiveSessionImageFiles()]).toEqual([
+      'first.jpg', 'thumb_first.jpg', 'second.png', 'thumb_second.png', 'third.webp', 'thumb_third.webp'
+    ]);
+    clearPersistedActiveSessions();
+    expect(getActiveSessionImageFiles().size).toBe(0);
   });
 
   test('deduplicates sessions on save and clears them cleanly', () => {

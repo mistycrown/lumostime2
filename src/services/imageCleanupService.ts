@@ -1,5 +1,6 @@
 /**
  * @file imageCleanupService.ts
+ * @updated 2026-11-01: Excludes running timer attachments from cleanup without publishing them.
  * @input Log records, Todo cover images, grouped theme settings references, local images
  * @output Cleanup operations
  * @pos Service (Image Management)
@@ -17,6 +18,7 @@ import { getSettingsReferencedImages } from './settingsImageReferenceService';
 import { webdavService } from './webdavService';
 import { collectCustomStickerReferencedImages } from './customStickerAssetService';
 import { ImageManifestGroups } from './imageManifest';
+import { getActiveSessionImageFiles } from '../utils/sessionPersistence';
 
 export interface CleanupResult {
     totalImages: number;
@@ -178,7 +180,9 @@ export class ImageCleanupService {
             const referencedGroups = this.getReferencedImageGroups(logs, todos, dailyReviews, customStickerSets, customStickers);
             const referencedImages = new Set([...referencedGroups.content, ...referencedGroups.theme]);
             const manifest = imageService.getReferencedImageManifest();
+            const activeImageFiles = getActiveSessionImageFiles();
             const isReferenced = (filename: string): boolean => {
+                if (activeImageFiles.has(filename)) return true;
                 if (manifest.theme.includes(filename)) {
                     return referencedGroups.theme.includes(filename);
                 }

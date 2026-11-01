@@ -1,5 +1,7 @@
 # Views Layer
 
+Update 2026-11-01: `FocusDetailView` supports gallery/camera attachments with shared preview and deletion. Timer photos persist locally per session, survive closing/reopening, and join logs on submission. Submission waits for pending saves, including stops from other entry points.
+
 Update 2026-10-30: Settings delegates restore confirmation to the WebDAV/COS/compatible-S3 views, using the existing in-app `ConfirmModal`. Cloud sync begins only after confirmation; the native system confirmation has been removed from these restore actions.
 
 Update 2026-10-29: Execution mode uses the same category-pill style as schedule ranges. Top-level sections follow the execution library categories; each category displays task groups for its individual labels. Category badges count distinct tasks, empty categories show their own empty state, and unlabeled tasks retain a separate entry.

@@ -1,5 +1,7 @@
 # Custom Hooks
 
+Update 2026-11-01: `useWidgetBridgeSync` waits for in-flight timer photos, merges persisted session attachments into native completion logs, and publishes photo references only after importing the completion.
+
 Update 2026-10-30: `useSyncManager` exposes live `syncProgress` across settings, quick sync, conflicts and automatic transfers. It connects stage/image callbacks, reports both safety-backup phases and cloud application, and clears feedback on every completed, conflicted or failed attempt.
 
 Update 2026-10-29: `useTodoQuickActions.handleQuickActionSaveTodo` refreshes the active shortcut task after execution-label edits, preventing later Pin and other quick actions from restoring stale labels.

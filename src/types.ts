@@ -1,5 +1,6 @@
 /**
  * @file types.ts
+ * @updated 2026-11-01: Stores local photo attachments on running timer sessions.
  * @updated 2026-10-29: Adds execution label folder identity independent of semantic groups.
  * @updated 2026-10-29: Adds optional structured execution tags for todo energy, scene, time, and custom context.
  * @updated 2026-10-25: Adds a standalone cross-day overview table card.
@@ -329,6 +330,7 @@ export interface ActiveSession {
   scopeIds?: string[]; // NEW: Link to multiple Scopes - changed from scopeId
   title?: string;
   note?: string;
+  images?: string[]; // Local attachments, published with the completed log
   attributeValues?: ActivityAttributeValue[];
   progressIncrement?: number; // New: Carry over to Log
   focusScore?: number; // 1-5

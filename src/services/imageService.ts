@@ -1,5 +1,6 @@
 /**
  * @file imageService.ts
+ * @updated 2026-11-01: Supports local-only timer saves and protects running attachments during cleanup.
  * @input Image Files (Blob/File), content references, and theme settings references
  * @output Persistence, grouped image manifests, and URL Generation
  * @pos Service (Local Storage)
@@ -16,6 +17,7 @@
  */
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Capacitor } from '@capacitor/core';
+import { getActiveSessionImageFiles } from '../utils/sessionPersistence';
 import { CustomStickerRecord, CustomStickerSetRecord, DailyReview, Log, TodoItem } from '../types';
 import { collectCustomStickerReferencedImages } from './customStickerAssetService';
 import { getSettingsReferencedImages } from './settingsImageReferenceService';
@@ -97,7 +99,7 @@ class ImageService {
     /**
      * Save an image file and return the unique filename
      */
-    async saveImage(file: Blob | File, group: ImageReferenceGroup = 'content'): Promise<string> {
+    async saveImage(file: Blob | File, group: ImageReferenceGroup = 'content', localOnly = false): Promise<string> {
         // console.log(`[ImageService] ========== saveImage 开始 ==========`);
         // console.log(`[ImageService] 文件类型: ${file.type}, 大小: ${file.size} bytes`);
 
@@ -139,10 +141,10 @@ class ImageService {
 
         // 3. 添加到引用列表
         // console.log(`[ImageService] 添加到引用列表: ${filename}`);
-        this.addToReferencedList(filename, group === 'content', group);
+        if (!localOnly) this.addToReferencedList(filename, group === 'content', group);
 
         // 4. 触发全局事件通知图片已上传，需要同步
-        if (typeof window !== 'undefined') {
+        if (!localOnly && typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('imageUploaded', {
                 detail: { filename }
             }));
@@ -157,7 +159,7 @@ class ImageService {
      * Save a camera image returned from a native file path.
      * Camera URIs on Android are more reliable when read through Filesystem first.
      */
-    async saveNativeCameraImage(filePath: string, format = 'jpeg', group: ImageReferenceGroup = 'content'): Promise<string> {
+    async saveNativeCameraImage(filePath: string, format = 'jpeg', group: ImageReferenceGroup = 'content', localOnly = false): Promise<string> {
         await this.ensureInit();
 
         const filename = `${Date.now()}_${Math.random().toString(36).substring(2, 11)}.${this.normalizeImageExtension(format)}`;
@@ -201,9 +203,9 @@ class ImageService {
             }
         }
 
-        this.addToReferencedList(filename, group === 'content', group);
+        if (!localOnly) this.addToReferencedList(filename, group === 'content', group);
 
-        if (typeof window !== 'undefined') {
+        if (!localOnly && typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('imageUploaded', {
                 detail: { filename }
             }));
@@ -1099,7 +1101,8 @@ class ImageService {
         // console.log(`[ImageService] 本地文件: ${localFiles.length} 个`);
 
         // 6. 找出本地存在但未被引用的文件
-        const filesToDelete = localFiles.filter(file => !referencedImages.has(file));
+        const activeImageFiles = getActiveSessionImageFiles();
+        const filesToDelete = localFiles.filter(file => !referencedImages.has(file) && !activeImageFiles.has(file));
         // console.log(`[ImageService] 需要删除的文件: ${filesToDelete.length} 个`, filesToDelete);
 
         // 7. 删除这些文件

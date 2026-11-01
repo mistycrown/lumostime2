@@ -1,6 +1,7 @@
 /**
  * @updated 2026-10-04: Key focus editors by session identity to commit and reset note drafts.
  * @file App.tsx
+ * @updated 2026-11-01: Appends asynchronous timer photos to the latest session even after closing the detail view.
  * @updated 2026-10-30: Keeps cloud transfer stage and image counts visible across views.
  * @updated 2026-10-18: Includes principle groups in manual backups.
  * @updated 2026-10-17: Reconciles local reminders on resume and opens todos from reminder notifications.
@@ -1279,6 +1280,11 @@ const AppContent: React.FC = () => {
                 }}
                 onUpdateActivity={handleUpdateActivity}
                 autoFocusNote={autoFocusNote}
+                onImagesChange={(update) => {
+                  setActiveSessions(prev => prev.map(current => current.id === session.id
+                    ? { ...current, images: typeof update === 'function' ? update(current.images || []) : update }
+                    : current));
+                }}
               />
             </React.Suspense>
           </LazyViewRecoveryBoundary>

@@ -1,5 +1,7 @@
 # Application contexts
 
+Update 2026-11-01: `SessionContext` persists timer updates synchronously, waits for in-flight photo saves before stopping, carries attachments into split logs, and publishes their image references only on completion.
+
 Update 2026-10-25: `ToastContext` queues errors with report references in persistent feedback dialogs, suppressing duplicate open receipts for the same event ID.
 
 Update 2026-10-18: `DataContext.setTodos` normalizes completion/abandonment exclusivity on hydration and updates before snapshots are persisted or passed to reminder reconciliation. Missing `abandonedAt` preserves compatibility with existing data.
