@@ -1,5 +1,6 @@
 /**
  * @file DetailTimelineCard.tsx
+ * @updated 2026-11-01: Uses white dates on keyword-colored cells while keeping uncolored and sticker dates gray.
  * @updated 2026-11-01: Softens keyword calendar segments and legend swatches with a shared 35% white overlay.
  * @updated 2026-10-11: Adds collapsible linked reviews with ten-card batches and resets pagination when the entity or period changes.
  * @updated 2026-10-11: Uses the Lucide Orbit icon for node identity in timeline metadata.
@@ -737,7 +738,7 @@ export const DetailTimelineCard: React.FC<DetailTimelineCardProps> = ({
                                                                 style={getKeywordColor(kw)}
                                                             />
                                                         ))}
-                                                        <span className="absolute inset-0 flex items-center justify-center text-sm font-medium" style={{ color: '#a8a29e' }}>
+                                                        <span className="absolute inset-0 flex items-center justify-center text-sm font-medium" style={{ color: '#ffffff' }}>
                                                             {day}
                                                         </span>
                                                     </div>

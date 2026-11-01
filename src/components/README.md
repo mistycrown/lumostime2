@@ -1,5 +1,7 @@
 # Components Directory
 
+Update 2026-11-01: `DetailTimelineCard` uses white date numbers on keyword-colored calendar cells, retaining gray dates for uncolored cells and sticker cells.
+
 Update 2026-11-01: `FocusImageAttachments` saves gallery/camera photos locally for running sessions, shares preview/deletion controls, retains failed-to-load references, and tracks saves across view remounts. Its renderer harness checks restoration, cleanup protection and completion before publication.
 
 Update 2026-11-01: `DetailTimelineCard` applies a shared 35% white overlay to keyword calendar color segments and legend swatches, keeping date text and sticker rendering unchanged.
